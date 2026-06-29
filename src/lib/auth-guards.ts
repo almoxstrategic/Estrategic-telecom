@@ -1,5 +1,11 @@
 import { redirect } from "@tanstack/react-router";
 import { getSupabaseClient } from "./supabase";
+import {
+  getCachedSession,
+  getCachedUser,
+  homePathForUser,
+  waitForAuth,
+} from "./auth-session";
 import type { AppUser, UserRole } from "./types";
 
 function isClient(): boolean {
@@ -34,18 +40,16 @@ export async function requireAuth(): Promise<AppUser> {
     return { id: "", email: "", nome: "", role: "tecnico" };
   }
 
-  const supabase = getSupabaseClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  await waitForAuth();
 
-  if (!session) {
+  const activeSession = getCachedSession();
+  if (!activeSession) {
     throw redirect({ to: "/login" });
   }
 
-  const profile = await fetchProfile(session.user.id);
+  const profile = getCachedUser();
   if (!profile) {
-    await supabase.auth.signOut();
+    await getSupabaseClient().auth.signOut();
     throw redirect({ to: "/login" });
   }
 
@@ -55,33 +59,56 @@ export async function requireAuth(): Promise<AppUser> {
 export async function requireGuest() {
   if (!isClient()) return;
 
-  const supabase = getSupabaseClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  await waitForAuth();
 
-  if (session) {
-    const profile = await fetchProfile(session.user.id);
-    throw redirect({ to: profile?.role === "admin" ? "/admin" : "/" });
+  const profile = getCachedUser();
+  if (profile) {
+    throw redirect({ to: homePathForUser(profile) });
   }
 }
 
 export async function requireAdmin(): Promise<AppUser> {
-  const user = await requireAuth();
-  if (user.role !== "admin") {
+  const authUser = await requireAuth();
+  if (authUser.role !== "admin") {
     throw redirect({ to: "/" });
   }
-  return user;
+  return authUser;
 }
 
 export async function requireTecnico(): Promise<AppUser> {
-  const user = await requireAuth();
-  if (user.role !== "tecnico") {
-    throw redirect({ to: "/admin" });
+  const authUser = await requireAuth();
+  if (authUser.role !== "admin") {
+    return authUser;
   }
-  return user;
+  throw redirect({ to: "/admin" });
 }
 
 export async function requireTecnicoOrAdmin(): Promise<AppUser> {
   return requireAuth();
+}
+
+/** Rota raiz: sem sessão → login; admin → painel admin. */
+export async function requireHomeEntry(): Promise<AppUser> {
+  if (!isClient()) {
+    return { id: "", email: "", nome: "", role: "tecnico" };
+  }
+
+  await waitForAuth();
+
+  const activeSession = getCachedSession();
+  if (!activeSession) {
+    throw redirect({ to: "/login" });
+  }
+
+  const profile = getCachedUser();
+  if (!profile) {
+    await getSupabaseClient().auth.signOut();
+    throw redirect({ to: "/login" });
+  }
+
+  if (profile.role === "admin") {
+    throw redirect({ to: "/admin" });
+  }
+
+  return profile;
 }

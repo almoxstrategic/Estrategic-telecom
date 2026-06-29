@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useApp } from "@/lib/app-store";
+import { homePathForUser } from "@/lib/auth-session";
 import { requireGuest } from "@/lib/auth-guards";
 import { PasswordInput } from "@/components/PasswordInput";
 import { toast } from "sonner";
@@ -29,7 +30,7 @@ function LoginPage() {
     setLoading(true);
     try {
       const profile = await login(loginId.trim(), senha);
-      navigate({ to: profile.role === "admin" ? "/admin" : "/" });
+      navigate({ to: homePathForUser(profile) });
     } catch (err) {
       toast.error((err as Error).message || "Credenciais inválidas.");
     } finally {

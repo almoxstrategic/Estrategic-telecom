@@ -8,8 +8,10 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { Toaster } from "sonner";
 import { AppProvider, useApp } from "../lib/app-store";
+import { initAuthSession } from "../lib/auth-session";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -127,13 +129,18 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
-        <p className="text-sm font-medium text-muted-foreground">Carregando sessão...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-surface">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
+        <p className="text-sm font-medium text-muted-foreground">Verificando sessão...</p>
       </div>
     );
   }
 
   return children;
+}
+
+if (typeof window !== "undefined") {
+  void initAuthSession();
 }
 
 function RootComponent() {

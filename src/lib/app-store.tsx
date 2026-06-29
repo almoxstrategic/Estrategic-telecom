@@ -8,9 +8,16 @@ import {
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { getSupabaseClient } from "./supabase";
-import { parseLoginIdentifier } from "./auth-identificacao";
 import { fetchProfile } from "./auth-guards";
+import {
+  getAuthSnapshot,
+  initAuthSession,
+  setCachedAuth,
+  subscribeAuth,
+  waitForAuth,
+} from "./auth-session";
+import { parseLoginIdentifier } from "./auth-identificacao";
+import { getSupabaseClient } from "./supabase";
 import type { AppUser } from "./types";
 
 type AuthState = {
@@ -25,41 +32,41 @@ type AuthState = {
 
 const AuthCtx = createContext<AuthState | null>(null);
 
+function syncFromCache(
+  setSession: (session: Session | null) => void,
+  setUser: (user: AppUser | null) => void,
+) {
+  const { session, user } = getAuthSnapshot();
+  setSession(session);
+  setUser(user);
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const hydrateSession = useCallback(async (nextSession: Session | null) => {
-    setSession(nextSession);
-    if (!nextSession) {
-      setUser(null);
-      return null;
-    }
-    const profile = await fetchProfile(nextSession.user.id);
-    setUser(profile);
-    return profile;
-  }, []);
-
   useEffect(() => {
-    const supabase = getSupabaseClient();
     let active = true;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+    void (async () => {
+      await initAuthSession();
+      await waitForAuth();
       if (!active) return;
-      void hydrateSession(nextSession);
-      if (event === "INITIAL_SESSION") {
-        setLoading(false);
-      }
+      syncFromCache(setSession, setUser);
+      setLoading(false);
+    })();
+
+    const unsubscribe = subscribeAuth(() => {
+      if (!active) return;
+      syncFromCache(setSession, setUser);
     });
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
-  }, [hydrateSession]);
+  }, []);
 
   const login = useCallback(async (identificacao: string, password: string) => {
     const supabase = getSupabaseClient();
@@ -69,14 +76,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       password,
     });
     if (error) throw error;
-    const profile = await hydrateSession(data.session);
+
+    const profile = await fetchProfile(data.session.user.id);
     if (!profile) throw new Error("Perfil não encontrado.");
+
+    setCachedAuth(data.session, profile);
+    setSession(data.session);
+    setUser(profile);
     return profile;
-  }, [hydrateSession]);
+  }, []);
 
   const logout = useCallback(async () => {
     const supabase = getSupabaseClient();
     await supabase.auth.signOut();
+    setCachedAuth(null, null);
     setUser(null);
     setSession(null);
   }, []);
@@ -86,8 +99,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const {
       data: { session: current },
     } = await supabase.auth.getSession();
-    return hydrateSession(current);
-  }, [hydrateSession]);
+
+    if (!current) {
+      setCachedAuth(null, null);
+      setSession(null);
+      setUser(null);
+      return null;
+    }
+
+    const profile = await fetchProfile(current.user.id);
+    setCachedAuth(current, profile);
+    setSession(current);
+    setUser(profile);
+    return profile;
+  }, []);
 
   const getAccessToken = useCallback(() => session?.access_token ?? null, [session]);
 

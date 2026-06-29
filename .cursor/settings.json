@@ -3,5 +3,6 @@
     "vercel": {
       "enabled": true
     }
-  }
+  },
+  "terminal.integrated.defaultProfile.windows": "Command Prompt"
 }

@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Ruler, Lock } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
-import { requireTecnico } from "@/lib/auth-guards";
+import { requireHomeEntry } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: () => requireTecnico(),
+  beforeLoad: () => requireHomeEntry(),
   head: () => ({
     meta: [
       { title: "Início — Estrategic Field" },
