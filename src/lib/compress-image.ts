@@ -1,5 +1,7 @@
-const MAX_EDGE = 720;
-const JPEG_QUALITY = 0.55;
+const MAX_EDGE = 640;
+const JPEG_QUALITY_START = 0.5;
+const TARGET_MAX_BYTES = 320 * 1024;
+const MIN_JPEG_QUALITY = 0.35;
 
 function scaleToMax(width: number, height: number, max: number) {
   if (width <= max && height <= max) return { width, height };
@@ -51,6 +53,24 @@ function releaseBitmapSource(source: ImageBitmap | HTMLImageElement) {
   }
 }
 
+async function canvasToJpegFile(
+  canvas: HTMLCanvasElement,
+  originalName: string,
+  quality: number,
+): Promise<File> {
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/jpeg", quality);
+  });
+
+  if (!blob) throw new Error("Falha ao comprimir imagem.");
+
+  const baseName = originalName.replace(/\.[^.]+$/, "") || "evidencia";
+  return new File([blob], `${baseName}.jpg`, {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
+
 async function sourceToJpegFile(
   source: ImageBitmap | HTMLImageElement,
   originalName: string,
@@ -69,20 +89,18 @@ async function sourceToJpegFile(
   ctx.drawImage(source, 0, 0, width, height);
   releaseBitmapSource(source);
 
-  const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY);
-  });
+  let quality = JPEG_QUALITY_START;
+  let file = await canvasToJpegFile(canvas, originalName, quality);
+
+  while (file.size > TARGET_MAX_BYTES && quality > MIN_JPEG_QUALITY) {
+    quality = Math.max(MIN_JPEG_QUALITY, quality - 0.08);
+    file = await canvasToJpegFile(canvas, originalName, quality);
+  }
 
   canvas.width = 0;
   canvas.height = 0;
 
-  if (!blob) throw new Error("Falha ao comprimir imagem.");
-
-  const baseName = originalName.replace(/\.[^.]+$/, "") || "evidencia";
-  return new File([blob], `${baseName}.jpg`, {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
+  return file;
 }
 
 export function waitForImageMemoryRelease(): Promise<void> {

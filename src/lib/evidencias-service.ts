@@ -128,6 +128,47 @@ export async function uploadEvidencePhoto(
   return { path, publicUrl: getStoragePublicUrl(path) };
 }
 
+export async function submitEvidenciaForm(input: {
+  accessToken: string;
+  tecnicoId: string;
+  contrato: string;
+  wo: string;
+  metragem_inicial: number;
+  metragem_final: number;
+  total_utilizado: number;
+  fotoInicio: File;
+  fotoFim: File;
+}): Promise<Evidencia> {
+  assertBrowserUpload();
+
+  const formData = new FormData();
+  formData.append("access_token", input.accessToken);
+  formData.append("tecnico_id", input.tecnicoId);
+  formData.append("contrato", input.contrato);
+  formData.append("wo", input.wo);
+  formData.append("metragem_inicial", String(input.metragem_inicial));
+  formData.append("metragem_final", String(input.metragem_final));
+  formData.append("total_utilizado", String(input.total_utilizado));
+  formData.append("foto_inicio", input.fotoInicio, input.fotoInicio.name);
+  formData.append("foto_fim", input.fotoFim, input.fotoFim.name);
+
+  const response = await fetch("/api/evidencias/submit", {
+    method: "POST",
+    body: formData,
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | (Evidencia & { error?: string })
+    | { error?: string }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(body?.error || "Erro ao enviar evidência.");
+  }
+
+  return body as Evidencia;
+}
+
 export async function insertEvidencia(payload: EvidenciaInsert): Promise<Evidencia> {
   assertBrowserUpload();
 

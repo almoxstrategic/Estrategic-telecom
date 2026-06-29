@@ -6,7 +6,7 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { useApp } from "@/lib/app-store";
 import { requireTecnico } from "@/lib/auth-guards";
 import {
-  insertEvidencia,
+  submitEvidenciaForm,
 } from "@/lib/evidencias-service";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/metragem")({
 });
 
 function MetragemPage() {
-  const { user } = useApp();
+  const { user, getAccessToken } = useApp();
   const initialDraft = useMemo(() => loadMetragemDraft(), []);
   const [contrato, setContrato] = useState(initialDraft?.contrato ?? "");
   const [wo, setWo] = useState(initialDraft?.wo ?? "");
@@ -116,17 +116,19 @@ function MetragemPage() {
 
     setSubmitting(true);
     try {
-      await insertEvidencia({
+      const accessToken = getAccessToken();
+      if (!accessToken) throw new Error("Sessão expirada. Faça login novamente.");
+
+      await submitEvidenciaForm({
+        accessToken,
+        tecnicoId: user.id,
         contrato: contrato.trim(),
         wo: wo.trim(),
         metragem_inicial: mi,
         metragem_final: mf,
         total_utilizado: total!,
-        foto_inicio_url: fotoInicio.publicUrl,
-        foto_fim_url: fotoFim.publicUrl,
-        foto_inicio_path: fotoInicio.path,
-        foto_fim_path: fotoFim.path,
-        tecnico_id: user.id,
+        fotoInicio: fotoInicio.file,
+        fotoFim: fotoFim.file,
       });
 
       toast.success(`Registrado metragem da WO ${wo.trim()} (${total} m)`, {
@@ -245,13 +247,12 @@ function MetragemPage() {
 
           <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-950">
-              <strong className="font-semibold">Dica:</strong> cada foto é comprimida e enviada
-              direto ao storage ao selecionar. Se &quot;Tirar Foto&quot; falhar no celular, use o app{" "}
+              <strong className="font-semibold">Dica:</strong> cada foto é comprimida no celular e
+              enviada junto com o formulário. Se &quot;Tirar Foto&quot; falhar, use o app{" "}
               <strong>Câmera</strong> e depois <strong>Fazer Upload</strong>.
             </p>
             <PhotoUpload
               label="📸 Foto do Início"
-              tecnicoId={user!.id}
               suffix="inicio"
               value={fotoInicio}
               onChange={setFotoInicio}
@@ -260,7 +261,6 @@ function MetragemPage() {
             {fotoInicio ? (
               <PhotoUpload
                 label="📸 Foto do Fim"
-                tecnicoId={user!.id}
                 suffix="fim"
                 value={fotoFim}
                 onChange={setFotoFim}

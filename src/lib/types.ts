@@ -26,10 +26,10 @@ export type Evidencia = {
   tecnico_login?: string;
 };
 
-/** Foto já comprimida e enviada direto ao Supabase Storage (browser). */
+/** Foto comprimida no navegador; enviada com o formulário via FormData. */
 export type EvidencePhotoRef = {
-  path: string;
-  publicUrl: string;
+  file: File;
+  previewUrl: string;
 };
 
 export type EvidenciaInsert = {

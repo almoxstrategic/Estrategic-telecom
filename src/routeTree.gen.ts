@@ -18,6 +18,7 @@ import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as AlterarRouteImport } from './routes/alterar'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiEvidenciasSubmitRouteImport } from './routes/api/evidencias.submit'
 
 const TodosRoute = TodosRouteImport.update({
   id: '/todos',
@@ -64,6 +65,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEvidenciasSubmitRoute = ApiEvidenciasSubmitRouteImport.update({
+  id: '/api/evidencias/submit',
+  path: '/api/evidencias/submit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/api/evidencias/submit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/api/evidencias/submit'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/api/evidencias/submit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   MetragemRoute: typeof MetragemRoute
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
+  ApiEvidenciasSubmitRoute: typeof ApiEvidenciasSubmitRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/evidencias/submit': {
+      id: '/api/evidencias/submit'
+      path: '/api/evidencias/submit'
+      fullPath: '/api/evidencias/submit'
+      preLoaderRoute: typeof ApiEvidenciasSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetragemRoute: MetragemRoute,
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
+  ApiEvidenciasSubmitRoute: ApiEvidenciasSubmitRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

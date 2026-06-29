@@ -1,20 +1,17 @@
 import { Camera, Upload, X, ImageIcon, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { compressEvidencePhoto, waitForImageMemoryRelease } from "@/lib/compress-image";
-import { removeEvidencePhotos, uploadEvidencePhoto } from "@/lib/evidencias-service";
 import type { EvidencePhotoRef } from "@/lib/types";
 
 export function PhotoUpload({
   label,
-  tecnicoId,
   suffix,
   value,
   onChange,
   onBeforePick,
 }: {
   label: string;
-  tecnicoId: string;
   suffix: "inicio" | "fim";
   value: EvidencePhotoRef | null;
   onChange: (photo: EvidencePhotoRef | null) => void;
@@ -23,7 +20,12 @@ export function PhotoUpload({
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<"compressing" | "uploading">("compressing");
+
+  useEffect(() => {
+    return () => {
+      if (value?.previewUrl) URL.revokeObjectURL(value.previewUrl);
+    };
+  }, [value?.previewUrl]);
 
   const openPicker = (target: "camera" | "gallery") => {
     onBeforePick?.();
@@ -34,14 +36,8 @@ export function PhotoUpload({
     galleryRef.current?.click();
   };
 
-  const clearPhoto = async () => {
-    if (value?.path) {
-      try {
-        await removeEvidencePhotos([value.path]);
-      } catch {
-        // ignora falha ao limpar orphan no storage
-      }
-    }
+  const clearPhoto = () => {
+    if (value?.previewUrl) URL.revokeObjectURL(value.previewUrl);
     onChange(null);
   };
 
@@ -49,24 +45,20 @@ export function PhotoUpload({
     if (!file) return;
 
     setBusy(true);
-    setStatus("compressing");
     try {
-      if (value?.path) {
+      if (value?.previewUrl) {
+        URL.revokeObjectURL(value.previewUrl);
         onChange(null);
         await waitForImageMemoryRelease();
-        try {
-          await removeEvidencePhotos([value.path]);
-        } catch {
-          // segue com novo upload
-        }
       }
 
       const compressed = await compressEvidencePhoto(file);
       await waitForImageMemoryRelease();
 
-      setStatus("uploading");
-      const uploaded = await uploadEvidencePhoto(tecnicoId, compressed, suffix);
-      onChange(uploaded);
+      onChange({
+        file: compressed,
+        previewUrl: URL.createObjectURL(compressed),
+      });
     } catch (err) {
       toast.error(`Erro ao processar foto: ${(err as Error).message || "tente novamente"}`);
     } finally {
@@ -82,12 +74,12 @@ export function PhotoUpload({
       {busy ? (
         <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-muted text-sm text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
-          {status === "compressing" ? "Otimizando imagem..." : "Enviando ao storage..."}
+          Otimizando imagem...
         </div>
       ) : value ? (
         <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
           <img
-            src={value.publicUrl}
+            src={value.previewUrl}
             alt={label}
             decoding="async"
             loading="lazy"
@@ -95,7 +87,7 @@ export function PhotoUpload({
           />
           <button
             type="button"
-            onClick={() => void clearPhoto()}
+            onClick={clearPhoto}
             className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-background/90 text-destructive shadow"
             aria-label="Remover foto"
           >
@@ -159,6 +151,9 @@ export function PhotoUpload({
         className="hidden"
         onChange={(e) => void handleFile(e.target.files?.[0])}
       />
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        {suffix === "inicio" ? "Início" : "Fim"}: imagem comprimida (~320KB) e enviada junto ao formulário.
+      </p>
     </div>
   );
 }
