@@ -10,6 +10,7 @@ import type {
   KpisFiltro,
   PendenciaEvidencia,
   PeriodoConsumo,
+  TopConsumidorMaterial,
   UpsertResult,
   WoCabecalhoRow,
   WoConsumoRow,
@@ -41,6 +42,7 @@ function dedupeWoConsumoRows(rows: WoConsumoRow[]): { rows: WoConsumoRow[]; merg
         material: existing.material,
         descr_material: row.descr_material || existing.descr_material,
         qtd_baixada: existing.qtd_baixada + row.qtd_baixada,
+        data_atendimento: row.data_atendimento ?? existing.data_atendimento,
       });
     } else {
       map.set(key, {
@@ -77,6 +79,43 @@ async function upsertInBatches<T extends Record<string, unknown>>(
   }
 }
 
+async function insertInBatches<T extends Record<string, unknown>>(
+  table: "wos_cabecalho",
+  payload: T[],
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  for (let i = 0; i < payload.length; i += UPSERT_BATCH_SIZE) {
+    const chunk = payload.slice(i, i + UPSERT_BATCH_SIZE);
+    const { error } = await supabase.from(table).insert(chunk);
+    if (error) throw error;
+  }
+}
+
+export async function replaceWoCabecalho(rows: WoCabecalhoRow[]): Promise<{ inserted: number }> {
+  const supabase = getSupabaseClient();
+
+  const { error: deleteError } = await supabase
+    .from("wos_cabecalho")
+    .delete()
+    .neq("work_order_id", "");
+
+  if (deleteError) throw deleteError;
+  if (rows.length === 0) return { inserted: 0 };
+
+  const deduped = dedupeWoCabecalhoRows(rows);
+  const payload = deduped.map((r) => ({
+    work_order_id: r.work_order_id,
+    id_tecnico: r.id_tecnico,
+    status: r.status,
+    sla: r.sla,
+    updated_at: new Date().toISOString(),
+  }));
+
+  await insertInBatches("wos_cabecalho", payload);
+  return { inserted: deduped.length };
+}
+
+/** @deprecated Use replaceWoCabecalho para full load do cabeçalho. */
 export async function upsertWoCabecalho(rows: WoCabecalhoRow[]): Promise<UpsertResult> {
   if (rows.length === 0) return { inserted: 0, updated: 0 };
 
@@ -127,6 +166,7 @@ export async function upsertWoConsumo(
     material: normalizeMaterialCode(r.material),
     descr_material: r.descr_material.trim(),
     qtd_baixada: parseQtdBaixada(r.qtd_baixada),
+    data_atendimento: r.data_atendimento,
     updated_at: new Date().toISOString(),
   }));
 
@@ -154,6 +194,7 @@ function normalizeKpis(raw: KpisConsumo): KpisConsumo {
     })),
     top_tecnicos: (raw.top_tecnicos ?? []).map((t) => ({
       id_tecnico: t.id_tecnico,
+      nome_tecnico: t.nome_tecnico ?? "",
       total: parseQtdBaixada(t.total),
     })),
   };
@@ -209,6 +250,26 @@ export async function fetchConsumoItensCriticos(
   return (data ?? []).map((row: ConsumoItemCritico) => ({
     material: row.material,
     descr_material: row.descr_material,
+    total: parseQtdBaixada(row.total),
+  }));
+}
+
+export async function fetchTopConsumidoresMaterial(
+  material: string,
+  filtro?: KpisFiltro,
+): Promise<TopConsumidorMaterial[]> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_top_consumidores_material", {
+    p_material: material,
+    p_mes,
+    p_ano,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row: TopConsumidorMaterial) => ({
+    id_tecnico: row.id_tecnico,
+    nome_tecnico: row.nome_tecnico ?? "",
     total: parseQtdBaixada(row.total),
   }));
 }
@@ -285,6 +346,7 @@ export async function fetchPendenciasEvidencias(): Promise<PendenciaEvidencia[]>
     work_order_id: row.work_order_id,
     id_tecnico: row.id_tecnico,
     nome_tecnico: row.nome_tecnico,
+    login_tecnico: row.login_tecnico ?? "",
     sla: Number(row.sla),
     celular: row.celular ?? "",
     tem_evidencia: Boolean(row.tem_evidencia),

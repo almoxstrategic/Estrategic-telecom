@@ -37,6 +37,23 @@ function parseNumber(value: string): number {
   return parseLocaleNumber(value);
 }
 
+/** Data de atendimento (WO) — DD/MM/AAAA do Consolidado Revisado. */
+function parseDataAtendimento(value: string): string | null {
+  const raw = trimCell(value);
+  if (!raw) return null;
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slash) {
+    const [, d, m, y] = slash;
+    return `${y}-${m!.padStart(2, "0")}-${d!.padStart(2, "0")}`;
+  }
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  return null;
+}
+
 function splitCsvLine(line: string, delimiter: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -174,6 +191,13 @@ function mapConsolidadoConsumoRow(row: RawRow): WoConsumoRow | null {
   const material = pick(row, "Material");
   const descr = pick(row, "Descr. Material", "Descr.Material");
   const qtdRaw = pick(row, "Qtd Baixada");
+  const dataAtendimentoRaw = pick(
+    row,
+    "Data de atendimento(WO)",
+    "Data de atendimento (WO)",
+    "Data de atendimento",
+    "Data Atendimento",
+  );
 
   if (!workOrderId || !idTecnico || !material) return null;
 
@@ -186,6 +210,7 @@ function mapConsolidadoConsumoRow(row: RawRow): WoConsumoRow | null {
     material: materialCode,
     descr_material: (descr || material).trim(),
     qtd_baixada: parseConsolidadoQtdBaixada(qtdRaw),
+    data_atendimento: parseDataAtendimento(dataAtendimentoRaw),
   };
 }
 

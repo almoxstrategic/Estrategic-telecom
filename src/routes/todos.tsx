@@ -24,6 +24,7 @@ export const Route = createFileRoute("/todos")({
   beforeLoad: () => requireAdmin(),
   validateSearch: (search: Record<string, unknown>) => ({
     login: typeof search.login === "string" ? search.login : undefined,
+    wo: typeof search.wo === "string" ? search.wo : undefined,
   }),
   head: () => ({
     meta: [
@@ -39,10 +40,10 @@ function fmtDate(d: Date) {
 }
 
 function TodosPage() {
-  const { login: loginFilter } = Route.useSearch();
+  const { login: loginFilter, wo: woFilter } = Route.useSearch();
   const [records, setRecords] = useState<Evidencia[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState(loginFilter ?? "");
+  const [query, setQuery] = useState(woFilter ?? loginFilter ?? "");
   const [range, setRange] = useState<DateRange | undefined>();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -66,8 +67,9 @@ function TodosPage() {
   }, []);
 
   useEffect(() => {
-    if (loginFilter) setQuery(loginFilter);
-  }, [loginFilter]);
+    if (woFilter) setQuery(woFilter);
+    else if (loginFilter) setQuery(loginFilter);
+  }, [woFilter, loginFilter]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -11,6 +11,7 @@ export type WoConsumoRow = {
   material: string;
   descr_material: string;
   qtd_baixada: number;
+  data_atendimento: string | null;
 };
 
 export type KpisFiltro = {
@@ -50,6 +51,13 @@ export type KpiTopMaterial = {
 
 export type KpiTopTecnico = {
   id_tecnico: string;
+  nome_tecnico: string;
+  total: number;
+};
+
+export type TopConsumidorMaterial = {
+  id_tecnico: string;
+  nome_tecnico: string;
   total: number;
 };
 
@@ -64,6 +72,7 @@ export type PendenciaEvidencia = {
   work_order_id: string;
   id_tecnico: string;
   nome_tecnico: string;
+  login_tecnico: string;
   sla: number;
   celular: string;
   tem_evidencia: boolean;

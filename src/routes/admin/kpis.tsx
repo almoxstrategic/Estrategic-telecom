@@ -45,6 +45,7 @@ import {
   fetchConsumoTecnicoDetalhe,
   fetchKpisConsumo,
   fetchPeriodosConsumo,
+  fetchTopConsumidoresMaterial,
 } from "@/lib/logistica-service";
 import type {
   ConsumoItemCritico,
@@ -53,9 +54,11 @@ import type {
   KpisConsumo,
   KpisFiltro,
   PeriodoConsumo,
+  TopConsumidorMaterial,
 } from "@/lib/logistica-types";
+import { normalizeMaterialCode } from "@/lib/material-code";
 import { formatQuantidade } from "@/lib/parse-locale-number";
-import { formatMaterialLabel, normalizeMaterialCode } from "@/lib/material-code";
+import { formatTecnicoLabel } from "@/lib/tecnico-label";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/admin/kpis")({
@@ -95,6 +98,26 @@ const ITENS_CRITICOS_PADRAO = [
   "22026223",
 ];
 
+const ITENS_CRITICOS_STORAGE_KEY = "estrategic:kpis-itens-criticos";
+
+function loadItensCriticosFromStorage(): string[] {
+  try {
+    const raw = localStorage.getItem(ITENS_CRITICOS_STORAGE_KEY);
+    if (!raw) return ITENS_CRITICOS_PADRAO;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed.every((item) => typeof item === "string")
+    ) {
+      return parsed;
+    }
+    return ITENS_CRITICOS_PADRAO;
+  } catch {
+    return ITENS_CRITICOS_PADRAO;
+  }
+}
+
 function descricaoPeriodo(filtro: KpisFiltro): string {
   if (filtro.mes === null || filtro.ano === null) {
     return "Histórico completo";
@@ -111,14 +134,25 @@ function KpisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [itensCriticos, setItensCriticos] = useState<string[]>(ITENS_CRITICOS_PADRAO);
+  const [itensCriticos, setItensCriticos] = useState<string[]>(loadItensCriticosFromStorage);
   const [itensCriticosLabels, setItensCriticosLabels] = useState<Record<string, string>>({});
   const [criticosData, setCriticosData] = useState<ConsumoItemCritico[]>([]);
   const [loadingCriticos, setLoadingCriticos] = useState(false);
 
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(null);
+  const [tecnicoSelecionadoLabel, setTecnicoSelecionadoLabel] = useState("");
   const [detalhesTecnico, setDetalhesTecnico] = useState<ConsumoTecnicoItem[]>([]);
   const [loadingDetalhes, setLoadingDetalhes] = useState(false);
+
+  const [materialSelecionado, setMaterialSelecionado] = useState<string | null>(null);
+  const [topConsumidoresMaterial, setTopConsumidoresMaterial] = useState<TopConsumidorMaterial[]>(
+    [],
+  );
+  const [loadingTopConsumidores, setLoadingTopConsumidores] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(ITENS_CRITICOS_STORAGE_KEY, JSON.stringify(itensCriticos));
+  }, [itensCriticos]);
 
   useEffect(() => {
     void (async () => {
@@ -203,6 +237,25 @@ function KpisPage() {
     })();
   }, [tecnicoSelecionado, filtro]);
 
+  useEffect(() => {
+    if (!materialSelecionado) {
+      setTopConsumidoresMaterial([]);
+      return;
+    }
+    void (async () => {
+      setLoadingTopConsumidores(true);
+      try {
+        setTopConsumidoresMaterial(
+          await fetchTopConsumidoresMaterial(materialSelecionado, filtro),
+        );
+      } catch {
+        setTopConsumidoresMaterial([]);
+      } finally {
+        setLoadingTopConsumidores(false);
+      }
+    })();
+  }, [materialSelecionado, filtro]);
+
   const materiaisChart = useMemo(
     () =>
       (kpis?.top_materiais ?? []).map((m) => ({
@@ -216,6 +269,8 @@ function KpisPage() {
     () =>
       (kpis?.top_tecnicos ?? []).slice(0, 5).map((t) => ({
         label: t.id_tecnico,
+        nome_tecnico: t.nome_tecnico,
+        display: formatTecnicoLabel(t.nome_tecnico, t.id_tecnico),
         total: t.total,
         id_tecnico: t.id_tecnico,
       })),
@@ -245,8 +300,13 @@ function KpisPage() {
     setItensCriticos((prev) => prev.filter((c) => c !== codigo));
   };
 
-  const abrirDetalheTecnico = (idTecnico: string) => {
+  const abrirDetalheTecnico = (idTecnico: string, nomeTecnico?: string) => {
     setTecnicoSelecionado(idTecnico);
+    setTecnicoSelecionadoLabel(formatTecnicoLabel(nomeTecnico, idTecnico));
+  };
+
+  const abrirTopConsumidoresMaterial = (material: string) => {
+    setMaterialSelecionado(material);
   };
 
   const filtrosLimpos = filtro.mes === null || filtro.ano === null;
@@ -259,7 +319,7 @@ function KpisPage() {
           <div>
             <h1 className="text-2xl font-black tracking-tight">KPIs de Consumo</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Consolidado de materiais baixados por WO — {descricaoPeriodo(filtro)}.
+              Consolidado por data de atendimento da WO — {descricaoPeriodo(filtro)}.
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -439,15 +499,38 @@ function KpisPage() {
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                       <YAxis tickFormatter={(v) => formatQuantidade(v)} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartTooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.[0]) return null;
+                          const item = payload[0].payload as {
+                            display?: string;
+                            total: number;
+                          };
+                          return (
+                            <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
+                              <p className="font-semibold">{item.display}</p>
+                              <p className="text-muted-foreground">
+                                {formatQuantidade(item.total)} itens
+                              </p>
+                            </div>
+                          );
+                        }}
+                      />
                       <Bar
                         dataKey="total"
                         fill="var(--color-total)"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
                         onClick={(data) => {
-                          const payload = data as { id_tecnico?: string; label?: string };
-                          abrirDetalheTecnico(payload.id_tecnico ?? payload.label ?? "");
+                          const payload = data as {
+                            id_tecnico?: string;
+                            label?: string;
+                            nome_tecnico?: string;
+                          };
+                          abrirDetalheTecnico(
+                            payload.id_tecnico ?? payload.label ?? "",
+                            payload.nome_tecnico,
+                          );
                         }}
                       />
                     </BarChart>
@@ -458,10 +541,12 @@ function KpisPage() {
                     <li key={t.id_tecnico}>
                       <button
                         type="button"
-                        onClick={() => abrirDetalheTecnico(t.id_tecnico)}
+                        onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
                         className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
                       >
-                        <span className="font-medium text-primary">{t.id_tecnico}</span>
+                        <span className="font-medium text-primary">
+                          {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
+                        </span>
                         <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
                       </button>
                     </li>
@@ -509,11 +594,9 @@ function KpisPage() {
                     <Badge
                       key={codigo}
                       variant="secondary"
-                      className="gap-1 pr-1 text-xs"
+                      className="gap-1 pr-1 font-mono text-xs"
                     >
-                      {itensCriticosLabels[codigo]
-                        ? formatMaterialLabel(codigo, itensCriticosLabels[codigo])
-                        : normalizeMaterialCode(codigo)}
+                      {normalizeMaterialCode(codigo)}
                       <button
                         type="button"
                         aria-label={`Remover ${codigo}`}
@@ -574,7 +657,11 @@ function KpisPage() {
                     </TableHeader>
                     <TableBody>
                       {criticosData.map((item) => (
-                        <TableRow key={item.material}>
+                        <TableRow
+                          key={item.material}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => abrirTopConsumidoresMaterial(item.material)}
+                        >
                           <TableCell className="font-mono text-xs">{item.material}</TableCell>
                           <TableCell className="max-w-[180px] truncate text-sm">
                             {item.descr_material}
@@ -596,14 +683,15 @@ function KpisPage() {
       <Dialog
         open={tecnicoSelecionado !== null}
         onOpenChange={(open) => {
-          if (!open) setTecnicoSelecionado(null);
+          if (!open) {
+            setTecnicoSelecionado(null);
+            setTecnicoSelecionadoLabel("");
+          }
         }}
       >
         <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Detalhes de Consumo: {tecnicoSelecionado ?? "—"}
-            </DialogTitle>
+            <DialogTitle>Detalhes de Consumo: {tecnicoSelecionadoLabel || "—"}</DialogTitle>
           </DialogHeader>
           {loadingDetalhes ? (
             <p className="text-sm text-muted-foreground">Carregando detalhes...</p>
@@ -630,6 +718,52 @@ function KpisPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatQuantidade(item.qtd_baixada)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={materialSelecionado !== null}
+        onOpenChange={(open) => {
+          if (!open) setMaterialSelecionado(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Top Consumidores: {materialSelecionado ?? "—"}</DialogTitle>
+          </DialogHeader>
+          {loadingTopConsumidores ? (
+            <p className="text-sm text-muted-foreground">Carregando consumidores...</p>
+          ) : topConsumidoresMaterial.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum consumo registrado para este material no período.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Técnico</TableHead>
+                  <TableHead className="text-right">Quantidade</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topConsumidoresMaterial.map((item) => (
+                  <TableRow key={item.id_tecnico}>
+                    <TableCell>
+                      <div className="font-medium">
+                        {formatTecnicoLabel(item.nome_tecnico, item.id_tecnico)}
+                      </div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {item.id_tecnico}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatQuantidade(item.total)}
                     </TableCell>
                   </TableRow>
                 ))}

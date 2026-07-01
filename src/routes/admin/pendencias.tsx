@@ -88,11 +88,33 @@ function PendenciasPage() {
               <TableBody>
                 {rows.map((row) => {
                   const wa = celularToWhatsAppUrl(row.celular);
+                  const loginBusca = row.login_tecnico || row.id_tecnico;
+
                   return (
                     <TableRow key={row.work_order_id}>
-                      <TableCell className="font-mono font-semibold">{row.work_order_id}</TableCell>
+                      <TableCell className="font-mono font-semibold">
+                        {row.tem_evidencia ? (
+                          <Link
+                            to="/todos"
+                            search={{ wo: row.work_order_id }}
+                            className="text-primary hover:underline"
+                          >
+                            {row.work_order_id}
+                          </Link>
+                        ) : (
+                          row.work_order_id
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono">{row.id_tecnico}</TableCell>
-                      <TableCell>{row.nome_tecnico}</TableCell>
+                      <TableCell>
+                        <Link
+                          to="/todos"
+                          search={{ login: loginBusca }}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          {row.nome_tecnico}
+                        </Link>
+                      </TableCell>
                       <TableCell className="font-bold text-destructive">
                         {row.sla} dias
                       </TableCell>

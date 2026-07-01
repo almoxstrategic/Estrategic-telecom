@@ -4,7 +4,7 @@ import { FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { FileDropzone } from "@/components/FileDropzone";
-import { upsertDimMateriais, upsertWoCabecalho, upsertWoConsumo } from "@/lib/logistica-service";
+import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
 import {
   parseDimMateriaisFile,
   parseWoCabecalhoFile,
@@ -65,9 +65,9 @@ function ImportacaoPage() {
         toast.error("Nenhuma linha válida encontrada no arquivo de cabeçalho.");
         return;
       }
-      const result = await upsertWoCabecalho(rows);
+      const result = await replaceWoCabecalho(rows);
       toast.success(
-        `Cabeçalho importado: ${result.inserted} inseridas, ${result.updated} atualizadas (${rows.length} linhas).`,
+        `Cabeçalho importado (full load): ${result.inserted} WOs carregadas. Registros antigos foram substituídos.`,
       );
     } catch (err) {
       toast.error(formatImportError("cabecalho", err));
