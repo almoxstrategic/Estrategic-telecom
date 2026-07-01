@@ -66,6 +66,8 @@ export type PendenciaEvidencia = {
   nome_tecnico: string;
   sla: number;
   celular: string;
+  tem_evidencia: boolean;
+  evidencia_data_registro: string | null;
 };
 
 export type UpsertResult = {

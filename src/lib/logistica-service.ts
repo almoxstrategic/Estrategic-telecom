@@ -287,5 +287,7 @@ export async function fetchPendenciasEvidencias(): Promise<PendenciaEvidencia[]>
     nome_tecnico: row.nome_tecnico,
     sla: Number(row.sla),
     celular: row.celular ?? "",
+    tem_evidencia: Boolean(row.tem_evidencia),
+    evidencia_data_registro: row.evidencia_data_registro ?? null,
   }));
 }

@@ -19,7 +19,7 @@ export const Route = createFileRoute("/admin/pendencias")({
   head: () => ({
     meta: [
       { title: "Pendências — Estrategic Field" },
-      { name: "description", content: "WOs atrasadas sem evidência enviada." },
+      { name: "description", content: "WOs atrasadas para auditoria de evidência." },
     ],
   }),
   component: PendenciasPage,
@@ -53,7 +53,8 @@ function PendenciasPage() {
               Pendências de Evidência
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              WOs com SLA negativo (status 3) sem foto enviada no app.
+              WOs com SLA negativo (status 3) para auditar se o gargalo é do técnico ou da
+              operadora.
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -69,8 +70,7 @@ function PendenciasPage() {
           </p>
         ) : rows.length === 0 ? (
           <p className="rounded-2xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
-            Nenhuma pendência encontrada. Importe o arquivo de cabeçalho ou todas as evidências já
-            foram enviadas.
+            Nenhuma WO em risco no momento. Importe o arquivo de cabeçalho para atualizar a lista.
           </p>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -82,7 +82,7 @@ function PendenciasPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead>SLA</TableHead>
                   <TableHead>Contato</TableHead>
-                  <TableHead>Evidência</TableHead>
+                  <TableHead>Status da Evidência</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -112,7 +112,13 @@ function PendenciasPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="destructive">Pendente</Badge>
+                        {row.tem_evidencia ? (
+                          <Badge className="border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/90">
+                            Evidenciado
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">Pendente</Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
