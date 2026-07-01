@@ -60,7 +60,14 @@ const matriculaField = z
   .string()
   .transform((v) => normalizeMatricula(v))
   .refine((v) => matriculaSchema.test(v), {
-    message: "Matrícula deve conter apenas números (3 a 20 dígitos).",
+    message: "Matrícula deve ser alfanumérica (2 a 20 caracteres, ex: Z628337).",
+  });
+
+const celularField = z
+  .string()
+  .transform((v) => v.replace(/\D/g, ""))
+  .refine((v) => v.length === 10 || v.length === 11, {
+    message: "Celular inválido. Use DDD + número (10 ou 11 dígitos).",
   });
 
 const loginField = z
@@ -74,6 +81,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
   .validator(
     withToken.extend({
       identificacao: matriculaField,
+      celular: celularField,
       login: loginField,
       password: z.string().min(6),
       nome: z.string().min(2),
@@ -126,6 +134,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
       role: data.role,
       identificacao: matricula,
       login,
+      celular: data.celular,
     });
 
     if (profileError) throw new Error(profileError.message);

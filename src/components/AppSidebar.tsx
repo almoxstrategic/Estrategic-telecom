@@ -1,5 +1,15 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ClipboardList, LogOut, Home, ShieldCheck, Database, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  ClipboardList,
+  FileUp,
+  LogOut,
+  Home,
+  ShieldCheck,
+  Database,
+  Users,
+} from "lucide-react";
 import { Logo } from "./Logo";
 import { useApp } from "@/lib/app-store";
 
@@ -64,6 +74,33 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             >
               <Users className="h-5 w-5 text-primary" />
               Gestão de Equipe
+            </Link>
+            <Link
+              to="/admin/kpis"
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <BarChart3 className="h-5 w-5 text-primary" />
+              KPIs de Consumo
+            </Link>
+            <Link
+              to="/admin/pendencias"
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Pendências
+            </Link>
+            <Link
+              to="/admin/importacao"
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <FileUp className="h-5 w-5 text-primary" />
+              Importação
             </Link>
           </>
         ) : (

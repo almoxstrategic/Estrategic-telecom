@@ -18,6 +18,10 @@ import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as AlterarRouteImport } from './routes/alterar'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminPendenciasRouteImport } from './routes/admin/pendencias'
+import { Route as AdminKpisRouteImport } from './routes/admin/kpis'
+import { Route as AdminImportacaoRouteImport } from './routes/admin/importacao'
 import { Route as ApiEvidenciasSubmitRouteImport } from './routes/api/evidencias.submit'
 
 const TodosRoute = TodosRouteImport.update({
@@ -65,6 +69,26 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPendenciasRoute = AdminPendenciasRouteImport.update({
+  id: '/pendencias',
+  path: '/pendencias',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminKpisRoute = AdminKpisRouteImport.update({
+  id: '/kpis',
+  path: '/kpis',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminImportacaoRoute = AdminImportacaoRouteImport.update({
+  id: '/importacao',
+  path: '/importacao',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiEvidenciasSubmitRoute = ApiEvidenciasSubmitRouteImport.update({
   id: '/api/evidencias/submit',
   path: '/api/evidencias/submit',
@@ -73,7 +97,7 @@ const ApiEvidenciasSubmitRoute = ApiEvidenciasSubmitRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/alterar': typeof AlterarRoute
   '/cadastro': typeof CadastroRoute
   '/historico': typeof HistoricoRoute
@@ -81,11 +105,14 @@ export interface FileRoutesByFullPath {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/admin/importacao': typeof AdminImportacaoRoute
+  '/admin/kpis': typeof AdminKpisRoute
+  '/admin/pendencias': typeof AdminPendenciasRoute
+  '/admin/': typeof AdminIndexRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/alterar': typeof AlterarRoute
   '/cadastro': typeof CadastroRoute
   '/historico': typeof HistoricoRoute
@@ -93,12 +120,16 @@ export interface FileRoutesByTo {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/admin/importacao': typeof AdminImportacaoRoute
+  '/admin/kpis': typeof AdminKpisRoute
+  '/admin/pendencias': typeof AdminPendenciasRoute
+  '/admin': typeof AdminIndexRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/alterar': typeof AlterarRoute
   '/cadastro': typeof CadastroRoute
   '/historico': typeof HistoricoRoute
@@ -106,6 +137,10 @@ export interface FileRoutesById {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/admin/importacao': typeof AdminImportacaoRoute
+  '/admin/kpis': typeof AdminKpisRoute
+  '/admin/pendencias': typeof AdminPendenciasRoute
+  '/admin/': typeof AdminIndexRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRouteTypes {
@@ -120,11 +155,14 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/admin/importacao'
+    | '/admin/kpis'
+    | '/admin/pendencias'
+    | '/admin/'
     | '/api/evidencias/submit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/alterar'
     | '/cadastro'
     | '/historico'
@@ -132,6 +170,10 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/admin/importacao'
+    | '/admin/kpis'
+    | '/admin/pendencias'
+    | '/admin'
     | '/api/evidencias/submit'
   id:
     | '__root__'
@@ -144,12 +186,16 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/admin/importacao'
+    | '/admin/kpis'
+    | '/admin/pendencias'
+    | '/admin/'
     | '/api/evidencias/submit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AlterarRoute: typeof AlterarRoute
   CadastroRoute: typeof CadastroRoute
   HistoricoRoute: typeof HistoricoRoute
@@ -225,6 +271,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pendencias': {
+      id: '/admin/pendencias'
+      path: '/pendencias'
+      fullPath: '/admin/pendencias'
+      preLoaderRoute: typeof AdminPendenciasRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/kpis': {
+      id: '/admin/kpis'
+      path: '/kpis'
+      fullPath: '/admin/kpis'
+      preLoaderRoute: typeof AdminKpisRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/importacao': {
+      id: '/admin/importacao'
+      path: '/importacao'
+      fullPath: '/admin/importacao'
+      preLoaderRoute: typeof AdminImportacaoRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/evidencias/submit': {
       id: '/api/evidencias/submit'
       path: '/api/evidencias/submit'
@@ -235,9 +309,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminImportacaoRoute: typeof AdminImportacaoRoute
+  AdminKpisRoute: typeof AdminKpisRoute
+  AdminPendenciasRoute: typeof AdminPendenciasRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminImportacaoRoute: AdminImportacaoRoute,
+  AdminKpisRoute: AdminKpisRoute,
+  AdminPendenciasRoute: AdminPendenciasRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AlterarRoute: AlterarRoute,
   CadastroRoute: CadastroRoute,
   HistoricoRoute: HistoricoRoute,

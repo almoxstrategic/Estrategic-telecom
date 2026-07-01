@@ -1,0 +1,184 @@
+import type { WoCabecalhoRow, WoConsumoRow } from "./logistica-types";
+import { normalizeMatricula } from "./auth-identificacao";
+
+type RawRow = Record<string, string>;
+
+/** Remove espaços normais, NBSP e outros whitespace nas bordas. */
+function trimCell(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeHeader(key: string): string {
+  return trimCell(key)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function pick(row: RawRow, ...aliases: string[]): string {
+  const map = new Map<string, string>();
+  for (const [k, v] of Object.entries(row)) {
+    map.set(normalizeHeader(k), trimCell(v));
+  }
+  for (const alias of aliases) {
+    const hit = map.get(normalizeHeader(alias));
+    if (hit !== undefined && hit !== "") return hit;
+  }
+  return "";
+}
+
+function parseNumber(value: string): number {
+  const normalized = value.replace(/\./g, "").replace(",", ".").trim();
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === delimiter && !inQuotes) {
+      out.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function detectDelimiter(headerLine: string): string {
+  const commas = (headerLine.match(/,/g) ?? []).length;
+  const semis = (headerLine.match(/;/g) ?? []).length;
+  return semis > commas ? ";" : ",";
+}
+
+function rowsFromMatrix(matrix: string[][]): RawRow[] {
+  if (matrix.length < 2) return [];
+  const headers = matrix[0].map((h) => trimCell(h));
+  return matrix.slice(1).map((cells) => {
+    const row: RawRow = {};
+    headers.forEach((h, i) => {
+      if (!h) return;
+      row[h] = trimCell(cells[i]);
+    });
+    return row;
+  });
+}
+
+async function parseXlsx(file: File): Promise<RawRow[]> {
+  const XLSX = await import("xlsx");
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return [];
+  const sheet = workbook.Sheets[sheetName];
+  const matrix = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  }) as string[][];
+  return rowsFromMatrix(matrix);
+}
+
+async function parseCsv(file: File): Promise<RawRow[]> {
+  const text = await file.text();
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+
+  const delimiter = detectDelimiter(lines[0]);
+  const headers = splitCsvLine(lines[0], delimiter).map((h) => trimCell(h));
+  return lines.slice(1).map((line) => {
+    const cells = splitCsvLine(line, delimiter);
+    const row: RawRow = {};
+    headers.forEach((h, i) => {
+      if (!h) return;
+      row[h] = trimCell(cells[i]);
+    });
+    return row;
+  });
+}
+
+export async function parseSpreadsheet(file: File): Promise<RawRow[]> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    return parseXlsx(file);
+  }
+  return parseCsv(file);
+}
+
+export async function parseWoCabecalhoFile(file: File): Promise<WoCabecalhoRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const rows: WoCabecalhoRow[] = [];
+
+  for (const row of raw) {
+    const workOrderId = pick(row, "workOrderID", "work_order_id", "wo", "work order id");
+    const idTecnico = normalizeMatricula(
+      pick(row, "idTecnico", "id_tecnico", "matricula", "id tecnico"),
+    );
+    const statusRaw = pick(row, "status");
+    const slaRaw = pick(row, "sla");
+
+    if (!workOrderId || !idTecnico) continue;
+
+    rows.push({
+      work_order_id: workOrderId,
+      id_tecnico: idTecnico,
+      status: Math.trunc(parseNumber(statusRaw)),
+      sla: parseNumber(slaRaw),
+    });
+  }
+
+  return rows;
+}
+
+/**
+ * Consolidado Revisado (legado):
+ * WO → workOrderID | Técnico → idTecnico | Material | Descr. Material | Qtd Baixada
+ */
+function mapConsolidadoConsumoRow(row: RawRow): WoConsumoRow | null {
+  const workOrderId = pick(row, "WO", "workOrderID", "work_order_id");
+  const idTecnico = normalizeMatricula(pick(row, "Técnico", "Tecnico", "idTecnico", "id_tecnico"));
+  const material = pick(row, "Material");
+  const descr = pick(row, "Descr. Material", "Descr.Material");
+  const qtdRaw = pick(row, "Qtd Baixada");
+
+  if (!workOrderId || !idTecnico || !material) return null;
+
+  return {
+    work_order_id: workOrderId.trim(),
+    id_tecnico: idTecnico,
+    material: material.trim(),
+    descr_material: (descr || material).trim(),
+    qtd_baixada: parseNumber(qtdRaw),
+  };
+}
+
+export async function parseWoConsumoFile(file: File): Promise<WoConsumoRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const rows: WoConsumoRow[] = [];
+
+  for (const row of raw) {
+    const mapped = mapConsolidadoConsumoRow(row);
+    if (mapped) rows.push(mapped);
+  }
+
+  return rows;
+}

@@ -1,0 +1,137 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { FileUp } from "lucide-react";
+import { toast } from "sonner";
+import { AppHeader } from "@/components/AppHeader";
+import { FileDropzone } from "@/components/FileDropzone";
+import { upsertWoCabecalho, upsertWoConsumo } from "@/lib/logistica-service";
+import { parseWoCabecalhoFile, parseWoConsumoFile } from "@/lib/spreadsheet-import";
+
+function formatImportError(scope: string, err: unknown): string {
+  console.error(`[importacao/${scope}]`, err);
+
+  if (err && typeof err === "object") {
+    const supabaseErr = err as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      code?: string;
+    };
+    const parts = [
+      supabaseErr.message,
+      supabaseErr.details,
+      supabaseErr.hint,
+      supabaseErr.code ? `código ${supabaseErr.code}` : undefined,
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join(" — ");
+  }
+
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+export const Route = createFileRoute("/admin/importacao")({
+  head: () => ({
+    meta: [
+      { title: "Importação — Estrategic Field" },
+      { name: "description", content: "Importar dados do sistema legado." },
+    ],
+  }),
+  component: ImportacaoPage,
+});
+
+function ImportacaoPage() {
+  const [busyCabecalho, setBusyCabecalho] = useState(false);
+  const [busyConsumo, setBusyConsumo] = useState(false);
+
+  const handleCabecalho = async (file: File) => {
+    setBusyCabecalho(true);
+    try {
+      const rows = await parseWoCabecalhoFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada no arquivo de cabeçalho.");
+        return;
+      }
+      const result = await upsertWoCabecalho(rows);
+      toast.success(
+        `Cabeçalho importado: ${result.inserted} inseridas, ${result.updated} atualizadas (${rows.length} linhas).`,
+      );
+    } catch (err) {
+      toast.error(formatImportError("cabecalho", err));
+    } finally {
+      setBusyCabecalho(false);
+    }
+  };
+
+  const handleConsumo = async (file: File) => {
+    setBusyConsumo(true);
+    try {
+      const rows = await parseWoConsumoFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada no consolidado de consumo.");
+        return;
+      }
+      const result = await upsertWoConsumo(rows);
+      const mergedNote =
+        result.mergedDuplicates > 0
+          ? ` (${result.mergedDuplicates} duplicatas na planilha foram somadas)`
+          : "";
+      toast.success(
+        `Consumo importado: ${result.inserted} inseridas, ${result.updated} atualizadas (${rows.length} linhas lidas)${mergedNote}.`,
+      );
+    } catch (err) {
+      const detail = formatImportError("consumo", err);
+      toast.error(`Falha ao importar consumo: ${detail}`);
+    } finally {
+      setBusyConsumo(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-surface">
+      <AppHeader />
+      <main className="mx-auto max-w-3xl px-5 pb-10 pt-6">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
+              <FileUp className="h-6 w-6 text-primary" />
+              Importação de Dados
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Leitura no navegador (CSV/XLSX) antes de enviar ao Supabase.
+            </p>
+          </div>
+          <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
+            ← Voltar ao painel
+          </Link>
+        </div>
+
+        <div className="space-y-8">
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              Upload A — Cabeçalho da WO
+            </h2>
+            <FileDropzone
+              title="Arquivo de Cabeçalho (Auditoria)"
+              description="Colunas: workOrderID, idTecnico, status, sla. Alimenta a tela de Pendências."
+              busy={busyCabecalho}
+              onFile={handleCabecalho}
+            />
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              Upload B — Consolidado de Consumo
+            </h2>
+            <FileDropzone
+              title="Consolidado Revisado (Consumo)"
+              description="Colunas legado: WO, Técnico, Material, Descr. Material, Qtd Baixada. Alimenta os KPIs."
+              busy={busyConsumo}
+              onFile={handleConsumo}
+            />
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+}

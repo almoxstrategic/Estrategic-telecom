@@ -6,7 +6,13 @@ import { requireAdmin } from "@/lib/auth-guards";
 import { useApp } from "@/lib/app-store";
 import { createUserAccount } from "@/lib/admin-actions.server";
 import { PasswordInput } from "@/components/PasswordInput";
-import { isValidLogin, isValidMatricula } from "@/lib/auth-identificacao";
+import {
+  formatCelularMask,
+  isValidCelular,
+  isValidLogin,
+  isValidMatricula,
+  normalizeMatricula,
+} from "@/lib/auth-identificacao";
 
 export const Route = createFileRoute("/cadastro")({
   beforeLoad: () => requireAdmin(),
@@ -24,6 +30,7 @@ function CadastroPage() {
   const navigate = useNavigate();
   const [nome, setNome] = useState("");
   const [identificacao, setIdentificacao] = useState("");
+  const [celular, setCelular] = useState("");
   const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
@@ -37,7 +44,12 @@ function CadastroPage() {
     }
 
     if (!isValidMatricula(identificacao)) {
-      toast.error("Matrícula inválida. Use apenas números (3 a 20 dígitos).");
+      toast.error("Matrícula inválida. Use 2–20 caracteres alfanuméricos (ex: Z628337).");
+      return;
+    }
+
+    if (!isValidCelular(celular)) {
+      toast.error("Celular inválido. Use o formato (XX) X XXXX-XXXX.");
       return;
     }
 
@@ -57,7 +69,8 @@ function CadastroPage() {
       await createUserAccount({
         data: {
           accessToken,
-          identificacao: identificacao.trim(),
+          identificacao: normalizeMatricula(identificacao),
+          celular: celular.replace(/\D/g, ""),
           login: login.trim(),
           password: senha,
           nome: nome.trim(),
@@ -105,17 +118,28 @@ function CadastroPage() {
             <label className="mb-1.5 block text-sm font-semibold">Identificação (Matrícula)</label>
             <input
               type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
+              autoCapitalize="characters"
               value={identificacao}
-              onChange={(e) => setIdentificacao(e.target.value.replace(/\D/g, ""))}
-              placeholder="Ex: 458921"
-              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              onChange={(e) => setIdentificacao(normalizeMatricula(e.target.value))}
+              placeholder="Ex: Z628337"
+              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base uppercase outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Número de matrícula do técnico — apenas para controle interno.
+              Código alfanumérico do técnico no sistema legado.
             </p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold">Celular</label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={celular}
+              onChange={(e) => setCelular(formatCelularMask(e.target.value))}
+              placeholder="(11) 9 8765-4321"
+              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              required
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Login</label>
