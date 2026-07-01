@@ -1,7 +1,15 @@
 import { getSupabaseClient } from "./supabase";
+import { parseLocaleNumber, parseQtdBaixada } from "./parse-locale-number";
+import { normalizeMaterialCode } from "./material-code";
 import type {
+  ConsumoItemCritico,
+  ConsumoTecnicoItem,
+  DimMaterial,
+  DimMaterialRow,
   KpisConsumo,
+  KpisFiltro,
   PendenciaEvidencia,
+  PeriodoConsumo,
   UpsertResult,
   WoCabecalhoRow,
   WoConsumoRow,
@@ -14,7 +22,7 @@ function countUpsert(rows: { length: number }, existingCount: number): UpsertRes
 }
 
 function consumoKey(workOrderId: string, material: string): string {
-  return `${workOrderId.trim()}::${material.trim()}`;
+  return `${workOrderId.trim()}::${normalizeMaterialCode(material)}`;
 }
 
 /** Mescla linhas duplicadas (WO + Material) no mesmo lote — evita erro 21000 no upsert. */
@@ -35,7 +43,11 @@ function dedupeWoConsumoRows(rows: WoConsumoRow[]): { rows: WoConsumoRow[]; merg
         qtd_baixada: existing.qtd_baixada + row.qtd_baixada,
       });
     } else {
-      map.set(key, { ...row });
+      map.set(key, {
+        ...row,
+        material: normalizeMaterialCode(row.material),
+        qtd_baixada: parseQtdBaixada(row.qtd_baixada),
+      });
     }
   }
 
@@ -53,7 +65,7 @@ function dedupeWoCabecalhoRows(rows: WoCabecalhoRow[]): WoCabecalhoRow[] {
 const UPSERT_BATCH_SIZE = 500;
 
 async function upsertInBatches<T extends Record<string, unknown>>(
-  table: "wos_cabecalho" | "wos_consumo",
+  table: "wos_cabecalho" | "wos_consumo" | "dim_materiais",
   payload: T[],
   onConflict: string,
 ): Promise<void> {
@@ -112,9 +124,9 @@ export async function upsertWoConsumo(
   const payload = deduped.map((r) => ({
     work_order_id: r.work_order_id.trim(),
     id_tecnico: r.id_tecnico,
-    material: r.material.trim(),
-    descr_material: r.descr_material,
-    qtd_baixada: r.qtd_baixada,
+    material: normalizeMaterialCode(r.material),
+    descr_material: r.descr_material.trim(),
+    qtd_baixada: parseQtdBaixada(r.qtd_baixada),
     updated_at: new Date().toISOString(),
   }));
 
@@ -122,25 +134,146 @@ export async function upsertWoConsumo(
   return { inserted: deduped.length - updated, updated, mergedDuplicates: merged };
 }
 
-export async function fetchKpisConsumo(): Promise<KpisConsumo> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase.rpc("get_kpis_consumo");
-  if (error) throw error;
+function toRpcFiltro(filtro?: KpisFiltro): { p_mes: number | null; p_ano: number | null } {
+  const mes = filtro?.mes ?? null;
+  const ano = filtro?.ano ?? null;
+  if (mes === null || ano === null) {
+    return { p_mes: null, p_ano: null };
+  }
+  return { p_mes: mes, p_ano: ano };
+}
 
-  const raw = (data ?? {}) as KpisConsumo;
+function normalizeKpis(raw: KpisConsumo): KpisConsumo {
   return {
-    total_itens: Number(raw.total_itens ?? 0),
-    total_wos: Number(raw.total_wos ?? 0),
+    total_itens: parseQtdBaixada(raw.total_itens),
+    total_wos: parseQtdBaixada(raw.total_wos),
     top_materiais: (raw.top_materiais ?? []).map((m) => ({
       descricao: m.descricao,
       sku: m.sku,
-      total: Number(m.total),
+      total: parseQtdBaixada(m.total),
     })),
     top_tecnicos: (raw.top_tecnicos ?? []).map((t) => ({
       id_tecnico: t.id_tecnico,
-      total: Number(t.total),
+      total: parseQtdBaixada(t.total),
     })),
   };
+}
+
+export async function fetchKpisConsumo(filtro?: KpisFiltro): Promise<KpisConsumo> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_kpis_consumo", {
+    p_mes,
+    p_ano,
+  });
+  if (error) throw error;
+
+  return normalizeKpis((data ?? {}) as KpisConsumo);
+}
+
+export async function fetchConsumoTecnicoDetalhe(
+  idTecnico: string,
+  filtro?: KpisFiltro,
+): Promise<ConsumoTecnicoItem[]> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_consumo_tecnico_detalhe", {
+    p_id_tecnico: idTecnico,
+    p_mes,
+    p_ano,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row: ConsumoTecnicoItem) => ({
+    material: row.material,
+    descr_material: row.descr_material,
+    qtd_baixada: parseQtdBaixada(row.qtd_baixada),
+  }));
+}
+
+export async function fetchConsumoItensCriticos(
+  materiais: string[],
+  filtro?: KpisFiltro,
+): Promise<ConsumoItemCritico[]> {
+  if (materiais.length === 0) return [];
+
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_consumo_itens_criticos", {
+    p_materiais: materiais,
+    p_mes,
+    p_ano,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row: ConsumoItemCritico) => ({
+    material: row.material,
+    descr_material: row.descr_material,
+    total: parseQtdBaixada(row.total),
+  }));
+}
+
+export async function fetchPeriodosConsumo(): Promise<PeriodoConsumo[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("get_periodos_consumo");
+  if (error) throw error;
+
+  return (data ?? []).map((row: PeriodoConsumo) => ({
+    mes: Number(row.mes),
+    ano: Number(row.ano),
+  }));
+}
+
+export async function searchDimMateriais(
+  query: string,
+  limit = 40,
+): Promise<DimMaterial[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("search_dim_materiais", {
+    p_query: query.trim(),
+    p_limit: limit,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row: DimMaterial) => ({
+    material: normalizeMaterialCode(row.material),
+    descr_material: row.descr_material.trim(),
+  }));
+}
+
+function dedupeDimMateriaisRows(rows: DimMaterialRow[]): DimMaterialRow[] {
+  const map = new Map<string, DimMaterialRow>();
+  for (const row of rows) {
+    const material = normalizeMaterialCode(row.material);
+    if (!material) continue;
+    map.set(material, {
+      material,
+      descr_material: row.descr_material.trim(),
+    });
+  }
+  return [...map.values()];
+}
+
+export async function upsertDimMateriais(rows: DimMaterialRow[]): Promise<UpsertResult> {
+  if (rows.length === 0) return { inserted: 0, updated: 0 };
+
+  const deduped = dedupeDimMateriaisRows(rows);
+  const supabase = getSupabaseClient();
+  const ids = deduped.map((r) => r.material);
+
+  const { count: existingCount } = await supabase
+    .from("dim_materiais")
+    .select("material", { count: "exact", head: true })
+    .in("material", ids);
+
+  const payload = deduped.map((r) => ({
+    material: r.material,
+    descr_material: r.descr_material,
+    updated_at: new Date().toISOString(),
+  }));
+
+  await upsertInBatches("dim_materiais", payload, "material");
+  return countUpsert(deduped, existingCount ?? 0);
 }
 
 export async function fetchPendenciasEvidencias(): Promise<PendenciaEvidencia[]> {

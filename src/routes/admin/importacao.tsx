@@ -1,11 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { FileDropzone } from "@/components/FileDropzone";
-import { upsertWoCabecalho, upsertWoConsumo } from "@/lib/logistica-service";
-import { parseWoCabecalhoFile, parseWoConsumoFile } from "@/lib/spreadsheet-import";
+import { upsertDimMateriais, upsertWoCabecalho, upsertWoConsumo } from "@/lib/logistica-service";
+import {
+  parseDimMateriaisFile,
+  parseWoCabecalhoFile,
+  parseWoConsumoFile,
+} from "@/lib/spreadsheet-import";
 
 function formatImportError(scope: string, err: unknown): string {
   console.error(`[importacao/${scope}]`, err);
@@ -43,6 +47,15 @@ export const Route = createFileRoute("/admin/importacao")({
 function ImportacaoPage() {
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
+  const [busyEstoque, setBusyEstoque] = useState(false);
+
+  useEffect(() => {
+    console.info(
+      "[importacao] Para reimportar consumo com dados corrigidos, execute no SQL Editor do Supabase:\n\n" +
+        "TRUNCATE TABLE public.wos_consumo;\n\n" +
+        "Script completo: supabase/scripts/limpar_wos_consumo.sql",
+    );
+  }, []);
 
   const handleCabecalho = async (file: File) => {
     setBusyCabecalho(true);
@@ -87,6 +100,25 @@ function ImportacaoPage() {
     }
   };
 
+  const handleEstoque = async (file: File) => {
+    setBusyEstoque(true);
+    try {
+      const rows = await parseDimMateriaisFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada na consulta de estoque.");
+        return;
+      }
+      const result = await upsertDimMateriais(rows);
+      toast.success(
+        `Estoque importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
+      );
+    } catch (err) {
+      toast.error(formatImportError("estoque", err));
+    } finally {
+      setBusyEstoque(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -128,6 +160,18 @@ function ImportacaoPage() {
               description="Colunas legado: WO, Técnico, Material, Descr. Material, Qtd Baixada. Alimenta os KPIs."
               busy={busyConsumo}
               onFile={handleConsumo}
+            />
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              Upload C — Consulta de Estoque
+            </h2>
+            <FileDropzone
+              title="Catálogo Mestre de Materiais"
+              description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
+              busy={busyEstoque}
+              onFile={handleEstoque}
             />
           </section>
         </div>

@@ -1,5 +1,7 @@
-import type { WoCabecalhoRow, WoConsumoRow } from "./logistica-types";
+import type { DimMaterialRow, WoCabecalhoRow, WoConsumoRow } from "./logistica-types";
 import { normalizeMatricula } from "./auth-identificacao";
+import { normalizeMaterialCode } from "./material-code";
+import { parseLocaleNumber } from "./parse-locale-number";
 
 type RawRow = Record<string, string>;
 
@@ -32,9 +34,7 @@ function pick(row: RawRow, ...aliases: string[]): string {
 }
 
 function parseNumber(value: string): number {
-  const normalized = value.replace(/\./g, "").replace(",", ".").trim();
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : 0;
+  return parseLocaleNumber(value);
 }
 
 function splitCsvLine(line: string, delimiter: string): string[] {
@@ -150,6 +150,21 @@ export async function parseWoCabecalhoFile(file: File): Promise<WoCabecalhoRow[]
 }
 
 /**
+ * Qtd Baixada do Consolidado Revisado (ex: "5,000" → 5 unidades inteiras).
+ * Usado exclusivamente neste upload — não reutilizar nos demais.
+ */
+function parseConsolidadoQtdBaixada(value: unknown): number {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+
+  const comPonto = raw.replace(",", ".");
+  const n = parseFloat(comPonto);
+  if (Number.isNaN(n)) return 0;
+
+  return Math.trunc(n);
+}
+
+/**
  * Consolidado Revisado (legado):
  * WO → workOrderID | Técnico → idTecnico | Material | Descr. Material | Qtd Baixada
  */
@@ -162,12 +177,15 @@ function mapConsolidadoConsumoRow(row: RawRow): WoConsumoRow | null {
 
   if (!workOrderId || !idTecnico || !material) return null;
 
+  const materialCode = normalizeMaterialCode(material);
+  if (!materialCode) return null;
+
   return {
     work_order_id: workOrderId.trim(),
     id_tecnico: idTecnico,
-    material: material.trim(),
+    material: materialCode,
     descr_material: (descr || material).trim(),
-    qtd_baixada: parseNumber(qtdRaw),
+    qtd_baixada: parseConsolidadoQtdBaixada(qtdRaw),
   };
 }
 
@@ -181,4 +199,32 @@ export async function parseWoConsumoFile(file: File): Promise<WoConsumoRow[]> {
   }
 
   return rows;
+}
+
+/** Consulta de Estoque: Material + Descr. Material */
+function mapEstoqueRow(row: RawRow): DimMaterialRow | null {
+  const material = pick(row, "Material");
+  const descr = pick(row, "Descr. Material", "Descr.Material", "Descr Material");
+
+  if (!material) return null;
+
+  const materialCode = normalizeMaterialCode(material);
+  if (!materialCode) return null;
+
+  return {
+    material: materialCode,
+    descr_material: (descr || material).trim(),
+  };
+}
+
+export async function parseDimMateriaisFile(file: File): Promise<DimMaterialRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const map = new Map<string, DimMaterialRow>();
+
+  for (const row of raw) {
+    const mapped = mapEstoqueRow(row);
+    if (mapped) map.set(mapped.material, mapped);
+  }
+
+  return [...map.values()];
 }

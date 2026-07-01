@@ -13,6 +13,35 @@ export type WoConsumoRow = {
   qtd_baixada: number;
 };
 
+export type KpisFiltro = {
+  mes: number | null;
+  ano: number | null;
+};
+
+export type ConsumoTecnicoItem = {
+  material: string;
+  descr_material: string;
+  qtd_baixada: number;
+};
+
+export type ConsumoItemCritico = {
+  material: string;
+  descr_material: string;
+  total: number;
+};
+
+export type DimMaterialRow = {
+  material: string;
+  descr_material: string;
+};
+
+export type DimMaterial = DimMaterialRow;
+
+export type PeriodoConsumo = {
+  mes: number;
+  ano: number;
+};
+
 export type KpiTopMaterial = {
   descricao: string;
   sku: string;
