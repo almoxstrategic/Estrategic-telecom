@@ -24,6 +24,7 @@ export type Evidencia = {
   tecnico_id: string;
   tecnico_nome?: string;
   tecnico_login?: string;
+  tecnico_identificacao?: string;
 };
 
 /** Foto comprimida no navegador; enviada com o formulário via FormData. */

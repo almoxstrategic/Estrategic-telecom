@@ -4,6 +4,7 @@ import {
   BarChart3,
   Database,
   FileUp,
+  Send,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -111,6 +112,20 @@ function AdminHome() {
                 <div className="font-bold text-foreground">Importação</div>
                 <div className="text-xs text-muted-foreground">
                   Cabeçalho WO e consolidado de consumo
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/admin/enviar-evidencia" className="block">
+            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Send className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-bold text-foreground">Envio pelo Técnico</div>
+                <div className="text-xs text-muted-foreground">
+                  Registrar evidência em nome de um técnico
                 </div>
               </div>
             </div>

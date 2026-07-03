@@ -8,14 +8,22 @@ import {
   FileText,
   X,
   Trash2,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { CopyRegistroButton } from "@/components/CopyRegistroButton";
 import { requireAdmin } from "@/lib/auth-guards";
-import { deleteEvidenciasWithPhotos, fetchAllEvidencias } from "@/lib/evidencias-service";
+import {
+  deleteEvidenciasWithPhotos,
+  fetchAllEvidencias,
+  updateEvidenciaWoContrato,
+} from "@/lib/evidencias-service";
 import type { Evidencia } from "@/lib/types";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
@@ -48,6 +56,10 @@ function TodosPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editWo, setEditWo] = useState("");
+  const [editContrato, setEditContrato] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadRecords = async () => {
     setLoading(true);
@@ -112,6 +124,43 @@ function TodosPage() {
       else next.delete(id);
       return next;
     });
+  };
+
+  const iniciarEdicao = (record: Evidencia) => {
+    setEditingId(record.id);
+    setEditWo(record.wo);
+    setEditContrato(record.contrato);
+  };
+
+  const salvarEdicao = async (id: string) => {
+    const wo = editWo.trim();
+    const contrato = editContrato.trim();
+    if (!wo || !contrato) {
+      toast.error("WO e contrato são obrigatórios.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const atualizado = await updateEvidenciaWoContrato(id, { wo, contrato });
+      setRecords((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                wo: atualizado.wo,
+                contrato: atualizado.contrato,
+              }
+            : r,
+        ),
+      );
+      setEditingId(null);
+      toast.success("Registro atualizado com sucesso.");
+    } catch (err) {
+      toast.error((err as Error).message || "Erro ao salvar alterações.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -249,41 +298,113 @@ function TodosPage() {
                       onCheckedChange={(v) => toggleOne(r.id, v === true)}
                       className="mt-1"
                     />
-                    <button
-                      onClick={() => setExpanded(open ? null : r.id)}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left active:bg-muted/50"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                            WO {r.wo}
-                          </span>
-                          <span className="text-xs font-semibold text-foreground">
-                            {r.tecnico_nome ?? "Técnico"}
-                          </span>
-                          <span className="ml-auto rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-                            {r.total_utilizado} m
-                          </span>
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                      {editingId === r.id ? (
+                        <div
+                          className="min-w-0 flex-1 space-y-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+                                WO
+                              </label>
+                              <Input
+                                type="text"
+                                value={editWo}
+                                onChange={(e) => setEditWo(e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+                                Contrato
+                              </label>
+                              <Input
+                                type="text"
+                                value={editContrato}
+                                onChange={(e) => setEditContrato(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void salvarEdicao(r.id)}
+                            disabled={savingEdit}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            {savingEdit ? "Salvando..." : "Salvar"}
+                          </button>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
-                          <span>Contrato {r.contrato}</span>
-                          <span>Inicial {r.metragem_inicial} m</span>
-                          <span>Final {r.metragem_final} m</span>
-                          <span>
-                            {dt.toLocaleDateString("pt-BR")} ·{" "}
-                            {dt.toLocaleTimeString("pt-BR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setExpanded(open ? null : r.id)}
+                          className="min-w-0 flex-1 text-left active:bg-muted/50"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                                WO {r.wo}
+                              </span>
+                              <span className="text-xs font-semibold text-foreground">
+                                {r.tecnico_nome ?? "Técnico"}
+                              </span>
+                              <span className="ml-auto rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                                {r.total_utilizado} m
+                              </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                              <span>Contrato {r.contrato}</span>
+                              <span>Inicial {r.metragem_inicial} m</span>
+                              <span>Final {r.metragem_final} m</span>
+                              <span>
+                                {dt.toLocaleDateString("pt-BR")} ·{" "}
+                                {dt.toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      )}
+                      <div className="flex shrink-0 items-center gap-1">
+                        {editingId !== r.id && (
+                          <>
+                            <CopyRegistroButton
+                              contrato={r.contrato}
+                              wo={r.wo}
+                              nomeTecnico={r.tecnico_nome ?? "Técnico"}
+                              matricula={
+                                r.tecnico_identificacao ?? r.tecnico_login ?? "—"
+                              }
+                            />
+                            <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              iniciarEdicao(r);
+                            }}
+                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label="Editar WO e contrato"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setExpanded(open ? null : r.id)}
+                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label={open ? "Recolher detalhes" : "Expandir detalhes"}
+                        >
+                          <ChevronDown
+                            className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`}
+                          />
+                        </button>
                       </div>
-                      <ChevronDown
-                        className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
-                          open ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
+                    </div>
                   </div>
                   <div
                     className={`grid transition-all duration-300 ${

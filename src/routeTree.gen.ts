@@ -22,7 +22,9 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminPendenciasRouteImport } from './routes/admin/pendencias'
 import { Route as AdminKpisRouteImport } from './routes/admin/kpis'
 import { Route as AdminImportacaoRouteImport } from './routes/admin/importacao'
+import { Route as AdminEnviarEvidenciaRouteImport } from './routes/admin/enviar-evidencia'
 import { Route as ApiEvidenciasSubmitRouteImport } from './routes/api/evidencias.submit'
+import { Route as ApiEvidenciasAdminSubmitRouteImport } from './routes/api/evidencias.admin-submit'
 
 const TodosRoute = TodosRouteImport.update({
   id: '/todos',
@@ -89,11 +91,22 @@ const AdminImportacaoRoute = AdminImportacaoRouteImport.update({
   path: '/importacao',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEnviarEvidenciaRoute = AdminEnviarEvidenciaRouteImport.update({
+  id: '/enviar-evidencia',
+  path: '/enviar-evidencia',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiEvidenciasSubmitRoute = ApiEvidenciasSubmitRouteImport.update({
   id: '/api/evidencias/submit',
   path: '/api/evidencias/submit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEvidenciasAdminSubmitRoute =
+  ApiEvidenciasAdminSubmitRouteImport.update({
+    id: '/api/evidencias/admin-submit',
+    path: '/api/evidencias/admin-submit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -105,10 +118,12 @@ export interface FileRoutesByFullPath {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesByTo {
@@ -120,10 +135,12 @@ export interface FileRoutesByTo {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin': typeof AdminIndexRoute
+  '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesById {
@@ -137,10 +154,12 @@ export interface FileRoutesById {
   '/metragem': typeof MetragemRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
+  '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRouteTypes {
@@ -155,10 +174,12 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/admin/enviar-evidencia'
     | '/admin/importacao'
     | '/admin/kpis'
     | '/admin/pendencias'
     | '/admin/'
+    | '/api/evidencias/admin-submit'
     | '/api/evidencias/submit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -170,10 +191,12 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/admin/enviar-evidencia'
     | '/admin/importacao'
     | '/admin/kpis'
     | '/admin/pendencias'
     | '/admin'
+    | '/api/evidencias/admin-submit'
     | '/api/evidencias/submit'
   id:
     | '__root__'
@@ -186,10 +209,12 @@ export interface FileRouteTypes {
     | '/metragem'
     | '/tecnicos'
     | '/todos'
+    | '/admin/enviar-evidencia'
     | '/admin/importacao'
     | '/admin/kpis'
     | '/admin/pendencias'
     | '/admin/'
+    | '/api/evidencias/admin-submit'
     | '/api/evidencias/submit'
   fileRoutesById: FileRoutesById
 }
@@ -203,6 +228,7 @@ export interface RootRouteChildren {
   MetragemRoute: typeof MetragemRoute
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
+  ApiEvidenciasAdminSubmitRoute: typeof ApiEvidenciasAdminSubmitRoute
   ApiEvidenciasSubmitRoute: typeof ApiEvidenciasSubmitRoute
 }
 
@@ -299,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminImportacaoRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/enviar-evidencia': {
+      id: '/admin/enviar-evidencia'
+      path: '/enviar-evidencia'
+      fullPath: '/admin/enviar-evidencia'
+      preLoaderRoute: typeof AdminEnviarEvidenciaRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/evidencias/submit': {
       id: '/api/evidencias/submit'
       path: '/api/evidencias/submit'
@@ -306,10 +339,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEvidenciasSubmitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/evidencias/admin-submit': {
+      id: '/api/evidencias/admin-submit'
+      path: '/api/evidencias/admin-submit'
+      fullPath: '/api/evidencias/admin-submit'
+      preLoaderRoute: typeof ApiEvidenciasAdminSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminEnviarEvidenciaRoute: typeof AdminEnviarEvidenciaRoute
   AdminImportacaoRoute: typeof AdminImportacaoRoute
   AdminKpisRoute: typeof AdminKpisRoute
   AdminPendenciasRoute: typeof AdminPendenciasRoute
@@ -317,6 +358,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminEnviarEvidenciaRoute: AdminEnviarEvidenciaRoute,
   AdminImportacaoRoute: AdminImportacaoRoute,
   AdminKpisRoute: AdminKpisRoute,
   AdminPendenciasRoute: AdminPendenciasRoute,
@@ -335,6 +377,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetragemRoute: MetragemRoute,
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
+  ApiEvidenciasAdminSubmitRoute: ApiEvidenciasAdminSubmitRoute,
   ApiEvidenciasSubmitRoute: ApiEvidenciasSubmitRoute,
 }
 export const routeTree = rootRouteImport

@@ -5,7 +5,7 @@ import {
   extractEvidenciaData,
   finalizeEmailData,
   parseRecipients,
-  resolveNomeTecnico,
+  resolveTecnicoInfo,
   sendResendEmail,
 } from "./lib.ts";
 
@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
 
     const payload = await req.json();
     const { data: partial, tecnicoId } = extractEvidenciaData(payload);
-    const nomeTecnico = await resolveNomeTecnico(tecnicoId, partial.nome_tecnico);
-    const emailData = finalizeEmailData(partial, nomeTecnico);
+    const tecnico = await resolveTecnicoInfo(tecnicoId, partial.nome_tecnico);
+    const emailData = finalizeEmailData(partial, tecnico);
     const { subject, html } = buildEvidenciaEmail(emailData);
 
     const from = Deno.env.get("RESEND_FROM_EMAIL");

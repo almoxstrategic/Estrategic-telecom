@@ -3,12 +3,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 export type EvidenciaEmailData = {
   nome_tecnico: string;
+  matricula: string;
   contrato: string;
   wo: string;
   metragem_inicial: string;
   metragem_final: string;
   total_utilizado: string;
-  data_registro: string;
   foto_inicio_url: string;
   foto_fim_url: string;
 };
@@ -108,16 +108,51 @@ export function extractEvidenciaData(payload: DatabaseWebhookPayload): {
           : payload.total_utilizado !== undefined
             ? formatMetragem(payload.total_utilizado)
             : undefined,
-      data_registro:
-        record.data_registro ?? payload.data_registro
-          ? formatDataRegistro(asString(record.data_registro ?? payload.data_registro, "data_registro"))
-          : undefined,
       foto_inicio_url: fotoInicio,
       foto_fim_url: fotoFim,
     },
   };
 }
 
+export async function resolveTecnicoInfo(
+  tecnicoId: string | undefined,
+  currentNome?: string,
+): Promise<{ nome: string; matricula: string }> {
+  if (!tecnicoId) {
+    return {
+      nome: currentNome?.trim() || "—",
+      matricula: "—",
+    };
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados na Edge Function.");
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("nome, identificacao, login")
+    .eq("id", tecnicoId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const nome = currentNome?.trim() || data?.nome?.trim();
+  if (!nome) throw new Error(`Perfil do técnico ${tecnicoId} não encontrado.`);
+
+  const matricula =
+    data?.identificacao?.trim() || data?.login?.trim() || "—";
+
+  return { nome, matricula };
+}
+
+/** @deprecated Use resolveTecnicoInfo */
 export async function resolveNomeTecnico(
   tecnicoId: string | undefined,
   currentNome?: string,
@@ -198,8 +233,8 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
                     <td style="padding:10px 12px;border:1px solid #e2e8f0;">${data.nome_tecnico}</td>
                   </tr>
                   <tr>
-                    <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;">Data do Registro</td>
-                    <td style="padding:10px 12px;border:1px solid #e2e8f0;">${data.data_registro}</td>
+                    <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;">Matrícula</td>
+                    <td style="padding:10px 12px;border:1px solid #e2e8f0;">${data.matricula}</td>
                   </tr>
                   <tr>
                     <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;">Número do Contrato</td>
@@ -244,16 +279,16 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
 
 export function finalizeEmailData(
   partial: Partial<EvidenciaEmailData>,
-  nomeTecnico: string,
+  tecnico: { nome: string; matricula: string },
 ): EvidenciaEmailData {
   return {
-    nome_tecnico: nomeTecnico,
+    nome_tecnico: tecnico.nome,
+    matricula: tecnico.matricula,
     contrato: asString(partial.contrato, "contrato"),
     wo: asString(partial.wo, "wo"),
     metragem_inicial: asString(partial.metragem_inicial, "metragem_inicial"),
     metragem_final: asString(partial.metragem_final, "metragem_final"),
     total_utilizado: asString(partial.total_utilizado, "total_utilizado"),
-    data_registro: asString(partial.data_registro, "data_registro"),
     foto_inicio_url: asString(partial.foto_inicio_url, "foto_inicio_url"),
     foto_fim_url: asString(partial.foto_fim_url, "foto_fim_url"),
   };

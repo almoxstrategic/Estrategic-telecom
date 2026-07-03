@@ -40,7 +40,7 @@ export async function deleteTecnicoEvidencePhotos(tecnicoId: string): Promise<vo
 }
 
 type DbEvidencia = Evidencia & {
-  profiles?: { nome: string; login?: string | null } | null;
+  profiles?: { nome: string; login?: string | null; identificacao?: string | null } | null;
 };
 
 function mapRow(row: DbEvidencia): Evidencia {
@@ -59,6 +59,8 @@ function mapRow(row: DbEvidencia): Evidencia {
     tecnico_id: row.tecnico_id,
     tecnico_nome: row.profiles?.nome ?? row.tecnico_nome,
     tecnico_login: row.profiles?.login ?? row.tecnico_login ?? undefined,
+    tecnico_identificacao:
+      row.profiles?.identificacao ?? row.tecnico_identificacao ?? undefined,
   };
 }
 
@@ -85,14 +87,18 @@ export async function fetchAllEvidencias(): Promise<Evidencia[]> {
 
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, nome, login");
+    .select("id, nome, login, identificacao");
 
   if (profilesError) throw profilesError;
 
   const profileById = new Map(
     (profiles ?? []).map((profile) => [
       profile.id,
-      { nome: profile.nome, login: profile.login ?? undefined },
+      {
+        nome: profile.nome,
+        login: profile.login ?? undefined,
+        identificacao: profile.identificacao ?? undefined,
+      },
     ]),
   );
 
@@ -102,6 +108,7 @@ export async function fetchAllEvidencias(): Promise<Evidencia[]> {
       ...(row as DbEvidencia),
       tecnico_nome: profile?.nome,
       tecnico_login: profile?.login,
+      tecnico_identificacao: profile?.identificacao,
     });
   });
 }
@@ -169,6 +176,47 @@ export async function submitEvidenciaForm(input: {
   return body as Evidencia;
 }
 
+export async function submitEvidenciaFormAsAdmin(input: {
+  accessToken: string;
+  tecnicoId: string;
+  contrato: string;
+  wo: string;
+  metragem_inicial: number;
+  metragem_final: number;
+  total_utilizado: number;
+  fotoInicio: File;
+  fotoFim: File;
+}): Promise<Evidencia> {
+  assertBrowserUpload();
+
+  const formData = new FormData();
+  formData.append("access_token", input.accessToken);
+  formData.append("tecnico_id", input.tecnicoId);
+  formData.append("contrato", input.contrato);
+  formData.append("wo", input.wo);
+  formData.append("metragem_inicial", String(input.metragem_inicial));
+  formData.append("metragem_final", String(input.metragem_final));
+  formData.append("total_utilizado", String(input.total_utilizado));
+  formData.append("foto_inicio", input.fotoInicio, input.fotoInicio.name);
+  formData.append("foto_fim", input.fotoFim, input.fotoFim.name);
+
+  const response = await fetch("/api/evidencias/admin-submit", {
+    method: "POST",
+    body: formData,
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | (Evidencia & { error?: string })
+    | { error?: string }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(body?.error || "Erro ao enviar evidência.");
+  }
+
+  return body as Evidencia;
+}
+
 export async function insertEvidencia(payload: EvidenciaInsert): Promise<Evidencia> {
   assertBrowserUpload();
 
@@ -198,4 +246,23 @@ export async function deleteEvidenciasWithPhotos(ids: string[]): Promise<void> {
 
   const { error: deleteError } = await supabase.from("evidencias").delete().in("id", ids);
   if (deleteError) throw deleteError;
+}
+
+export async function updateEvidenciaWoContrato(
+  id: string,
+  payload: { wo: string; contrato: string },
+): Promise<Evidencia> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("evidencias")
+    .update({
+      wo: payload.wo.trim(),
+      contrato: payload.contrato.trim(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return mapRow(data as DbEvidencia);
 }

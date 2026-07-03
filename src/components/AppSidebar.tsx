@@ -6,6 +6,7 @@ import {
   FileUp,
   LogOut,
   Home,
+  Send,
   ShieldCheck,
   Database,
   Users,
@@ -101,6 +102,15 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             >
               <FileUp className="h-5 w-5 text-primary" />
               Importação
+            </Link>
+            <Link
+              to="/admin/enviar-evidencia"
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <Send className="h-5 w-5 text-primary" />
+              Envio pelo Técnico
             </Link>
           </>
         ) : (
