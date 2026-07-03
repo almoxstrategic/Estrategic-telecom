@@ -92,32 +92,29 @@ const MESES = [
   { value: "12", label: "Dezembro" },
 ] as const;
 
-const ITENS_CRITICOS_PADRAO = [
-  "22065513",
-  "22069613",
-  "22026189",
-  "22026219",
-  "22026223",
-];
-
 const ITENS_CRITICOS_STORAGE_KEY = "estrategic:kpis-itens-criticos";
+
+function hasItensCriticosStorage(): boolean {
+  return localStorage.getItem(ITENS_CRITICOS_STORAGE_KEY) !== null;
+}
 
 function loadItensCriticosFromStorage(): string[] {
   try {
     const raw = localStorage.getItem(ITENS_CRITICOS_STORAGE_KEY);
-    if (!raw) return ITENS_CRITICOS_PADRAO;
+    if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    if (
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      parsed.every((item) => typeof item === "string")
-    ) {
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
       return parsed;
     }
-    return ITENS_CRITICOS_PADRAO;
+    return [];
   } catch {
-    return ITENS_CRITICOS_PADRAO;
+    return [];
   }
+}
+
+function formatRepresentatividade(quantidade: number, total: number): string {
+  if (total <= 0) return "0.0%";
+  return `${((quantidade / total) * 100).toFixed(1)}%`;
 }
 
 function descricaoPeriodo(filtro: KpisFiltro): string {
@@ -137,6 +134,7 @@ function KpisPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [itensCriticos, setItensCriticos] = useState<string[]>(loadItensCriticosFromStorage);
+  const [itensCriticosSeeded, setItensCriticosSeeded] = useState(hasItensCriticosStorage);
   const [itensCriticosLabels, setItensCriticosLabels] = useState<Record<string, string>>({});
   const [criticosData, setCriticosData] = useState<ConsumoItemCritico[]>([]);
   const [loadingCriticos, setLoadingCriticos] = useState(false);
@@ -155,8 +153,22 @@ function KpisPage() {
   const [loadingTopConsumidores, setLoadingTopConsumidores] = useState(false);
 
   useEffect(() => {
+    if (!itensCriticosSeeded && itensCriticos.length === 0) return;
     localStorage.setItem(ITENS_CRITICOS_STORAGE_KEY, JSON.stringify(itensCriticos));
-  }, [itensCriticos]);
+  }, [itensCriticos, itensCriticosSeeded]);
+
+  useEffect(() => {
+    if (itensCriticosSeeded || !kpis?.top_materiais?.length) return;
+
+    const codigos = kpis.top_materiais.map((m) => normalizeMaterialCode(m.sku));
+    const labels = Object.fromEntries(
+      kpis.top_materiais.map((m) => [normalizeMaterialCode(m.sku), m.descricao.trim()]),
+    );
+
+    setItensCriticos(codigos);
+    setItensCriticosLabels((prev) => ({ ...labels, ...prev }));
+    setItensCriticosSeeded(true);
+  }, [kpis?.top_materiais, itensCriticosSeeded]);
 
   useEffect(() => {
     void (async () => {
@@ -332,6 +344,11 @@ function KpisPage() {
     setMaterialSelecionado(material);
   };
 
+  const totalConsumoMaterial = useMemo(
+    () => topConsumidoresMaterial.reduce((sum, item) => sum + item.total, 0),
+    [topConsumidoresMaterial],
+  );
+
   const filtrosLimpos = filtro.mes === null || filtro.ano === null;
 
   return (
@@ -470,7 +487,7 @@ function KpisPage() {
 
             <section className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="mb-4 font-bold">Top 5 Materiais Mais Consumidos</h2>
+                <h2 className="mb-4 font-bold">Top 7 Materiais Mais Consumidos</h2>
                 {materiaisChart.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                 ) : (
@@ -582,10 +599,9 @@ function KpisPage() {
               <div className="mb-4 flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                 <div>
-                  <h2 className="font-bold">Monitoramento de Itens Críticos</h2>
+                  <h2 className="font-bold">Monitoramento de Itens</h2>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    Acompanhe o consumo de materiais sensíveis do estoque no período
-                    selecionado.
+                    Acompanhe o consumo dos materiais mais relevantes do período selecionado.
                   </p>
                 </div>
               </div>
@@ -607,7 +623,7 @@ function KpisPage() {
                   }}
                   disabled={itensCriticos.length === 0}
                 >
-                  Limpar Itens Críticos
+                  Limpar Itens
                 </Button>
               </div>
 
@@ -635,13 +651,13 @@ function KpisPage() {
 
               {itensCriticos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Nenhum item crítico selecionado. Busque no catálogo de estoque para monitorar.
+                  Nenhum item selecionado. Busque no catálogo de estoque para monitorar.
                 </p>
               ) : loadingCriticos ? (
-                <p className="text-sm text-muted-foreground">Carregando itens críticos...</p>
+                <p className="text-sm text-muted-foreground">Carregando itens...</p>
               ) : criticosData.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Nenhum consumo registrado para os itens críticos neste período.
+                  Nenhum consumo registrado para os itens monitorados neste período.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -806,6 +822,7 @@ function KpisPage() {
                 <TableRow>
                   <TableHead>Técnico</TableHead>
                   <TableHead className="text-right">Quantidade</TableHead>
+                  <TableHead className="text-right">Representatividade</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -821,6 +838,9 @@ function KpisPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatQuantidade(item.total)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-primary">
+                      {formatRepresentatividade(item.total, totalConsumoMaterial)}
                     </TableCell>
                   </TableRow>
                 ))}
