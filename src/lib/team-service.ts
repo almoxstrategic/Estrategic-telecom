@@ -7,13 +7,14 @@ export type TecnicoProfile = {
   identificacao: string | null;
   login: string | null;
   celular: string | null;
+  created_at: string | null;
 };
 
 export async function fetchTecnicos(): Promise<TecnicoProfile[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, nome, identificacao, login, celular")
+    .select("id, nome, identificacao, login, celular, created_at")
     .eq("role", "tecnico")
     .order("nome", { ascending: true });
 

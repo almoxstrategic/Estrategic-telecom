@@ -384,7 +384,7 @@ function KpisPage() {
           </Link>
         </div>
 
-        <section className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <section className="sticky top-16 z-20 mb-6 rounded-2xl border border-border bg-card/90 p-4 pb-4 shadow-sm backdrop-blur-md">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <BarChart3 className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-bold">Filtros de Período</h2>

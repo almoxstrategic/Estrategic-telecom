@@ -171,6 +171,46 @@ export const resetUserPassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const celularOptionalField = z
+  .string()
+  .transform((v) => v.replace(/\D/g, ""))
+  .refine((v) => v.length === 0 || v.length === 10 || v.length === 11, {
+    message: "Celular inválido. Use DDD + número (10 ou 11 dígitos).",
+  });
+
+export const updateTecnico = createServerFn({ method: "POST" })
+  .validator(
+    withToken.extend({
+      tecnicoId: z.string().uuid(),
+      celular: celularOptionalField,
+      password: z.string().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await assertAdmin(data.accessToken);
+    const supabase = getServiceClient();
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ celular: data.celular || null })
+      .eq("id", data.tecnicoId);
+
+    if (profileError) throw new Error(profileError.message);
+
+    if (data.password) {
+      if (data.password.length < 6) {
+        throw new Error("Senha deve ter ao mínimo 6 caracteres.");
+      }
+
+      const { error } = await supabase.auth.admin.updateUserById(data.tecnicoId, {
+        password: data.password,
+      });
+      if (error) throw new Error(error.message);
+    }
+
+    return { ok: true };
+  });
+
 export const createInitialAdmin = createServerFn({ method: "POST" })
   .validator(
     z.object({
