@@ -10,6 +10,7 @@ type CopyRegistroButtonProps = {
   wo: string;
   nomeTecnico: string;
   matricula: string;
+  copyText?: string;
   disabled?: boolean;
   className?: string;
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
@@ -20,6 +21,7 @@ export function CopyRegistroButton({
   wo,
   nomeTecnico,
   matricula,
+  copyText,
   disabled = false,
   className,
   onClick,
@@ -31,7 +33,8 @@ export function CopyRegistroButton({
     e.stopPropagation();
     e.preventDefault();
 
-    const text = formatRegistroCopyText({ contrato, wo, nomeTecnico, matricula });
+    const text =
+      copyText ?? formatRegistroCopyText({ contrato, wo, nomeTecnico, matricula });
 
     try {
       const ok = await copyTextToClipboard(text);

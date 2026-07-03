@@ -2,9 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, AlertTriangle, ChevronDown, FileText, Calendar } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { CopyRegistroButton } from "@/components/CopyRegistroButton";
 import { useApp } from "@/lib/app-store";
 import { requireTecnico } from "@/lib/auth-guards";
 import { fetchMyEvidencias } from "@/lib/evidencias-service";
+import { formatHistoricoCopyText } from "@/lib/registro-copy";
 import type { Evidencia } from "@/lib/types";
 
 export const Route = createFileRoute("/historico")({
@@ -130,11 +132,27 @@ function HistoricoPage() {
                         </span>
                       </div>
                     </div>
-                    <ChevronDown
-                      className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
-                        open ? "rotate-180" : ""
-                      }`}
-                    />
+                    <div className="flex shrink-0 items-center gap-1">
+                      <CopyRegistroButton
+                        contrato={r.contrato}
+                        wo={r.wo}
+                        nomeTecnico={user?.nome ?? r.tecnico_nome ?? ""}
+                        matricula={user?.identificacao ?? user?.login ?? r.tecnico_identificacao ?? ""}
+                        copyText={formatHistoricoCopyText({
+                          contrato: r.contrato,
+                          wo: r.wo,
+                          nomeTecnico: user?.nome ?? r.tecnico_nome ?? "",
+                          matricula:
+                            user?.identificacao ?? user?.login ?? r.tecnico_identificacao ?? "",
+                          metragem: r.total_utilizado,
+                        })}
+                      />
+                      <ChevronDown
+                        className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
+                          open ? "rotate-180" : ""
+                        }`}
+                      />
+                    </div>
                   </button>
                   <div
                     className={`grid transition-all duration-300 ${

@@ -100,6 +100,10 @@ function LoginPage() {
             <LogIn className="h-5 w-5" />
             {loading ? "Entrando..." : "Entrar"}
           </button>
+
+          <p className="mt-4 text-center text-sm text-gray-500">
+            Em caso de esquecimento de senha, entre em contato com a equipe do Almoxarifado.
+          </p>
         </form>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">

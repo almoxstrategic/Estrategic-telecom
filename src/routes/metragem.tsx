@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Send, CheckCircle2, Ruler, AlertCircle } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
-import { CopyRegistroButton } from "@/components/CopyRegistroButton";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { useApp } from "@/lib/app-store";
@@ -170,39 +169,27 @@ function MetragemPage() {
 
         <form id="metragem-form" onSubmit={onSubmit} className="space-y-5">
           <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Número do Contrato</label>
-                  <input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={contrato}
-                    onChange={(e) => setContrato(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Ex: 458921"
-                    className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Número da WO</label>
-                  <input
-                    type="text"
-                    value={wo}
-                    onChange={(e) => setWo(e.target.value)}
-                    placeholder="Ex: 12345|123456789"
-                    className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    required
-                  />
-                </div>
-              </div>
-              <CopyRegistroButton
-                contrato={contrato}
-                wo={wo}
-                nomeTecnico={user?.nome ?? ""}
-                matricula={user?.identificacao ?? user?.login ?? ""}
-                disabled={!contrato.trim() || !wo.trim() || !user}
-                className="mt-6"
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold">Número do Contrato</label>
+              <input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={contrato}
+                onChange={(e) => setContrato(e.target.value.replace(/\D/g, ""))}
+                placeholder="Ex: 458921"
+                className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold">Número da WO</label>
+              <input
+                type="text"
+                value={wo}
+                onChange={(e) => setWo(e.target.value)}
+                placeholder="Ex: 12345|123456789"
+                className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                required
               />
             </div>
           </div>
