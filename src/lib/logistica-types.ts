@@ -68,6 +68,20 @@ export type KpisConsumo = {
   top_tecnicos: KpiTopTecnico[];
 };
 
+export type KpisDetalheWo = {
+  work_order_id: string;
+  id_tecnico: string;
+  nome_tecnico: string;
+  total_itens: number;
+  data_atendimento: string | null;
+};
+
+export type KpisDetalheItem = {
+  material: string;
+  descr_material: string;
+  total: number;
+};
+
 export type PendenciaEvidencia = {
   work_order_id: string;
   id_tecnico: string;

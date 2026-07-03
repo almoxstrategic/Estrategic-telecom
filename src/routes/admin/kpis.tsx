@@ -3,12 +3,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
+  Copy,
   FilterX,
   Package,
   Search,
   Users,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +24,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -46,6 +49,8 @@ import {
   fetchConsumoItensCriticos,
   fetchConsumoTecnicoDetalhe,
   fetchKpisConsumo,
+  fetchKpisDetalheItens,
+  fetchKpisDetalheWos,
   fetchPeriodosConsumo,
   fetchTopConsumidoresMaterial,
 } from "@/lib/logistica-service";
@@ -54,10 +59,13 @@ import type {
   ConsumoTecnicoItem,
   DimMaterial,
   KpisConsumo,
+  KpisDetalheItem,
+  KpisDetalheWo,
   KpisFiltro,
   PeriodoConsumo,
   TopConsumidorMaterial,
 } from "@/lib/logistica-types";
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { normalizeMaterialCode } from "@/lib/material-code";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import { formatTecnicoLabel, formatTecnicoModalTitle } from "@/lib/tecnico-label";
@@ -125,6 +133,26 @@ function descricaoPeriodo(filtro: KpisFiltro): string {
   return `${mesLabel} de ${filtro.ano}`;
 }
 
+function formatDataAtendimento(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR");
+}
+
+async function copyTabela(
+  headers: string[],
+  rows: string[][],
+): Promise<void> {
+  const text = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
+  const ok = await copyTextToClipboard(text);
+  if (ok) {
+    toast.success("Dados copiados!");
+  } else {
+    toast.error("Não foi possível copiar.");
+  }
+}
+
 function KpisPage() {
   const [periodos, setPeriodos] = useState<PeriodoConsumo[]>([]);
   const [filtroReady, setFiltroReady] = useState(false);
@@ -152,6 +180,13 @@ function KpisPage() {
   );
   const [loadingTopConsumidores, setLoadingTopConsumidores] = useState(false);
   const [topConsumidoresBusca, setTopConsumidoresBusca] = useState("");
+
+  const [modalTotalTipo, setModalTotalTipo] = useState<"wos" | "itens" | null>(null);
+  const [detalheWos, setDetalheWos] = useState<KpisDetalheWo[]>([]);
+  const [detalheItens, setDetalheItens] = useState<KpisDetalheItem[]>([]);
+  const [loadingDetalheTotal, setLoadingDetalheTotal] = useState(false);
+  const [buscaDetalheWos, setBuscaDetalheWos] = useState("");
+  const [buscaDetalheItens, setBuscaDetalheItens] = useState("");
 
   useEffect(() => {
     if (!itensCriticosSeeded && itensCriticos.length === 0) return;
@@ -273,6 +308,30 @@ function KpisPage() {
     })();
   }, [materialSelecionado, filtro]);
 
+  useEffect(() => {
+    if (!modalTotalTipo) {
+      setDetalheWos([]);
+      setDetalheItens([]);
+      return;
+    }
+
+    void (async () => {
+      setLoadingDetalheTotal(true);
+      try {
+        if (modalTotalTipo === "wos") {
+          setDetalheWos(await fetchKpisDetalheWos(filtro));
+        } else {
+          setDetalheItens(await fetchKpisDetalheItens(filtro));
+        }
+      } catch {
+        if (modalTotalTipo === "wos") setDetalheWos([]);
+        else setDetalheItens([]);
+      } finally {
+        setLoadingDetalheTotal(false);
+      }
+    })();
+  }, [modalTotalTipo, filtro]);
+
   const materiaisChart = useMemo(
     () =>
       (kpis?.top_materiais ?? []).map((m) => ({
@@ -366,6 +425,61 @@ function KpisPage() {
     );
   }, [topConsumidoresMaterial, topConsumidoresBusca]);
 
+  const detalheWosFiltrados = useMemo(() => {
+    const termo = buscaDetalheWos.trim().toLowerCase();
+    if (!termo) return detalheWos;
+    return detalheWos.filter(
+      (row) =>
+        row.work_order_id.toLowerCase().includes(termo) ||
+        row.id_tecnico.toLowerCase().includes(termo) ||
+        row.nome_tecnico.toLowerCase().includes(termo),
+    );
+  }, [detalheWos, buscaDetalheWos]);
+
+  const detalheItensFiltrados = useMemo(() => {
+    const termo = buscaDetalheItens.trim().toLowerCase();
+    if (!termo) return detalheItens;
+    return detalheItens.filter(
+      (row) =>
+        row.material.toLowerCase().includes(termo) ||
+        row.descr_material.toLowerCase().includes(termo),
+    );
+  }, [detalheItens, buscaDetalheItens]);
+
+  const abrirModalTotalWos = () => {
+    setBuscaDetalheWos("");
+    setModalTotalTipo("wos");
+  };
+
+  const abrirModalTotalItens = () => {
+    setBuscaDetalheItens("");
+    setModalTotalTipo("itens");
+  };
+
+  const copiarDetalheWos = () => {
+    void copyTabela(
+      ["WO", "Técnico", "Id TOA", "Qtd Itens", "Data Atendimento"],
+      detalheWosFiltrados.map((row) => [
+        row.work_order_id,
+        row.nome_tecnico || "—",
+        row.id_tecnico,
+        String(row.total_itens),
+        formatDataAtendimento(row.data_atendimento),
+      ]),
+    );
+  };
+
+  const copiarDetalheItens = () => {
+    void copyTabela(
+      ["Código", "Descrição", "Quantidade"],
+      detalheItensFiltrados.map((row) => [
+        row.material,
+        row.descr_material,
+        String(row.total),
+      ]),
+    );
+  };
+
   const filtrosLimpos = filtro.mes === null || filtro.ano === null;
 
   return (
@@ -384,9 +498,9 @@ function KpisPage() {
           </Link>
         </div>
 
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <aside className="w-full shrink-0 lg:w-72">
-            <div className="sticky top-4 z-20 h-[calc(100vh-2rem)] self-start overflow-y-auto rounded-2xl border border-border bg-card/95 p-4 shadow-sm backdrop-blur-md [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
+        <div className="flex flex-col items-start gap-6 lg:flex-row lg:items-stretch">
+          <aside className="w-full shrink-0 lg:w-48 lg:min-w-[200px] lg:max-w-[220px]">
+            <div className="sticky top-6 z-20 h-fit rounded-2xl border border-border bg-card/95 p-4 shadow-sm backdrop-blur-md">
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-bold">Filtros de Período</h2>
@@ -476,7 +590,7 @@ function KpisPage() {
             </div>
           </aside>
 
-          <div className="min-w-0 flex-1 space-y-6">
+          <div className="min-w-0 w-full flex-1 space-y-6">
             {(!filtroReady || loading) ? (
               <p className="text-sm text-muted-foreground">Carregando métricas...</p>
             ) : error ? (
@@ -490,7 +604,11 @@ function KpisPage() {
             ) : (
               <>
                 <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <button
+                type="button"
+                onClick={abrirModalTotalItens}
+                className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
+              >
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Package className="h-4 w-4 text-primary" />
                   Total de Itens Consumidos
@@ -498,8 +616,12 @@ function KpisPage() {
                 <div className="mt-2 text-3xl font-black text-foreground">
                   {formatQuantidade(kpis?.total_itens ?? 0)}
                 </div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              </button>
+              <button
+                type="button"
+                onClick={abrirModalTotalWos}
+                className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
+              >
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <BarChart3 className="h-4 w-4 text-primary" />
                   Total de WOs Processadas
@@ -507,7 +629,7 @@ function KpisPage() {
                 <div className="mt-2 text-3xl font-black text-foreground">
                   {formatQuantidade(kpis?.total_wos ?? 0)}
                 </div>
-              </div>
+              </button>
             </section>
 
             <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -901,6 +1023,161 @@ function KpisPage() {
                   </TableBody>
                 </Table>
               )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={modalTotalTipo === "wos"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setModalTotalTipo(null);
+            setBuscaDetalheWos("");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>WOs Processadas — {descricaoPeriodo(filtro)}</DialogTitle>
+          </DialogHeader>
+          {loadingDetalheTotal ? (
+            <p className="text-sm text-muted-foreground">Carregando WOs...</p>
+          ) : (
+            <>
+              <div className="relative mb-4">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar por WO, técnico ou matrícula..."
+                  value={buscaDetalheWos}
+                  onChange={(e) => setBuscaDetalheWos(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {detalheWosFiltrados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma WO encontrada para o período ou busca.
+                </p>
+              ) : (
+                <div className="max-h-[50vh] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>WO</TableHead>
+                        <TableHead>Técnico</TableHead>
+                        <TableHead className="text-right">Qtd Itens</TableHead>
+                        <TableHead className="text-right">Data Atend.</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detalheWosFiltrados.map((row) => (
+                        <TableRow key={`${row.work_order_id}-${row.id_tecnico}`}>
+                          <TableCell className="font-mono text-xs">{row.work_order_id}</TableCell>
+                          <TableCell>
+                            <div className="font-medium">
+                              {formatTecnicoLabel(row.nome_tecnico, row.id_tecnico)}
+                            </div>
+                            <div className="font-mono text-xs text-muted-foreground">
+                              {row.id_tecnico}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatQuantidade(row.total_itens)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            {formatDataAtendimento(row.data_atendimento)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <DialogFooter className="mt-4 sm:justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  disabled={detalheWosFiltrados.length === 0}
+                  onClick={copiarDetalheWos}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar Todos os Dados
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={modalTotalTipo === "itens"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setModalTotalTipo(null);
+            setBuscaDetalheItens("");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Itens Consumidos — {descricaoPeriodo(filtro)}</DialogTitle>
+          </DialogHeader>
+          {loadingDetalheTotal ? (
+            <p className="text-sm text-muted-foreground">Carregando itens...</p>
+          ) : (
+            <>
+              <div className="relative mb-4">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar por código ou descrição..."
+                  value={buscaDetalheItens}
+                  onChange={(e) => setBuscaDetalheItens(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {detalheItensFiltrados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum item encontrado para o período ou busca.
+                </p>
+              ) : (
+                <div className="max-h-[50vh] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="text-right">Quantidade</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detalheItensFiltrados.map((row) => (
+                        <TableRow key={`${row.material}-${row.descr_material}`}>
+                          <TableCell className="font-mono text-xs">{row.material}</TableCell>
+                          <TableCell className="max-w-[240px] truncate">{row.descr_material}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatQuantidade(row.total)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <DialogFooter className="mt-4 sm:justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  disabled={detalheItensFiltrados.length === 0}
+                  onClick={copiarDetalheItens}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar Todos os Dados
+                </Button>
+              </DialogFooter>
             </>
           )}
         </DialogContent>

@@ -7,6 +7,8 @@ import type {
   DimMaterial,
   DimMaterialRow,
   KpisConsumo,
+  KpisDetalheItem,
+  KpisDetalheWo,
   KpisFiltro,
   PendenciaEvidencia,
   PeriodoConsumo,
@@ -210,6 +212,34 @@ export async function fetchKpisConsumo(filtro?: KpisFiltro): Promise<KpisConsumo
   if (error) throw error;
 
   return normalizeKpis((data ?? {}) as KpisConsumo);
+}
+
+export async function fetchKpisDetalheWos(filtro?: KpisFiltro): Promise<KpisDetalheWo[]> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_kpis_detalhe_wos", { p_mes, p_ano });
+  if (error) throw error;
+
+  return (data ?? []).map((row: KpisDetalheWo) => ({
+    work_order_id: row.work_order_id,
+    id_tecnico: row.id_tecnico,
+    nome_tecnico: row.nome_tecnico ?? "",
+    total_itens: parseQtdBaixada(row.total_itens),
+    data_atendimento: row.data_atendimento ?? null,
+  }));
+}
+
+export async function fetchKpisDetalheItens(filtro?: KpisFiltro): Promise<KpisDetalheItem[]> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_kpis_detalhe_itens", { p_mes, p_ano });
+  if (error) throw error;
+
+  return (data ?? []).map((row: KpisDetalheItem) => ({
+    material: row.material,
+    descr_material: row.descr_material,
+    total: parseQtdBaixada(row.total),
+  }));
 }
 
 export async function fetchConsumoTecnicoDetalhe(
