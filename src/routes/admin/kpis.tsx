@@ -371,7 +371,7 @@ function KpisPage() {
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
-      <main className="mx-auto max-w-5xl px-5 pb-10 pt-6">
+      <main className="mx-auto max-w-7xl px-4 pb-10 pt-6 lg:px-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">KPIs de Consumo</h1>
@@ -384,104 +384,21 @@ function KpisPage() {
           </Link>
         </div>
 
-        <section className="sticky top-16 z-20 mb-6 rounded-2xl border border-border bg-card/90 p-4 pb-4 shadow-sm backdrop-blur-md">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-bold">Filtros de Período</h2>
-            {filtrosLimpos && (
-              <Badge variant="secondary" className="text-xs">
-                Histórico geral
-              </Badge>
-            )}
-          </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="w-40 space-y-1.5">
-              <Label htmlFor="filtro-mes">Mês</Label>
-              <Select
-                value={filtro.mes !== null ? String(filtro.mes) : "todos"}
-                disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
-                onValueChange={(v) =>
-                  setFiltro((prev) => ({
-                    ...prev,
-                    mes: Number(v),
-                  }))
-                }
-              >
-                <SelectTrigger id="filtro-mes">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mesesDoAnoSelecionado.map((mes) => {
-                    const label = MESES.find((m) => m.value === String(mes))?.label ?? String(mes);
-                    return (
-                      <SelectItem key={mes} value={String(mes)}>
-                        {label}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-32 space-y-1.5">
-              <Label htmlFor="filtro-ano">Ano</Label>
-              <Select
-                value={filtro.ano !== null ? String(filtro.ano) : "todos"}
-                disabled={anosComDados.length === 0}
-                onValueChange={(v) => {
-                  if (v === "todos") {
-                    setFiltro({ mes: null, ano: null });
-                    return;
-                  }
-                  const ano = Number(v);
-                  const meses = periodos
-                    .filter((p) => p.ano === ano)
-                    .map((p) => p.mes)
-                    .sort((a, b) => a - b);
-                  setFiltro({
-                    ano,
-                    mes: meses[meses.length - 1] ?? null,
-                  });
-                }}
-              >
-                <SelectTrigger id="filtro-ano">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {anosComDados.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setFiltro({ mes: null, ano: null })}
-            >
-              <FilterX className="h-4 w-4" />
-              Limpar Filtros
-            </Button>
-          </div>
-        </section>
-
-        {(!filtroReady || loading) ? (
-          <p className="text-sm text-muted-foreground">Carregando métricas...</p>
-        ) : error ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </p>
-        ) : periodos.length === 0 ? (
-          <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            Nenhum período com consumo importado. Faça o Upload B na tela de Importação.
-          </p>
-        ) : (
-          <>
-            <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col-reverse gap-6 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1 space-y-6">
+            {(!filtroReady || loading) ? (
+              <p className="text-sm text-muted-foreground">Carregando métricas...</p>
+            ) : error ? (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
+              </p>
+            ) : periodos.length === 0 ? (
+              <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                Nenhum período com consumo importado. Faça o Upload B na tela de Importação.
+              </p>
+            ) : (
+              <>
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Package className="h-4 w-4 text-primary" />
@@ -502,7 +419,7 @@ function KpisPage() {
               </div>
             </section>
 
-            <section className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="mb-4 font-bold">Top 7 Materiais Mais Consumidos</h2>
                 {materiaisChart.length === 0 ? (
@@ -679,8 +596,8 @@ function KpisPage() {
                   Nenhum consumo registrado para os itens monitorados neste período.
                 </p>
               ) : (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  <ChartContainer config={CHART_CONFIG} className="h-56 w-full">
+                <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
+                  <ChartContainer config={CHART_CONFIG} className="h-56 w-full min-w-0">
                     <BarChart data={criticosChart}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -705,6 +622,7 @@ function KpisPage() {
                     </BarChart>
                   </ChartContainer>
 
+                  <div className="min-w-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -731,11 +649,105 @@ function KpisPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               )}
             </section>
-          </>
-        )}
+              </>
+            )}
+          </div>
+
+          <aside className="w-full shrink-0 lg:w-72">
+            <div className="sticky top-16 z-20 max-h-[calc(100vh-4rem)] overflow-y-auto rounded-2xl border border-border bg-card/95 p-4 shadow-sm backdrop-blur-md [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-bold">Filtros de Período</h2>
+                {filtrosLimpos && (
+                  <Badge variant="secondary" className="text-xs">
+                    Histórico geral
+                  </Badge>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="filtro-ano">Ano</Label>
+                  <Select
+                    value={filtro.ano !== null ? String(filtro.ano) : "todos"}
+                    disabled={anosComDados.length === 0}
+                    onValueChange={(v) => {
+                      if (v === "todos") {
+                        setFiltro({ mes: null, ano: null });
+                        return;
+                      }
+                      const ano = Number(v);
+                      const meses = periodos
+                        .filter((p) => p.ano === ano)
+                        .map((p) => p.mes)
+                        .sort((a, b) => a - b);
+                      setFiltro({
+                        ano,
+                        mes: meses[meses.length - 1] ?? null,
+                      });
+                    }}
+                  >
+                    <SelectTrigger id="filtro-ano" className="w-full">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {anosComDados.map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="filtro-mes">Mês</Label>
+                  <Select
+                    value={filtro.mes !== null ? String(filtro.mes) : "todos"}
+                    disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
+                    onValueChange={(v) =>
+                      setFiltro((prev) => ({
+                        ...prev,
+                        mes: Number(v),
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="filtro-mes" className="w-full">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mesesDoAnoSelecionado.map((mes) => {
+                        const label =
+                          MESES.find((m) => m.value === String(mes))?.label ?? String(mes);
+                        return (
+                          <SelectItem key={mes} value={String(mes)}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5"
+                  onClick={() => setFiltro({ mes: null, ano: null })}
+                >
+                  <FilterX className="h-4 w-4" />
+                  Limpar Filtros
+                </Button>
+              </div>
+            </div>
+          </aside>
+        </div>
       </main>
 
       <Dialog
