@@ -151,6 +151,7 @@ function KpisPage() {
     [],
   );
   const [loadingTopConsumidores, setLoadingTopConsumidores] = useState(false);
+  const [topConsumidoresBusca, setTopConsumidoresBusca] = useState("");
 
   useEffect(() => {
     if (!itensCriticosSeeded && itensCriticos.length === 0) return;
@@ -340,7 +341,13 @@ function KpisPage() {
     );
   }, [detalhesTecnico, detalheBusca, detalheOrdenacao]);
 
+  const totalConsumoTecnico = useMemo(
+    () => detalhesTecnico.reduce((sum, item) => sum + item.qtd_baixada, 0),
+    [detalhesTecnico],
+  );
+
   const abrirTopConsumidoresMaterial = (material: string) => {
+    setTopConsumidoresBusca("");
     setMaterialSelecionado(material);
   };
 
@@ -348,6 +355,16 @@ function KpisPage() {
     () => topConsumidoresMaterial.reduce((sum, item) => sum + item.total, 0),
     [topConsumidoresMaterial],
   );
+
+  const topConsumidoresFiltrados = useMemo(() => {
+    const termo = topConsumidoresBusca.trim().toLowerCase();
+    if (!termo) return topConsumidoresMaterial;
+    return topConsumidoresMaterial.filter(
+      (item) =>
+        item.nome_tecnico.toLowerCase().includes(termo) ||
+        item.id_tecnico.toLowerCase().includes(termo),
+    );
+  }, [topConsumidoresMaterial, topConsumidoresBusca]);
 
   const filtrosLimpos = filtro.mes === null || filtro.ano === null;
 
@@ -526,7 +543,7 @@ function KpisPage() {
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="mb-1 flex items-center gap-2 font-bold">
                   <Users className="h-4 w-4 text-primary" />
-                  Top Técnicos por Volume de Baixa
+                  Técnicos por Volume de Baixa
                 </h2>
                 <p className="mb-4 text-xs text-muted-foreground">
                   Clique em um técnico para ver o detalhamento.
@@ -534,7 +551,8 @@ function KpisPage() {
                 {tecnicosChart.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                 ) : (
-                  <ChartContainer config={CHART_CONFIG} className="h-64 w-full">
+                  <div className="max-h-[min(500px,60vh)] overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
+                    <ChartContainer config={CHART_CONFIG} className="h-64 w-full">
                     <BarChart data={tecnicosChart}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -575,23 +593,24 @@ function KpisPage() {
                       />
                     </BarChart>
                   </ChartContainer>
+                    <ul className="mt-4 space-y-2">
+                      {(kpis?.top_tecnicos ?? []).map((t) => (
+                        <li key={t.id_tecnico}>
+                          <button
+                            type="button"
+                            onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
+                            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                          >
+                            <span className="font-medium text-primary">
+                              {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
+                            </span>
+                            <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                <ul className="mt-4 space-y-2">
-                  {(kpis?.top_tecnicos ?? []).map((t) => (
-                    <li key={t.id_tecnico}>
-                      <button
-                        type="button"
-                        onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
-                        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
-                      >
-                        <span className="font-medium text-primary">
-                          {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
-                        </span>
-                        <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </section>
 
@@ -599,7 +618,7 @@ function KpisPage() {
               <div className="mb-4 flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                 <div>
-                  <h2 className="font-bold">Monitoramento de Itens</h2>
+                  <h2 className="font-bold">Monitoramento de Itens Críticos</h2>
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     Acompanhe o consumo dos materiais mais relevantes do período selecionado.
                   </p>
@@ -776,6 +795,7 @@ function KpisPage() {
                     <TableRow>
                       <TableHead>Material</TableHead>
                       <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead className="text-right">Representatividade</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -790,6 +810,9 @@ function KpisPage() {
                         <TableCell className="text-right font-semibold">
                           {formatQuantidade(item.qtd_baixada)}
                         </TableCell>
+                        <TableCell className="text-right font-semibold text-primary">
+                          {formatRepresentatividade(item.qtd_baixada, totalConsumoTecnico)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -803,7 +826,10 @@ function KpisPage() {
       <Dialog
         open={materialSelecionado !== null}
         onOpenChange={(open) => {
-          if (!open) setMaterialSelecionado(null);
+          if (!open) {
+            setMaterialSelecionado(null);
+            setTopConsumidoresBusca("");
+          }
         }}
       >
         <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
@@ -817,35 +843,53 @@ function KpisPage() {
               Nenhum consumo registrado para este material no período.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Técnico</TableHead>
-                  <TableHead className="text-right">Quantidade</TableHead>
-                  <TableHead className="text-right">Representatividade</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topConsumidoresMaterial.map((item) => (
-                  <TableRow key={item.id_tecnico}>
-                    <TableCell>
-                      <div className="font-medium">
-                        {formatTecnicoLabel(item.nome_tecnico, item.id_tecnico)}
-                      </div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {item.id_tecnico}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatQuantidade(item.total)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-primary">
-                      {formatRepresentatividade(item.total, totalConsumoMaterial)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="relative mb-4">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar por nome ou matrícula..."
+                  value={topConsumidoresBusca}
+                  onChange={(e) => setTopConsumidoresBusca(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {topConsumidoresFiltrados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum técnico corresponde à busca.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Técnico</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead className="text-right">Representatividade</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topConsumidoresFiltrados.map((item) => (
+                      <TableRow key={item.id_tecnico}>
+                        <TableCell>
+                          <div className="font-medium">
+                            {formatTecnicoLabel(item.nome_tecnico, item.id_tecnico)}
+                          </div>
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {item.id_tecnico}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatQuantidade(item.total)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-primary">
+                          {formatRepresentatividade(item.total, totalConsumoMaterial)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>
