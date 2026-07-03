@@ -5,6 +5,7 @@ import {
   BarChart3,
   FilterX,
   Package,
+  Search,
   Users,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -58,7 +60,7 @@ import type {
 } from "@/lib/logistica-types";
 import { normalizeMaterialCode } from "@/lib/material-code";
 import { formatQuantidade } from "@/lib/parse-locale-number";
-import { formatTecnicoLabel } from "@/lib/tecnico-label";
+import { formatTecnicoLabel, formatTecnicoModalTitle } from "@/lib/tecnico-label";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/admin/kpis")({
@@ -143,6 +145,8 @@ function KpisPage() {
   const [tecnicoSelecionadoLabel, setTecnicoSelecionadoLabel] = useState("");
   const [detalhesTecnico, setDetalhesTecnico] = useState<ConsumoTecnicoItem[]>([]);
   const [loadingDetalhes, setLoadingDetalhes] = useState(false);
+  const [detalheBusca, setDetalheBusca] = useState("");
+  const [detalheOrdenacao, setDetalheOrdenacao] = useState<"desc" | "asc">("desc");
 
   const [materialSelecionado, setMaterialSelecionado] = useState<string | null>(null);
   const [topConsumidoresMaterial, setTopConsumidoresMaterial] = useState<TopConsumidorMaterial[]>(
@@ -302,8 +306,27 @@ function KpisPage() {
 
   const abrirDetalheTecnico = (idTecnico: string, nomeTecnico?: string) => {
     setTecnicoSelecionado(idTecnico);
-    setTecnicoSelecionadoLabel(formatTecnicoLabel(nomeTecnico, idTecnico));
+    setTecnicoSelecionadoLabel(formatTecnicoModalTitle(nomeTecnico, idTecnico));
+    setDetalheBusca("");
+    setDetalheOrdenacao("desc");
   };
+
+  const detalhesFiltrados = useMemo(() => {
+    const termo = detalheBusca.trim().toLowerCase();
+    let lista = detalhesTecnico;
+    if (termo) {
+      lista = lista.filter(
+        (item) =>
+          item.material.toLowerCase().includes(termo) ||
+          item.descr_material.toLowerCase().includes(termo),
+      );
+    }
+    return [...lista].sort((a, b) =>
+      detalheOrdenacao === "desc"
+        ? b.qtd_baixada - a.qtd_baixada
+        : a.qtd_baixada - b.qtd_baixada,
+    );
+  }, [detalhesTecnico, detalheBusca, detalheOrdenacao]);
 
   const abrirTopConsumidoresMaterial = (material: string) => {
     setMaterialSelecionado(material);
@@ -686,6 +709,8 @@ function KpisPage() {
           if (!open) {
             setTecnicoSelecionado(null);
             setTecnicoSelecionadoLabel("");
+            setDetalheBusca("");
+            setDetalheOrdenacao("desc");
           }
         }}
       >
@@ -700,29 +725,61 @@ function KpisPage() {
               Nenhum item encontrado para este técnico no período.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Material</TableHead>
-                  <TableHead className="text-right">Quantidade</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detalhesTecnico.map((item) => (
-                  <TableRow key={`${item.material}-${item.descr_material}`}>
-                    <TableCell>
-                      <div className="font-medium">{item.descr_material}</div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {item.material}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatQuantidade(item.qtd_baixada)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Buscar por código ou descrição..."
+                    value={detalheBusca}
+                    onChange={(e) => setDetalheBusca(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  value={detalheOrdenacao}
+                  onValueChange={(v) => setDetalheOrdenacao(v as "desc" | "asc")}
+                >
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Maior para Menor</SelectItem>
+                    <SelectItem value="asc">Menor para Maior</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {detalhesFiltrados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum material corresponde à busca.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Material</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detalhesFiltrados.map((item) => (
+                      <TableRow key={`${item.material}-${item.descr_material}`}>
+                        <TableCell>
+                          <div className="font-medium">{item.descr_material}</div>
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {item.material}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatQuantidade(item.qtd_baixada)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>

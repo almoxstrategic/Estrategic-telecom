@@ -110,7 +110,7 @@ function PendenciasPage() {
                         <Link
                           to="/todos"
                           search={{ login: loginBusca }}
-                          className="font-semibold text-primary hover:underline"
+                          className="font-semibold text-foreground hover:text-muted-foreground hover:underline"
                         >
                           {row.nome_tecnico}
                         </Link>
