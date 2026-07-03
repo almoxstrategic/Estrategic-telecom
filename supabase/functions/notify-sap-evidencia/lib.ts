@@ -233,7 +233,7 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
                     <td style="padding:10px 12px;border:1px solid #e2e8f0;">${data.nome_tecnico}</td>
                   </tr>
                   <tr>
-                    <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;">Matrícula</td>
+                    <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;">Id TOA</td>
                     <td style="padding:10px 12px;border:1px solid #e2e8f0;">${data.matricula}</td>
                   </tr>
                   <tr>

@@ -1,7 +1,10 @@
 import { Camera, Upload, X, ImageIcon, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { compressEvidencePhoto, waitForImageMemoryRelease } from "@/lib/compress-image";
+import { useEvidencePhotoPasteSlot } from "@/components/EvidencePhotoPasteContext";
+import { ExpandableImage } from "@/components/ExpandableImage";
+import { waitForImageMemoryRelease } from "@/lib/compress-image";
+import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
 import type { EvidencePhotoRef } from "@/lib/types";
 
 export function PhotoUpload({
@@ -27,6 +30,32 @@ export function PhotoUpload({
     };
   }, [value?.previewUrl]);
 
+  const handleFile = useCallback(
+    async (file: File | undefined) => {
+      if (!file) return;
+
+      setBusy(true);
+      try {
+        const prepared = await prepareEvidencePhotoFile(file, value?.previewUrl);
+        onChange(prepared);
+      } catch (err) {
+        toast.error(`Erro ao processar foto: ${(err as Error).message || "tente novamente"}`);
+      } finally {
+        setBusy(false);
+        if (cameraRef.current) cameraRef.current.value = "";
+        if (galleryRef.current) galleryRef.current.value = "";
+      }
+    },
+    [onChange, value?.previewUrl],
+  );
+
+  useEvidencePhotoPasteSlot({
+    priority: suffix === "inicio" ? 0 : 1,
+    isEmpty: value === null,
+    isBusy: busy,
+    acceptFile: (file) => void handleFile(file),
+  });
+
   const openPicker = (target: "camera" | "gallery") => {
     onBeforePick?.();
     if (target === "camera") {
@@ -39,33 +68,7 @@ export function PhotoUpload({
   const clearPhoto = () => {
     if (value?.previewUrl) URL.revokeObjectURL(value.previewUrl);
     onChange(null);
-  };
-
-  const handleFile = async (file: File | undefined) => {
-    if (!file) return;
-
-    setBusy(true);
-    try {
-      if (value?.previewUrl) {
-        URL.revokeObjectURL(value.previewUrl);
-        onChange(null);
-        await waitForImageMemoryRelease();
-      }
-
-      const compressed = await compressEvidencePhoto(file);
-      await waitForImageMemoryRelease();
-
-      onChange({
-        file: compressed,
-        previewUrl: URL.createObjectURL(compressed),
-      });
-    } catch (err) {
-      toast.error(`Erro ao processar foto: ${(err as Error).message || "tente novamente"}`);
-    } finally {
-      setBusy(false);
-      if (cameraRef.current) cameraRef.current.value = "";
-      if (galleryRef.current) galleryRef.current.value = "";
-    }
+    void waitForImageMemoryRelease();
   };
 
   return (
@@ -78,13 +81,7 @@ export function PhotoUpload({
         </div>
       ) : value ? (
         <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
-          <img
-            src={value.previewUrl}
-            alt={label}
-            decoding="async"
-            loading="lazy"
-            className="h-40 w-full object-cover"
-          />
+          <ExpandableImage src={value.previewUrl} alt={label} />
           <button
             type="button"
             onClick={clearPhoto}
@@ -152,7 +149,8 @@ export function PhotoUpload({
         onChange={(e) => void handleFile(e.target.files?.[0])}
       />
       <p className="mt-1 text-[11px] text-muted-foreground">
-        {suffix === "inicio" ? "Início" : "Fim"}: imagem comprimida (~320KB) e enviada junto ao formulário.
+        Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
+        {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio.
       </p>
     </div>
   );

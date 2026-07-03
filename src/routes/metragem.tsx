@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Send, CheckCircle2, Ruler, AlertCircle } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { CopyRegistroButton } from "@/components/CopyRegistroButton";
+import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { useApp } from "@/lib/app-store";
 import { requireTecnico } from "@/lib/auth-guards";
@@ -257,33 +258,35 @@ function MetragemPage() {
             </div>
           </div>
 
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-950">
-              <strong className="font-semibold">Dica:</strong> cada foto é comprimida no celular e
-              enviada junto com o formulário. Se &quot;Tirar Foto&quot; falhar, use o app{" "}
-              <strong>Câmera</strong> e depois <strong>Fazer Upload</strong>.
-            </p>
-            <PhotoUpload
-              label="📸 Foto do Início"
-              suffix="inicio"
-              value={fotoInicio}
-              onChange={setFotoInicio}
-              onBeforePick={persistDraftNow}
-            />
-            {fotoInicio ? (
+          <EvidencePhotoPasteProvider>
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-950">
+                <strong className="font-semibold">Dica:</strong> cada foto é comprimida no celular e
+                enviada junto com o formulário. Se &quot;Tirar Foto&quot; falhar, use o app{" "}
+                <strong>Câmera</strong> e depois <strong>Fazer Upload</strong>.
+              </p>
               <PhotoUpload
-                label="📸 Foto do Fim"
-                suffix="fim"
-                value={fotoFim}
-                onChange={setFotoFim}
+                label="📸 Foto do Início"
+                suffix="inicio"
+                value={fotoInicio}
+                onChange={setFotoInicio}
                 onBeforePick={persistDraftNow}
               />
-            ) : (
-              <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-xs text-muted-foreground">
-                Tire a foto do início primeiro. Isso reduz o uso de memória no celular.
-              </p>
-            )}
-          </div>
+              {fotoInicio ? (
+                <PhotoUpload
+                  label="📸 Foto do Fim"
+                  suffix="fim"
+                  value={fotoFim}
+                  onChange={setFotoFim}
+                  onBeforePick={persistDraftNow}
+                />
+              ) : (
+                <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-xs text-muted-foreground">
+                  Tire a foto do início primeiro. Isso reduz o uso de memória no celular.
+                </p>
+              )}
+            </div>
+          </EvidencePhotoPasteProvider>
         </form>
       </main>
 

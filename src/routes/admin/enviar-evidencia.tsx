@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, Send, CheckCircle2, Ruler, AlertCircle } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { TecnicoCombobox } from "@/components/TecnicoCombobox";
 import { useApp } from "@/lib/app-store";
 import { submitEvidenciaFormAsAdmin } from "@/lib/evidencias-service";
@@ -215,26 +216,28 @@ function EnviarEvidenciaPage() {
             </div>
           </div>
 
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <PhotoUpload
-              label="📸 Foto do Início"
-              suffix="inicio"
-              value={fotoInicio}
-              onChange={setFotoInicio}
-            />
-            {fotoInicio ? (
+          <EvidencePhotoPasteProvider>
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <PhotoUpload
-                label="📸 Foto do Fim"
-                suffix="fim"
-                value={fotoFim}
-                onChange={setFotoFim}
+                label="📸 Foto do Início"
+                suffix="inicio"
+                value={fotoInicio}
+                onChange={setFotoInicio}
               />
-            ) : (
-              <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-xs text-muted-foreground">
-                Anexe a foto do início antes da foto do fim.
-              </p>
-            )}
-          </div>
+              {fotoInicio ? (
+                <PhotoUpload
+                  label="📸 Foto do Fim"
+                  suffix="fim"
+                  value={fotoFim}
+                  onChange={setFotoFim}
+                />
+              ) : (
+                <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-xs text-muted-foreground">
+                  Anexe a foto do início antes da foto do fim.
+                </p>
+              )}
+            </div>
+          </EvidencePhotoPasteProvider>
         </form>
       </main>
 

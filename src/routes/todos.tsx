@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { CopyRegistroButton } from "@/components/CopyRegistroButton";
+import { ExpandableImage } from "@/components/ExpandableImage";
 import { requireAdmin } from "@/lib/auth-guards";
 import {
   deleteEvidenciasWithPhotos,
@@ -414,20 +415,20 @@ function TodosPage() {
                     <div className="overflow-hidden">
                       <div className="grid grid-cols-2 gap-3 border-t border-border p-4">
                         <figure>
-                          <img
+                          <ExpandableImage
                             src={r.foto_inicio_url}
                             alt="Foto do início"
-                            className="h-40 w-full rounded-lg object-cover"
+                            className="rounded-lg"
                           />
                           <figcaption className="mt-1 text-center text-xs font-semibold text-muted-foreground">
                             Foto do Início
                           </figcaption>
                         </figure>
                         <figure>
-                          <img
+                          <ExpandableImage
                             src={r.foto_fim_url}
                             alt="Foto do fim"
-                            className="h-40 w-full rounded-lg object-cover"
+                            className="rounded-lg"
                           />
                           <figcaption className="mt-1 text-center text-xs font-semibold text-muted-foreground">
                             Foto do Fim
