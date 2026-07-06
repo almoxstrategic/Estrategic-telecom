@@ -1,3 +1,4 @@
+import type { EngajamentoTecnico, HistoricoLancamento } from "./logistica-types";
 import { getStoragePublicUrl, getSupabaseClient } from "./supabase";
 import type { Evidencia, EvidenciaInsert } from "./types";
 
@@ -57,6 +58,7 @@ function mapRow(row: DbEvidencia): Evidencia {
     foto_fim_path: row.foto_fim_path,
     data_registro: row.data_registro,
     tecnico_id: row.tecnico_id,
+    enviado_por_admin: Boolean(row.enviado_por_admin),
     tecnico_nome: row.profiles?.nome ?? row.tecnico_nome,
     tecnico_login: row.profiles?.login ?? row.tecnico_login ?? undefined,
     tecnico_identificacao:
@@ -265,4 +267,44 @@ export async function updateEvidenciaWoContrato(
 
   if (error) throw error;
   return mapRow(data as DbEvidencia);
+}
+
+export async function fetchEngajamentoEvidencias(): Promise<EngajamentoTecnico[]> {
+  const evidencias = await fetchAllEvidencias();
+  const byTecnico = new Map<string, EngajamentoTecnico>();
+
+  for (const ev of evidencias) {
+    const nome = ev.tecnico_nome?.trim() || "Técnico";
+    const current = byTecnico.get(ev.tecnico_id) ?? {
+      tecnico_id: ev.tecnico_id,
+      nome_tecnico: nome,
+      proprias: 0,
+      via_admin: 0,
+    };
+
+    if (ev.enviado_por_admin) {
+      current.via_admin += 1;
+    } else {
+      current.proprias += 1;
+    }
+
+    byTecnico.set(ev.tecnico_id, current);
+  }
+
+  return [...byTecnico.values()].sort((a, b) => {
+    if (b.via_admin !== a.via_admin) return b.via_admin - a.via_admin;
+    return b.proprias - a.proprias;
+  });
+}
+
+export async function fetchHistoricoLancamentos(): Promise<HistoricoLancamento[]> {
+  const evidencias = await fetchAllEvidencias();
+  return evidencias.map((ev) => ({
+    id: ev.id,
+    data_registro: ev.data_registro,
+    wo: ev.wo,
+    tecnico_id: ev.tecnico_id,
+    nome_tecnico: ev.tecnico_nome?.trim() || "Técnico",
+    enviado_por_admin: ev.enviado_por_admin,
+  }));
 }

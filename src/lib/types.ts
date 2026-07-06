@@ -22,6 +22,7 @@ export type Evidencia = {
   foto_fim_path: string;
   data_registro: string;
   tecnico_id: string;
+  enviado_por_admin: boolean;
   tecnico_nome?: string;
   tecnico_login?: string;
   tecnico_identificacao?: string;
@@ -44,4 +45,5 @@ export type EvidenciaInsert = {
   foto_inicio_path: string;
   foto_fim_path: string;
   tecnico_id: string;
+  enviado_por_admin?: boolean;
 };

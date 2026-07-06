@@ -129,6 +129,7 @@ export const Route = createFileRoute("/api/evidencias/submit")({
               foto_inicio_path: inicio.path,
               foto_fim_path: fim.path,
               tecnico_id: tecnicoId,
+              enviado_por_admin: false,
             })
             .select("*")
             .single();

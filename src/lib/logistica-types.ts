@@ -97,3 +97,19 @@ export type UpsertResult = {
   inserted: number;
   updated: number;
 };
+
+export type EngajamentoTecnico = {
+  tecnico_id: string;
+  nome_tecnico: string;
+  proprias: number;
+  via_admin: number;
+};
+
+export type HistoricoLancamento = {
+  id: string;
+  data_registro: string;
+  wo: string;
+  tecnico_id: string;
+  nome_tecnico: string;
+  enviado_por_admin: boolean;
+};
