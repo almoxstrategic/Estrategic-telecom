@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardList, MessageCircle, Users } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ClipboardList, MessageCircle, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import {
@@ -48,6 +48,27 @@ const ENGAJAMENTO_CHART_CONFIG = {
   via_admin: { label: "Via Admin", color: "#f97316" },
 } satisfies ChartConfig;
 
+type AutonomiaSortKey =
+  | "pct_evidenciada_desc"
+  | "pct_evidenciada_asc"
+  | "pct_nao_evidenciada_desc"
+  | "pct_nao_evidenciada_asc";
+
+type AutonomiaDetalheRow = {
+  tecnico_id: string;
+  nome_tecnico: string;
+  total: number;
+  evidenciadas: number;
+  nao_evidenciadas: number;
+  pct_evidenciada: number;
+  pct_nao_evidenciada: number;
+};
+
+function formatPercentual(value: number, total: number): string {
+  if (total <= 0) return "0.0%";
+  return `${((value / total) * 100).toFixed(1)}%`;
+}
+
 function formatDataHora(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -77,6 +98,10 @@ function PendenciasPage() {
   const [historico, setHistorico] = useState<HistoricoLancamento[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [buscaHistorico, setBuscaHistorico] = useState("");
+
+  const [detalheOpen, setDetalheOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<AutonomiaSortKey>("pct_evidenciada_desc");
 
   useEffect(() => {
     void (async () => {
@@ -140,6 +165,70 @@ function PendenciasPage() {
   );
 
   const engajamentoChartMinWidth = Math.max(engajamentoChart.length * 72, 800);
+
+  const autonomiaDetalhes = useMemo<AutonomiaDetalheRow[]>(
+    () =>
+      engajamento.map((item) => {
+        const total = item.proprias + item.via_admin;
+        return {
+          tecnico_id: item.tecnico_id,
+          nome_tecnico: item.nome_tecnico,
+          total,
+          evidenciadas: item.proprias,
+          nao_evidenciadas: item.via_admin,
+          pct_evidenciada: total > 0 ? (item.proprias / total) * 100 : 0,
+          pct_nao_evidenciada: total > 0 ? (item.via_admin / total) * 100 : 0,
+        };
+      }),
+    [engajamento],
+  );
+
+  const autonomiaDetalhesFiltrados = useMemo(() => {
+    const termo = searchTerm.trim().toLowerCase();
+    let lista = autonomiaDetalhes;
+    if (termo) {
+      lista = lista.filter((row) => row.nome_tecnico.toLowerCase().includes(termo));
+    }
+
+    return [...lista].sort((a, b) => {
+      switch (sortConfig) {
+        case "pct_evidenciada_desc":
+          return b.pct_evidenciada - a.pct_evidenciada;
+        case "pct_evidenciada_asc":
+          return a.pct_evidenciada - b.pct_evidenciada;
+        case "pct_nao_evidenciada_desc":
+          return b.pct_nao_evidenciada - a.pct_nao_evidenciada;
+        case "pct_nao_evidenciada_asc":
+          return a.pct_nao_evidenciada - b.pct_nao_evidenciada;
+        default:
+          return 0;
+      }
+    });
+  }, [autonomiaDetalhes, searchTerm, sortConfig]);
+
+  const abrirHistorico = () => {
+    setBuscaHistorico("");
+    setHistoricoOpen(true);
+  };
+
+  const abrirDetalheTecnicos = () => {
+    setSearchTerm("");
+    setSortConfig("pct_evidenciada_desc");
+    setDetalheOpen(true);
+  };
+
+  const alternarOrdenacaoEvidenciada = () => {
+    setSortConfig((prev) =>
+      prev === "pct_evidenciada_desc" ? "pct_evidenciada_asc" : "pct_evidenciada_desc",
+    );
+  };
+
+  const alternarOrdenacaoNaoEvidenciada = () => {
+    setSortConfig((prev) =>
+      prev === "pct_nao_evidenciada_desc" ? "pct_nao_evidenciada_asc" : "pct_nao_evidenciada_desc",
+    );
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -155,9 +244,21 @@ function PendenciasPage() {
               operadora.
             </p>
           </div>
-          <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
-            ← Voltar ao painel
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={abrirHistorico}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Ver Histórico de Lançamentos
+            </Button>
+            <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
+              ← Voltar ao painel
+            </Link>
+          </div>
         </div>
 
         {loading ? (
@@ -264,13 +365,11 @@ function PendenciasPage() {
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => {
-                setBuscaHistorico("");
-                setHistoricoOpen(true);
-              }}
+              onClick={abrirDetalheTecnicos}
+              disabled={engajamento.length === 0}
             >
-              <ClipboardList className="h-4 w-4" />
-              Ver Histórico de Lançamentos
+              <Users className="h-4 w-4" />
+              Visualizar Técnicos
             </Button>
           </div>
 
@@ -396,6 +495,105 @@ function PendenciasPage() {
                             {item.nome_tecnico}: evidenciou a WO
                           </span>
                         )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={detalheOpen}
+        onOpenChange={(open) => {
+          setDetalheOpen(open);
+          if (!open) {
+            setSearchTerm("");
+            setSortConfig("pct_evidenciada_desc");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhamento de Autonomia por Técnico</DialogTitle>
+          </DialogHeader>
+
+          <div className="mb-4">
+            <Input
+              type="search"
+              placeholder="Buscar técnico pelo nome..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {autonomiaDetalhesFiltrados.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {autonomiaDetalhes.length === 0
+                ? "Nenhuma evidência registrada nos últimos 30 dias."
+                : "Nenhum técnico encontrado para a busca."}
+            </p>
+          ) : (
+            <div className="max-h-[55vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Técnico</TableHead>
+                    <TableHead className="text-right">Total WOs</TableHead>
+                    <TableHead className="text-right">Evidenciadas</TableHead>
+                    <TableHead className="text-right">Não Evidenciadas</TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={alternarOrdenacaoEvidenciada}
+                        className="inline-flex w-full cursor-pointer select-none items-center justify-end gap-1 hover:text-gray-600"
+                      >
+                        % Evidenciada
+                        {sortConfig.startsWith("pct_evidenciada") &&
+                          (sortConfig === "pct_evidenciada_desc" ? (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+                          ) : (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+                          ))}
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={alternarOrdenacaoNaoEvidenciada}
+                        className="inline-flex w-full cursor-pointer select-none items-center justify-end gap-1 hover:text-gray-600"
+                      >
+                        % Não Evidenciada
+                        {sortConfig.startsWith("pct_nao_evidenciada") &&
+                          (sortConfig === "pct_nao_evidenciada_desc" ? (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+                          ) : (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+                          ))}
+                      </button>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {autonomiaDetalhesFiltrados.map((row) => (
+                    <TableRow key={row.tecnico_id}>
+                      <TableCell className="font-medium">{row.nome_tecnico}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatQuantidade(row.total)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                        {formatQuantidade(row.evidenciadas)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-orange-600 dark:text-orange-400">
+                        {formatQuantidade(row.nao_evidenciadas)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                        {formatPercentual(row.evidenciadas, row.total)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-red-600">
+                        {formatPercentual(row.nao_evidenciadas, row.total)}
                       </TableCell>
                     </TableRow>
                   ))}
