@@ -49,6 +49,8 @@ const ENGAJAMENTO_CHART_CONFIG = {
 } satisfies ChartConfig;
 
 type AutonomiaSortKey =
+  | "total_desc"
+  | "total_asc"
   | "pct_evidenciada_desc"
   | "pct_evidenciada_asc"
   | "pct_nao_evidenciada_desc"
@@ -192,6 +194,10 @@ function PendenciasPage() {
 
     return [...lista].sort((a, b) => {
       switch (sortConfig) {
+        case "total_desc":
+          return b.total - a.total;
+        case "total_asc":
+          return a.total - b.total;
         case "pct_evidenciada_desc":
           return b.pct_evidenciada - a.pct_evidenciada;
         case "pct_evidenciada_asc":
@@ -221,6 +227,10 @@ function PendenciasPage() {
     setSortConfig((prev) =>
       prev === "pct_evidenciada_desc" ? "pct_evidenciada_asc" : "pct_evidenciada_desc",
     );
+  };
+
+  const alternarOrdenacaoTotal = () => {
+    setSortConfig((prev) => (prev === "total_desc" ? "total_asc" : "total_desc"));
   };
 
   const alternarOrdenacaoNaoEvidenciada = () => {
@@ -541,7 +551,21 @@ function PendenciasPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Técnico</TableHead>
-                    <TableHead className="text-right">Total WOs</TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={alternarOrdenacaoTotal}
+                        className="inline-flex w-full cursor-pointer select-none items-center justify-end gap-1 hover:text-gray-600"
+                      >
+                        Total WOs
+                        {sortConfig.startsWith("total_") &&
+                          (sortConfig === "total_desc" ? (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+                          ) : (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+                          ))}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">Evidenciadas</TableHead>
                     <TableHead className="text-right">Não Evidenciadas</TableHead>
                     <TableHead className="text-right">
