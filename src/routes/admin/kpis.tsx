@@ -74,7 +74,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 export const Route = createFileRoute("/admin/kpis")({
   head: () => ({
     meta: [
-      { title: "KPIs de Consumo — Estrategic Field" },
+      { title: "KPI's — Estrategic Field" },
       { name: "description", content: "Métricas de consumo de miscelâneas." },
     ],
   }),
@@ -123,6 +123,13 @@ function loadItensCriticosFromStorage(): string[] {
 function formatRepresentatividade(quantidade: number, total: number): string {
   if (total <= 0) return "0.0%";
   return `${((quantidade / total) * 100).toFixed(1)}%`;
+}
+
+function formatKpiNumero(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  });
 }
 
 function descricaoPeriodo(filtro: KpisFiltro): string {
@@ -471,11 +478,12 @@ function KpisPage() {
 
   const copiarDetalheItens = () => {
     void copyTabela(
-      ["Código", "Descrição", "Quantidade"],
+      ["Código", "Descrição", "Quantidade", "Média consumo"],
       detalheItensFiltrados.map((row) => [
         row.material,
         row.descr_material,
-        String(row.total),
+        formatKpiNumero(row.total),
+        formatKpiNumero(row.total / 4),
       ]),
     );
   };
@@ -488,7 +496,7 @@ function KpisPage() {
       <main className="mx-auto max-w-7xl px-4 pb-10 pt-6 lg:px-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black tracking-tight">KPIs de Consumo</h1>
+            <h1 className="text-2xl font-black tracking-tight">KPI&apos;s</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Consolidado por data de atendimento da WO — {descricaoPeriodo(filtro)}.
             </p>
@@ -632,7 +640,7 @@ function KpisPage() {
               </button>
             </section>
 
-            <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <section className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="mb-4 font-bold">Top 7 Materiais Mais Consumidos</h2>
                 {materiaisChart.length === 0 ? (
@@ -657,20 +665,33 @@ function KpisPage() {
                     </BarChart>
                   </ChartContainer>
                 )}
-                <ul className="mt-4 space-y-2">
-                  {(kpis?.top_materiais ?? []).map((m) => (
-                    <li
-                      key={`${m.sku}-${m.descricao}`}
-                      className="flex items-center justify-between gap-2 text-sm"
-                    >
-                      <span className="truncate">{m.descricao}</span>
-                      <Badge variant="secondary">{formatQuantidade(m.total)}</Badge>
-                    </li>
-                  ))}
-                </ul>
+                <Table className="mt-4">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Quant</TableHead>
+                      <TableHead className="text-right">Média consumo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(kpis?.top_materiais ?? []).map((m) => (
+                      <TableRow key={`${m.sku}-${m.descricao}`}>
+                        <TableCell className="max-w-[200px] truncate text-sm">
+                          {m.descricao}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold">
+                          {formatKpiNumero(m.total)}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold text-muted-foreground">
+                          {formatKpiNumero(m.total / 4)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
 
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="mb-1 flex items-center gap-2 font-bold">
                   <Users className="h-4 w-4 text-primary" />
                   Técnicos por Volume de Baixa
@@ -681,64 +702,72 @@ function KpisPage() {
                 {tecnicosChart.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                 ) : (
-                  <div className="max-h-[min(500px,60vh)] overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
-                    <ChartContainer config={CHART_CONFIG} className="h-64 w-full">
-                    <BarChart data={tecnicosChart}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={(v) => formatQuantidade(v)} />
-                      <ChartTooltip
-                        content={({ active, payload }) => {
-                          if (!active || !payload?.[0]) return null;
-                          const item = payload[0].payload as {
-                            display?: string;
-                            total: number;
-                          };
-                          return (
-                            <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
-                              <p className="font-semibold">{item.display}</p>
-                              <p className="text-muted-foreground">
-                                {formatQuantidade(item.total)} itens
-                              </p>
-                            </div>
-                          );
-                        }}
-                      />
-                      <Bar
-                        dataKey="total"
-                        fill="var(--color-total)"
-                        radius={[4, 4, 0, 0]}
-                        className="cursor-pointer"
-                        onClick={(data) => {
-                          const payload = data as {
-                            id_tecnico?: string;
-                            label?: string;
-                            nome_tecnico?: string;
-                          };
-                          abrirDetalheTecnico(
-                            payload.id_tecnico ?? payload.label ?? "",
-                            payload.nome_tecnico,
-                          );
-                        }}
-                      />
-                    </BarChart>
-                  </ChartContainer>
-                    <ul className="mt-4 space-y-2">
-                      {(kpis?.top_tecnicos ?? []).map((t) => (
-                        <li key={t.id_tecnico}>
-                          <button
-                            type="button"
-                            onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
-                            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
-                          >
-                            <span className="font-medium text-primary">
-                              {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
-                            </span>
-                            <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="overflow-x-auto">
+                      <ChartContainer
+                        config={CHART_CONFIG}
+                        className="h-64 w-full"
+                        style={{ minWidth: Math.max(tecnicosChart.length * 56, 280) }}
+                      >
+                        <BarChart data={tecnicosChart}>
+                          <CartesianGrid vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                          <YAxis tickFormatter={(v) => formatQuantidade(v)} />
+                          <ChartTooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.[0]) return null;
+                              const item = payload[0].payload as {
+                                display?: string;
+                                total: number;
+                              };
+                              return (
+                                <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
+                                  <p className="font-semibold">{item.display}</p>
+                                  <p className="text-muted-foreground">
+                                    {formatQuantidade(item.total)} itens
+                                  </p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Bar
+                            dataKey="total"
+                            fill="var(--color-total)"
+                            radius={[4, 4, 0, 0]}
+                            className="cursor-pointer"
+                            onClick={(data) => {
+                              const payload = data as {
+                                id_tecnico?: string;
+                                label?: string;
+                                nome_tecnico?: string;
+                              };
+                              abrirDetalheTecnico(
+                                payload.id_tecnico ?? payload.label ?? "",
+                                payload.nome_tecnico,
+                              );
+                            }}
+                          />
+                        </BarChart>
+                      </ChartContainer>
+                    </div>
+                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
+                      <ul className="space-y-2">
+                        {(kpis?.top_tecnicos ?? []).map((t) => (
+                          <li key={t.id_tecnico}>
+                            <button
+                              type="button"
+                              onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
+                              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                            >
+                              <span className="font-medium text-primary">
+                                {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
+                              </span>
+                              <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1120,7 +1149,7 @@ function KpisPage() {
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Itens Consumidos — {descricaoPeriodo(filtro)}</DialogTitle>
           </DialogHeader>
@@ -1147,18 +1176,28 @@ function KpisPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Código</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="text-right">Quantidade</TableHead>
+                        <TableHead className="w-[88px] px-2">Código</TableHead>
+                        <TableHead className="min-w-[140px] px-2">Descrição</TableHead>
+                        <TableHead className="w-[88px] px-2 text-right whitespace-nowrap">
+                          Quantidade
+                        </TableHead>
+                        <TableHead className="w-[96px] px-2 text-right whitespace-nowrap">
+                          Média consumo
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {detalheItensFiltrados.map((row) => (
                         <TableRow key={`${row.material}-${row.descr_material}`}>
-                          <TableCell className="font-mono text-xs">{row.material}</TableCell>
-                          <TableCell className="max-w-[240px] truncate">{row.descr_material}</TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatQuantidade(row.total)}
+                          <TableCell className="px-2 font-mono text-xs">{row.material}</TableCell>
+                          <TableCell className="max-w-[200px] truncate px-2 text-sm">
+                            {row.descr_material}
+                          </TableCell>
+                          <TableCell className="px-2 text-right text-sm font-semibold">
+                            {formatKpiNumero(row.total)}
+                          </TableCell>
+                          <TableCell className="px-2 text-right text-sm font-semibold text-muted-foreground">
+                            {formatKpiNumero(row.total / 4)}
                           </TableCell>
                         </TableRow>
                       ))}

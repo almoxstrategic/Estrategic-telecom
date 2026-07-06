@@ -81,7 +81,7 @@ function AdminHome() {
                 <BarChart3 className="h-6 w-6" />
               </div>
               <div>
-                <div className="font-bold text-foreground">KPIs de Consumo</div>
+                <div className="font-bold text-foreground">KPI&apos;s</div>
                 <div className="text-xs text-muted-foreground">
                   Materiais e técnicos com maior volume de baixa
                 </div>

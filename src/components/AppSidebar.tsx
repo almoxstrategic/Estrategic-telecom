@@ -83,7 +83,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
             >
               <BarChart3 className="h-5 w-5 text-primary" />
-              KPIs de Consumo
+              KPI&apos;s
             </Link>
             <Link
               to="/admin/pendencias"
