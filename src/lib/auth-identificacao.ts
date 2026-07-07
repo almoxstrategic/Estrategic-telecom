@@ -53,9 +53,11 @@ export function isValidCelular(value: string): boolean {
   return d.length === 10 || d.length === 11;
 }
 
-/** Link WhatsApp (DDI 55). */
-export function celularToWhatsAppUrl(digits: string): string | null {
+/** Link WhatsApp (DDI 55). Opcionalmente pré-preenche o texto da mensagem. */
+export function celularToWhatsAppUrl(digits: string, text?: string): string | null {
   const d = normalizeCelularDigits(digits);
   if (d.length < 10) return null;
-  return `https://api.whatsapp.com/send?phone=55${d}`;
+  const base = `https://wa.me/55${d}`;
+  if (!text?.trim()) return base;
+  return `${base}?text=${encodeURIComponent(text)}`;
 }

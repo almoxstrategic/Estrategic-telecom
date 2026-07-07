@@ -296,7 +296,11 @@ function PendenciasPage() {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
-                  const wa = celularToWhatsAppUrl(row.celular);
+                  const nomeDoTecnico =
+                    row.nome_tecnico.trim().split(/\s+/)[0] ?? row.nome_tecnico;
+                  const numeroDaWO = row.work_order_id;
+                  const mensagem = `Olá, ${nomeDoTecnico}. Tudo bem? Verificamos que a WO ${numeroDaWO} consta como pendente de evidência. Poderia nos enviar as fotos dos materiais utilizados para regularizarmos a baixa no sistema?`;
+                  const wa = celularToWhatsAppUrl(row.celular, mensagem);
                   const loginBusca = row.login_tecnico || row.id_tecnico;
 
                   return (
