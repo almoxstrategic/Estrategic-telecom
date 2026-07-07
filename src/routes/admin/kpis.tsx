@@ -136,6 +136,12 @@ function formatKpiNumero(value: number): string {
   });
 }
 
+function formatKpiRepresentatividade(quantidade: number, total: number): string {
+  if (total <= 0) return "0,0%";
+  const pct = (quantidade / total) * 100;
+  return `${pct.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
 function descricaoPeriodo(filtro: KpisFiltro): string {
   if (filtro.mes === null || filtro.ano === null) {
     return "Histórico completo";
@@ -477,6 +483,13 @@ function KpisPage() {
     );
   }, [detalheItens, buscaDetalheItens]);
 
+  const totalGeralItens = useMemo(() => {
+    if (detalheItens.length > 0) {
+      return detalheItens.reduce((sum, row) => sum + row.total, 0);
+    }
+    return kpis?.total_itens ?? 0;
+  }, [detalheItens, kpis?.total_itens]);
+
   const abrirModalTotalWos = () => {
     setBuscaDetalheWos("");
     setModalTotalTipo("wos");
@@ -543,12 +556,13 @@ function KpisPage() {
 
   const copiarDetalheItens = () => {
     void copyTabela(
-      ["Código", "Descrição", "Quantidade", "Média consumo"],
+      ["Código", "Descrição", "Quantidade", "Média consumo", "Representatividade"],
       detalheItensFiltrados.map((row) => [
         row.material,
         row.descr_material,
         formatKpiNumero(row.total),
         formatKpiNumero(row.total / 4),
+        formatKpiRepresentatividade(row.total, totalGeralItens),
       ]),
     );
   };
@@ -730,18 +744,21 @@ function KpisPage() {
                     </BarChart>
                   </ChartContainer>
                 )}
-                <Table className="mt-4">
+                <Table className="mt-4 table-fixed">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-right">Quant</TableHead>
-                      <TableHead className="text-right">Média consumo</TableHead>
+                      <TableHead className="w-[40%]">Item</TableHead>
+                      <TableHead className="w-[20%] text-right">Quant</TableHead>
+                      <TableHead className="w-[22%] text-right whitespace-nowrap">
+                        Média consumo
+                      </TableHead>
+                      <TableHead className="w-[18%] text-right whitespace-nowrap">% Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(kpis?.top_materiais ?? []).map((m) => (
                       <TableRow key={`${m.sku}-${m.descricao}`}>
-                        <TableCell className="max-w-[200px] truncate text-sm">
+                        <TableCell className="max-w-0 truncate text-sm">
                           {m.descricao}
                         </TableCell>
                         <TableCell className="text-right text-sm font-semibold">
@@ -749,6 +766,9 @@ function KpisPage() {
                         </TableCell>
                         <TableCell className="text-right text-sm font-semibold text-muted-foreground">
                           {formatKpiNumero(m.total / 4)}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold text-primary">
+                          {formatKpiRepresentatividade(m.total, totalGeralItens)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1247,13 +1267,16 @@ function KpisPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[88px] px-2">Código</TableHead>
-                        <TableHead className="min-w-[140px] px-2">Descrição</TableHead>
-                        <TableHead className="w-[88px] px-2 text-right whitespace-nowrap">
+                        <TableHead className="w-[80px] px-2">Código</TableHead>
+                        <TableHead className="min-w-[120px] px-2">Descrição</TableHead>
+                        <TableHead className="w-[80px] px-2 text-right whitespace-nowrap">
                           Quantidade
                         </TableHead>
-                        <TableHead className="w-[96px] px-2 text-right whitespace-nowrap">
+                        <TableHead className="w-[88px] px-2 text-right whitespace-nowrap">
                           Média consumo
+                        </TableHead>
+                        <TableHead className="w-[88px] px-2 text-right whitespace-nowrap">
+                          Representatividade
                         </TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1261,7 +1284,7 @@ function KpisPage() {
                       {detalheItensFiltrados.map((row) => (
                         <TableRow key={`${row.material}-${row.descr_material}`}>
                           <TableCell className="px-2 font-mono text-xs">{row.material}</TableCell>
-                          <TableCell className="max-w-[200px] truncate px-2 text-sm">
+                          <TableCell className="max-w-[180px] truncate px-2 text-sm">
                             {row.descr_material}
                           </TableCell>
                           <TableCell className="px-2 text-right text-sm font-semibold">
@@ -1269,6 +1292,9 @@ function KpisPage() {
                           </TableCell>
                           <TableCell className="px-2 text-right text-sm font-semibold text-muted-foreground">
                             {formatKpiNumero(row.total / 4)}
+                          </TableCell>
+                          <TableCell className="px-2 text-right text-sm font-semibold text-primary">
+                            {formatKpiRepresentatividade(row.total, totalGeralItens)}
                           </TableCell>
                         </TableRow>
                       ))}
