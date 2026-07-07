@@ -758,7 +758,7 @@ function KpisPage() {
                   <TableBody>
                     {(kpis?.top_materiais ?? []).map((m) => (
                       <TableRow key={`${m.sku}-${m.descricao}`}>
-                        <TableCell className="max-w-0 truncate text-sm">
+                        <TableCell className="max-w-0 truncate text-sm" title={m.descricao}>
                           {m.descricao}
                         </TableCell>
                         <TableCell className="text-right text-sm font-semibold">
@@ -1284,7 +1284,10 @@ function KpisPage() {
                       {detalheItensFiltrados.map((row) => (
                         <TableRow key={`${row.material}-${row.descr_material}`}>
                           <TableCell className="px-2 font-mono text-xs">{row.material}</TableCell>
-                          <TableCell className="max-w-[180px] truncate px-2 text-sm">
+                          <TableCell
+                            className="max-w-[180px] truncate px-2 text-sm"
+                            title={row.descr_material}
+                          >
                             {row.descr_material}
                           </TableCell>
                           <TableCell className="px-2 text-right text-sm font-semibold">
