@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/chart";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -50,6 +51,7 @@ import {
   fetchConsumoTecnicoDetalhe,
   fetchKpisConsumo,
   fetchKpisDetalheItens,
+  fetchKpisDetalheWoMateriais,
   fetchKpisDetalheWos,
   fetchPeriodosConsumo,
   fetchTopConsumidoresMaterial,
@@ -61,6 +63,8 @@ import type {
   KpisConsumo,
   KpisDetalheItem,
   KpisDetalheWo,
+  KpisDetalheWoMaterial,
+  KpisDetalheWoSelecionada,
   KpisFiltro,
   PeriodoConsumo,
   TopConsumidorMaterial,
@@ -189,11 +193,19 @@ function KpisPage() {
   const [topConsumidoresBusca, setTopConsumidoresBusca] = useState("");
 
   const [modalTotalTipo, setModalTotalTipo] = useState<"wos" | "itens" | null>(null);
+  const [isProcessadasModalOpen, setIsProcessadasModalOpen] = useState(false);
   const [detalheWos, setDetalheWos] = useState<KpisDetalheWo[]>([]);
   const [detalheItens, setDetalheItens] = useState<KpisDetalheItem[]>([]);
   const [loadingDetalheTotal, setLoadingDetalheTotal] = useState(false);
   const [buscaDetalheWos, setBuscaDetalheWos] = useState("");
   const [buscaDetalheItens, setBuscaDetalheItens] = useState("");
+  const [isWoDetailsModalOpen, setIsWoDetailsModalOpen] = useState(false);
+  const [selectedWoDetails, setSelectedWoDetails] = useState<KpisDetalheWoSelecionada | null>(
+    null,
+  );
+  const [woMateriais, setWoMateriais] = useState<KpisDetalheWoMaterial[]>([]);
+  const [loadingWoMateriais, setLoadingWoMateriais] = useState(false);
+  const fechandoDetalheWoRef = useRef(false);
 
   useEffect(() => {
     if (!itensCriticosSeeded && itensCriticos.length === 0) return;
@@ -316,8 +328,25 @@ function KpisPage() {
   }, [materialSelecionado, filtro]);
 
   useEffect(() => {
-    if (!modalTotalTipo) {
+    if (!isProcessadasModalOpen) {
       setDetalheWos([]);
+      return;
+    }
+
+    void (async () => {
+      setLoadingDetalheTotal(true);
+      try {
+        setDetalheWos(await fetchKpisDetalheWos(filtro));
+      } catch {
+        setDetalheWos([]);
+      } finally {
+        setLoadingDetalheTotal(false);
+      }
+    })();
+  }, [isProcessadasModalOpen, filtro]);
+
+  useEffect(() => {
+    if (modalTotalTipo !== "itens") {
       setDetalheItens([]);
       return;
     }
@@ -325,14 +354,9 @@ function KpisPage() {
     void (async () => {
       setLoadingDetalheTotal(true);
       try {
-        if (modalTotalTipo === "wos") {
-          setDetalheWos(await fetchKpisDetalheWos(filtro));
-        } else {
-          setDetalheItens(await fetchKpisDetalheItens(filtro));
-        }
+        setDetalheItens(await fetchKpisDetalheItens(filtro));
       } catch {
-        if (modalTotalTipo === "wos") setDetalheWos([]);
-        else setDetalheItens([]);
+        setDetalheItens([]);
       } finally {
         setLoadingDetalheTotal(false);
       }
@@ -456,11 +480,52 @@ function KpisPage() {
   const abrirModalTotalWos = () => {
     setBuscaDetalheWos("");
     setModalTotalTipo("wos");
+    setIsProcessadasModalOpen(true);
   };
 
   const abrirModalTotalItens = () => {
     setBuscaDetalheItens("");
     setModalTotalTipo("itens");
+  };
+
+  const fecharModalDetalhes = (e?: SyntheticEvent) => {
+    e?.stopPropagation();
+    fechandoDetalheWoRef.current = true;
+    setIsWoDetailsModalOpen(false);
+    setSelectedWoDetails(null);
+    setWoMateriais([]);
+    requestAnimationFrame(() => {
+      fechandoDetalheWoRef.current = false;
+    });
+  };
+
+  const fecharModalProcessadas = () => {
+    setIsProcessadasModalOpen(false);
+    setBuscaDetalheWos("");
+    if (modalTotalTipo === "wos") {
+      setModalTotalTipo(null);
+    }
+    fecharModalDetalhes();
+  };
+
+  const abrirDetalheWoMateriais = (row: KpisDetalheWo) => {
+    setSelectedWoDetails({
+      work_order_id: row.work_order_id,
+      id_tecnico: row.id_tecnico,
+      nome_tecnico: row.nome_tecnico,
+    });
+    setIsWoDetailsModalOpen(true);
+
+    void (async () => {
+      setLoadingWoMateriais(true);
+      try {
+        setWoMateriais(await fetchKpisDetalheWoMateriais(row.work_order_id, filtro));
+      } catch {
+        setWoMateriais([]);
+      } finally {
+        setLoadingWoMateriais(false);
+      }
+    })();
   };
 
   const copiarDetalheWos = () => {
@@ -1058,11 +1123,13 @@ function KpisPage() {
       </Dialog>
 
       <Dialog
-        open={modalTotalTipo === "wos"}
+        open={isProcessadasModalOpen}
         onOpenChange={(open) => {
+          if (fechandoDetalheWoRef.current) return;
           if (!open) {
-            setModalTotalTipo(null);
-            setBuscaDetalheWos("");
+            fecharModalProcessadas();
+          } else {
+            setIsProcessadasModalOpen(true);
           }
         }}
       >
@@ -1101,7 +1168,11 @@ function KpisPage() {
                     </TableHeader>
                     <TableBody>
                       {detalheWosFiltrados.map((row) => (
-                        <TableRow key={`${row.work_order_id}-${row.id_tecnico}`}>
+                        <TableRow
+                          key={`${row.work_order_id}-${row.id_tecnico}`}
+                          className="cursor-pointer transition-colors hover:bg-gray-50"
+                          onClick={() => abrirDetalheWoMateriais(row)}
+                        >
                           <TableCell className="font-mono text-xs">{row.work_order_id}</TableCell>
                           <TableCell>
                             <div className="font-medium">
@@ -1219,6 +1290,99 @@ function KpisPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isWoDetailsModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            fecharModalDetalhes();
+          }
+        }}
+      >
+        <DialogContent
+          className="z-[60] max-h-[85vh] max-w-2xl overflow-y-auto [&>button:last-child]:hidden"
+          onPointerDownOutside={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fecharModalDetalhes(e);
+          }}
+          onInteractOutside={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onEscapeKeyDown={(e) => {
+            e.stopPropagation();
+            fecharModalDetalhes(e);
+          }}
+        >
+          <DialogClose
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            onClick={(e) => fecharModalDetalhes(e)}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fechar</span>
+          </DialogClose>
+          <DialogHeader>
+            <DialogTitle>Detalhamento da WO</DialogTitle>
+            {selectedWoDetails && (
+              <p className="text-sm text-muted-foreground">
+                WO{" "}
+                <span className="font-mono font-bold text-foreground">
+                  {selectedWoDetails.work_order_id}
+                </span>
+                {" · "}
+                <span className="font-semibold text-foreground">
+                  {formatTecnicoLabel(
+                    selectedWoDetails.nome_tecnico,
+                    selectedWoDetails.id_tecnico,
+                  )}
+                </span>
+              </p>
+            )}
+          </DialogHeader>
+
+          {loadingWoMateriais ? (
+            <p className="text-sm text-muted-foreground">Carregando materiais...</p>
+          ) : woMateriais.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum material registrado para esta WO no período.
+            </p>
+          ) : (
+            <div className="max-h-[50vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Descrição do Item</TableHead>
+                    <TableHead className="text-right">Quantidade Utilizada</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {woMateriais.map((item) => (
+                    <TableRow key={`${item.material}-${item.descr_material}`}>
+                      <TableCell className="font-mono text-xs">{item.material}</TableCell>
+                      <TableCell className="text-sm">{item.descr_material}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatQuantidade(item.qtd_baixada)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4 sm:justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={(e) => fecharModalDetalhes(e)}
+            >
+              Voltar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

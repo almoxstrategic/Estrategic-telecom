@@ -9,6 +9,8 @@ import type {
   KpisConsumo,
   KpisDetalheItem,
   KpisDetalheWo,
+  KpisDetalheWoMaterial,
+  KpisDetalheWoSelecionada,
   KpisFiltro,
   PendenciaEvidencia,
   PeriodoConsumo,
@@ -239,6 +241,26 @@ export async function fetchKpisDetalheItens(filtro?: KpisFiltro): Promise<KpisDe
     material: row.material,
     descr_material: row.descr_material,
     total: parseQtdBaixada(row.total),
+  }));
+}
+
+export async function fetchKpisDetalheWoMateriais(
+  workOrderId: string,
+  filtro?: KpisFiltro,
+): Promise<KpisDetalheWoMaterial[]> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_kpis_detalhe_wo_materiais", {
+    p_work_order_id: workOrderId,
+    p_mes,
+    p_ano,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row: KpisDetalheWoMaterial) => ({
+    material: row.material,
+    descr_material: row.descr_material,
+    qtd_baixada: parseQtdBaixada(row.qtd_baixada),
   }));
 }
 

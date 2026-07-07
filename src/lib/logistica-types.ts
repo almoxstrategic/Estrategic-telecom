@@ -82,6 +82,18 @@ export type KpisDetalheItem = {
   total: number;
 };
 
+export type KpisDetalheWoMaterial = {
+  material: string;
+  descr_material: string;
+  qtd_baixada: number;
+};
+
+export type KpisDetalheWoSelecionada = {
+  work_order_id: string;
+  id_tecnico: string;
+  nome_tecnico: string;
+};
+
 export type PendenciaEvidencia = {
   work_order_id: string;
   id_tecnico: string;
