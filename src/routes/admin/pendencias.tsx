@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, ClipboardList, MessageCircle, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import {
   ChartContainer,
@@ -12,8 +13,16 @@ import {
   fetchEngajamentoEvidencias,
   fetchHistoricoLancamentos,
 } from "@/lib/evidencias-service";
-import { fetchPendenciasEvidencias } from "@/lib/logistica-service";
+import {
+  fetchPendenciasEvidencias,
+  incrementNumeroCobrancas,
+} from "@/lib/logistica-service";
 import type { EngajamentoTecnico, HistoricoLancamento, PendenciaEvidencia } from "@/lib/logistica-types";
+import {
+  filtrarWosParaIncrementoCobranca,
+  filtrarWosPendentesDoTecnico,
+  obterDataHojeIso,
+} from "@/lib/pendencias-cobranca";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +63,9 @@ type AutonomiaSortKey =
   | "pct_evidenciada_desc"
   | "pct_evidenciada_asc"
   | "pct_nao_evidenciada_desc"
-  | "pct_nao_evidenciada_asc";
+  | "pct_nao_evidenciada_asc"
+  | "cobrancas_desc"
+  | "cobrancas_asc";
 
 type AutonomiaDetalheRow = {
   tecnico_id: string;
@@ -64,6 +75,7 @@ type AutonomiaDetalheRow = {
   nao_evidenciadas: number;
   pct_evidenciada: number;
   pct_nao_evidenciada: number;
+  total_cobrancas: number;
 };
 
 function formatPercentual(value: number, total: number): string {
@@ -87,10 +99,16 @@ function primeiroNome(nome: string): string {
   const partes = nome.trim().split(/\s+/);
   return partes[0] ?? nome;
 }
+
+function normalizarIdTecnico(id: string): string {
+  return id.trim().toUpperCase();
+}
+
 function PendenciasPage() {
   const [rows, setRows] = useState<PendenciaEvidencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [enviandoCobranca, setEnviandoCobranca] = useState<string | null>(null);
 
   const [engajamento, setEngajamento] = useState<EngajamentoTecnico[]>([]);
   const [loadingEngajamento, setLoadingEngajamento] = useState(true);
@@ -168,6 +186,15 @@ function PendenciasPage() {
 
   const engajamentoChartMinWidth = Math.max(engajamentoChart.length * 72, 800);
 
+  const cobrancasPorTecnico = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      const key = normalizarIdTecnico(row.id_tecnico);
+      map.set(key, (map.get(key) ?? 0) + (row.numero_cobrancas ?? 0));
+    }
+    return map;
+  }, [rows]);
+
   const autonomiaDetalhes = useMemo<AutonomiaDetalheRow[]>(
     () =>
       engajamento.map((item) => {
@@ -180,9 +207,10 @@ function PendenciasPage() {
           nao_evidenciadas: item.via_admin,
           pct_evidenciada: total > 0 ? (item.proprias / total) * 100 : 0,
           pct_nao_evidenciada: total > 0 ? (item.via_admin / total) * 100 : 0,
+          total_cobrancas: cobrancasPorTecnico.get(normalizarIdTecnico(item.tecnico_id)) ?? 0,
         };
       }),
-    [engajamento],
+    [engajamento, cobrancasPorTecnico],
   );
 
   const autonomiaDetalhesFiltrados = useMemo(() => {
@@ -206,6 +234,10 @@ function PendenciasPage() {
           return b.pct_nao_evidenciada - a.pct_nao_evidenciada;
         case "pct_nao_evidenciada_asc":
           return a.pct_nao_evidenciada - b.pct_nao_evidenciada;
+        case "cobrancas_desc":
+          return b.total_cobrancas - a.total_cobrancas;
+        case "cobrancas_asc":
+          return a.total_cobrancas - b.total_cobrancas;
         default:
           return 0;
       }
@@ -238,6 +270,84 @@ function PendenciasPage() {
       prev === "pct_nao_evidenciada_desc" ? "pct_nao_evidenciada_asc" : "pct_nao_evidenciada_desc",
     );
   };
+
+  const alternarOrdenacaoCobrancas = () => {
+    setSortConfig((prev) =>
+      prev === "cobrancas_desc" ? "cobrancas_asc" : "cobrancas_desc",
+    );
+  };
+
+  const enviarCobrancaWhatsApp = useCallback(
+    async (row: PendenciaEvidencia) => {
+      if (row.tem_evidencia) return;
+
+      const pendentes = filtrarWosPendentesDoTecnico(rows, row.id_tecnico);
+      if (pendentes.length === 0) {
+        toast.error("Nenhuma WO pendente para este técnico.");
+        return;
+      }
+
+      const nomeDoTecnico = row.nome_tecnico.trim().split(/\s+/)[0] ?? row.nome_tecnico;
+      const listaDeWOsFormatada = pendentes
+        .map((item) => `- ${item.work_order_id}`)
+        .join("\n");
+
+      const mensagem = `Olá, *${nomeDoTecnico}*. Tudo bem? 
+Verificamos que existem evidências pendentes em seu nome. Poderia nos enviar as fotos dos materiais utilizados para regularizarmos a baixa no sistema?
+
+*WOs Pendentes:*
+${listaDeWOsFormatada}
+
+\u26A0\uFE0F *Lembrete:* É necessário evidenciar os seguintes itens com metragem acima de:
+- *Cabo Coaxial Branco:* acima de 18 Metros
+- *Cabo Coaxial Preto:* acima de 35 Metros
+- *Cabo Drop Low:* acima de 78 Metros`;
+
+      const linkWhatsApp = celularToWhatsAppUrl(row.celular, mensagem);
+      if (!linkWhatsApp) {
+        toast.error("Celular inválido para envio via WhatsApp.");
+        return;
+      }
+
+      const dataHoje = obterDataHojeIso();
+      const pendentesParaIncrementar = filtrarWosParaIncrementoCobranca(pendentes, dataHoje);
+      const workOrderIdsParaIncrementar = pendentesParaIncrementar.map(
+        (item) => item.work_order_id,
+      );
+      setEnviandoCobranca(row.id_tecnico);
+
+      try {
+        let incrementadas = 0;
+        if (workOrderIdsParaIncrementar.length > 0) {
+          incrementadas = await incrementNumeroCobrancas(workOrderIdsParaIncrementar);
+          const idsIncrementados = new Set(workOrderIdsParaIncrementar);
+
+          setRows((prev) =>
+            prev.map((item) =>
+              idsIncrementados.has(item.work_order_id)
+                ? {
+                    ...item,
+                    numero_cobrancas: (item.numero_cobrancas ?? 0) + 1,
+                    ultima_data_cobranca: dataHoje,
+                  }
+                : item,
+            ),
+          );
+        }
+
+        window.open(linkWhatsApp, "_blank");
+
+        if (incrementadas > 0) {
+          toast.success(`Cobrança registrada para ${incrementadas} WOs!`);
+        }
+      } catch (err) {
+        toast.error((err as Error).message || "Não foi possível registrar a cobrança.");
+      } finally {
+        setEnviandoCobranca(null);
+      }
+    },
+    [rows],
+  );
 
   return (
     <div className="min-h-screen bg-surface">
@@ -292,16 +402,18 @@ function PendenciasPage() {
                   <TableHead>SLA</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Status da Evidência</TableHead>
+                  <TableHead className="text-right">Nº Cobranças</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
-                  const nomeDoTecnico =
-                    row.nome_tecnico.trim().split(/\s+/)[0] ?? row.nome_tecnico;
-                  const numeroDaWO = row.work_order_id;
-                  const mensagem = `Olá, ${nomeDoTecnico}. Tudo bem? Verificamos que a WO ${numeroDaWO} consta como pendente de evidência. Poderia nos enviar as fotos dos materiais utilizados para regularizarmos a baixa no sistema?`;
-                  const wa = celularToWhatsAppUrl(row.celular, mensagem);
+                  const temCelular = Boolean(celularToWhatsAppUrl(row.celular));
                   const loginBusca = row.login_tecnico || row.id_tecnico;
+                  const numeroCobrancas = row.numero_cobrancas ?? 0;
+                  const temPendentes =
+                    filtrarWosPendentesDoTecnico(rows, row.id_tecnico).length > 0;
+                  const enviando = enviandoCobranca === row.id_tecnico;
+                  const evidenciado = row.tem_evidencia;
 
                   return (
                     <TableRow key={row.work_order_id}>
@@ -332,16 +444,31 @@ function PendenciasPage() {
                         {row.sla} dias
                       </TableCell>
                       <TableCell>
-                        {wa ? (
-                          <a
-                            href={wa}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                        {evidenciado ? (
+                          <span
+                            className="inline-flex cursor-not-allowed items-center gap-1 text-sm font-semibold text-muted-foreground opacity-50 grayscale"
+                            aria-disabled="true"
                           >
                             <MessageCircle className="h-4 w-4" />
                             WhatsApp
-                          </a>
+                          </span>
+                        ) : !temCelular ? (
+                          <span
+                            className="inline-flex cursor-not-allowed items-center gap-1 text-sm font-semibold text-muted-foreground opacity-50"
+                            title="Cadastre o celular do técnico no painel de equipe"
+                          >
+                            Sem Número
+                          </span>
+                        ) : temPendentes ? (
+                          <button
+                            type="button"
+                            disabled={enviando}
+                            onClick={() => void enviarCobrancaWhatsApp(row)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            {enviando ? "Enviando..." : "WhatsApp"}
+                          </button>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -354,6 +481,13 @@ function PendenciasPage() {
                         ) : (
                           <Badge variant="destructive">Pendente</Badge>
                         )}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-semibold ${
+                          numeroCobrancas > 0 ? "text-orange-600 dark:text-orange-400" : ""
+                        }`}
+                      >
+                        {numeroCobrancas}
                       </TableCell>
                     </TableRow>
                   );
@@ -602,6 +736,21 @@ function PendenciasPage() {
                           ))}
                       </button>
                     </TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={alternarOrdenacaoCobrancas}
+                        className="inline-flex w-full cursor-pointer select-none items-center justify-end gap-1 hover:text-gray-600"
+                      >
+                        Nº de Cobranças
+                        {sortConfig.startsWith("cobrancas_") &&
+                          (sortConfig === "cobrancas_desc" ? (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+                          ) : (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+                          ))}
+                      </button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -622,6 +771,15 @@ function PendenciasPage() {
                       </TableCell>
                       <TableCell className="text-right font-semibold text-red-600">
                         {formatPercentual(row.nao_evidenciadas, row.total)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-semibold ${
+                          row.total_cobrancas > 0
+                            ? "text-orange-600 dark:text-orange-400"
+                            : ""
+                        }`}
+                      >
+                        {formatQuantidade(row.total_cobrancas)}
                       </TableCell>
                     </TableRow>
                   ))}

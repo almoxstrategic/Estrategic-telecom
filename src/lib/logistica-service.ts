@@ -403,5 +403,18 @@ export async function fetchPendenciasEvidencias(): Promise<PendenciaEvidencia[]>
     celular: row.celular ?? "",
     tem_evidencia: Boolean(row.tem_evidencia),
     evidencia_data_registro: row.evidencia_data_registro ?? null,
+    numero_cobrancas: Number(row.numero_cobrancas ?? 0),
+    ultima_data_cobranca: row.ultima_data_cobranca ?? null,
   }));
+}
+
+export async function incrementNumeroCobrancas(workOrderIds: string[]): Promise<number> {
+  if (workOrderIds.length === 0) return 0;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("increment_numero_cobrancas", {
+    p_work_order_ids: workOrderIds,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
 }

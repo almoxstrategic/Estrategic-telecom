@@ -103,6 +103,8 @@ export type PendenciaEvidencia = {
   celular: string;
   tem_evidencia: boolean;
   evidencia_data_registro: string | null;
+  numero_cobrancas: number;
+  ultima_data_cobranca: string | null;
 };
 
 export type UpsertResult = {
