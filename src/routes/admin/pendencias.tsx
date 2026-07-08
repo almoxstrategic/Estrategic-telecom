@@ -1,23 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, ClipboardList, MessageCircle, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ClipboardList,
+  Copy,
+  MessageCircle,
+  Users,
+} from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
-import {
-  ChartContainer,
-  type ChartConfig,
-} from "@/components/ui/chart";
+import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { celularToWhatsAppUrl } from "@/lib/auth-identificacao";
-import {
-  fetchEngajamentoEvidencias,
-  fetchHistoricoLancamentos,
-} from "@/lib/evidencias-service";
-import {
-  fetchPendenciasEvidencias,
-  incrementNumeroCobrancas,
-} from "@/lib/logistica-service";
-import type { EngajamentoTecnico, HistoricoLancamento, PendenciaEvidencia } from "@/lib/logistica-types";
+import { fetchEngajamentoEvidencias, fetchHistoricoLancamentos } from "@/lib/evidencias-service";
+import { fetchPendenciasEvidencias, incrementNumeroCobrancas } from "@/lib/logistica-service";
+import type {
+  EngajamentoTecnico,
+  HistoricoLancamento,
+  PendenciaEvidencia,
+} from "@/lib/logistica-types";
 import {
   filtrarWosParaIncrementoCobranca,
   filtrarWosPendentesDoTecnico,
@@ -26,12 +29,7 @@ import {
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -41,6 +39,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin/pendencias")({
   head: () => ({
@@ -70,6 +75,7 @@ type AutonomiaSortKey =
 type AutonomiaDetalheRow = {
   tecnico_id: string;
   nome_tecnico: string;
+  wos: PendenciaEvidencia[];
   total: number;
   evidenciadas: number;
   nao_evidenciadas: number;
@@ -121,7 +127,12 @@ function PendenciasPage() {
 
   const [detalheOpen, setDetalheOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState<AutonomiaSortKey>("pct_evidenciada_desc");
+  const [sortConfig, setSortConfig] = useState<AutonomiaSortKey>("total_desc");
+  const [isModalCobrancasOpen, setIsModalCobrancasOpen] = useState(false);
+  const [tecnicoSelecionadoCobrancas, setTecnicoSelecionadoCobrancas] =
+    useState<AutonomiaDetalheRow | null>(null);
+  const [buscaWoCobrancas, setBuscaWoCobrancas] = useState("");
+  const [mesAnoCobrancas, setMesAnoCobrancas] = useState("todos");
 
   useEffect(() => {
     void (async () => {
@@ -167,51 +178,100 @@ function PendenciasPage() {
     if (!termo) return historico;
     return historico.filter(
       (item) =>
-        item.wo.toLowerCase().includes(termo) ||
-        item.nome_tecnico.toLowerCase().includes(termo),
+        item.wo.toLowerCase().includes(termo) || item.nome_tecnico.toLowerCase().includes(termo),
     );
   }, [historico, buscaHistorico]);
 
-  const engajamentoChart = useMemo(
-    () =>
-      engajamento.map((item) => ({
+  const engajamentoChart = useMemo(() => {
+    const byTecnico = new Map<
+      string,
+      {
+        label: string;
+        nome_completo: string;
+        proprias: number;
+        via_admin: number;
+        total: number;
+      }
+    >();
+
+    for (const item of engajamento) {
+      const key = normalizarIdTecnico(item.tecnico_id);
+      byTecnico.set(key, {
         label: primeiroNome(item.nome_tecnico),
         nome_completo: item.nome_tecnico,
         proprias: item.proprias,
         via_admin: item.via_admin,
         total: item.proprias + item.via_admin,
-      })),
-    [engajamento],
-  );
+      });
+    }
 
-  const engajamentoChartMinWidth = Math.max(engajamentoChart.length * 72, 800);
-
-  const cobrancasPorTecnico = useMemo(() => {
-    const map = new Map<string, number>();
     for (const row of rows) {
       const key = normalizarIdTecnico(row.id_tecnico);
-      map.set(key, (map.get(key) ?? 0) + (row.numero_cobrancas ?? 0));
+      if (byTecnico.has(key)) continue;
+      byTecnico.set(key, {
+        label: primeiroNome(row.nome_tecnico),
+        nome_completo: row.nome_tecnico,
+        proprias: 0,
+        via_admin: 0,
+        total: 0,
+      });
+    }
+
+    return [...byTecnico.values()].sort((a, b) => b.total - a.total);
+  }, [engajamento, rows]);
+
+  const engajamentoChartWidth = Math.max(engajamentoChart.length * 80, 320);
+
+  const wosPorTecnico = useMemo(() => {
+    const map = new Map<string, PendenciaEvidencia[]>();
+    for (const row of rows) {
+      const key = normalizarIdTecnico(row.id_tecnico);
+      const wos = map.get(key) ?? [];
+      wos.push(row);
+      map.set(key, wos);
     }
     return map;
   }, [rows]);
 
-  const autonomiaDetalhes = useMemo<AutonomiaDetalheRow[]>(
-    () =>
-      engajamento.map((item) => {
-        const total = item.proprias + item.via_admin;
-        return {
-          tecnico_id: item.tecnico_id,
-          nome_tecnico: item.nome_tecnico,
-          total,
-          evidenciadas: item.proprias,
-          nao_evidenciadas: item.via_admin,
-          pct_evidenciada: total > 0 ? (item.proprias / total) * 100 : 0,
-          pct_nao_evidenciada: total > 0 ? (item.via_admin / total) * 100 : 0,
-          total_cobrancas: cobrancasPorTecnico.get(normalizarIdTecnico(item.tecnico_id)) ?? 0,
-        };
-      }),
-    [engajamento, cobrancasPorTecnico],
-  );
+  const autonomiaDetalhes = useMemo<AutonomiaDetalheRow[]>(() => {
+    const byTecnico = new Map<string, AutonomiaDetalheRow>();
+
+    for (const item of engajamento) {
+      const total = item.proprias + item.via_admin;
+      const key = normalizarIdTecnico(item.tecnico_id);
+      const wos = wosPorTecnico.get(key) ?? [];
+      byTecnico.set(key, {
+        tecnico_id: item.tecnico_id,
+        nome_tecnico: item.nome_tecnico,
+        wos,
+        total,
+        evidenciadas: item.proprias,
+        nao_evidenciadas: item.via_admin,
+        pct_evidenciada: total > 0 ? (item.proprias / total) * 100 : 0,
+        pct_nao_evidenciada: total > 0 ? (item.via_admin / total) * 100 : 0,
+        total_cobrancas: wos.reduce((sum, row) => sum + (row.numero_cobrancas ?? 0), 0),
+      });
+    }
+
+    for (const row of rows) {
+      const key = normalizarIdTecnico(row.id_tecnico);
+      if (byTecnico.has(key)) continue;
+      const wos = wosPorTecnico.get(key) ?? [];
+      byTecnico.set(key, {
+        tecnico_id: row.id_tecnico,
+        nome_tecnico: row.nome_tecnico,
+        wos,
+        total: 0,
+        evidenciadas: 0,
+        nao_evidenciadas: 0,
+        pct_evidenciada: 0,
+        pct_nao_evidenciada: 0,
+        total_cobrancas: wos.reduce((sum, item) => sum + (item.numero_cobrancas ?? 0), 0),
+      });
+    }
+
+    return [...byTecnico.values()];
+  }, [engajamento, wosPorTecnico, rows]);
 
   const autonomiaDetalhesFiltrados = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
@@ -251,8 +311,15 @@ function PendenciasPage() {
 
   const abrirDetalheTecnicos = () => {
     setSearchTerm("");
-    setSortConfig("pct_evidenciada_desc");
+    setSortConfig("total_desc");
     setDetalheOpen(true);
+  };
+
+  const abrirModalCobrancas = (row: AutonomiaDetalheRow) => {
+    setTecnicoSelecionadoCobrancas(row);
+    setBuscaWoCobrancas("");
+    setMesAnoCobrancas("todos");
+    setIsModalCobrancasOpen(true);
   };
 
   const alternarOrdenacaoEvidenciada = () => {
@@ -272,9 +339,49 @@ function PendenciasPage() {
   };
 
   const alternarOrdenacaoCobrancas = () => {
-    setSortConfig((prev) =>
-      prev === "cobrancas_desc" ? "cobrancas_asc" : "cobrancas_desc",
-    );
+    setSortConfig((prev) => (prev === "cobrancas_desc" ? "cobrancas_asc" : "cobrancas_desc"));
+  };
+
+  const mesesAnoDisponiveisCobrancas = useMemo(() => {
+    const meses = new Set<string>();
+    for (const row of tecnicoSelecionadoCobrancas?.wos ?? []) {
+      if ((row.numero_cobrancas ?? 0) <= 0 || !row.ultima_data_cobranca) continue;
+      meses.add(row.ultima_data_cobranca.slice(0, 7));
+    }
+    return [...meses].sort().reverse();
+  }, [tecnicoSelecionadoCobrancas]);
+
+  const wosCobrancasFiltradas = useMemo(() => {
+    const termo = buscaWoCobrancas.trim().toLowerCase();
+    return (tecnicoSelecionadoCobrancas?.wos ?? []).filter((row) => {
+      const numeroCobrancas = row.numero_cobrancas ?? 0;
+      const dataCobranca = row.ultima_data_cobranca ?? "";
+      const correspondeWo = !termo || row.work_order_id.toLowerCase().includes(termo);
+      const correspondeMesAno =
+        mesAnoCobrancas === "todos" || dataCobranca.startsWith(mesAnoCobrancas);
+      return numeroCobrancas > 0 && correspondeWo && correspondeMesAno;
+    });
+  }, [tecnicoSelecionadoCobrancas, buscaWoCobrancas, mesAnoCobrancas]);
+
+  const copiarInformacoesCobrancas = async () => {
+    if (!tecnicoSelecionadoCobrancas || wosCobrancasFiltradas.length === 0) {
+      toast.error("Nenhuma cobrança filtrada para copiar.");
+      return;
+    }
+
+    const textoGerado = wosCobrancasFiltradas
+      .map((wo) =>
+        [
+          tecnicoSelecionadoCobrancas.nome_tecnico,
+          wo.id_tecnico || tecnicoSelecionadoCobrancas.tecnico_id,
+          wo.work_order_id,
+          wo.numero_cobrancas ?? 0,
+        ].join("\t"),
+      )
+      .join("\n");
+
+    await navigator.clipboard.writeText(textoGerado);
+    toast.success("Informações copiadas para a área de transferência.");
   };
 
   const enviarCobrancaWhatsApp = useCallback(
@@ -288,9 +395,7 @@ function PendenciasPage() {
       }
 
       const nomeDoTecnico = row.nome_tecnico.trim().split(/\s+/)[0] ?? row.nome_tecnico;
-      const listaDeWOsFormatada = pendentes
-        .map((item) => `- ${item.work_order_id}`)
-        .join("\n");
+      const listaDeWOsFormatada = pendentes.map((item) => `- ${item.work_order_id}`).join("\n");
 
       const mensagem = `Olá, *${nomeDoTecnico}*. Tudo bem? 
 Verificamos que existem evidências pendentes em seu nome. Poderia nos enviar as fotos dos materiais utilizados para regularizarmos a baixa no sistema?
@@ -440,9 +545,7 @@ ${listaDeWOsFormatada}
                           {row.nome_tecnico}
                         </Link>
                       </TableCell>
-                      <TableCell className="font-bold text-destructive">
-                        {row.sla} dias
-                      </TableCell>
+                      <TableCell className="font-bold text-destructive">{row.sla} dias</TableCell>
                       <TableCell>
                         {evidenciado ? (
                           <span
@@ -502,7 +605,7 @@ ${listaDeWOsFormatada}
             <div>
               <h2 className="flex items-center gap-2 text-lg font-bold">
                 <Users className="h-5 w-5 text-primary" />
-                Autonomia de Evidências
+                Monitoramento de pendencias - Técnicos
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Ranking de envios próprios (positivo) versus envios feitos pelo admin (dependência).
@@ -514,7 +617,7 @@ ${listaDeWOsFormatada}
               size="sm"
               className="gap-2"
               onClick={abrirDetalheTecnicos}
-              disabled={engajamento.length === 0}
+              disabled={engajamentoChart.length === 0}
             >
               <Users className="h-4 w-4" />
               Visualizar Técnicos
@@ -527,7 +630,7 @@ ${listaDeWOsFormatada}
             <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {engajamentoError}
             </p>
-          ) : engajamento.length === 0 ? (
+          ) : engajamentoChart.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Nenhuma evidência registrada nos últimos 30 dias.
             </p>
@@ -535,12 +638,24 @@ ${listaDeWOsFormatada}
             <div className="overflow-x-auto">
               <ChartContainer
                 config={ENGAJAMENTO_CHART_CONFIG}
-                className="h-80 w-full"
-                style={{ minWidth: engajamentoChartMinWidth }}
+                className="h-80 shrink-0"
+                style={{ width: engajamentoChartWidth, minWidth: engajamentoChartWidth }}
               >
-                <BarChart data={engajamentoChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart
+                  width={engajamentoChartWidth}
+                  height={320}
+                  data={engajamentoChart}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 52 }}
+                >
                   <CartesianGrid vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <XAxis
+                    dataKey="label"
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                    height={64}
+                    tick={{ fontSize: 10 }}
+                  />
                   <YAxis tickFormatter={(v) => formatQuantidade(v)} allowDecimals={false} />
                   <Tooltip
                     content={({ active, payload }) => {
@@ -567,18 +682,8 @@ ${listaDeWOsFormatada}
                       );
                     }}
                   />
-                  <Bar
-                    dataKey="proprias"
-                    stackId="a"
-                    fill="#10b981"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="via_admin"
-                    stackId="a"
-                    fill="#f97316"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  <Bar dataKey="proprias" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="via_admin" stackId="a" fill="#f97316" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ChartContainer>
             </div>
@@ -659,13 +764,13 @@ ${listaDeWOsFormatada}
           setDetalheOpen(open);
           if (!open) {
             setSearchTerm("");
-            setSortConfig("pct_evidenciada_desc");
+            setSortConfig("total_desc");
           }
         }}
       >
         <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhamento de Autonomia por Técnico</DialogTitle>
+            <DialogTitle>Detalhamento por Técnico</DialogTitle>
           </DialogHeader>
 
           <div className="mb-4">
@@ -684,7 +789,7 @@ ${listaDeWOsFormatada}
                 : "Nenhum técnico encontrado para a busca."}
             </p>
           ) : (
-            <div className="max-h-[55vh] overflow-auto">
+            <div className="max-h-[70vh] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -772,14 +877,100 @@ ${listaDeWOsFormatada}
                       <TableCell className="text-right font-semibold text-red-600">
                         {formatPercentual(row.nao_evidenciadas, row.total)}
                       </TableCell>
-                      <TableCell
-                        className={`text-right font-semibold ${
-                          row.total_cobrancas > 0
-                            ? "text-orange-600 dark:text-orange-400"
-                            : ""
-                        }`}
-                      >
-                        {formatQuantidade(row.total_cobrancas)}
+                      <TableCell className="text-right">
+                        <button
+                          type="button"
+                          onClick={() => abrirModalCobrancas(row)}
+                          className="text-blue-600 underline cursor-pointer hover:text-blue-800 font-bold"
+                        >
+                          {formatQuantidade(row.total_cobrancas)}
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isModalCobrancasOpen}
+        onOpenChange={(open) => {
+          setIsModalCobrancasOpen(open);
+          if (!open) {
+            setTecnicoSelecionadoCobrancas(null);
+            setBuscaWoCobrancas("");
+            setMesAnoCobrancas("todos");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <DialogTitle>
+                Cobranças: {tecnicoSelecionadoCobrancas?.nome_tecnico ?? "Técnico"}
+              </DialogTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => void copiarInformacoesCobrancas()}
+              >
+                <Copy className="h-4 w-4" />
+                Copiar Informações
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+            <Input
+              type="search"
+              placeholder="Buscar pelo Número da WO..."
+              value={buscaWoCobrancas}
+              onChange={(e) => setBuscaWoCobrancas(e.target.value)}
+            />
+            <Select value={mesAnoCobrancas} onValueChange={setMesAnoCobrancas}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por mês/ano" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os meses</SelectItem>
+                {mesesAnoDisponiveisCobrancas.map((mesAno) => {
+                  const [ano, mes] = mesAno.split("-");
+                  return (
+                    <SelectItem key={mesAno} value={mesAno}>
+                      {mes}/{ano}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {wosCobrancasFiltradas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma WO com cobrança encontrada para os filtros selecionados.
+            </p>
+          ) : (
+            <div className="max-h-[55vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nº da WO</TableHead>
+                    <TableHead className="text-right">Nº de vezes cobrado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wosCobrancasFiltradas.map((wo) => (
+                    <TableRow key={wo.work_order_id}>
+                      <TableCell className="font-mono text-sm font-semibold">
+                        {wo.work_order_id}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatQuantidade(wo.numero_cobrancas ?? 0)}
                       </TableCell>
                     </TableRow>
                   ))}
