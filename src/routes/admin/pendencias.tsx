@@ -9,10 +9,9 @@ import {
   MessageCircle,
   Users,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { celularToWhatsAppUrl } from "@/lib/auth-identificacao";
 import { fetchEngajamentoEvidencias, fetchHistoricoLancamentos } from "@/lib/evidencias-service";
 import { fetchPendenciasEvidencias, incrementNumeroCobrancas } from "@/lib/logistica-service";
@@ -26,6 +25,7 @@ import {
   filtrarWosPendentesDoTecnico,
   obterDataHojeIso,
 } from "@/lib/pendencias-cobranca";
+import { fetchTecnicos, type TecnicoProfile } from "@/lib/team-service";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,11 +56,6 @@ export const Route = createFileRoute("/admin/pendencias")({
   }),
   component: PendenciasPage,
 });
-
-const ENGAJAMENTO_CHART_CONFIG = {
-  proprias: { label: "WOs Próprias", color: "#10b981" },
-  via_admin: { label: "Via Admin", color: "#f97316" },
-} satisfies ChartConfig;
 
 type AutonomiaSortKey =
   | "total_desc"
@@ -117,6 +112,7 @@ function PendenciasPage() {
   const [enviandoCobranca, setEnviandoCobranca] = useState<string | null>(null);
 
   const [engajamento, setEngajamento] = useState<EngajamentoTecnico[]>([]);
+  const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [loadingEngajamento, setLoadingEngajamento] = useState(true);
   const [engajamentoError, setEngajamentoError] = useState<string | null>(null);
 
@@ -149,7 +145,12 @@ function PendenciasPage() {
   useEffect(() => {
     void (async () => {
       try {
-        setEngajamento(await fetchEngajamentoEvidencias());
+        const [engajamentoData, tecnicosData] = await Promise.all([
+          fetchEngajamentoEvidencias(),
+          fetchTecnicos(),
+        ]);
+        setEngajamento(engajamentoData);
+        setTecnicos(tecnicosData);
       } catch (err) {
         setEngajamentoError((err as Error).message);
       } finally {
@@ -182,45 +183,59 @@ function PendenciasPage() {
     );
   }, [historico, buscaHistorico]);
 
-  const engajamentoChart = useMemo(() => {
-    const byTecnico = new Map<
-      string,
-      {
-        label: string;
-        nome_completo: string;
-        proprias: number;
-        via_admin: number;
-        total: number;
-      }
-    >();
-
+  const engajamentoPorTecnicoId = useMemo(() => {
+    const map = new Map<string, { evidenciadas: number; naoEvidenciadas: number }>();
     for (const item of engajamento) {
       const key = normalizarIdTecnico(item.tecnico_id);
-      byTecnico.set(key, {
-        label: primeiroNome(item.nome_tecnico),
-        nome_completo: item.nome_tecnico,
-        proprias: item.proprias,
-        via_admin: item.via_admin,
-        total: item.proprias + item.via_admin,
+      const existente = map.get(key);
+      if (existente) {
+        existente.evidenciadas += item.proprias;
+        existente.naoEvidenciadas += item.via_admin;
+        continue;
+      }
+      map.set(key, {
+        evidenciadas: item.proprias,
+        naoEvidenciadas: item.via_admin,
       });
     }
+    return map;
+  }, [engajamento]);
 
-    for (const row of rows) {
-      const key = normalizarIdTecnico(row.id_tecnico);
-      if (byTecnico.has(key)) continue;
-      byTecnico.set(key, {
-        label: primeiroNome(row.nome_tecnico),
-        nome_completo: row.nome_tecnico,
-        proprias: 0,
-        via_admin: 0,
-        total: 0,
-      });
-    }
+  const engajamentoChart = useMemo(
+    () =>
+      tecnicos
+        .map((tecnico) => {
+          const dados = engajamentoPorTecnicoId.get(normalizarIdTecnico(tecnico.id));
+          const evidenciadas = dados?.evidenciadas ?? 0;
+          const naoEvidenciadas = dados?.naoEvidenciadas ?? 0;
+          const matricula = tecnico.identificacao?.trim() || tecnico.login?.trim() || tecnico.id;
+          const nomeCompleto = tecnico.nome.trim();
 
-    return [...byTecnico.values()].sort((a, b) => b.total - a.total);
-  }, [engajamento, rows]);
+          return {
+            id: tecnico.id,
+            matricula,
+            nome_completo: nomeCompleto,
+            nomeCurto: primeiroNome(nomeCompleto),
+            evidenciadas,
+            naoEvidenciadas,
+            total: evidenciadas + naoEvidenciadas,
+            proprias: evidenciadas,
+            via_admin: naoEvidenciadas,
+          };
+        })
+        .sort((a, b) => {
+          if (b.total !== a.total) return b.total - a.total;
+          return a.nome_completo.localeCompare(b.nome_completo, "pt-BR");
+        }),
+    [tecnicos, engajamentoPorTecnicoId],
+  );
 
-  const engajamentoChartWidth = Math.max(engajamentoChart.length * 80, 320);
+  const engajamentoChartPorMatricula = useMemo(
+    () => new Map(engajamentoChart.map((item) => [item.matricula, item])),
+    [engajamentoChart],
+  );
+
+  const engajamentoChartMinWidth = Math.max(engajamentoChart.length * 60, 320);
 
   const wosPorTecnico = useMemo(() => {
     const map = new Map<string, PendenciaEvidencia[]>();
@@ -617,7 +632,7 @@ ${listaDeWOsFormatada}
               size="sm"
               className="gap-2"
               onClick={abrirDetalheTecnicos}
-              disabled={engajamentoChart.length === 0}
+              disabled={tecnicos.length === 0}
             >
               <Users className="h-4 w-4" />
               Visualizar Técnicos
@@ -630,62 +645,60 @@ ${listaDeWOsFormatada}
             <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {engajamentoError}
             </p>
-          ) : engajamentoChart.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma evidência registrada nos últimos 30 dias.
-            </p>
+          ) : tecnicos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum técnico cadastrado na equipe.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <ChartContainer
-                config={ENGAJAMENTO_CHART_CONFIG}
-                className="h-80 shrink-0"
-                style={{ width: engajamentoChartWidth, minWidth: engajamentoChartWidth }}
-              >
-                <BarChart
-                  width={engajamentoChartWidth}
-                  height={320}
-                  data={engajamentoChart}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 52 }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    interval={0}
-                    angle={-45}
-                    textAnchor="end"
-                    height={64}
-                    tick={{ fontSize: 10 }}
-                  />
-                  <YAxis tickFormatter={(v) => formatQuantidade(v)} allowDecimals={false} />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.[0]) return null;
-                      const item = payload[0].payload as {
-                        nome_completo: string;
-                        proprias: number;
-                        via_admin: number;
-                        total: number;
-                      };
-                      return (
-                        <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
-                          <p className="font-semibold">{item.nome_completo}</p>
-                          <p className="text-emerald-600">
-                            WOs próprias: {formatQuantidade(item.proprias)}
-                          </p>
-                          <p className="text-orange-600">
-                            Via admin: {formatQuantidade(item.via_admin)}
-                          </p>
-                          <p className="text-muted-foreground">
-                            Total: {formatQuantidade(item.total)}
-                          </p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="proprias" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="via_admin" stackId="a" fill="#f97316" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
+            <div className="w-full overflow-x-auto">
+              <div className="h-80 w-full" style={{ minWidth: `${engajamentoChartMinWidth}px` }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={engajamentoChart}
+                    margin={{ top: 8, right: 8, left: 0, bottom: 52 }}
+                  >
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="matricula"
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={64}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(value) => {
+                        const item = engajamentoChartPorMatricula.get(String(value));
+                        return item ? primeiroNome(item.nome_completo) : String(value);
+                      }}
+                    />
+                    <YAxis tickFormatter={(v) => formatQuantidade(v)} allowDecimals={false} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.[0]) return null;
+                        const item = payload[0].payload as {
+                          nome_completo: string;
+                          proprias: number;
+                          via_admin: number;
+                          total: number;
+                        };
+                        return (
+                          <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
+                            <p className="font-semibold">{item.nome_completo}</p>
+                            <p className="text-emerald-600">
+                              WOs próprias: {formatQuantidade(item.proprias)}
+                            </p>
+                            <p className="text-orange-600">
+                              Via admin: {formatQuantidade(item.via_admin)}
+                            </p>
+                            <p className="text-muted-foreground">
+                              Total: {formatQuantidade(item.total)}
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="proprias" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="via_admin" stackId="a" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
         </section>
