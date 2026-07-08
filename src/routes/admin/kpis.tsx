@@ -373,6 +373,7 @@ function KpisPage() {
     () =>
       (kpis?.top_materiais ?? []).map((m) => ({
         label: m.descricao.length > 28 ? `${m.descricao.slice(0, 28)}…` : m.descricao,
+        descricao: m.descricao,
         total: m.total,
       })),
     [kpis?.top_materiais],
@@ -461,6 +462,16 @@ function KpisPage() {
         item.id_tecnico.toLowerCase().includes(termo),
     );
   }, [topConsumidoresMaterial, topConsumidoresBusca]);
+
+  const tituloTopConsumidores = useMemo(() => {
+    if (!materialSelecionado) return "—";
+    const nome =
+      itensCriticosLabels[materialSelecionado] ??
+      criticosData.find((c) => c.material === materialSelecionado)?.descr_material ??
+      "";
+    const codigo = normalizeMaterialCode(materialSelecionado);
+    return nome ? `${codigo} - ${nome}` : codigo;
+  }, [materialSelecionado, itensCriticosLabels, criticosData]);
 
   const detalheWosFiltrados = useMemo(() => {
     const termo = buscaDetalheWos.trim().toLowerCase();
@@ -720,12 +731,12 @@ function KpisPage() {
             </section>
 
             <section className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="mb-4 font-bold">Top 7 Materiais Mais Consumidos</h2>
+              <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <h2 className="mb-4 shrink-0 font-bold">Top 7 Materiais Mais Consumidos</h2>
                 {materiaisChart.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                 ) : (
-                  <ChartContainer config={CHART_CONFIG} className="h-64 w-full">
+                  <ChartContainer config={CHART_CONFIG} className="h-64 w-full shrink-0">
                     <BarChart data={materiaisChart} layout="vertical" margin={{ left: 8 }}>
                       <CartesianGrid horizontal={false} />
                       <XAxis type="number" hide />
@@ -735,7 +746,18 @@ function KpisPage() {
                         width={120}
                         tick={{ fontSize: 11 }}
                       />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            labelFormatter={(_, payload) => {
+                              const item = payload?.[0]?.payload as
+                                | { descricao?: string; label?: string }
+                                | undefined;
+                              return item?.descricao ?? item?.label ?? "";
+                            }}
+                          />
+                        }
+                      />
                       <Bar
                         dataKey="total"
                         fill="var(--color-total)"
@@ -776,19 +798,19 @@ function KpisPage() {
                 </Table>
               </div>
 
-              <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="mb-1 flex items-center gap-2 font-bold">
+              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <h2 className="mb-1 flex shrink-0 items-center gap-2 font-bold">
                   <Users className="h-4 w-4 text-primary" />
                   Técnicos por Volume de Baixa
                 </h2>
-                <p className="mb-4 text-xs text-muted-foreground">
+                <p className="mb-4 shrink-0 text-xs text-muted-foreground">
                   Clique em um técnico para ver o detalhamento.
                 </p>
                 {tecnicosChart.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="overflow-x-auto">
+                    <div className="shrink-0 overflow-x-auto">
                       <ChartContainer
                         config={CHART_CONFIG}
                         className="h-64 w-full"
@@ -835,24 +857,22 @@ function KpisPage() {
                         </BarChart>
                       </ChartContainer>
                     </div>
-                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
-                      <ul className="space-y-2">
-                        {(kpis?.top_tecnicos ?? []).map((t) => (
-                          <li key={t.id_tecnico}>
-                            <button
-                              type="button"
-                              onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
-                              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
-                            >
-                              <span className="font-medium text-primary">
-                                {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
-                              </span>
-                              <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
+                      {(kpis?.top_tecnicos ?? []).map((t) => (
+                        <li key={t.id_tecnico}>
+                          <button
+                            type="button"
+                            onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
+                            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                          >
+                            <span className="font-medium text-primary">
+                              {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
+                            </span>
+                            <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
@@ -892,23 +912,31 @@ function KpisPage() {
 
               {itensCriticos.length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-2">
-                  {itensCriticos.map((codigo) => (
+                  {itensCriticos.map((codigo) => {
+                    const nomeCompleto =
+                      itensCriticosLabels[codigo] ??
+                      criticosData.find((c) => c.material === codigo)?.descr_material ??
+                      codigo;
+                    return (
                     <Badge
                       key={codigo}
                       variant="secondary"
-                      className="gap-1 pr-1 font-mono text-xs"
+                      className="max-w-[220px] gap-1 pr-1 font-mono text-xs"
                     >
-                      {normalizeMaterialCode(codigo)}
+                      <span className="truncate" title={nomeCompleto}>
+                        {normalizeMaterialCode(codigo)}
+                      </span>
                       <button
                         type="button"
                         aria-label={`Remover ${codigo}`}
-                        className="ml-0.5 rounded-full p-0.5 hover:bg-muted"
+                        className="ml-0.5 shrink-0 rounded-full p-0.5 hover:bg-muted"
                         onClick={() => removerCodigoCritico(codigo)}
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -1082,7 +1110,7 @@ function KpisPage() {
       >
         <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Top Consumidores: {materialSelecionado ?? "—"}</DialogTitle>
+            <DialogTitle>Top Consumidores: {tituloTopConsumidores}</DialogTitle>
           </DialogHeader>
           {loadingTopConsumidores ? (
             <p className="text-sm text-muted-foreground">Carregando consumidores...</p>
