@@ -20,10 +20,13 @@ export default defineConfig({
       "VITE_SUPABASE_ANON_KEY",
       "SUPABASE_SERVICE_ROLE_KEY",
       "ADMIN_SETUP_SECRET",
+      "NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET",
+      "EVIDENCIA_WEBHOOK_SECRET",
     ],
   },
   // SSR no Render falha com jsxDEV (runtime de dev) se development=true no OXC.
   vite: {
+    envPrefix: ["VITE_", "NEXT_PUBLIC_"],
     oxc: {
       jsx: {
         development: false,

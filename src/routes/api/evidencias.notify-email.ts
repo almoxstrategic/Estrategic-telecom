@@ -112,18 +112,23 @@ export const Route = createFileRoute("/api/evidencias/notify-email")({
           const payload = parseNotifyBody(await request.json());
           await assertTecnico(payload.access_token, payload.tecnico_id);
 
-          await notifySapEvidenciaBatch({
-            tecnicoId: payload.tecnico_id,
-            contrato: payload.contrato,
-            wo: payload.wo,
-            observacao: payload.observacao,
-            materiais: payload.materiais.map((material) => ({
-              tipo_material: material.tipo,
-              metragem: material.metragem,
-              foto_inicio_url: material.foto_inicio_url,
-              foto_fim_url: material.foto_fim_url,
-            })),
-          });
+          const webhookSecret = request.headers.get("x-evidencia-webhook-secret") ?? undefined;
+
+          await notifySapEvidenciaBatch(
+            {
+              tecnicoId: payload.tecnico_id,
+              contrato: payload.contrato,
+              wo: payload.wo,
+              observacao: payload.observacao,
+              materiais: payload.materiais.map((material) => ({
+                tipo_material: material.tipo,
+                metragem: material.metragem,
+                foto_inicio_url: material.foto_inicio_url,
+                foto_fim_url: material.foto_fim_url,
+              })),
+            },
+            webhookSecret,
+          );
 
           return Response.json({ ok: true });
         } catch (error) {

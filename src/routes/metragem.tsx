@@ -217,7 +217,7 @@ function MetragemPage() {
 
       toast.error(
         isEmailFailure
-          ? "Erro: Ocorreu uma falha no envio do e-mail. A evidência não foi salva. Por favor, tente enviar novamente."
+          ? "Erro: Ocorreu uma falha no envio do e-mail. A evidência não foi salva. Pode ser uma falha de credenciais de produção (NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET). Por favor, tente enviar novamente."
           : `Erro de envio: ${message || "tente novamente"}`,
         {
           icon: <AlertCircle className="h-5 w-5" />,

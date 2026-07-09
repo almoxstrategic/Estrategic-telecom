@@ -11,15 +11,18 @@ type NotifySapMaterial = {
   foto_fim_url: string;
 };
 
-export async function notifySapEvidenciaBatch(input: {
-  tecnicoId: string;
-  contrato: string;
-  wo: string;
-  observacao?: string;
-  materiais: NotifySapMaterial[];
-}): Promise<void> {
+export async function notifySapEvidenciaBatch(
+  input: {
+    tecnicoId: string;
+    contrato: string;
+    wo: string;
+    observacao?: string;
+    materiais: NotifySapMaterial[];
+  },
+  webhookSecretOverride?: string,
+): Promise<void> {
   const url = `${getSupabaseUrl()}/functions/v1/notify-sap-evidencia`;
-  const webhookSecret = getEvidenciaWebhookSecret();
+  const webhookSecret = webhookSecretOverride?.trim() || getEvidenciaWebhookSecret();
 
   const response = await fetch(url, {
     method: "POST",

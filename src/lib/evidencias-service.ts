@@ -162,10 +162,20 @@ type BatchFormInput = {
 export async function notifyEvidenciaEmailBatch(input: BatchFormInput): Promise<void> {
   assertBrowserUpload();
 
+  const webhookSecret = import.meta.env.NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET as
+    | string
+    | undefined;
+  if (!webhookSecret) {
+    console.warn(
+      "AVISO: A variável NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET está indefinida no frontend.",
+    );
+  }
+
   const response = await fetch("/api/evidencias/notify-email", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(webhookSecret ? { "x-evidencia-webhook-secret": webhookSecret } : {}),
     },
     body: JSON.stringify({
       access_token: input.accessToken,
