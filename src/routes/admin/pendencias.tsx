@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -8,6 +8,7 @@ import {
   Copy,
   MessageCircle,
   Users,
+  X,
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -69,6 +70,7 @@ type AutonomiaSortKey =
 
 type AutonomiaDetalheRow = {
   tecnico_id: string;
+  matricula: string;
   nome_tecnico: string;
   wos: PendenciaEvidencia[];
   total: number;
@@ -237,56 +239,57 @@ function PendenciasPage() {
 
   const engajamentoChartMinWidth = Math.max(engajamentoChart.length * 60, 320);
 
-  const wosPorTecnico = useMemo(() => {
+  const wosPorProfileId = useMemo(() => {
+    const matriculaParaProfileId = new Map<string, string>();
+    for (const tecnico of tecnicos) {
+      if (tecnico.identificacao?.trim()) {
+        matriculaParaProfileId.set(normalizarIdTecnico(tecnico.identificacao), tecnico.id);
+      }
+      if (tecnico.login?.trim()) {
+        matriculaParaProfileId.set(normalizarIdTecnico(tecnico.login), tecnico.id);
+      }
+      matriculaParaProfileId.set(normalizarIdTecnico(tecnico.id), tecnico.id);
+    }
+
     const map = new Map<string, PendenciaEvidencia[]>();
     for (const row of rows) {
-      const key = normalizarIdTecnico(row.id_tecnico);
-      const wos = map.get(key) ?? [];
+      const profileId =
+        matriculaParaProfileId.get(normalizarIdTecnico(row.id_tecnico)) ??
+        matriculaParaProfileId.get(normalizarIdTecnico(row.login_tecnico));
+      if (!profileId) continue;
+
+      const wos = map.get(profileId) ?? [];
       wos.push(row);
-      map.set(key, wos);
+      map.set(profileId, wos);
     }
     return map;
-  }, [rows]);
+  }, [rows, tecnicos]);
 
-  const autonomiaDetalhes = useMemo<AutonomiaDetalheRow[]>(() => {
-    const byTecnico = new Map<string, AutonomiaDetalheRow>();
+  const autonomiaDetalhes = useMemo<AutonomiaDetalheRow[]>(
+    () =>
+      tecnicos.map((tecnico) => {
+        const dados = engajamentoPorTecnicoId.get(normalizarIdTecnico(tecnico.id));
+        const evidenciadas = dados?.evidenciadas ?? 0;
+        const nao_evidenciadas = dados?.naoEvidenciadas ?? 0;
+        const total = evidenciadas + nao_evidenciadas;
+        const wos = wosPorProfileId.get(tecnico.id) ?? [];
+        const matricula = tecnico.identificacao?.trim() || tecnico.login?.trim() || tecnico.id;
 
-    for (const item of engajamento) {
-      const total = item.proprias + item.via_admin;
-      const key = normalizarIdTecnico(item.tecnico_id);
-      const wos = wosPorTecnico.get(key) ?? [];
-      byTecnico.set(key, {
-        tecnico_id: item.tecnico_id,
-        nome_tecnico: item.nome_tecnico,
-        wos,
-        total,
-        evidenciadas: item.proprias,
-        nao_evidenciadas: item.via_admin,
-        pct_evidenciada: total > 0 ? (item.proprias / total) * 100 : 0,
-        pct_nao_evidenciada: total > 0 ? (item.via_admin / total) * 100 : 0,
-        total_cobrancas: wos.reduce((sum, row) => sum + (row.numero_cobrancas ?? 0), 0),
-      });
-    }
-
-    for (const row of rows) {
-      const key = normalizarIdTecnico(row.id_tecnico);
-      if (byTecnico.has(key)) continue;
-      const wos = wosPorTecnico.get(key) ?? [];
-      byTecnico.set(key, {
-        tecnico_id: row.id_tecnico,
-        nome_tecnico: row.nome_tecnico,
-        wos,
-        total: 0,
-        evidenciadas: 0,
-        nao_evidenciadas: 0,
-        pct_evidenciada: 0,
-        pct_nao_evidenciada: 0,
-        total_cobrancas: wos.reduce((sum, item) => sum + (item.numero_cobrancas ?? 0), 0),
-      });
-    }
-
-    return [...byTecnico.values()];
-  }, [engajamento, wosPorTecnico, rows]);
+        return {
+          tecnico_id: tecnico.id,
+          matricula,
+          nome_tecnico: tecnico.nome.trim(),
+          wos,
+          total,
+          evidenciadas,
+          nao_evidenciadas,
+          pct_evidenciada: total > 0 ? (evidenciadas / total) * 100 : 0,
+          pct_nao_evidenciada: total > 0 ? (nao_evidenciadas / total) * 100 : 0,
+          total_cobrancas: wos.reduce((sum, row) => sum + (row.numero_cobrancas ?? 0), 0),
+        };
+      }),
+    [tecnicos, engajamentoPorTecnicoId, wosPorProfileId],
+  );
 
   const autonomiaDetalhesFiltrados = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
@@ -335,6 +338,14 @@ function PendenciasPage() {
     setBuscaWoCobrancas("");
     setMesAnoCobrancas("todos");
     setIsModalCobrancasOpen(true);
+  };
+
+  const fecharModalCobrancas = (e?: SyntheticEvent) => {
+    e?.stopPropagation();
+    setIsModalCobrancasOpen(false);
+    setTecnicoSelecionadoCobrancas(null);
+    setBuscaWoCobrancas("");
+    setMesAnoCobrancas("todos");
   };
 
   const alternarOrdenacaoEvidenciada = () => {
@@ -388,7 +399,7 @@ function PendenciasPage() {
       .map((wo) =>
         [
           tecnicoSelecionadoCobrancas.nome_tecnico,
-          wo.id_tecnico || tecnicoSelecionadoCobrancas.tecnico_id,
+          tecnicoSelecionadoCobrancas.matricula,
           wo.work_order_id,
           wo.numero_cobrancas ?? 0,
         ].join("\t"),
@@ -477,7 +488,7 @@ ${listaDeWOsFormatada}
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
               <AlertTriangle className="h-6 w-6 text-destructive" />
-              Pendências de Evidência
+              Pendências de Evidência ({rows.length})
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               WOs com SLA negativo (status 3) para auditar se o gargalo é do técnico ou da
@@ -773,7 +784,9 @@ ${listaDeWOsFormatada}
 
       <Dialog
         open={detalheOpen}
+        modal={!isModalCobrancasOpen}
         onOpenChange={(open) => {
+          if (isModalCobrancasOpen) return;
           setDetalheOpen(open);
           if (!open) {
             setSearchTerm("");
@@ -797,8 +810,8 @@ ${listaDeWOsFormatada}
 
           {autonomiaDetalhesFiltrados.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {autonomiaDetalhes.length === 0
-                ? "Nenhuma evidência registrada nos últimos 30 dias."
+              {tecnicos.length === 0
+                ? "Nenhum técnico cadastrado na equipe."
                 : "Nenhum técnico encontrado para a busca."}
             </p>
           ) : (
@@ -911,32 +924,52 @@ ${listaDeWOsFormatada}
       <Dialog
         open={isModalCobrancasOpen}
         onOpenChange={(open) => {
-          setIsModalCobrancasOpen(open);
-          if (!open) {
-            setTecnicoSelecionadoCobrancas(null);
-            setBuscaWoCobrancas("");
-            setMesAnoCobrancas("todos");
+          if (open) {
+            setIsModalCobrancasOpen(true);
+            return;
           }
+          fecharModalCobrancas();
         }}
       >
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <DialogTitle>
-                Cobranças: {tecnicoSelecionadoCobrancas?.nome_tecnico ?? "Técnico"}
-              </DialogTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => void copiarInformacoesCobrancas()}
-              >
-                <Copy className="h-4 w-4" />
-                Copiar Informações
-              </Button>
-            </div>
-          </DialogHeader>
+        <DialogContent
+          className="z-[60] max-h-[85vh] max-w-3xl overflow-y-auto [&>button.absolute]:hidden"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDownOutside={(e) => e.stopPropagation()}
+          onInteractOutside={(e) => e.stopPropagation()}
+          onEscapeKeyDown={(e) => {
+            e.stopPropagation();
+            fecharModalCobrancas(e);
+          }}
+        >
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <DialogTitle className="text-left">
+              Cobranças: {tecnicoSelecionadoCobrancas?.nome_tecnico ?? "Técnico"}
+            </DialogTitle>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fecharModalCobrancas(e);
+              }}
+              className="shrink-0 text-gray-500 hover:text-gray-800"
+              aria-label="Fechar cobranças"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          <div className="mb-4 flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => void copiarInformacoesCobrancas()}
+            >
+              <Copy className="h-4 w-4" />
+              Copiar Informações
+            </Button>
+          </div>
 
           <div className="grid gap-3 md:grid-cols-[1fr_220px]">
             <Input

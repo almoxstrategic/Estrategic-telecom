@@ -95,8 +95,59 @@ async function insertInBatches<T extends Record<string, unknown>>(
   }
 }
 
+async function fetchCobrancasExistentesPorWo(
+  workOrderIds: string[],
+): Promise<Map<string, { numero_cobrancas: number; ultima_data_cobranca: string | null }>> {
+  const map = new Map<string, { numero_cobrancas: number; ultima_data_cobranca: string | null }>();
+  if (workOrderIds.length === 0) return map;
+
+  const supabase = getSupabaseClient();
+  for (let i = 0; i < workOrderIds.length; i += UPSERT_BATCH_SIZE) {
+    const chunk = workOrderIds.slice(i, i + UPSERT_BATCH_SIZE);
+    const { data, error } = await supabase
+      .from("wos_cabecalho")
+      .select("work_order_id, numero_cobrancas, ultima_data_cobranca")
+      .in("work_order_id", chunk);
+    if (error) throw error;
+
+    for (const row of data ?? []) {
+      map.set(row.work_order_id, {
+        numero_cobrancas: Number(row.numero_cobrancas ?? 0),
+        ultima_data_cobranca: row.ultima_data_cobranca ?? null,
+      });
+    }
+  }
+
+  return map;
+}
+
+function montarPayloadWoCabecalho(
+  rows: WoCabecalhoRow[],
+  cobrancasExistentes: Map<
+    string,
+    { numero_cobrancas: number; ultima_data_cobranca: string | null }
+  >,
+) {
+  return rows.map((r) => {
+    const existente = cobrancasExistentes.get(r.work_order_id);
+    return {
+      work_order_id: r.work_order_id,
+      id_tecnico: r.id_tecnico,
+      status: r.status,
+      sla: r.sla,
+      numero_cobrancas: existente?.numero_cobrancas ?? 0,
+      ultima_data_cobranca: existente?.ultima_data_cobranca ?? null,
+      updated_at: new Date().toISOString(),
+    };
+  });
+}
+
 export async function replaceWoCabecalho(rows: WoCabecalhoRow[]): Promise<{ inserted: number }> {
   const supabase = getSupabaseClient();
+  const deduped = dedupeWoCabecalhoRows(rows);
+  const cobrancasExistentes = await fetchCobrancasExistentesPorWo(
+    deduped.map((r) => r.work_order_id),
+  );
 
   const { error: deleteError } = await supabase
     .from("wos_cabecalho")
@@ -104,16 +155,9 @@ export async function replaceWoCabecalho(rows: WoCabecalhoRow[]): Promise<{ inse
     .neq("work_order_id", "");
 
   if (deleteError) throw deleteError;
-  if (rows.length === 0) return { inserted: 0 };
+  if (deduped.length === 0) return { inserted: 0 };
 
-  const deduped = dedupeWoCabecalhoRows(rows);
-  const payload = deduped.map((r) => ({
-    work_order_id: r.work_order_id,
-    id_tecnico: r.id_tecnico,
-    status: r.status,
-    sla: r.sla,
-    updated_at: new Date().toISOString(),
-  }));
+  const payload = montarPayloadWoCabecalho(deduped, cobrancasExistentes);
 
   await insertInBatches("wos_cabecalho", payload);
   return { inserted: deduped.length };
@@ -126,19 +170,14 @@ export async function upsertWoCabecalho(rows: WoCabecalhoRow[]): Promise<UpsertR
   const deduped = dedupeWoCabecalhoRows(rows);
   const supabase = getSupabaseClient();
   const ids = deduped.map((r) => r.work_order_id);
+  const cobrancasExistentes = await fetchCobrancasExistentesPorWo(ids);
 
   const { count: existingCount } = await supabase
     .from("wos_cabecalho")
     .select("work_order_id", { count: "exact", head: true })
     .in("work_order_id", ids);
 
-  const payload = deduped.map((r) => ({
-    work_order_id: r.work_order_id,
-    id_tecnico: r.id_tecnico,
-    status: r.status,
-    sla: r.sla,
-    updated_at: new Date().toISOString(),
-  }));
+  const payload = montarPayloadWoCabecalho(deduped, cobrancasExistentes);
 
   await upsertInBatches("wos_cabecalho", payload, "work_order_id");
   return countUpsert(deduped, existingCount ?? 0);
@@ -337,10 +376,7 @@ export async function fetchPeriodosConsumo(): Promise<PeriodoConsumo[]> {
   }));
 }
 
-export async function searchDimMateriais(
-  query: string,
-  limit = 40,
-): Promise<DimMaterial[]> {
+export async function searchDimMateriais(query: string, limit = 40): Promise<DimMaterial[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("search_dim_materiais", {
     p_query: query.trim(),
