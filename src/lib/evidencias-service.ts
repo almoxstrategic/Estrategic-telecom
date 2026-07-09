@@ -59,6 +59,9 @@ function mapRow(row: DbEvidencia): Evidencia {
     data_registro: row.data_registro,
     tecnico_id: row.tecnico_id,
     enviado_por_admin: Boolean(row.enviado_por_admin),
+    tipo_material: row.tipo_material ?? null,
+    observacao: row.observacao ?? null,
+    envio_grupo_id: row.envio_grupo_id ?? null,
     tecnico_nome: row.profiles?.nome ?? row.tecnico_nome,
     tecnico_login: row.profiles?.login ?? row.tecnico_login ?? undefined,
     tecnico_identificacao:
@@ -137,6 +140,95 @@ export async function uploadEvidencePhoto(
   return { path, publicUrl: getStoragePublicUrl(path) };
 }
 
+type BatchMaterialInput = {
+  tipo: string;
+  metragem: string;
+  foto_inicio_url: string;
+  foto_fim_url: string;
+  foto_inicio_path: string;
+  foto_fim_path: string;
+};
+
+type BatchFormInput = {
+  accessToken: string;
+  tecnicoId: string;
+  contrato: string;
+  wo: string;
+  envioGrupoId: string;
+  observacao?: string;
+  materiais: BatchMaterialInput[];
+};
+
+export async function notifyEvidenciaEmailBatch(input: BatchFormInput): Promise<void> {
+  assertBrowserUpload();
+
+  const response = await fetch("/api/evidencias/notify-email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      access_token: input.accessToken,
+      tecnico_id: input.tecnicoId,
+      contrato: input.contrato,
+      wo: input.wo,
+      observacao: input.observacao,
+      materiais: input.materiais.map((material) => ({
+        tipo: material.tipo,
+        metragem: material.metragem,
+        foto_inicio_url: material.foto_inicio_url,
+        foto_fim_url: material.foto_fim_url,
+      })),
+    }),
+  });
+
+  const body = (await response.json().catch(() => null)) as { error?: string } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      body?.error || "Falha no envio do e-mail. Webhook não autorizado ou indisponível.",
+    );
+  }
+}
+
+export async function saveEvidenciaBatchRecords(
+  input: BatchFormInput,
+): Promise<{ count: number }> {
+  assertBrowserUpload();
+
+  const response = await fetch("/api/evidencias/batch-submit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      access_token: input.accessToken,
+      tecnico_id: input.tecnicoId,
+      contrato: input.contrato,
+      wo: input.wo,
+      envio_grupo_id: input.envioGrupoId,
+      observacao: input.observacao,
+      materiais: input.materiais,
+    }),
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | { count?: number; error?: string }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(body?.error || "Erro ao salvar evidências.");
+  }
+
+  return { count: body?.count ?? input.materiais.length };
+}
+
+/** @deprecated Use notifyEvidenciaEmailBatch + saveEvidenciaBatchRecords */
+export async function submitEvidenciaBatchForm(input: BatchFormInput): Promise<{ count: number }> {
+  await notifyEvidenciaEmailBatch(input);
+  return saveEvidenciaBatchRecords(input);
+}
+
 export async function submitEvidenciaForm(input: {
   accessToken: string;
   tecnicoId: string;
@@ -147,6 +239,8 @@ export async function submitEvidenciaForm(input: {
   total_utilizado: number;
   fotoInicio: File;
   fotoFim: File;
+  tipo_material?: string;
+  observacao?: string;
 }): Promise<Evidencia> {
   assertBrowserUpload();
 
@@ -160,6 +254,12 @@ export async function submitEvidenciaForm(input: {
   formData.append("total_utilizado", String(input.total_utilizado));
   formData.append("foto_inicio", input.fotoInicio, input.fotoInicio.name);
   formData.append("foto_fim", input.fotoFim, input.fotoFim.name);
+  if (input.tipo_material?.trim()) {
+    formData.append("tipo_material", input.tipo_material.trim());
+  }
+  if (input.observacao?.trim()) {
+    formData.append("observacao", input.observacao.trim());
+  }
 
   const response = await fetch("/api/evidencias/submit", {
     method: "POST",

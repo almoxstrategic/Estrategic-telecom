@@ -110,6 +110,8 @@ export const Route = createFileRoute("/api/evidencias/submit")({
 
           const fotoInicio = requiredFile(formData, "foto_inicio");
           const fotoFim = requiredFile(formData, "foto_fim");
+          const tipoMaterial = formData.get("tipo_material");
+          const observacao = formData.get("observacao");
 
           const authedClient = await assertTecnico(accessToken, tecnicoId);
 
@@ -130,6 +132,14 @@ export const Route = createFileRoute("/api/evidencias/submit")({
               foto_fim_path: fim.path,
               tecnico_id: tecnicoId,
               enviado_por_admin: false,
+              tipo_material:
+                typeof tipoMaterial === "string" && tipoMaterial.trim()
+                  ? tipoMaterial.trim()
+                  : null,
+              observacao:
+                typeof observacao === "string" && observacao.trim()
+                  ? observacao.trim()
+                  : null,
             })
             .select("*")
             .single();

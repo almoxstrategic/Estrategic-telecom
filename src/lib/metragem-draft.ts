@@ -3,8 +3,7 @@ const STORAGE_KEY = "estrategic-metragem-draft";
 export type MetragemDraft = {
   contrato: string;
   wo: string;
-  metInicial: string;
-  metFinal: string;
+  observacao: string;
 };
 
 export function loadMetragemDraft(): MetragemDraft | null {
@@ -13,20 +12,14 @@ export function loadMetragemDraft(): MetragemDraft | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<MetragemDraft>;
-    if (
-      typeof parsed.contrato !== "string" ||
-      typeof parsed.wo !== "string" ||
-      typeof parsed.metInicial !== "string" ||
-      typeof parsed.metFinal !== "string"
-    ) {
+    const parsed = JSON.parse(raw) as Partial<MetragemDraft & { metInicial?: string; metFinal?: string }>;
+    if (typeof parsed.contrato !== "string" || typeof parsed.wo !== "string") {
       return null;
     }
     return {
       contrato: parsed.contrato,
       wo: parsed.wo,
-      metInicial: parsed.metInicial,
-      metFinal: parsed.metFinal,
+      observacao: typeof parsed.observacao === "string" ? parsed.observacao : "",
     };
   } catch {
     return null;

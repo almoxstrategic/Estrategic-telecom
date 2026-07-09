@@ -24,6 +24,8 @@ import { Route as AdminKpisRouteImport } from './routes/admin/kpis'
 import { Route as AdminImportacaoRouteImport } from './routes/admin/importacao'
 import { Route as AdminEnviarEvidenciaRouteImport } from './routes/admin/enviar-evidencia'
 import { Route as ApiEvidenciasSubmitRouteImport } from './routes/api/evidencias.submit'
+import { Route as ApiEvidenciasNotifyEmailRouteImport } from './routes/api/evidencias.notify-email'
+import { Route as ApiEvidenciasBatchSubmitRouteImport } from './routes/api/evidencias.batch-submit'
 import { Route as ApiEvidenciasAdminSubmitRouteImport } from './routes/api/evidencias.admin-submit'
 
 const TodosRoute = TodosRouteImport.update({
@@ -101,6 +103,18 @@ const ApiEvidenciasSubmitRoute = ApiEvidenciasSubmitRouteImport.update({
   path: '/api/evidencias/submit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEvidenciasNotifyEmailRoute =
+  ApiEvidenciasNotifyEmailRouteImport.update({
+    id: '/api/evidencias/notify-email',
+    path: '/api/evidencias/notify-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiEvidenciasBatchSubmitRoute =
+  ApiEvidenciasBatchSubmitRouteImport.update({
+    id: '/api/evidencias/batch-submit',
+    path: '/api/evidencias/batch-submit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiEvidenciasAdminSubmitRoute =
   ApiEvidenciasAdminSubmitRouteImport.update({
     id: '/api/evidencias/admin-submit',
@@ -124,6 +138,8 @@ export interface FileRoutesByFullPath {
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
   '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
+  '/api/evidencias/batch-submit': typeof ApiEvidenciasBatchSubmitRoute
+  '/api/evidencias/notify-email': typeof ApiEvidenciasNotifyEmailRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesByTo {
@@ -141,6 +157,8 @@ export interface FileRoutesByTo {
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin': typeof AdminIndexRoute
   '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
+  '/api/evidencias/batch-submit': typeof ApiEvidenciasBatchSubmitRoute
+  '/api/evidencias/notify-email': typeof ApiEvidenciasNotifyEmailRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRoutesById {
@@ -160,6 +178,8 @@ export interface FileRoutesById {
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
   '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
+  '/api/evidencias/batch-submit': typeof ApiEvidenciasBatchSubmitRoute
+  '/api/evidencias/notify-email': typeof ApiEvidenciasNotifyEmailRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
 }
 export interface FileRouteTypes {
@@ -180,6 +200,8 @@ export interface FileRouteTypes {
     | '/admin/pendencias'
     | '/admin/'
     | '/api/evidencias/admin-submit'
+    | '/api/evidencias/batch-submit'
+    | '/api/evidencias/notify-email'
     | '/api/evidencias/submit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -197,6 +219,8 @@ export interface FileRouteTypes {
     | '/admin/pendencias'
     | '/admin'
     | '/api/evidencias/admin-submit'
+    | '/api/evidencias/batch-submit'
+    | '/api/evidencias/notify-email'
     | '/api/evidencias/submit'
   id:
     | '__root__'
@@ -215,6 +239,8 @@ export interface FileRouteTypes {
     | '/admin/pendencias'
     | '/admin/'
     | '/api/evidencias/admin-submit'
+    | '/api/evidencias/batch-submit'
+    | '/api/evidencias/notify-email'
     | '/api/evidencias/submit'
   fileRoutesById: FileRoutesById
 }
@@ -229,6 +255,8 @@ export interface RootRouteChildren {
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
   ApiEvidenciasAdminSubmitRoute: typeof ApiEvidenciasAdminSubmitRoute
+  ApiEvidenciasBatchSubmitRoute: typeof ApiEvidenciasBatchSubmitRoute
+  ApiEvidenciasNotifyEmailRoute: typeof ApiEvidenciasNotifyEmailRoute
   ApiEvidenciasSubmitRoute: typeof ApiEvidenciasSubmitRoute
 }
 
@@ -339,6 +367,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEvidenciasSubmitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/evidencias/notify-email': {
+      id: '/api/evidencias/notify-email'
+      path: '/api/evidencias/notify-email'
+      fullPath: '/api/evidencias/notify-email'
+      preLoaderRoute: typeof ApiEvidenciasNotifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/evidencias/batch-submit': {
+      id: '/api/evidencias/batch-submit'
+      path: '/api/evidencias/batch-submit'
+      fullPath: '/api/evidencias/batch-submit'
+      preLoaderRoute: typeof ApiEvidenciasBatchSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/evidencias/admin-submit': {
       id: '/api/evidencias/admin-submit'
       path: '/api/evidencias/admin-submit'
@@ -378,6 +420,8 @@ const rootRouteChildren: RootRouteChildren = {
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
   ApiEvidenciasAdminSubmitRoute: ApiEvidenciasAdminSubmitRoute,
+  ApiEvidenciasBatchSubmitRoute: ApiEvidenciasBatchSubmitRoute,
+  ApiEvidenciasNotifyEmailRoute: ApiEvidenciasNotifyEmailRoute,
   ApiEvidenciasSubmitRoute: ApiEvidenciasSubmitRoute,
 }
 export const routeTree = rootRouteImport

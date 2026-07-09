@@ -83,3 +83,13 @@ export function getSupabaseServiceRoleKey(): string {
   }
   return value;
 }
+
+export function getEvidenciaWebhookSecret(): string {
+  const value = readEnv("EVIDENCIA_WEBHOOK_SECRET");
+  if (!value) {
+    throw new Error(
+      "Configure EVIDENCIA_WEBHOOK_SECRET no .env (mesmo valor da Edge Function notify-sap-evidencia).",
+    );
+  }
+  return value;
+}

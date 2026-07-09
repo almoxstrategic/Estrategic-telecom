@@ -16,22 +16,30 @@ $baseUrl = if ($Local) {
   "https://lanllzwoylgedegkawsa.supabase.co/functions/v1/notify-sap-evidencia"
 }
 
+$fotoInicio = "https://lanllzwoylgedegkawsa.supabase.co/storage/v1/object/public/evidencias-fotos/9ec9b9ba-b483-4beb-896d-8ea1be0d7059/5405f82d-255e-4997-87a3-c56fa35ccdad-inicio.png"
+$fotoFim = "https://lanllzwoylgedegkawsa.supabase.co/storage/v1/object/public/evidencias-fotos/9ec9b9ba-b483-4beb-896d-8ea1be0d7059/3f7ce5d4-913a-4de2-8aaf-7d4c6634d3cc-fim.png"
+
 $body = @{
-  type   = "INSERT"
-  table  = "evidencias"
-  schema = "public"
-  record = @{
-    contrato          = "1234567"
-    wo                = "7654321"
-    metragem_inicial  = 1000
-    metragem_final    = 500
-    total_utilizado   = 500
-    foto_inicio_url   = "https://lanllzwoylgedegkawsa.supabase.co/storage/v1/object/public/evidencias-fotos/9ec9b9ba-b483-4beb-896d-8ea1be0d7059/5405f82d-255e-4997-87a3-c56fa35ccdad-inicio.png"
-    foto_fim_url      = "https://lanllzwoylgedegkawsa.supabase.co/storage/v1/object/public/evidencias-fotos/9ec9b9ba-b483-4beb-896d-8ea1be0d7059/3f7ce5d4-913a-4de2-8aaf-7d4c6634d3cc-fim.png"
-    data_registro     = (Get-Date).ToUniversalTime().ToString("o")
-    tecnico_id        = $TecnicoId
-  }
-} | ConvertTo-Json -Depth 5
+  type        = "BATCH"
+  tecnico_id  = $TecnicoId
+  contrato    = "123456789"
+  wo          = "03230|739003299"
+  observacao  = "Comecei utilizando uma caixa de cabo coaxial branca e tive que abrir outra."
+  materiais   = @(
+    @{
+      tipo_material    = "Cabo coaxial Branco"
+      metragem         = "20"
+      foto_inicio_url  = $fotoInicio
+      foto_fim_url     = $fotoFim
+    },
+    @{
+      tipo_material    = "Cabo Drop Low"
+      metragem         = "85"
+      foto_inicio_url  = $fotoInicio
+      foto_fim_url     = $fotoFim
+    }
+  )
+} | ConvertTo-Json -Depth 6
 
 $headers = @{
   "Content-Type" = "application/json"

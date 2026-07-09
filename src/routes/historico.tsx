@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { CopyRegistroButton } from "@/components/CopyRegistroButton";
 import { useApp } from "@/lib/app-store";
 import { requireTecnico } from "@/lib/auth-guards";
+import { groupEvidenciasPorEnvio } from "@/lib/evidencias-grouping";
 import { fetchMyEvidencias } from "@/lib/evidencias-service";
 import { formatHistoricoCopyText } from "@/lib/registro-copy";
 import type { Evidencia } from "@/lib/types";
@@ -40,10 +41,14 @@ function HistoricoPage() {
       .finally(() => setLoading(false));
   }, [user]);
 
+  const envios = useMemo(() => groupEvidenciasPorEnvio(records), [records]);
+
   const filtered = useMemo(() => {
-    const list = filterDate ? records.filter((r) => dayKey(r.data_registro) === filterDate) : records;
+    const list = filterDate
+      ? envios.filter((envio) => dayKey(envio.data_registro) === filterDate)
+      : envios;
     return [...list].sort((a, b) => (a.data_registro < b.data_registro ? 1 : -1));
-  }, [records, filterDate]);
+  }, [envios, filterDate]);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -95,34 +100,38 @@ function HistoricoPage() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {filtered.map((r) => {
-              const open = expanded === r.id;
-              const dt = new Date(r.data_registro);
+            {filtered.map((envio) => {
+              const open = expanded === envio.id;
+              const dt = new Date(envio.data_registro);
+              const totalMetros = envio.materiais.reduce(
+                (sum, material) => sum + material.total_utilizado,
+                0,
+              );
+
               return (
                 <li
-                  key={r.id}
+                  key={envio.id}
                   className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
                 >
                   <button
                     type="button"
-                    onClick={() => setExpanded(open ? null : r.id)}
+                    onClick={() => setExpanded(open ? null : envio.id)}
                     className="flex w-full items-center justify-between gap-3 p-4 text-left active:bg-muted/50"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                          WO {r.wo}
+                          WO {envio.wo}
                         </span>
                         <span className="text-xs font-semibold text-foreground">
-                          Contrato {r.contrato}
+                          Contrato {envio.contrato}
                         </span>
                         <span className="ml-auto rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-                          {r.total_utilizado} m
+                          {envio.materiais.length} item{envio.materiais.length > 1 ? "s" : ""}
                         </span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
-                        <span>Inicial {r.metragem_inicial} m</span>
-                        <span>Final {r.metragem_final} m</span>
+                        <span>Total {totalMetros} m</span>
                         <span>
                           {dt.toLocaleDateString("pt-BR")} ·{" "}
                           {dt.toLocaleTimeString("pt-BR", {
@@ -134,17 +143,18 @@ function HistoricoPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <CopyRegistroButton
-                        contrato={r.contrato}
-                        wo={r.wo}
-                        nomeTecnico={user?.nome ?? r.tecnico_nome ?? ""}
-                        matricula={user?.identificacao ?? user?.login ?? r.tecnico_identificacao ?? ""}
+                        contrato={envio.contrato}
+                        wo={envio.wo}
+                        nomeTecnico={user?.nome ?? ""}
+                        matricula={user?.identificacao ?? user?.login ?? ""}
                         copyText={formatHistoricoCopyText({
-                          contrato: r.contrato,
-                          wo: r.wo,
-                          nomeTecnico: user?.nome ?? r.tecnico_nome ?? "",
-                          matricula:
-                            user?.identificacao ?? user?.login ?? r.tecnico_identificacao ?? "",
-                          metragem: r.total_utilizado,
+                          contrato: envio.contrato,
+                          wo: envio.wo,
+                          nomeTecnico: user?.nome ?? "",
+                          matricula: user?.identificacao ?? user?.login ?? "",
+                          metragem: envio.materiais
+                            .map((material) => `${material.tipo}: ${material.metragem}m`)
+                            .join(" | "),
                         })}
                       />
                       <ChevronDown
@@ -160,27 +170,56 @@ function HistoricoPage() {
                     }`}
                   >
                     <div className="overflow-hidden">
-                      <div className="grid grid-cols-2 gap-3 border-t border-border p-4">
-                        <figure>
-                          <img
-                            src={r.foto_inicio_url}
-                            alt="Foto do início"
-                            className="h-40 w-full rounded-lg object-cover"
-                          />
-                          <figcaption className="mt-1 text-center text-xs font-semibold text-muted-foreground">
-                            Foto do Início
-                          </figcaption>
-                        </figure>
-                        <figure>
-                          <img
-                            src={r.foto_fim_url}
-                            alt="Foto do fim"
-                            className="h-40 w-full rounded-lg object-cover"
-                          />
-                          <figcaption className="mt-1 text-center text-xs font-semibold text-muted-foreground">
-                            Foto do Fim
-                          </figcaption>
-                        </figure>
+                      <div className="space-y-4 border-t border-border p-4">
+                        {envio.materiais.map((material) => (
+                          <div
+                            key={material.id}
+                            className="rounded-lg border border-border/70 bg-muted/20 p-3"
+                          >
+                            <p className="text-sm font-bold text-foreground">{material.tipo}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Total: {material.metragem} Metros
+                            </p>
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                              <a
+                                href={material.foto_inicio_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group block"
+                              >
+                                <img
+                                  src={material.foto_inicio_url}
+                                  alt={`Foto início — ${material.tipo}`}
+                                  className="h-28 w-full rounded-lg border border-border object-cover transition group-hover:opacity-90"
+                                />
+                                <span className="mt-1 block text-center text-xs font-semibold text-muted-foreground">
+                                  Foto Início
+                                </span>
+                              </a>
+                              <a
+                                href={material.foto_fim_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group block"
+                              >
+                                <img
+                                  src={material.foto_fim_url}
+                                  alt={`Foto fim — ${material.tipo}`}
+                                  className="h-28 w-full rounded-lg border border-border object-cover transition group-hover:opacity-90"
+                                />
+                                <span className="mt-1 block text-center text-xs font-semibold text-muted-foreground">
+                                  Foto Fim
+                                </span>
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                        {envio.observacao && (
+                          <p className="rounded-lg bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                            <span className="font-semibold text-foreground">Observação:</span>{" "}
+                            {envio.observacao}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

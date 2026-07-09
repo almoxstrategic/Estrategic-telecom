@@ -23,6 +23,10 @@ export type Evidencia = {
   data_registro: string;
   tecnico_id: string;
   enviado_por_admin: boolean;
+  tipo_material?: string | null;
+  observacao?: string | null;
+  envio_grupo_id?: string | null;
+  notificar_email?: boolean;
   tecnico_nome?: string;
   tecnico_login?: string;
   tecnico_identificacao?: string;
