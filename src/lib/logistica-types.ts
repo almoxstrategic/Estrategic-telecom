@@ -3,6 +3,7 @@ export type WoCabecalhoRow = {
   id_tecnico: string;
   status: number;
   sla: number;
+  dataAtendimento: string | null;
 };
 
 export type WoConsumoRow = {
@@ -105,6 +106,7 @@ export type PendenciaEvidencia = {
   evidencia_data_registro: string | null;
   numero_cobrancas: number;
   ultima_data_cobranca: string | null;
+  dataAtendimento: string | null;
 };
 
 export type UpsertResult = {

@@ -40,13 +40,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin/pendencias")({
   head: () => ({
@@ -107,6 +100,79 @@ function normalizarIdTecnico(id: string): string {
   return id.trim().toUpperCase();
 }
 
+function inicioDoDia(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function parseDataIsoLocal(value: string | null | undefined): Date | null {
+  if (value == null) return null;
+
+  const texto = String(value).trim();
+  if (!texto) return null;
+
+  const parteData = texto.split("T")[0]?.split(" ")[0];
+  if (!parteData) return null;
+
+  const [ano, mes, dia] = parteData.split("-").map(Number);
+  if (!ano || !mes || !dia) return null;
+
+  const data = new Date(ano, mes - 1, dia);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+function formatarDataUnificada(dataString: string | null | undefined): string | null {
+  if (!dataString) return null;
+
+  try {
+    const apenasData = String(dataString).trim().split("T")[0]?.split(" ")[0];
+    if (!apenasData) return null;
+
+    const partesIso = apenasData.split("-");
+    if (partesIso.length === 3 && partesIso[0]!.length === 4) {
+      return `${partesIso[2]}/${partesIso[1]}/${partesIso[0]}`;
+    }
+
+    const partesBr = apenasData.split("/");
+    if (partesBr.length === 3 && partesBr[2]!.length === 4) {
+      const dia = partesBr[0]!.padStart(2, "0");
+      const mes = partesBr[1]!.padStart(2, "0");
+      const ano = partesBr[2]!;
+      return `${dia}/${mes}/${ano}`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function calcularDiasDesdeCobranca(ultimaDataCobranca: string | null): number | null {
+  if (!ultimaDataCobranca) return null;
+
+  const dataCobranca = parseDataIsoLocal(ultimaDataCobranca);
+  if (!dataCobranca) return null;
+
+  const hoje = inicioDoDia(new Date());
+  const dataZerada = inicioDoDia(dataCobranca);
+  const diffTime = Math.abs(hoje.getTime() - dataZerada.getTime());
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function renderizarStatusCobranca(ultimaDataCobranca: string | null) {
+  const dias = calcularDiasDesdeCobranca(ultimaDataCobranca);
+
+  if (dias === null) {
+    return <span className="whitespace-nowrap text-gray-400">Não cobrado</span>;
+  }
+  if (dias === 0) {
+    return <span className="whitespace-nowrap font-medium text-green-600">Hoje</span>;
+  }
+  if (dias === 1) {
+    return <span className="whitespace-nowrap text-orange-500">Há 1 dia</span>;
+  }
+  return <span className="whitespace-nowrap text-red-500">Há {dias} dias</span>;
+}
+
 function PendenciasPage() {
   const [rows, setRows] = useState<PendenciaEvidencia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +196,7 @@ function PendenciasPage() {
   const [tecnicoSelecionadoCobrancas, setTecnicoSelecionadoCobrancas] =
     useState<AutonomiaDetalheRow | null>(null);
   const [buscaWoCobrancas, setBuscaWoCobrancas] = useState("");
-  const [mesAnoCobrancas, setMesAnoCobrancas] = useState("todos");
+  const [dataFiltroCobrancas, setDataFiltroCobrancas] = useState("todas");
 
   useEffect(() => {
     void (async () => {
@@ -336,7 +402,7 @@ function PendenciasPage() {
   const abrirModalCobrancas = (row: AutonomiaDetalheRow) => {
     setTecnicoSelecionadoCobrancas(row);
     setBuscaWoCobrancas("");
-    setMesAnoCobrancas("todos");
+    setDataFiltroCobrancas("todas");
     setIsModalCobrancasOpen(true);
   };
 
@@ -345,7 +411,7 @@ function PendenciasPage() {
     setIsModalCobrancasOpen(false);
     setTecnicoSelecionadoCobrancas(null);
     setBuscaWoCobrancas("");
-    setMesAnoCobrancas("todos");
+    setDataFiltroCobrancas("todas");
   };
 
   const alternarOrdenacaoEvidenciada = () => {
@@ -368,26 +434,48 @@ function PendenciasPage() {
     setSortConfig((prev) => (prev === "cobrancas_desc" ? "cobrancas_asc" : "cobrancas_desc"));
   };
 
-  const mesesAnoDisponiveisCobrancas = useMemo(() => {
-    const meses = new Set<string>();
-    for (const row of tecnicoSelecionadoCobrancas?.wos ?? []) {
-      if ((row.numero_cobrancas ?? 0) <= 0 || !row.ultima_data_cobranca) continue;
-      meses.add(row.ultima_data_cobranca.slice(0, 7));
-    }
-    return [...meses].sort().reverse();
+  const opcoesDataCobrancas = useMemo(() => {
+    const wosDoTecnico = (tecnicoSelecionadoCobrancas?.wos ?? []).filter(
+      (wo) => (wo.numero_cobrancas ?? 0) > 0,
+    );
+
+    const datasFormatadas = wosDoTecnico
+      .map((wo) => formatarDataUnificada(wo.dataAtendimento))
+      .filter((d): d is string => Boolean(d));
+
+    const datasUnicas = [...new Set(datasFormatadas)];
+
+    datasUnicas.sort((a, b) => {
+      const [diaA, mesA, anoA] = a.split("/").map(Number);
+      const [diaB, mesB, anoB] = b.split("/").map(Number);
+      return (
+        new Date(anoB, mesB - 1, diaB).getTime() - new Date(anoA, mesA - 1, diaA).getTime()
+      );
+    });
+
+    return [
+      { label: "Todas as datas", value: "todas" },
+      ...datasUnicas.map((data) => ({ label: data, value: data })),
+    ];
   }, [tecnicoSelecionadoCobrancas]);
 
   const wosCobrancasFiltradas = useMemo(() => {
-    const termo = buscaWoCobrancas.trim().toLowerCase();
-    return (tecnicoSelecionadoCobrancas?.wos ?? []).filter((row) => {
-      const numeroCobrancas = row.numero_cobrancas ?? 0;
-      const dataCobranca = row.ultima_data_cobranca ?? "";
-      const correspondeWo = !termo || row.work_order_id.toLowerCase().includes(termo);
-      const correspondeMesAno =
-        mesAnoCobrancas === "todos" || dataCobranca.startsWith(mesAnoCobrancas);
-      return numeroCobrancas > 0 && correspondeWo && correspondeMesAno;
+    const buscaWo = buscaWoCobrancas.trim().toLowerCase();
+    const wosDoTecnico = tecnicoSelecionadoCobrancas?.wos ?? [];
+
+    return wosDoTecnico.filter((row) => {
+      if ((row.numero_cobrancas ?? 0) <= 0) return false;
+
+      const correspondeWo =
+        !buscaWo || row.work_order_id.toLowerCase().includes(buscaWo);
+      if (!correspondeWo) return false;
+
+      if (dataFiltroCobrancas === "todas") return true;
+
+      const dataLinha = formatarDataUnificada(row.dataAtendimento);
+      return dataLinha === dataFiltroCobrancas;
     });
-  }, [tecnicoSelecionadoCobrancas, buscaWoCobrancas, mesAnoCobrancas]);
+  }, [tecnicoSelecionadoCobrancas, buscaWoCobrancas, dataFiltroCobrancas]);
 
   const copiarInformacoesCobrancas = async () => {
     if (!tecnicoSelecionadoCobrancas || wosCobrancasFiltradas.length === 0) {
@@ -395,16 +483,25 @@ function PendenciasPage() {
       return;
     }
 
-    const textoGerado = wosCobrancasFiltradas
-      .map((wo) =>
-        [
-          tecnicoSelecionadoCobrancas.nome_tecnico,
-          tecnicoSelecionadoCobrancas.matricula,
-          wo.work_order_id,
-          wo.numero_cobrancas ?? 0,
-        ].join("\t"),
-      )
-      .join("\n");
+    const cabecalho = [
+      "Nome do Técnico",
+      "ID TOA",
+      "Nº da WO",
+      "Qtd de Cobranças",
+      "Data de Geração",
+    ].join("\t");
+
+    const linhas = wosCobrancasFiltradas.map((wo) =>
+      [
+        tecnicoSelecionadoCobrancas.nome_tecnico,
+        tecnicoSelecionadoCobrancas.matricula,
+        wo.work_order_id,
+        wo.numero_cobrancas ?? 0,
+        formatarDataUnificada(wo.dataAtendimento) || "—",
+      ].join("\t"),
+    );
+
+    const textoGerado = [cabecalho, ...linhas].join("\n");
 
     await navigator.clipboard.writeText(textoGerado);
     toast.success("Informações copiadas para a área de transferência.");
@@ -523,17 +620,18 @@ ${listaDeWOsFormatada}
             Nenhuma WO em risco no momento. Importe o arquivo de cabeçalho para atualizar a lista.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>WO</TableHead>
-                  <TableHead>Técnico</TableHead>
+                  <TableHead className="whitespace-nowrap">WO</TableHead>
+                  <TableHead className="whitespace-nowrap">Técnico</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>SLA</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Status da Evidência</TableHead>
-                  <TableHead className="text-right">Nº Cobranças</TableHead>
+                  <TableHead className="whitespace-nowrap">SLA</TableHead>
+                  <TableHead className="whitespace-nowrap">Contato</TableHead>
+                  <TableHead className="whitespace-nowrap">Status da Evidência</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Nº Cobranças</TableHead>
+                  <TableHead className="whitespace-nowrap">Status da Cobrança</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -618,6 +716,7 @@ ${listaDeWOsFormatada}
                       >
                         {numeroCobrancas}
                       </TableCell>
+                      <TableCell>{renderizarStatusCobranca(row.ultima_data_cobranca)}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -978,22 +1077,17 @@ ${listaDeWOsFormatada}
               value={buscaWoCobrancas}
               onChange={(e) => setBuscaWoCobrancas(e.target.value)}
             />
-            <Select value={mesAnoCobrancas} onValueChange={setMesAnoCobrancas}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por mês/ano" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os meses</SelectItem>
-                {mesesAnoDisponiveisCobrancas.map((mesAno) => {
-                  const [ano, mes] = mesAno.split("-");
-                  return (
-                    <SelectItem key={mesAno} value={mesAno}>
-                      {mes}/{ano}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <select
+              value={dataFiltroCobrancas}
+              onChange={(e) => setDataFiltroCobrancas(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {opcoesDataCobrancas.map((opcao) => (
+                <option key={opcao.value} value={opcao.value}>
+                  {opcao.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {wosCobrancasFiltradas.length === 0 ? (
@@ -1005,8 +1099,11 @@ ${listaDeWOsFormatada}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nº da WO</TableHead>
-                    <TableHead className="text-right">Nº de vezes cobrado</TableHead>
+                    <TableHead className="whitespace-nowrap">Nº da WO</TableHead>
+                    <TableHead className="whitespace-nowrap text-right">
+                      Nº de vezes cobrado
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Data de geração WO</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1017,6 +1114,9 @@ ${listaDeWOsFormatada}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
                         {formatQuantidade(wo.numero_cobrancas ?? 0)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatarDataUnificada(wo.dataAtendimento) || "—"}
                       </TableCell>
                     </TableRow>
                   ))}

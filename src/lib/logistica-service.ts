@@ -68,7 +68,13 @@ function dedupeWoConsumoRows(rows: WoConsumoRow[]): { rows: WoConsumoRow[]; merg
 function dedupeWoCabecalhoRows(rows: WoCabecalhoRow[]): WoCabecalhoRow[] {
   const map = new Map<string, WoCabecalhoRow>();
   for (const row of rows) {
-    map.set(row.work_order_id.trim(), { ...row, work_order_id: row.work_order_id.trim() });
+    const key = row.work_order_id.trim();
+    const existing = map.get(key);
+    map.set(key, {
+      ...row,
+      work_order_id: key,
+      dataAtendimento: row.dataAtendimento ?? existing?.dataAtendimento ?? null,
+    });
   }
   return [...map.values()];
 }
@@ -100,10 +106,26 @@ async function insertInBatches<T extends Record<string, unknown>>(
   }
 }
 
-async function fetchCobrancasExistentesPorWo(
+async function fetchCabecalhoExistentePorWo(
   workOrderIds: string[],
-): Promise<Map<string, { numero_cobrancas: number; ultima_data_cobranca: string | null }>> {
-  const map = new Map<string, { numero_cobrancas: number; ultima_data_cobranca: string | null }>();
+): Promise<
+  Map<
+    string,
+    {
+      numero_cobrancas: number;
+      ultima_data_cobranca: string | null;
+      data_atendimento: string | null;
+    }
+  >
+> {
+  const map = new Map<
+    string,
+    {
+      numero_cobrancas: number;
+      ultima_data_cobranca: string | null;
+      data_atendimento: string | null;
+    }
+  >();
   if (workOrderIds.length === 0) return map;
 
   const supabase = getSupabaseClient();
@@ -111,7 +133,7 @@ async function fetchCobrancasExistentesPorWo(
     const chunk = workOrderIds.slice(i, i + UPSERT_BATCH_SIZE);
     const { data, error } = await supabase
       .from("wos_cabecalho")
-      .select("work_order_id, numero_cobrancas, ultima_data_cobranca")
+      .select("work_order_id, numero_cobrancas, ultima_data_cobranca, data_atendimento")
       .in("work_order_id", chunk);
     if (error) throw error;
 
@@ -119,6 +141,7 @@ async function fetchCobrancasExistentesPorWo(
       map.set(row.work_order_id, {
         numero_cobrancas: Number(row.numero_cobrancas ?? 0),
         ultima_data_cobranca: row.ultima_data_cobranca ?? null,
+        data_atendimento: row.data_atendimento ?? null,
       });
     }
   }
@@ -128,13 +151,17 @@ async function fetchCobrancasExistentesPorWo(
 
 function montarPayloadWoCabecalho(
   rows: WoCabecalhoRow[],
-  cobrancasExistentes: Map<
+  cabecalhoExistente: Map<
     string,
-    { numero_cobrancas: number; ultima_data_cobranca: string | null }
+    {
+      numero_cobrancas: number;
+      ultima_data_cobranca: string | null;
+      data_atendimento: string | null;
+    }
   >,
 ) {
   return rows.map((r) => {
-    const existente = cobrancasExistentes.get(r.work_order_id);
+    const existente = cabecalhoExistente.get(r.work_order_id);
     return {
       work_order_id: r.work_order_id,
       id_tecnico: r.id_tecnico,
@@ -142,6 +169,7 @@ function montarPayloadWoCabecalho(
       sla: r.sla,
       numero_cobrancas: existente?.numero_cobrancas ?? 0,
       ultima_data_cobranca: existente?.ultima_data_cobranca ?? null,
+      data_atendimento: r.dataAtendimento ?? existente?.data_atendimento ?? null,
       updated_at: new Date().toISOString(),
     };
   });
@@ -150,7 +178,7 @@ function montarPayloadWoCabecalho(
 export async function replaceWoCabecalho(rows: WoCabecalhoRow[]): Promise<{ inserted: number }> {
   const supabase = getSupabaseClient();
   const deduped = dedupeWoCabecalhoRows(rows);
-  const cobrancasExistentes = await fetchCobrancasExistentesPorWo(
+  const cabecalhoExistente = await fetchCabecalhoExistentePorWo(
     deduped.map((r) => r.work_order_id),
   );
 
@@ -162,7 +190,7 @@ export async function replaceWoCabecalho(rows: WoCabecalhoRow[]): Promise<{ inse
   if (deleteError) throw deleteError;
   if (deduped.length === 0) return { inserted: 0 };
 
-  const payload = montarPayloadWoCabecalho(deduped, cobrancasExistentes);
+  const payload = montarPayloadWoCabecalho(deduped, cabecalhoExistente);
 
   await insertInBatches("wos_cabecalho", payload);
   return { inserted: deduped.length };
@@ -175,14 +203,14 @@ export async function upsertWoCabecalho(rows: WoCabecalhoRow[]): Promise<UpsertR
   const deduped = dedupeWoCabecalhoRows(rows);
   const supabase = getSupabaseClient();
   const ids = deduped.map((r) => r.work_order_id);
-  const cobrancasExistentes = await fetchCobrancasExistentesPorWo(ids);
+  const cabecalhoExistente = await fetchCabecalhoExistentePorWo(ids);
 
   const { count: existingCount } = await supabase
     .from("wos_cabecalho")
     .select("work_order_id", { count: "exact", head: true })
     .in("work_order_id", ids);
 
-  const payload = montarPayloadWoCabecalho(deduped, cobrancasExistentes);
+  const payload = montarPayloadWoCabecalho(deduped, cabecalhoExistente);
 
   await upsertInBatches("wos_cabecalho", payload, "work_order_id");
   return countUpsert(deduped, existingCount ?? 0);
@@ -447,7 +475,7 @@ export async function fetchPendenciasEvidencias(): Promise<PendenciaEvidencia[]>
   const { data, error } = await supabase.rpc("get_pendencias_evidencias");
   if (error) throw error;
 
-  return (data ?? []).map((row: PendenciaEvidencia) => ({
+  return (data ?? []).map((row: PendenciaEvidencia & Record<string, unknown>) => ({
     work_order_id: row.work_order_id,
     id_tecnico: row.id_tecnico,
     nome_tecnico: row.nome_tecnico,
@@ -458,6 +486,7 @@ export async function fetchPendenciasEvidencias(): Promise<PendenciaEvidencia[]>
     evidencia_data_registro: row.evidencia_data_registro ?? null,
     numero_cobrancas: Number(row.numero_cobrancas ?? 0),
     ultima_data_cobranca: row.ultima_data_cobranca ?? null,
+    dataAtendimento: (row.data_atendimento as string | null | undefined) ?? null,
   }));
 }
 

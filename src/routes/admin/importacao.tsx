@@ -145,7 +145,7 @@ function ImportacaoPage() {
             </h2>
             <FileDropzone
               title="Arquivo de Cabeçalho (Auditoria)"
-              description="Colunas: workOrderID, idTecnico, status, sla. Alimenta a tela de Pendências."
+              description="Colunas: workOrderID, idTecnico, status, sla, dataAtendimento. Alimenta a tela de Pendências."
               busy={busyCabecalho}
               onFile={handleCabecalho}
             />

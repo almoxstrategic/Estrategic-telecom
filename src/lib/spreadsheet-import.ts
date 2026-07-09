@@ -54,6 +54,62 @@ function parseDataAtendimento(value: string): string | null {
   return null;
 }
 
+/** Converte data exportada pelo SAPUI5 (DD/MM/YYYY ou serial Excel) para YYYY-MM-DD. */
+function converterDataSAP(dataString: unknown): string | null {
+  if (!dataString) return null;
+
+  if (!Number.isNaN(Number(dataString)) && typeof dataString === "number") {
+    const dataExcel = new Date((dataString - (25567 + 2)) * 86400 * 1000);
+    if (Number.isNaN(dataExcel.getTime())) return null;
+    return dataExcel.toISOString().slice(0, 10);
+  }
+
+  const str = String(dataString).trim();
+  if (!str) return null;
+
+  if (str.includes("/")) {
+    const parteData = str.split(" ")[0] ?? str;
+    const partes = parteData.split("/");
+
+    if (partes.length === 3) {
+      return `${partes[2]}-${partes[1]!.padStart(2, "0")}-${partes[0]!.padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(str);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return null;
+}
+
+function lerDataAtendimentoCabecalho(row: RawRow): string {
+  const chavesExatas = [
+    "Data Atendimento",
+    "dataAtendimento",
+    "Data de atendimento(WO)",
+    "Data de atendimento (WO)",
+    "Data de atendimento",
+    "Data",
+    "Data de criação",
+  ];
+
+  for (const chave of chavesExatas) {
+    const valor = row[chave];
+    if (valor !== undefined && trimCell(valor) !== "") return trimCell(valor);
+  }
+
+  const aliasesNormalizados = new Set(chavesExatas.map((chave) => normalizeHeader(chave)));
+  for (const [chave, valor] of Object.entries(row)) {
+    if (!aliasesNormalizados.has(normalizeHeader(chave))) continue;
+    const texto = trimCell(valor);
+    if (texto) return texto;
+  }
+
+  return "";
+}
+
 function splitCsvLine(line: string, delimiter: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -152,15 +208,19 @@ export async function parseWoCabecalhoFile(file: File): Promise<WoCabecalhoRow[]
     );
     const statusRaw = pick(row, "status");
     const slaRaw = pick(row, "sla");
+    const dataAtendimentoBruta = lerDataAtendimentoCabecalho(row);
 
     if (!workOrderId || !idTecnico) continue;
 
-    rows.push({
+    const novoRegistro: WoCabecalhoRow = {
       work_order_id: workOrderId,
       id_tecnico: idTecnico,
       status: Math.trunc(parseNumber(statusRaw)),
       sla: parseNumber(slaRaw),
-    });
+      dataAtendimento: dataAtendimentoBruta ? converterDataSAP(dataAtendimentoBruta) : null,
+    };
+
+    rows.push(novoRegistro);
   }
 
   return rows;
