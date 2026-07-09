@@ -1,6 +1,11 @@
 import { getSupabaseClient } from "./supabase";
 import { parseLocaleNumber, parseQtdBaixada } from "./parse-locale-number";
-import { normalizeMaterialCode } from "./material-code";
+import {
+  normalizeMaterialCode,
+  consolidarMateriaisPorCodigo,
+  consolidarMateriaisPorCodigoQtd,
+  consolidarTopMateriaisPorCodigo,
+} from "./material-code";
 import type {
   ConsumoItemCritico,
   ConsumoTecnicoItem,
@@ -44,7 +49,7 @@ function dedupeWoConsumoRows(rows: WoConsumoRow[]): { rows: WoConsumoRow[]; merg
         work_order_id: existing.work_order_id,
         id_tecnico: row.id_tecnico || existing.id_tecnico,
         material: existing.material,
-        descr_material: row.descr_material || existing.descr_material,
+        descr_material: existing.descr_material,
         qtd_baixada: existing.qtd_baixada + row.qtd_baixada,
         data_atendimento: row.data_atendimento ?? existing.data_atendimento,
       });
@@ -227,14 +232,18 @@ function toRpcFiltro(filtro?: KpisFiltro): { p_mes: number | null; p_ano: number
 }
 
 function normalizeKpis(raw: KpisConsumo): KpisConsumo {
-  return {
-    total_itens: parseQtdBaixada(raw.total_itens),
-    total_wos: parseQtdBaixada(raw.total_wos),
-    top_materiais: (raw.top_materiais ?? []).map((m) => ({
+  const top_materiais = consolidarTopMateriaisPorCodigo(
+    (raw.top_materiais ?? []).map((m) => ({
       descricao: m.descricao,
       sku: m.sku,
       total: parseQtdBaixada(m.total),
     })),
+  );
+
+  return {
+    total_itens: parseQtdBaixada(raw.total_itens),
+    total_wos: parseQtdBaixada(raw.total_wos),
+    top_materiais,
     top_tecnicos: (raw.top_tecnicos ?? []).map((t) => ({
       id_tecnico: t.id_tecnico,
       nome_tecnico: t.nome_tecnico ?? "",
@@ -276,11 +285,13 @@ export async function fetchKpisDetalheItens(filtro?: KpisFiltro): Promise<KpisDe
   const { data, error } = await supabase.rpc("get_kpis_detalhe_itens", { p_mes, p_ano });
   if (error) throw error;
 
-  return (data ?? []).map((row: KpisDetalheItem) => ({
-    material: row.material,
-    descr_material: row.descr_material,
-    total: parseQtdBaixada(row.total),
-  }));
+  return consolidarMateriaisPorCodigo(
+    (data ?? []).map((row: KpisDetalheItem) => ({
+      material: row.material,
+      descr_material: row.descr_material,
+      total: parseQtdBaixada(row.total),
+    })),
+  );
 }
 
 export async function fetchKpisDetalheWoMateriais(
@@ -316,11 +327,13 @@ export async function fetchConsumoTecnicoDetalhe(
   });
   if (error) throw error;
 
-  return (data ?? []).map((row: ConsumoTecnicoItem) => ({
-    material: row.material,
-    descr_material: row.descr_material,
-    qtd_baixada: parseQtdBaixada(row.qtd_baixada),
-  }));
+  return consolidarMateriaisPorCodigoQtd(
+    (data ?? []).map((row: ConsumoTecnicoItem) => ({
+      material: row.material,
+      descr_material: row.descr_material,
+      qtd_baixada: parseQtdBaixada(row.qtd_baixada),
+    })),
+  );
 }
 
 export async function fetchConsumoItensCriticos(
@@ -338,11 +351,13 @@ export async function fetchConsumoItensCriticos(
   });
   if (error) throw error;
 
-  return (data ?? []).map((row: ConsumoItemCritico) => ({
-    material: row.material,
-    descr_material: row.descr_material,
-    total: parseQtdBaixada(row.total),
-  }));
+  return consolidarMateriaisPorCodigo(
+    (data ?? []).map((row: ConsumoItemCritico) => ({
+      material: row.material,
+      descr_material: row.descr_material,
+      total: parseQtdBaixada(row.total),
+    })),
+  );
 }
 
 export async function fetchTopConsumidoresMaterial(
@@ -395,10 +410,12 @@ function dedupeDimMateriaisRows(rows: DimMaterialRow[]): DimMaterialRow[] {
   for (const row of rows) {
     const material = normalizeMaterialCode(row.material);
     if (!material) continue;
-    map.set(material, {
-      material,
-      descr_material: row.descr_material.trim(),
-    });
+    if (!map.has(material)) {
+      map.set(material, {
+        material,
+        descr_material: row.descr_material.trim(),
+      });
+    }
   }
   return [...map.values()];
 }
