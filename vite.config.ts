@@ -22,11 +22,29 @@ export default defineConfig({
       "ADMIN_SETUP_SECRET",
       "NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET",
       "EVIDENCIA_WEBHOOK_SECRET",
+      "VITE_EVIDENCIA_WEBHOOK_SECRET",
+      "evidencia_webhook_secret",
     ],
   },
   // SSR no Render falha com jsxDEV (runtime de dev) se development=true no OXC.
   vite: {
     envPrefix: ["VITE_", "NEXT_PUBLIC_"],
+    define: {
+      "import.meta.env.NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET": JSON.stringify(
+        process.env.NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET ??
+          process.env.EVIDENCIA_WEBHOOK_SECRET ??
+          process.env.VITE_EVIDENCIA_WEBHOOK_SECRET ??
+          process.env.evidencia_webhook_secret ??
+          "",
+      ),
+      "import.meta.env.VITE_EVIDENCIA_WEBHOOK_SECRET": JSON.stringify(
+        process.env.VITE_EVIDENCIA_WEBHOOK_SECRET ??
+          process.env.NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET ??
+          process.env.EVIDENCIA_WEBHOOK_SECRET ??
+          process.env.evidencia_webhook_secret ??
+          "",
+      ),
+    },
     oxc: {
       jsx: {
         development: false,

@@ -1,4 +1,5 @@
 import type { EngajamentoTecnico, HistoricoLancamento } from "./logistica-types";
+import { readClientEvidenciaWebhookSecret } from "./evidencia-webhook-secret";
 import { getStoragePublicUrl, getSupabaseClient } from "./supabase";
 import type { Evidencia, EvidenciaInsert } from "./types";
 
@@ -162,9 +163,7 @@ type BatchFormInput = {
 export async function notifyEvidenciaEmailBatch(input: BatchFormInput): Promise<void> {
   assertBrowserUpload();
 
-  const webhookSecret = import.meta.env.NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET as
-    | string
-    | undefined;
+  const webhookSecret = readClientEvidenciaWebhookSecret();
   if (!webhookSecret) {
     console.warn(
       "AVISO: A variável NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET está indefinida no frontend.",
@@ -183,6 +182,7 @@ export async function notifyEvidenciaEmailBatch(input: BatchFormInput): Promise<
       contrato: input.contrato,
       wo: input.wo,
       observacao: input.observacao,
+      webhook_secret: webhookSecret,
       materiais: input.materiais.map((material) => ({
         tipo: material.tipo,
         metragem: material.metragem,

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
+import { resolveEvidenciaWebhookSecret } from "@/lib/evidencia-webhook-secret";
 import { isStoragePublicUrl } from "@/lib/evidencias-grouping";
 import { notifySapEvidenciaBatch } from "@/lib/notify-sap-evidencia.server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/server-env";
@@ -24,12 +25,12 @@ function jsonError(message: string, status: number): Response {
   return Response.json({ error: message }, { status });
 }
 
-function parseNotifyBody(body: unknown): NotifyEmailBody {
+function parseNotifyBody(body: unknown): NotifyEmailBody & { webhook_secret?: string } {
   if (!body || typeof body !== "object") {
     throw new Error("Corpo da requisição inválido.");
   }
 
-  const input = body as Partial<NotifyEmailBody>;
+  const input = body as Partial<NotifyEmailBody & { webhook_secret?: string }>;
   const accessToken = typeof input.access_token === "string" ? input.access_token.trim() : "";
   const tecnicoId = typeof input.tecnico_id === "string" ? input.tecnico_id.trim() : "";
   const contrato = typeof input.contrato === "string" ? input.contrato.trim() : "";
@@ -82,6 +83,10 @@ function parseNotifyBody(body: unknown): NotifyEmailBody {
     wo,
     observacao,
     materiais,
+    webhook_secret:
+      typeof input.webhook_secret === "string" && input.webhook_secret.trim()
+        ? input.webhook_secret.trim()
+        : undefined,
   };
 }
 
@@ -112,7 +117,17 @@ export const Route = createFileRoute("/api/evidencias/notify-email")({
           const payload = parseNotifyBody(await request.json());
           await assertTecnico(payload.access_token, payload.tecnico_id);
 
-          const webhookSecret = request.headers.get("x-evidencia-webhook-secret") ?? undefined;
+          const webhookSecret = resolveEvidenciaWebhookSecret(
+            request.headers.get("x-evidencia-webhook-secret") ??
+              payload.webhook_secret ??
+              undefined,
+          );
+
+          if (!webhookSecret) {
+            throw new Error(
+              "Configure NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET (ou EVIDENCIA_WEBHOOK_SECRET) no ambiente de produção.",
+            );
+          }
 
           await notifySapEvidenciaBatch(
             {

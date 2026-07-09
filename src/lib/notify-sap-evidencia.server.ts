@@ -1,5 +1,5 @@
+import { resolveEvidenciaWebhookSecret } from "@/lib/evidencia-webhook-secret";
 import {
-  getEvidenciaWebhookSecret,
   getSupabaseAnonKey,
   getSupabaseUrl,
 } from "@/lib/server-env";
@@ -22,7 +22,12 @@ export async function notifySapEvidenciaBatch(
   webhookSecretOverride?: string,
 ): Promise<void> {
   const url = `${getSupabaseUrl()}/functions/v1/notify-sap-evidencia`;
-  const webhookSecret = webhookSecretOverride?.trim() || getEvidenciaWebhookSecret();
+  const webhookSecret = resolveEvidenciaWebhookSecret(webhookSecretOverride);
+  if (!webhookSecret) {
+    throw new Error(
+      "Configure NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET (ou EVIDENCIA_WEBHOOK_SECRET) no ambiente de produção.",
+    );
+  }
 
   const response = await fetch(url, {
     method: "POST",

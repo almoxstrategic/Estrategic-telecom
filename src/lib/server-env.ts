@@ -52,12 +52,12 @@ function loadDotEnv() {
 function readEnv(name: string): string | undefined {
   loadDotEnv();
 
-  const meta = import.meta.env as Record<string, string | undefined>;
-  if (meta?.[name]) return meta[name];
-
   if (typeof process !== "undefined" && process.env[name]) {
     return process.env[name];
   }
+
+  const meta = import.meta.env as Record<string, string | undefined>;
+  if (meta?.[name]) return meta[name];
 
   return undefined;
 }
@@ -84,9 +84,10 @@ export function getSupabaseServiceRoleKey(): string {
   return value;
 }
 
+import { resolveEvidenciaWebhookSecret } from "@/lib/evidencia-webhook-secret";
+
 export function getEvidenciaWebhookSecret(): string {
-  const value =
-    readEnv("NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET") ?? readEnv("EVIDENCIA_WEBHOOK_SECRET");
+  const value = resolveEvidenciaWebhookSecret();
   if (!value) {
     throw new Error(
       "Configure NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET (ou EVIDENCIA_WEBHOOK_SECRET) no ambiente de produção.",
