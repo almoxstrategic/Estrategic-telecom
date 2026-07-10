@@ -577,6 +577,16 @@ ${listaDeWOsFormatada}
     [rows],
   );
 
+  const contagemPendenciasPorTecnico = useMemo(() => {
+    const contagem = new Map<string, number>();
+    for (const row of rows) {
+      if (row.tem_evidencia) continue;
+      const chave = normalizarIdTecnico(row.id_tecnico);
+      contagem.set(chave, (contagem.get(chave) ?? 0) + 1);
+    }
+    return contagem;
+  }, [rows]);
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -624,14 +634,14 @@ ${listaDeWOsFormatada}
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">WO</TableHead>
-                  <TableHead className="whitespace-nowrap">Técnico</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="whitespace-nowrap">SLA</TableHead>
-                  <TableHead className="whitespace-nowrap">Contato</TableHead>
-                  <TableHead className="whitespace-nowrap">Status da Evidência</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Nº Cobranças</TableHead>
-                  <TableHead className="whitespace-nowrap">Status da Cobrança</TableHead>
+                  <TableHead className="whitespace-nowrap text-left">WO</TableHead>
+                  <TableHead className="whitespace-nowrap text-left">Técnico</TableHead>
+                  <TableHead className="text-left">Nome</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">SLA</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">Contato</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">Status da Evidência</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">Nº Cobranças</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">Status da Cobrança</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -643,10 +653,12 @@ ${listaDeWOsFormatada}
                     filtrarWosPendentesDoTecnico(rows, row.id_tecnico).length > 0;
                   const enviando = enviandoCobranca === row.id_tecnico;
                   const evidenciado = row.tem_evidencia;
+                  const qtdPendenciasTecnico =
+                    contagemPendenciasPorTecnico.get(normalizarIdTecnico(row.id_tecnico)) ?? 0;
 
                   return (
                     <TableRow key={row.work_order_id}>
-                      <TableCell className="font-mono font-semibold">
+                      <TableCell className="text-left font-mono font-semibold">
                         {row.tem_evidencia ? (
                           <Link
                             to="/todos"
@@ -659,21 +671,26 @@ ${listaDeWOsFormatada}
                           row.work_order_id
                         )}
                       </TableCell>
-                      <TableCell className="font-mono">{row.id_tecnico}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-left font-mono">{row.id_tecnico}</TableCell>
+                      <TableCell className="text-left">
                         <Link
                           to="/todos"
                           search={{ login: loginBusca }}
                           className="font-semibold text-foreground hover:text-muted-foreground hover:underline"
                         >
-                          {row.nome_tecnico}
+                          {row.nome_tecnico}{" "}
+                          <span className="font-semibold text-gray-600">
+                            ({qtdPendenciasTecnico})
+                          </span>
                         </Link>
                       </TableCell>
-                      <TableCell className="font-bold text-destructive">{row.sla} dias</TableCell>
-                      <TableCell>
+                      <TableCell className="text-center font-bold text-destructive">
+                        {row.sla} dias
+                      </TableCell>
+                      <TableCell className="text-center">
                         {evidenciado ? (
                           <span
-                            className="inline-flex cursor-not-allowed items-center gap-1 text-sm font-semibold text-muted-foreground opacity-50 grayscale"
+                            className="inline-flex cursor-not-allowed items-center justify-center gap-1 text-sm font-semibold text-muted-foreground opacity-50 grayscale"
                             aria-disabled="true"
                           >
                             <MessageCircle className="h-4 w-4" />
@@ -681,7 +698,7 @@ ${listaDeWOsFormatada}
                           </span>
                         ) : !temCelular ? (
                           <span
-                            className="inline-flex cursor-not-allowed items-center gap-1 text-sm font-semibold text-muted-foreground opacity-50"
+                            className="inline-flex cursor-not-allowed items-center justify-center gap-1 text-sm font-semibold text-muted-foreground opacity-50"
                             title="Cadastre o celular do técnico no painel de equipe"
                           >
                             Sem Número
@@ -691,7 +708,7 @@ ${listaDeWOsFormatada}
                             type="button"
                             disabled={enviando}
                             onClick={() => void enviarCobrancaWhatsApp(row)}
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <MessageCircle className="h-4 w-4" />
                             {enviando ? "Enviando..." : "WhatsApp"}
@@ -700,7 +717,7 @@ ${listaDeWOsFormatada}
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {row.tem_evidencia ? (
                           <Badge className="border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/90">
                             Evidenciado
@@ -710,13 +727,15 @@ ${listaDeWOsFormatada}
                         )}
                       </TableCell>
                       <TableCell
-                        className={`text-right font-semibold ${
+                        className={`text-center font-semibold ${
                           numeroCobrancas > 0 ? "text-orange-600 dark:text-orange-400" : ""
                         }`}
                       >
                         {numeroCobrancas}
                       </TableCell>
-                      <TableCell>{renderizarStatusCobranca(row.ultima_data_cobranca)}</TableCell>
+                      <TableCell className="text-center">
+                        {renderizarStatusCobranca(row.ultima_data_cobranca)}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
