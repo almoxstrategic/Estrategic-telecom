@@ -61,6 +61,18 @@ type AutonomiaSortKey =
   | "cobrancas_desc"
   | "cobrancas_asc";
 
+type PendenciasSortColumn =
+  | "nome"
+  | "sla"
+  | "status_evidencia"
+  | "numero_cobrancas"
+  | "status_cobranca";
+
+type ConfigOrdenacaoPendencias = {
+  coluna: PendenciasSortColumn;
+  direcao: "asc" | "desc";
+};
+
 type AutonomiaDetalheRow = {
   tecnico_id: string;
   matricula: string;
@@ -158,6 +170,24 @@ function calcularDiasDesdeCobranca(ultimaDataCobranca: string | null): number | 
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
+function extrairValorSla(sla: number | string): number {
+  const parsed = parseFloat(String(sla));
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function textoStatusEvidencia(temEvidencia: boolean): string {
+  return temEvidencia ? "Evidenciado" : "Pendente";
+}
+
+function textoStatusCobranca(ultimaDataCobranca: string | null): string {
+  const dias = calcularDiasDesdeCobranca(ultimaDataCobranca);
+
+  if (dias === null) return "Não cobrado";
+  if (dias === 0) return "Hoje";
+  if (dias === 1) return "Há 1 dia";
+  return `Há ${dias} dias`;
+}
+
 function renderizarStatusCobranca(ultimaDataCobranca: string | null) {
   const dias = calcularDiasDesdeCobranca(ultimaDataCobranca);
 
@@ -178,6 +208,11 @@ function PendenciasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [enviandoCobranca, setEnviandoCobranca] = useState<string | null>(null);
+  const [configOrdenacao, setConfigOrdenacao] = useState<ConfigOrdenacaoPendencias>({
+    coluna: "sla",
+    direcao: "asc",
+  });
+  const [buscaNomeTecnico, setBuscaNomeTecnico] = useState("");
 
   const [engajamento, setEngajamento] = useState<EngajamentoTecnico[]>([]);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
@@ -587,6 +622,67 @@ ${listaDeWOsFormatada}
     return contagem;
   }, [rows]);
 
+  const rowsFiltradas = useMemo(() => {
+    const termo = buscaNomeTecnico.trim().toLowerCase();
+    if (!termo) return rows;
+    return rows.filter((row) => row.nome_tecnico.toLowerCase().includes(termo));
+  }, [rows, buscaNomeTecnico]);
+
+  const rowsOrdenadas = useMemo(() => {
+    const { coluna, direcao } = configOrdenacao;
+    const fator = direcao === "asc" ? 1 : -1;
+
+    return [...rowsFiltradas].sort((a, b) => {
+      let comparacao = 0;
+
+      switch (coluna) {
+        case "nome":
+          comparacao = a.nome_tecnico.localeCompare(b.nome_tecnico, "pt-BR");
+          break;
+        case "sla":
+          comparacao = extrairValorSla(a.sla) - extrairValorSla(b.sla);
+          break;
+        case "status_evidencia":
+          comparacao = textoStatusEvidencia(a.tem_evidencia).localeCompare(
+            textoStatusEvidencia(b.tem_evidencia),
+            "pt-BR",
+          );
+          break;
+        case "numero_cobrancas":
+          comparacao = (a.numero_cobrancas ?? 0) - (b.numero_cobrancas ?? 0);
+          break;
+        case "status_cobranca":
+          comparacao = textoStatusCobranca(a.ultima_data_cobranca).localeCompare(
+            textoStatusCobranca(b.ultima_data_cobranca),
+            "pt-BR",
+          );
+          break;
+        default:
+          comparacao = 0;
+      }
+
+      return comparacao * fator;
+    });
+  }, [rowsFiltradas, configOrdenacao]);
+
+  const alternarOrdenacaoPendencias = (coluna: PendenciasSortColumn) => {
+    setConfigOrdenacao((prev) => {
+      if (prev.coluna === coluna) {
+        return { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" };
+      }
+      return { coluna, direcao: "asc" };
+    });
+  };
+
+  const iconeOrdenacao = (coluna: PendenciasSortColumn) => {
+    if (configOrdenacao.coluna !== coluna) return null;
+    return configOrdenacao.direcao === "asc" ? (
+      <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+    );
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -630,22 +726,75 @@ ${listaDeWOsFormatada}
             Nenhuma WO em risco no momento. Importe o arquivo de cabeçalho para atualizar a lista.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+          <div className="space-y-3">
+            <Input
+              type="search"
+              placeholder="Buscar por nome do técnico..."
+              value={buscaNomeTecnico}
+              onChange={(e) => setBuscaNomeTecnico(e.target.value)}
+              className="max-w-md rounded-md border border-input bg-background px-3 py-2"
+            />
+            <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="whitespace-nowrap text-left">WO</TableHead>
                   <TableHead className="whitespace-nowrap text-left">Técnico</TableHead>
-                  <TableHead className="text-left">Nome</TableHead>
-                  <TableHead className="whitespace-nowrap text-center">SLA</TableHead>
+                  <TableHead className="text-left">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenacaoPendencias("nome")}
+                      className="inline-flex cursor-pointer select-none items-center gap-1 hover:text-foreground"
+                    >
+                      Nome
+                      {iconeOrdenacao("nome")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-center">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenacaoPendencias("sla")}
+                      className="inline-flex cursor-pointer select-none items-center justify-center gap-1 hover:text-foreground"
+                    >
+                      SLA
+                      {iconeOrdenacao("sla")}
+                    </button>
+                  </TableHead>
                   <TableHead className="whitespace-nowrap text-center">Contato</TableHead>
-                  <TableHead className="whitespace-nowrap text-center">Status da Evidência</TableHead>
-                  <TableHead className="whitespace-nowrap text-center">Nº Cobranças</TableHead>
-                  <TableHead className="whitespace-nowrap text-center">Status da Cobrança</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenacaoPendencias("status_evidencia")}
+                      className="inline-flex cursor-pointer select-none items-center justify-center gap-1 hover:text-foreground"
+                    >
+                      Status da Evidência
+                      {iconeOrdenacao("status_evidencia")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-center">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenacaoPendencias("numero_cobrancas")}
+                      className="inline-flex cursor-pointer select-none items-center justify-center gap-1 hover:text-foreground"
+                    >
+                      Nº Cobranças
+                      {iconeOrdenacao("numero_cobrancas")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-center">
+                    <button
+                      type="button"
+                      onClick={() => alternarOrdenacaoPendencias("status_cobranca")}
+                      className="inline-flex cursor-pointer select-none items-center justify-center gap-1 hover:text-foreground"
+                    >
+                      Status da Cobrança
+                      {iconeOrdenacao("status_cobranca")}
+                    </button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => {
+                {rowsOrdenadas.map((row) => {
                   const temCelular = Boolean(celularToWhatsAppUrl(row.celular));
                   const loginBusca = row.login_tecnico || row.id_tecnico;
                   const numeroCobrancas = row.numero_cobrancas ?? 0;
@@ -741,6 +890,7 @@ ${listaDeWOsFormatada}
                 })}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
 
