@@ -217,6 +217,9 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+const IMG_STYLE =
+  "max-width:100%;height:auto;border:1px solid #ddd;border-radius:4px;margin-bottom:15px;display:block;";
+
 function renderMaterialBlock(material: MaterialEmailData): string {
   const tipo = escapeHtml(material.tipo_material);
   const metragem = escapeHtml(material.total_utilizado);
@@ -224,22 +227,60 @@ function renderMaterialBlock(material: MaterialEmailData): string {
   const urlFotoFim = escapeHtml(material.foto_fim_url);
 
   return `
-  <p><strong>${tipo}</strong></p>
-  <ul>
-    <li><strong>Total utilizado:</strong> ${metragem} metros</li>
-    <li><strong>Evidências Fotográficas:</strong></li>
-  </ul>
-  <div style="margin-left: 20px;">
-    <p><strong>Foto Início:</strong> <br> <img src="${urlFotoInicio}" alt="Foto Início" width="300" /></p>
-    <p><strong>Foto Fim:</strong> <br> <img src="${urlFotoFim}" alt="Foto Fim" width="300" /></p>
+  <h4 style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0f172a;">${tipo}</h4>
+
+  <div style="background-color:#f4f7f9;border-radius:8px;padding:15px;margin-bottom:16px;">
+    <span style="color:#0d6efd;font-weight:bold;font-size:16px;">Total utilizado: ${metragem} metros</span>
   </div>
-  <hr>
+
+  <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
+  <img src="${urlFotoInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
+
+  <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
+  <img src="${urlFotoFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+
+  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
   `;
 }
 
 function renderObservacao(observacao: string): string {
   const texto = escapeHtml(observacao);
-  return `<p><strong>Observação do Técnico:</strong><br>${texto}</p>`;
+  return `
+  <div style="background-color:#f4f7f9;border-radius:8px;padding:15px;margin-top:8px;">
+    <p style="margin:0 0 6px 0;font-weight:bold;color:#0f172a;">Observação do Técnico:</p>
+    <p style="margin:0;color:#334155;line-height:1.5;">${texto}</p>
+  </div>
+  `;
+}
+
+function renderDadosOperacao(data: EvidenciaEmailData): string {
+  const rows: [string, string][] = [
+    ["Nome do Técnico", data.nome_tecnico],
+    ["Id TOA", data.matricula],
+    ["Número do Contrato", data.contrato],
+    ["Número da WO", data.wo],
+  ];
+
+  const rowsHtml = rows
+    .map(
+      ([label, value]) => `
+      <tr>
+        <td style="padding:10px;border-bottom:1px solid #d1d5db;font-weight:bold;background-color:#f3f4f6;width:40%;color:#0f172a;">
+          ${escapeHtml(label)}
+        </td>
+        <td style="padding:10px;border-bottom:1px solid #d1d5db;color:#0f172a;">
+          ${escapeHtml(value)}
+        </td>
+      </tr>`,
+    )
+    .join("");
+
+  return `
+  <h2 style="margin:0 0 12px 0;font-size:18px;font-weight:bold;color:#0f172a;">Dados da Operação</h2>
+  <table style="border-collapse:collapse;width:100%;max-width:600px;border:1px solid #d1d5db;">
+    ${rowsHtml}
+  </table>
+  `;
 }
 
 export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string; html: string } {
@@ -250,13 +291,10 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
   const html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <p><strong>Nome do Técnico:</strong> ${escapeHtml(data.nome_tecnico)}</p>
-    <p><strong>ID TOA:</strong> ${escapeHtml(data.matricula)}</p>
-    <p><strong>Número do Contrato:</strong> ${escapeHtml(data.contrato)}</p>
-    <p><strong>Número da WO:</strong> ${escapeHtml(data.wo)}</p>
+  <body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background-color:#ffffff;">
+    ${renderDadosOperacao(data)}
 
-    <p><strong>Detalhamento:</strong></p>
+    <h3 style="margin:28px 0 16px 0;font-size:18px;font-weight:bold;color:#0f172a;">Detalhe do item</h3>
 
     ${materiaisHtml}
     ${observacaoHtml}
