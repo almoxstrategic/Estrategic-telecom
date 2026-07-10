@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   BarChart3,
+  CalendarClock,
   Database,
   FileUp,
   Package,
   Send,
-  UserPlus,
   Users,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
@@ -62,20 +62,6 @@ function AdminHome() {
             </div>
           </Link>
 
-          <Link to="/cadastro" className="block">
-            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-                <UserPlus className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="font-bold text-foreground">Cadastrar Técnico</div>
-                <div className="text-xs text-muted-foreground">
-                  Nome, matrícula, login e senha
-                </div>
-              </div>
-            </div>
-          </Link>
-
           <Link to="/admin/kpis" className="block">
             <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -111,6 +97,18 @@ function AdminHome() {
               </div>
               <div>
                 <div className="font-bold text-foreground">Estoque Físico X BTP</div>
+                <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/previsao-reserva" className="block">
+            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                <CalendarClock className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-bold text-foreground">Previsão de Reserva</div>
                 <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
               </div>
             </div>

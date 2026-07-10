@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Filter, Package, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Filter, X } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,18 +22,18 @@ import { requireAdmin } from "@/lib/auth-guards";
 import { fetchDimMateriais } from "@/lib/logistica-service";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/estoque-fisico-btp")({
+export const Route = createFileRoute("/previsao-reserva")({
   beforeLoad: () => requireAdmin(),
   head: () => ({
     meta: [
-      { title: "Estoque Físico X BTP — Estrategic Field" },
+      { title: "Previsão de Reserva — Estrategic Field" },
       {
         name: "description",
-        content: "Protótipo de divergência entre estoque físico, campo e BTP.",
+        content: "Protótipo de autonomia de estoque e ponto de ressuprimento.",
       },
     ],
   }),
-  component: EstoqueFisicoBtpPage,
+  component: PrevisaoReservaPage,
 });
 
 const ITENS_CRITICOS_INICIAIS = [
@@ -44,141 +44,69 @@ const ITENS_CRITICOS_INICIAIS = [
   "22065513",
 ] as const;
 
-type LinhaMockEstoque = {
+const LEAD_TIME_DIAS = 15;
+
+type LinhaPrevisao = {
   codigo: string;
   descricao: string;
   estoqueBTP: number;
   estoqueFisico: number;
   estoqueCampo: number;
-  estoqueFisicoCampo: number;
-  diferenca: number;
-  custoUnitario: number;
-  financeiro: number;
+  estoqueTotalReal: number;
+  mediaConsumo: number;
+  autonomia: number;
+  pontoRessuprimento: number;
+  diasParaReserva: number;
 };
+
+type ModalView = "selecao" | "definicao";
 
 type SortColumn =
   | "descricao"
   | "estoqueBTP"
-  | "estoqueFisicoCampo"
   | "estoqueFisico"
   | "estoqueCampo"
-  | "diferenca"
-  | "financeiro"
-  | "status";
+  | "mediaConsumo"
+  | "autonomia"
+  | "pontoRessuprimento"
+  | "diasParaReserva";
 
 type SortDirection = "asc" | "desc";
 
-type ModalView = "selecao" | "definicao";
+/** Mock saudável: BTP acima do ponto de ressuprimento na maioria dos casos. */
+function gerarLinhaPrevisao(codigo: string, descricao: string): LinhaPrevisao {
+  const leadTime = LEAD_TIME_DIAS;
+  const mediaConsumo = Math.floor(Math.random() * 30) + 1; // 1–30
+  const pontoRessuprimento = mediaConsumo * leadTime;
 
-type FiltroStatus = "Todos" | "Falta" | "Sobra" | "Neutro";
+  // ~90% com estoque acima do ponto; ~10% abaixo (exceção para demo)
+  const estoqueBTP =
+    Math.random() < 0.1
+      ? Math.max(1, pontoRessuprimento - Math.floor(Math.random() * mediaConsumo * 5))
+      : pontoRessuprimento + Math.floor(Math.random() * 200);
 
-const FILTRO_STATUS_OPCOES: FiltroStatus[] = ["Todos", "Falta", "Sobra", "Neutro"];
+  // Físico + Campo próximos ao BTP (±10%)
+  const desvio = Math.floor(estoqueBTP * 0.1);
+  const soma = estoqueBTP + Math.floor(Math.random() * (desvio * 2 + 1)) - desvio;
+  const estoqueTotalReal = Math.max(0, soma);
+  const estoqueFisico = Math.floor(Math.random() * (estoqueTotalReal + 1));
+  const estoqueCampo = estoqueTotalReal - estoqueFisico;
 
-function statusLabel(diferenca: number): string {
-  if (diferenca === 0) return "Neutro";
-  if (diferenca < 0) return "Falta";
-  return "Sobra";
-}
-
-function StatusBadge({ diferenca }: { diferenca: number }) {
-  if (diferenca === 0) {
-    return (
-      <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">
-        Neutro
-      </span>
-    );
-  }
-  if (diferenca < 0) {
-    return (
-      <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
-        Falta
-      </span>
-    );
-  }
-  return (
-    <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
-      Sobra
-    </span>
-  );
-}
-
-/** ~70% das linhas com (Físico + Campo) < BTP para favorecer status Falta (diferença negativa). */
-function gerarQuantidadesMock(): Omit<LinhaMockEstoque, "codigo" | "descricao"> {
-  const estoqueBTP = Math.floor(Math.random() * 40) + 10; // 10–49
-
-  let estoqueFisico: number;
-  let estoqueCampo: number;
-
-  if (Math.random() < 0.7) {
-    const somaMax = Math.max(0, estoqueBTP - 1);
-    const soma = Math.floor(Math.random() * (somaMax + 1));
-    estoqueFisico = Math.floor(Math.random() * (soma + 1));
-    estoqueCampo = soma - estoqueFisico;
-  } else {
-    estoqueFisico = Math.floor(Math.random() * 50);
-    estoqueCampo = Math.floor(Math.random() * 50);
-  }
-
-  const estoqueFisicoCampo = estoqueFisico + estoqueCampo;
-  const diferenca = estoqueFisicoCampo - estoqueBTP;
-  // Custo unitário fictício entre R$ 10 e R$ 99
-  const custoUnitario = Math.floor(Math.random() * 90) + 10;
-  // Impacto: Falta (diff < 0) negativo; Sobra (diff > 0) positivo
-  const financeiro = diferenca * custoUnitario;
+  const autonomia = mediaConsumo === 0 ? 999 : Math.floor(estoqueBTP / mediaConsumo);
+  const diasParaReserva = autonomia - leadTime;
 
   return {
+    codigo,
+    descricao,
     estoqueBTP,
     estoqueFisico,
     estoqueCampo,
-    estoqueFisicoCampo,
-    diferenca,
-    custoUnitario,
-    financeiro,
+    estoqueTotalReal,
+    mediaConsumo,
+    autonomia,
+    pontoRessuprimento,
+    diasParaReserva,
   };
-}
-
-function formatMoedaBr(valor: number): string {
-  return Math.abs(valor).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function custoSeguro(custoUnitario: number): number {
-  return Number.isFinite(custoUnitario) && custoUnitario > 0 ? custoUnitario : 10;
-}
-
-/** Impacto financeiro assinado: Falta subtrai, Sobra soma. */
-function impactoFinanceiro(diferenca: number, custoUnitario: number): number {
-  return diferenca * custoSeguro(custoUnitario);
-}
-
-function FinanceiroCell({
-  diferenca,
-  custoUnitario,
-}: {
-  diferenca: number;
-  custoUnitario: number;
-}) {
-  const valorFinanceiro = Math.abs(diferenca * custoSeguro(custoUnitario));
-
-  // Falta (diferença < 0) → prejuízo
-  if (diferenca < 0) {
-    return (
-      <span className="font-bold tabular-nums text-red-600">
-        -R$ {formatMoedaBr(valorFinanceiro)}
-      </span>
-    );
-  }
-  // Sobra (diferença > 0) → crédito
-  if (diferenca > 0) {
-    return (
-      <span className="font-bold tabular-nums text-green-600">
-        R$ {formatMoedaBr(valorFinanceiro)}
-      </span>
-    );
-  }
-  return <span className="font-bold tabular-nums text-green-600">R$ 0,00</span>;
 }
 
 function SortableHead({
@@ -188,19 +116,17 @@ function SortableHead({
   direction,
   onSort,
   align = "center",
-  className,
 }: {
-  label: ReactNode;
+  label: string;
   column: SortColumn;
   activeColumn: SortColumn;
   direction: SortDirection;
   onSort: (column: SortColumn) => void;
   align?: "left" | "center";
-  className?: string;
 }) {
   const active = activeColumn === column;
   return (
-    <TableHead className={cn(align === "left" ? "text-left" : "text-center", className)}>
+    <TableHead className={align === "left" ? "text-left" : "text-center"}>
       <button
         type="button"
         className={cn(
@@ -210,9 +136,7 @@ function SortableHead({
         )}
         onClick={() => onSort(column)}
       >
-        <span className={align === "center" ? "text-center leading-tight" : undefined}>
-          {label}
-        </span>
+        {label}
         {active ? (
           direction === "asc" ? (
             <ArrowUp className="h-3.5 w-3.5 shrink-0" />
@@ -258,8 +182,8 @@ function Chip({
   );
 }
 
-function EstoqueFisicoBtpPage() {
-  const [linhas, setLinhas] = useState<LinhaMockEstoque[]>([]);
+function PrevisaoReservaPage() {
+  const [linhas, setLinhas] = useState<LinhaPrevisao[]>([]);
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -270,7 +194,6 @@ function EstoqueFisicoBtpPage() {
   const [viewAtual, setViewAtual] = useState<ModalView>("selecao");
   const [buscaPopover, setBuscaPopover] = useState("");
   const [buscaCriticos, setBuscaCriticos] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("Todos");
 
   const [sortColumn, setSortColumn] = useState<SortColumn>("descricao");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -285,16 +208,7 @@ function EstoqueFisicoBtpPage() {
         const materiais = await fetchDimMateriais();
         if (cancelled) return;
 
-        const mock: LinhaMockEstoque[] = materiais.map((m) => {
-          const qtds = gerarQuantidadesMock();
-          return {
-            codigo: m.material,
-            descricao: m.descr_material,
-            ...qtds,
-          };
-        });
-
-        setLinhas(mock);
+        setLinhas(materiais.map((m) => gerarLinhaPrevisao(m.material, m.descr_material)));
       } catch (e) {
         if (!cancelled) {
           setErro(e instanceof Error ? e.message : "Falha ao carregar materiais.");
@@ -359,9 +273,6 @@ function EstoqueFisicoBtpPage() {
       if (itensSelecionados.length > 0 && !itensSelecionados.includes(row.codigo)) {
         return false;
       }
-      if (filtroStatus === "Falta" && !(row.diferenca < 0)) return false;
-      if (filtroStatus === "Sobra" && !(row.diferenca > 0)) return false;
-      if (filtroStatus === "Neutro" && row.diferenca !== 0) return false;
       return true;
     });
 
@@ -370,39 +281,27 @@ function EstoqueFisicoBtpPage() {
       switch (sortColumn) {
         case "descricao":
           return a.descricao.localeCompare(b.descricao, "pt-BR") * dir;
-        case "status":
-          return statusLabel(a.diferenca).localeCompare(statusLabel(b.diferenca), "pt-BR") * dir;
         case "estoqueBTP":
           return (a.estoqueBTP - b.estoqueBTP) * dir;
-        case "estoqueFisicoCampo":
-          return (a.estoqueFisicoCampo - b.estoqueFisicoCampo) * dir;
         case "estoqueFisico":
           return (a.estoqueFisico - b.estoqueFisico) * dir;
         case "estoqueCampo":
           return (a.estoqueCampo - b.estoqueCampo) * dir;
-        case "diferenca":
-          return (a.diferenca - b.diferenca) * dir;
-        case "financeiro":
-          return (
-            (impactoFinanceiro(a.diferenca, a.custoUnitario) -
-              impactoFinanceiro(b.diferenca, b.custoUnitario)) *
-            dir
-          );
+        case "mediaConsumo":
+          return (a.mediaConsumo - b.mediaConsumo) * dir;
+        case "autonomia":
+          return (a.autonomia - b.autonomia) * dir;
+        case "pontoRessuprimento":
+          return (a.pontoRessuprimento - b.pontoRessuprimento) * dir;
+        case "diasParaReserva":
+          return (a.diasParaReserva - b.diasParaReserva) * dir;
         default:
           return 0;
       }
     });
-  }, [linhas, busca, itensSelecionados, filtroStatus, sortColumn, sortDirection]);
+  }, [linhas, busca, itensSelecionados, sortColumn, sortDirection]);
 
-  const somaFinanceiro = useMemo(() => {
-    return linhasFiltradas.reduce(
-      (acc, row) => acc + impactoFinanceiro(row.diferenca, row.custoUnitario),
-      0,
-    );
-  }, [linhasFiltradas]);
-
-  const temFiltroAtivo =
-    busca.trim().length > 0 || itensSelecionados.length > 0 || filtroStatus !== "Todos";
+  const temFiltroAtivo = busca.trim().length > 0 || itensSelecionados.length > 0;
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -416,7 +315,6 @@ function EstoqueFisicoBtpPage() {
   const limparFiltros = () => {
     setBusca("");
     setItensSelecionados([]);
-    setFiltroStatus("Todos");
   };
 
   const adicionarItemSelecionado = (codigo: string) => {
@@ -640,30 +538,13 @@ function EstoqueFisicoBtpPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar ao painel
         </Link>
 
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <header>
-            <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
-              <Package className="h-6 w-6 text-primary" />
-              Estoque Físico X BTP
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">(Esse modulo é um protótipo)</p>
-          </header>
-
-          <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Soma Financeiro
-            </span>
-            {somaFinanceiro < 0 ? (
-              <span className="text-xl font-bold text-red-600">
-                -R$ {formatMoedaBr(somaFinanceiro)}
-              </span>
-            ) : (
-              <span className="text-xl font-bold text-green-600">
-                R$ {formatMoedaBr(somaFinanceiro)}
-              </span>
-            )}
-          </div>
-        </div>
+        <header className="mb-6">
+          <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
+            <CalendarClock className="h-6 w-6 text-primary" />
+            Previsão de Reserva
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">(Esse modulo é um protótipo)</p>
+        </header>
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative max-w-md flex-1">
@@ -672,7 +553,10 @@ function EstoqueFisicoBtpPage() {
               placeholder="Buscar por Código ou Descrição do Material..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="rounded-md border border-input bg-background px-3 py-2 pr-9"
+              className={cn(
+                "rounded-md border border-input bg-background px-3 py-2",
+                temFiltroAtivo ? "pr-9" : "",
+              )}
             />
             {temFiltroAtivo ? (
               <button
@@ -692,19 +576,6 @@ function EstoqueFisicoBtpPage() {
               Limpar filtro
             </Button>
           ) : null}
-
-          <select
-            aria-label="Status: Todos"
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)}
-            className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {FILTRO_STATUS_OPCOES.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao === "Todos" ? "Status: Todos" : opcao}
-              </option>
-            ))}
-          </select>
 
           <Button
             type="button"
@@ -763,21 +634,6 @@ function EstoqueFisicoBtpPage() {
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label={
-                      <>
-                        Estoque
-                        <br />
-                        <span className="text-sm font-normal">(Físico + Campo)</span>
-                      </>
-                    }
-                    column="estoqueFisicoCampo"
-                    activeColumn={sortColumn}
-                    direction={sortDirection}
-                    onSort={handleSort}
-                    align="center"
-                    className="text-center"
-                  />
-                  <SortableHead
                     label="Estoque Físico"
                     column="estoqueFisico"
                     activeColumn={sortColumn}
@@ -792,22 +648,29 @@ function EstoqueFisicoBtpPage() {
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label="Diferença"
-                    column="diferenca"
+                    label="Média de consumo"
+                    column="mediaConsumo"
                     activeColumn={sortColumn}
                     direction={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label="Status"
-                    column="status"
+                    label="Autonomia de consumo"
+                    column="autonomia"
                     activeColumn={sortColumn}
                     direction={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label="Financeiro"
-                    column="financeiro"
+                    label="Ponto de Ressuprimento"
+                    column="pontoRessuprimento"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Dias para reserva"
+                    column="diasParaReserva"
                     activeColumn={sortColumn}
                     direction={sortDirection}
                     onSort={handleSort}
@@ -827,22 +690,17 @@ function EstoqueFisicoBtpPage() {
                       <TableCell className="text-left font-mono text-sm">{row.codigo}</TableCell>
                       <TableCell className="text-left">{row.descricao}</TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueBTP}</TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {row.estoqueFisico + row.estoqueCampo}
-                      </TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueFisico}</TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueCampo}</TableCell>
+                      <TableCell className="text-center tabular-nums">{row.mediaConsumo}</TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {row.autonomia} dias
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {row.pontoRessuprimento}
+                      </TableCell>
                       <TableCell className="text-center font-medium tabular-nums">
-                        {row.diferenca}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <StatusBadge diferenca={row.diferenca} />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FinanceiroCell
-                          diferenca={row.diferenca}
-                          custoUnitario={row.custoUnitario}
-                        />
+                        {row.diasParaReserva} dias
                       </TableCell>
                     </TableRow>
                   ))

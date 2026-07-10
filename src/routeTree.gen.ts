@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as TecnicosRouteImport } from './routes/tecnicos'
+import { Route as PrevisaoReservaRouteImport } from './routes/previsao-reserva'
 import { Route as MetragemRouteImport } from './routes/metragem'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoricoRouteImport } from './routes/historico'
@@ -37,6 +38,11 @@ const TodosRoute = TodosRouteImport.update({
 const TecnicosRoute = TecnicosRouteImport.update({
   id: '/tecnicos',
   path: '/tecnicos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrevisaoReservaRoute = PrevisaoReservaRouteImport.update({
+  id: '/previsao-reserva',
+  path: '/previsao-reserva',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MetragemRoute = MetragemRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/metragem': typeof MetragemRoute
+  '/previsao-reserva': typeof PrevisaoReservaRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/metragem': typeof MetragemRoute
+  '/previsao-reserva': typeof PrevisaoReservaRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/metragem': typeof MetragemRoute
+  '/previsao-reserva': typeof PrevisaoReservaRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/historico'
     | '/login'
     | '/metragem'
+    | '/previsao-reserva'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/historico'
     | '/login'
     | '/metragem'
+    | '/previsao-reserva'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/historico'
     | '/login'
     | '/metragem'
+    | '/previsao-reserva'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -265,6 +277,7 @@ export interface RootRouteChildren {
   HistoricoRoute: typeof HistoricoRoute
   LoginRoute: typeof LoginRoute
   MetragemRoute: typeof MetragemRoute
+  PrevisaoReservaRoute: typeof PrevisaoReservaRoute
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
   ApiEvidenciasAdminSubmitRoute: typeof ApiEvidenciasAdminSubmitRoute
@@ -287,6 +300,13 @@ declare module '@tanstack/react-router' {
       path: '/tecnicos'
       fullPath: '/tecnicos'
       preLoaderRoute: typeof TecnicosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/previsao-reserva': {
+      id: '/previsao-reserva'
+      path: '/previsao-reserva'
+      fullPath: '/previsao-reserva'
+      preLoaderRoute: typeof PrevisaoReservaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/metragem': {
@@ -438,6 +458,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoricoRoute: HistoricoRoute,
   LoginRoute: LoginRoute,
   MetragemRoute: MetragemRoute,
+  PrevisaoReservaRoute: PrevisaoReservaRoute,
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
   ApiEvidenciasAdminSubmitRoute: ApiEvidenciasAdminSubmitRoute,
