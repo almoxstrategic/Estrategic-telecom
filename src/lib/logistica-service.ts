@@ -11,6 +11,7 @@ import type {
   ConsumoTecnicoItem,
   DimMaterial,
   DimMaterialRow,
+  EstoqueFisicoRow,
   KpisConsumo,
   KpisDetalheItem,
   KpisDetalheWo,
@@ -82,7 +83,7 @@ function dedupeWoCabecalhoRows(rows: WoCabecalhoRow[]): WoCabecalhoRow[] {
 const UPSERT_BATCH_SIZE = 500;
 
 async function upsertInBatches<T extends Record<string, unknown>>(
-  table: "wos_cabecalho" | "wos_consumo" | "dim_materiais",
+  table: "wos_cabecalho" | "wos_consumo" | "dim_materiais" | "estoque_fisico",
   payload: T[],
   onConflict: string,
 ): Promise<void> {
@@ -433,6 +434,22 @@ export async function searchDimMateriais(query: string, limit = 40): Promise<Dim
   }));
 }
 
+/** Lista completa do Upload C (dim_materiais) — base do protótipo Estoque Físico X BTP. */
+export async function fetchDimMateriais(): Promise<DimMaterial[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("dim_materiais")
+    .select("material, descr_material")
+    .order("descr_material", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: DimMaterial) => ({
+    material: normalizeMaterialCode(row.material),
+    descr_material: (row.descr_material ?? "").trim(),
+  }));
+}
+
 function dedupeDimMateriaisRows(rows: DimMaterialRow[]): DimMaterialRow[] {
   const map = new Map<string, DimMaterialRow>();
   for (const row of rows) {
@@ -467,6 +484,44 @@ export async function upsertDimMateriais(rows: DimMaterialRow[]): Promise<Upsert
   }));
 
   await upsertInBatches("dim_materiais", payload, "material");
+  return countUpsert(deduped, existingCount ?? 0);
+}
+
+function dedupeEstoqueFisicoRows(rows: EstoqueFisicoRow[]): EstoqueFisicoRow[] {
+  const map = new Map<string, EstoqueFisicoRow>();
+  for (const row of rows) {
+    const material = normalizeMaterialCode(row.material);
+    if (!material) continue;
+    map.set(material, {
+      material,
+      descricao_material: row.descricao_material.trim(),
+      quantidade_fisica: Number.isFinite(row.quantidade_fisica) ? row.quantidade_fisica : 0,
+      quantidade_campo: Number.isFinite(row.quantidade_campo) ? row.quantidade_campo : 0,
+    });
+  }
+  return [...map.values()];
+}
+
+export async function upsertEstoqueFisico(rows: EstoqueFisicoRow[]): Promise<UpsertResult> {
+  if (rows.length === 0) return { inserted: 0, updated: 0 };
+
+  const deduped = dedupeEstoqueFisicoRows(rows);
+  const supabase = getSupabaseClient();
+  const ids = deduped.map((r) => r.material);
+
+  const { count: existingCount } = await supabase
+    .from("estoque_fisico")
+    .select("material", { count: "exact", head: true })
+    .in("material", ids);
+
+  const payload = deduped.map((r) => ({
+    material: r.material,
+    descricao_material: r.descricao_material,
+    quantidade_fisica: r.quantidade_fisica,
+    quantidade_campo: r.quantidade_campo,
+  }));
+
+  await upsertInBatches("estoque_fisico", payload, "material");
   return countUpsert(deduped, existingCount ?? 0);
 }
 

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Database,
   FileUp,
+  Package,
   Send,
   UserPlus,
   Users,
@@ -99,6 +100,18 @@ function AdminHome() {
                 <div className="text-xs text-muted-foreground">
                   WOs atrasadas sem evidência enviada
                 </div>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/estoque-fisico-btp" className="block">
+            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Package className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-bold text-foreground">Estoque Físico X BTP</div>
+                <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
               </div>
             </div>
           </Link>

@@ -4,9 +4,10 @@ import { FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { FileDropzone } from "@/components/FileDropzone";
-import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
+import { replaceWoCabecalho, upsertDimMateriais, upsertEstoqueFisico, upsertWoConsumo } from "@/lib/logistica-service";
 import {
   parseDimMateriaisFile,
+  parseEstoqueFisicoFile,
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
@@ -48,6 +49,7 @@ function ImportacaoPage() {
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoque, setBusyEstoque] = useState(false);
+  const [busyEstoqueFisico, setBusyEstoqueFisico] = useState(false);
 
   useEffect(() => {
     console.info(
@@ -119,6 +121,25 @@ function ImportacaoPage() {
     }
   };
 
+  const handleEstoqueFisico = async (file: File) => {
+    setBusyEstoqueFisico(true);
+    try {
+      const rows = await parseEstoqueFisicoFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada no estoque físico.");
+        return;
+      }
+      const result = await upsertEstoqueFisico(rows);
+      toast.success(
+        `Estoque físico importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
+      );
+    } catch (err) {
+      toast.error(formatImportError("estoque-fisico", err));
+    } finally {
+      setBusyEstoqueFisico(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -172,6 +193,18 @@ function ImportacaoPage() {
               description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
               busy={busyEstoque}
               onFile={handleEstoque}
+            />
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              Upload D — Estoque Físico
+            </h2>
+            <FileDropzone
+              title="Estoque Físico e Campo"
+              description="Colunas: Material, Descr. Material, Qtd Física, Qtd Campo. Alimenta o módulo Estoque Físico X BTP."
+              busy={busyEstoqueFisico}
+              onFile={handleEstoqueFisico}
             />
           </section>
         </div>

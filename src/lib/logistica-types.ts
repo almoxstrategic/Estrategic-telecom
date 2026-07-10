@@ -39,6 +39,13 @@ export type DimMaterialRow = {
 
 export type DimMaterial = DimMaterialRow;
 
+export type EstoqueFisicoRow = {
+  material: string;
+  descricao_material: string;
+  quantidade_fisica: number;
+  quantidade_campo: number;
+};
+
 export type PeriodoConsumo = {
   mes: number;
   ano: number;

@@ -6,6 +6,7 @@ import {
   FileUp,
   LogOut,
   Home,
+  Package,
   Send,
   ShieldCheck,
   Database,
@@ -93,6 +94,15 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             >
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Pendências
+            </Link>
+            <Link
+              to="/estoque-fisico-btp"
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <Package className="h-5 w-5 text-primary" />
+              Estoque Físico X BTP
             </Link>
             <Link
               to="/admin/importacao"

@@ -1,4 +1,4 @@
-import type { DimMaterialRow, WoCabecalhoRow, WoConsumoRow } from "./logistica-types";
+import type { DimMaterialRow, WoCabecalhoRow, WoConsumoRow, EstoqueFisicoRow } from "./logistica-types";
 import { normalizeMatricula } from "./auth-identificacao";
 import { normalizeMaterialCode } from "./material-code";
 import { parseLocaleNumber } from "./parse-locale-number";
@@ -308,6 +308,44 @@ export async function parseDimMateriaisFile(file: File): Promise<DimMaterialRow[
 
   for (const row of raw) {
     const mapped = mapEstoqueRow(row);
+    if (mapped) map.set(mapped.material, mapped);
+  }
+
+  return [...map.values()];
+}
+
+/** Upload D — Estoque Físico: Material, Descr. Material, Qtd Física, Qtd Campo */
+function mapEstoqueFisicoRow(row: RawRow): EstoqueFisicoRow | null {
+  const material = pick(row, "Material");
+  const descr = pick(row, "Descr. Material", "Descr.Material", "Descr Material", "Descrição Material");
+  const qtdFisicaRaw = pick(
+    row,
+    "Qtd Física",
+    "Qtd Fisica",
+    "Quantidade Física",
+    "Quantidade Fisica",
+  );
+  const qtdCampoRaw = pick(row, "Qtd Campo", "Quantidade Campo");
+
+  if (!material) return null;
+
+  const materialCode = normalizeMaterialCode(material);
+  if (!materialCode) return null;
+
+  return {
+    material: materialCode,
+    descricao_material: (descr || material).trim(),
+    quantidade_fisica: parseNumber(qtdFisicaRaw),
+    quantidade_campo: parseNumber(qtdCampoRaw),
+  };
+}
+
+export async function parseEstoqueFisicoFile(file: File): Promise<EstoqueFisicoRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const map = new Map<string, EstoqueFisicoRow>();
+
+  for (const row of raw) {
+    const mapped = mapEstoqueFisicoRow(row);
     if (mapped) map.set(mapped.material, mapped);
   }
 
