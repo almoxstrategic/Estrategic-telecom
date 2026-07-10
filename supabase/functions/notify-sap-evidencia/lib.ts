@@ -217,14 +217,17 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+const CONTAINER_STYLE =
+  "width:100%;max-width:600px;margin:0 auto;box-sizing:border-box;";
+
 const IMG_STYLE =
   "width:100%;max-width:250px;height:auto;border-radius:6px;border:1px solid #ccc;display:block;margin:0 auto;";
 
 function renderCabecalhoEmpresa(): string {
   return `
-  <table role="presentation" width="100%" style="width:100%;max-width:600px;border-collapse:collapse;margin:0 0 24px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${CONTAINER_STYLE}border-collapse:collapse;margin:0 auto;">
     <tr>
-      <td style="background-color:#047857;padding:20px;text-align:center;color:#ffffff;">
+      <td style="background-color:#047857;padding:25px 20px;text-align:center;color:#ffffff;">
         <span style="font-size:20px;font-weight:bold;letter-spacing:0.3px;color:#ffffff;">Estrategic Engenharia</span>
       </td>
     </tr>
@@ -239,36 +242,46 @@ function renderMaterialBlock(material: MaterialEmailData): string {
   const urlFotoFim = escapeHtml(material.foto_fim_url);
 
   return `
-  <h3 style="margin:0 0 12px 0;font-size:18px;font-weight:bold;color:#0f172a;">Detalhe do item: ${tipo}</h3>
-
-  <div style="background-color:#f4f7f9;border-radius:8px;padding:15px;margin-bottom:20px;text-align:center;">
-    <span style="color:#0d6efd;font-weight:bold;font-size:16px;">Total utilizado: ${metragem} metros</span>
-  </div>
-
-  <table role="presentation" width="100%" style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:10px;margin:0 0 8px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${CONTAINER_STYLE}margin:24px auto 0 auto;">
     <tr>
-      <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
-        <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
-        <img src="${urlFotoInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
-      </td>
-      <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
-        <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
-        <img src="${urlFotoFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+      <td style="padding:0;text-align:left;">
+        <h3 style="margin:0 0 12px 0;font-size:18px;font-weight:bold;color:#0f172a;">Detalhe do item: ${tipo}</h3>
+
+        <div style="width:100%;max-width:600px;margin:0 auto 20px auto;box-sizing:border-box;background-color:#f4f7f9;border-radius:8px;padding:15px;text-align:center;">
+          <span style="color:#0d6efd;font-weight:bold;font-size:16px;">Total utilizado: ${metragem} metros</span>
+        </div>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;margin:0 auto;table-layout:fixed;border-collapse:separate;border-spacing:10px;box-sizing:border-box;">
+          <tr>
+            <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
+              <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
+              <img src="${urlFotoInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
+            </td>
+            <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
+              <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
+              <img src="${urlFotoFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+            </td>
+          </tr>
+        </table>
+
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 0 0;width:100%;" />
       </td>
     </tr>
   </table>
-
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
   `;
 }
 
 function renderObservacao(observacao: string): string {
   const texto = escapeHtml(observacao);
   return `
-  <div style="background-color:#f4f7f9;border-radius:8px;padding:15px;margin-top:8px;">
-    <p style="margin:0 0 6px 0;font-weight:bold;color:#0f172a;">Observação do Técnico:</p>
-    <p style="margin:0;color:#334155;line-height:1.5;">${texto}</p>
-  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${CONTAINER_STYLE}margin:16px auto 0 auto;">
+    <tr>
+      <td style="background-color:#f4f7f9;border-radius:8px;padding:15px;">
+        <p style="margin:0 0 6px 0;font-weight:bold;color:#0f172a;">Observação do Técnico:</p>
+        <p style="margin:0;color:#334155;line-height:1.5;">${texto}</p>
+      </td>
+    </tr>
+  </table>
   `;
 }
 
@@ -282,12 +295,12 @@ function renderDadosOperacao(data: EvidenciaEmailData): string {
 
   const rowsHtml = rows
     .map(
-      ([label, value]) => `
+      ([label, value], index) => `
       <tr>
-        <td style="padding:10px;border-bottom:1px solid #d1d5db;font-weight:bold;background-color:#f3f4f6;width:40%;color:#0f172a;">
+        <td width="30%" style="padding:10px;border-bottom:1px solid #d1d5db;font-weight:bold;background-color:#f3f4f6;width:30%;color:#0f172a;${index === rows.length - 1 ? "border-bottom:none;" : ""}">
           ${escapeHtml(label)}
         </td>
-        <td style="padding:10px;border-bottom:1px solid #d1d5db;color:#0f172a;">
+        <td width="70%" style="padding:10px;border-bottom:1px solid #d1d5db;width:70%;color:#0f172a;${index === rows.length - 1 ? "border-bottom:none;" : ""}">
           ${escapeHtml(value)}
         </td>
       </tr>`,
@@ -295,9 +308,15 @@ function renderDadosOperacao(data: EvidenciaEmailData): string {
     .join("");
 
   return `
-  <h2 style="margin:0 0 12px 0;font-size:18px;font-weight:bold;color:#0f172a;">Dados da Operação</h2>
-  <table style="border-collapse:collapse;width:100%;max-width:600px;border:1px solid #d1d5db;">
-    ${rowsHtml}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${CONTAINER_STYLE}margin:20px auto 0 auto;">
+    <tr>
+      <td style="padding:0;text-align:left;">
+        <h2 style="margin:0 0 12px 0;font-size:18px;font-weight:bold;color:#0f172a;">Dados da Operação</h2>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;margin:0 auto;table-layout:fixed;border-collapse:collapse;border:1px solid #d1d5db;box-sizing:border-box;">
+          ${rowsHtml}
+        </table>
+      </td>
+    </tr>
   </table>
   `;
 }
@@ -310,14 +329,17 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
   const html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background-color:#ffffff;">
-    ${renderCabecalhoEmpresa()}
-    ${renderDadosOperacao(data)}
-
-    <div style="margin-top:28px;">
-      ${materiaisHtml}
-    </div>
-    ${observacaoHtml}
+  <body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background-color:#ffffff;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#ffffff;">
+      <tr>
+        <td align="center" style="padding:16px 8px;text-align:center;">
+          ${renderCabecalhoEmpresa()}
+          ${renderDadosOperacao(data)}
+          ${materiaisHtml}
+          ${observacaoHtml}
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
   `.trim();
