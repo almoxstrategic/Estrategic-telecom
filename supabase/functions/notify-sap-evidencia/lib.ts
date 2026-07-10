@@ -218,7 +218,19 @@ function escapeHtml(value: string): string {
 }
 
 const IMG_STYLE =
-  "max-width:100%;height:auto;border:1px solid #ddd;border-radius:4px;margin-bottom:15px;display:block;";
+  "width:100%;max-width:250px;height:auto;border-radius:6px;border:1px solid #ccc;display:block;margin:0 auto;";
+
+function renderCabecalhoEmpresa(): string {
+  return `
+  <table role="presentation" width="100%" style="width:100%;max-width:600px;border-collapse:collapse;margin:0 0 24px 0;">
+    <tr>
+      <td style="background-color:#047857;padding:20px;text-align:center;color:#ffffff;">
+        <span style="font-size:20px;font-weight:bold;letter-spacing:0.3px;color:#ffffff;">Estrategic Engenharia</span>
+      </td>
+    </tr>
+  </table>
+  `;
+}
 
 function renderMaterialBlock(material: MaterialEmailData): string {
   const tipo = escapeHtml(material.tipo_material);
@@ -227,17 +239,24 @@ function renderMaterialBlock(material: MaterialEmailData): string {
   const urlFotoFim = escapeHtml(material.foto_fim_url);
 
   return `
-  <h4 style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0f172a;">${tipo}</h4>
+  <h3 style="margin:0 0 12px 0;font-size:18px;font-weight:bold;color:#0f172a;">Detalhe do item: ${tipo}</h3>
 
-  <div style="background-color:#f4f7f9;border-radius:8px;padding:15px;margin-bottom:16px;">
+  <div style="background-color:#f4f7f9;border-radius:8px;padding:15px;margin-bottom:20px;text-align:center;">
     <span style="color:#0d6efd;font-weight:bold;font-size:16px;">Total utilizado: ${metragem} metros</span>
   </div>
 
-  <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
-  <img src="${urlFotoInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
-
-  <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
-  <img src="${urlFotoFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+  <table role="presentation" width="100%" style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:10px;margin:0 0 8px 0;">
+    <tr>
+      <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
+        <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
+        <img src="${urlFotoInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
+      </td>
+      <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
+        <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
+        <img src="${urlFotoFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+      </td>
+    </tr>
+  </table>
 
   <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
   `;
@@ -292,11 +311,12 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
 <!DOCTYPE html>
 <html lang="pt-BR">
   <body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background-color:#ffffff;">
+    ${renderCabecalhoEmpresa()}
     ${renderDadosOperacao(data)}
 
-    <h3 style="margin:28px 0 16px 0;font-size:18px;font-weight:bold;color:#0f172a;">Detalhe do item</h3>
-
-    ${materiaisHtml}
+    <div style="margin-top:28px;">
+      ${materiaisHtml}
+    </div>
     ${observacaoHtml}
   </body>
 </html>
