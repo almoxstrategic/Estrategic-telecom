@@ -16,6 +16,10 @@ export type EvidenciaEnvioAgrupado = {
   data_registro: string;
   observacao?: string | null;
   materiais: EvidenciaMaterial[];
+  tecnico_id?: string;
+  tecnico_nome?: string | null;
+  tecnico_login?: string | null;
+  tecnico_identificacao?: string | null;
 };
 
 function formatMetragemDisplay(value: number): string {
@@ -39,10 +43,23 @@ export function groupEvidenciasPorEnvio(records: Evidencia[]): EvidenciaEnvioAgr
       data_registro: record.data_registro,
       observacao: record.observacao,
       materiais: [],
+      tecnico_id: record.tecnico_id,
+      tecnico_nome: record.tecnico_nome,
+      tecnico_login: record.tecnico_login,
+      tecnico_identificacao: record.tecnico_identificacao,
     };
 
     if (!existing.observacao && record.observacao) {
       existing.observacao = record.observacao;
+    }
+    if (!existing.tecnico_nome && record.tecnico_nome) {
+      existing.tecnico_nome = record.tecnico_nome;
+    }
+    if (!existing.tecnico_login && record.tecnico_login) {
+      existing.tecnico_login = record.tecnico_login;
+    }
+    if (!existing.tecnico_identificacao && record.tecnico_identificacao) {
+      existing.tecnico_identificacao = record.tecnico_identificacao;
     }
 
     existing.materiais.push({

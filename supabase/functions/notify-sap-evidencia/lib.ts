@@ -316,11 +316,34 @@ export function assertWebhookSecret(req: Request): void {
   }
 }
 
+export type EmailAnexo = {
+  filename: string;
+  content: string;
+};
+
+export function parseAnexos(value: unknown): EmailAnexo[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) return [];
+
+  const anexos: EmailAnexo[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const filename =
+      "filename" in item && typeof item.filename === "string" ? item.filename.trim() : "";
+    const content =
+      "content" in item && typeof item.content === "string" ? item.content.trim() : "";
+    if (!filename || !content) continue;
+    anexos.push({ filename, content });
+  }
+  return anexos;
+}
+
 export async function sendResendEmail(input: {
   from: string;
   to: string[];
   subject: string;
   html: string;
+  attachments?: EmailAnexo[];
 }): Promise<{ id?: string }> {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("RESEND_API_KEY não configurada.");
@@ -336,6 +359,9 @@ export async function sendResendEmail(input: {
       to: input.to,
       subject: input.subject,
       html: input.html,
+      ...(input.attachments && input.attachments.length > 0
+        ? { attachments: input.attachments }
+        : {}),
     }),
   });
 

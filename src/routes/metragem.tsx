@@ -45,6 +45,35 @@ type MaterialEvidencia = {
   metragem: string;
 };
 
+function fileToBase64(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Falha ao converter a imagem para Base64."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler a imagem."));
+  });
+}
+
+function stripBase64Prefix(dataUrl: string): string {
+  const commaIndex = dataUrl.indexOf(",");
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+}
+
+function sanitizeAnexoFilename(tipo: string, sufixo: "Inicio" | "Fim"): string {
+  const base = tipo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "");
+  return `${base || "Material"}_${sufixo}.jpg`;
+}
+
 export const Route = createFileRoute("/metragem")({
   beforeLoad: () => requireTecnico(),
   head: () => ({
@@ -157,9 +186,11 @@ function MetragemPage() {
             throw new Error("Material incompleto. Verifique fotos e metragem.");
           }
 
-          const [fotoInicio, fotoFim] = await Promise.all([
+          const [fotoInicio, fotoFim, base64Inicio, base64Fim] = await Promise.all([
             uploadEvidencePhoto(user.id, material.fotoInicio.file, "inicio"),
             uploadEvidencePhoto(user.id, material.fotoFim.file, "fim"),
+            fileToBase64(material.fotoInicio.file),
+            fileToBase64(material.fotoFim.file),
           ]);
 
           if (
@@ -178,6 +209,10 @@ function MetragemPage() {
             foto_fim_url: fotoFim.publicUrl,
             foto_inicio_path: fotoInicio.path,
             foto_fim_path: fotoFim.path,
+            foto_inicio_base64: stripBase64Prefix(base64Inicio),
+            foto_fim_base64: stripBase64Prefix(base64Fim),
+            anexo_inicio_filename: sanitizeAnexoFilename(material.tipo, "Inicio"),
+            anexo_fim_filename: sanitizeAnexoFilename(material.tipo, "Fim"),
           };
         }),
       );

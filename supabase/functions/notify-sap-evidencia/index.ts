@@ -4,6 +4,7 @@ import {
   buildEvidenciaEmail,
   extractEvidenciaData,
   finalizeEmailData,
+  parseAnexos,
   parseRecipients,
   resolveTecnicoInfo,
   sendResendEmail,
@@ -34,6 +35,7 @@ Deno.serve(async (req) => {
     const tecnico = await resolveTecnicoInfo(tecnicoId, partial.nome_tecnico);
     const emailData = finalizeEmailData(partial, tecnico);
     const { subject, html } = buildEvidenciaEmail(emailData);
+    const anexos = parseAnexos(payload?.anexos);
 
     const from = Deno.env.get("RESEND_FROM_EMAIL");
     const toRaw = Deno.env.get("RESEND_TO_EMAIL");
@@ -51,6 +53,7 @@ Deno.serve(async (req) => {
       to: recipients,
       subject,
       html,
+      attachments: anexos,
     });
 
     return new Response(
@@ -59,6 +62,7 @@ Deno.serve(async (req) => {
         email_id: result.id ?? null,
         contrato: emailData.contrato,
         wo: emailData.wo,
+        anexos: anexos.length,
       }),
       {
         status: 200,

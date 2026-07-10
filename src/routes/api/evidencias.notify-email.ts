@@ -12,6 +12,11 @@ type NotifyMaterialPayload = {
   foto_fim_url: string;
 };
 
+type NotifyAnexoPayload = {
+  filename: string;
+  content: string;
+};
+
 type NotifyEmailBody = {
   access_token: string;
   tecnico_id: string;
@@ -19,10 +24,34 @@ type NotifyEmailBody = {
   wo: string;
   observacao?: string;
   materiais: NotifyMaterialPayload[];
+  anexos: NotifyAnexoPayload[];
 };
 
 function jsonError(message: string, status: number): Response {
   return Response.json({ error: message }, { status });
+}
+
+function parseAnexos(value: unknown): NotifyAnexoPayload[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error("Campo anexos inválido.");
+  }
+
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object") {
+      throw new Error(`Anexo inválido na posição ${index}.`);
+    }
+
+    const filename =
+      "filename" in item && typeof item.filename === "string" ? item.filename.trim() : "";
+    const content =
+      "content" in item && typeof item.content === "string" ? item.content.trim() : "";
+
+    if (!filename) throw new Error(`Nome do anexo ausente na posição ${index}.`);
+    if (!content) throw new Error(`Conteúdo do anexo ausente na posição ${index}.`);
+
+    return { filename, content };
+  });
 }
 
 function parseNotifyBody(body: unknown): NotifyEmailBody & { webhook_secret?: string } {
@@ -83,6 +112,7 @@ function parseNotifyBody(body: unknown): NotifyEmailBody & { webhook_secret?: st
     wo,
     observacao,
     materiais,
+    anexos: parseAnexos(input.anexos),
     webhook_secret:
       typeof input.webhook_secret === "string" && input.webhook_secret.trim()
         ? input.webhook_secret.trim()
@@ -141,6 +171,7 @@ export const Route = createFileRoute("/api/evidencias/notify-email")({
                 foto_inicio_url: material.foto_inicio_url,
                 foto_fim_url: material.foto_fim_url,
               })),
+              anexos: payload.anexos,
             },
             webhookSecret,
           );

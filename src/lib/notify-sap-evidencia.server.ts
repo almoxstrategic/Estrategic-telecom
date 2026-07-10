@@ -11,6 +11,11 @@ type NotifySapMaterial = {
   foto_fim_url: string;
 };
 
+type NotifySapAnexo = {
+  filename: string;
+  content: string;
+};
+
 export async function notifySapEvidenciaBatch(
   input: {
     tecnicoId: string;
@@ -18,6 +23,7 @@ export async function notifySapEvidenciaBatch(
     wo: string;
     observacao?: string;
     materiais: NotifySapMaterial[];
+    anexos?: NotifySapAnexo[];
   },
   webhookSecretOverride?: string,
 ): Promise<void> {
@@ -48,6 +54,7 @@ export async function notifySapEvidenciaBatch(
         foto_inicio_url: material.foto_inicio_url,
         foto_fim_url: material.foto_fim_url,
       })),
+      anexos: input.anexos ?? [],
     }),
   });
 
