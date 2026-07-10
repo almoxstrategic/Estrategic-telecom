@@ -849,22 +849,24 @@ function KpisPage() {
                             </BarChart>
                           </ChartContainer>
                         </div>
-                        <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-track]:bg-transparent">
-                          {(kpis?.top_tecnicos ?? []).map((t) => (
-                            <li key={t.id_tecnico}>
-                              <button
-                                type="button"
-                                onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
-                                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
-                              >
-                                <span className="font-medium text-primary">
-                                  {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
-                                </span>
-                                <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="mt-4 overflow-y-auto max-h-96 pr-2">
+                          <ul className="space-y-2">
+                            {(kpis?.top_tecnicos ?? []).map((t) => (
+                              <li key={t.id_tecnico}>
+                                <button
+                                  type="button"
+                                  onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
+                                  className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                                >
+                                  <span className="font-medium text-primary">
+                                    {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
+                                  </span>
+                                  <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     )}
                   </div>
