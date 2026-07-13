@@ -7,6 +7,7 @@ import {
   FileUp,
   Package,
   Send,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
@@ -109,6 +110,18 @@ function AdminHome() {
               </div>
               <div>
                 <div className="font-bold text-foreground">Previsão de Reserva</div>
+                <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/media-baixa-tecnico" className="block">
+            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                <TrendingUp className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-bold text-foreground">Média de Baixa por Técnico</div>
                 <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
               </div>
             </div>

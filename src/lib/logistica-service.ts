@@ -18,6 +18,8 @@ import type {
   KpisDetalheWoMaterial,
   KpisDetalheWoSelecionada,
   KpisFiltro,
+  MediaBaixaTecnicoFiltro,
+  MediaBaixaTecnicoItem,
   PendenciaEvidencia,
   PeriodoConsumo,
   TopConsumidorMaterial,
@@ -418,6 +420,40 @@ export async function fetchPeriodosConsumo(): Promise<PeriodoConsumo[]> {
     mes: Number(row.mes),
     ano: Number(row.ano),
   }));
+}
+
+export async function fetchMediaBaixaTecnico(
+  filtro?: MediaBaixaTecnicoFiltro,
+): Promise<MediaBaixaTecnicoItem[]> {
+  const supabase = getSupabaseClient();
+  const { p_mes, p_ano } = toRpcFiltro(filtro);
+  const { data, error } = await supabase.rpc("get_media_baixa_tecnico", {
+    p_mes,
+    p_ano,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row: MediaBaixaTecnicoItem) => {
+    const media = Number(row.media_consumo) || 0;
+    const estoque = Number(row.estoque_tecnico) || 0;
+    const autonomiaRaw = row.autonomia_dias;
+    const autonomia =
+      autonomiaRaw === null || autonomiaRaw === undefined
+        ? media > 0
+          ? Math.floor(estoque / media)
+          : null
+        : Number(autonomiaRaw);
+
+    return {
+      id_tecnico: row.id_tecnico,
+      nome_tecnico: row.nome_tecnico ?? "",
+      material: normalizeMaterialCode(row.material),
+      descr_material: (row.descr_material ?? "").trim(),
+      estoque_tecnico: estoque,
+      media_consumo: media,
+      autonomia_dias: Number.isFinite(autonomia as number) ? (autonomia as number) : null,
+    };
+  });
 }
 
 export async function searchDimMateriais(query: string, limit = 40): Promise<DimMaterial[]> {

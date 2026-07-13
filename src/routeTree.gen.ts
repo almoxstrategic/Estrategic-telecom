@@ -13,6 +13,7 @@ import { Route as TodosRouteImport } from './routes/todos'
 import { Route as TecnicosRouteImport } from './routes/tecnicos'
 import { Route as PrevisaoReservaRouteImport } from './routes/previsao-reserva'
 import { Route as MetragemRouteImport } from './routes/metragem'
+import { Route as MediaBaixaTecnicoRouteImport } from './routes/media-baixa-tecnico'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as EstoqueFisicoBtpRouteImport } from './routes/estoque-fisico-btp'
@@ -48,6 +49,11 @@ const PrevisaoReservaRoute = PrevisaoReservaRouteImport.update({
 const MetragemRoute = MetragemRouteImport.update({
   id: '/metragem',
   path: '/metragem',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MediaBaixaTecnicoRoute = MediaBaixaTecnicoRouteImport.update({
+  id: '/media-baixa-tecnico',
+  path: '/media-baixa-tecnico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
+  '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
   '/tecnicos': typeof TecnicosRoute
@@ -163,6 +170,7 @@ export interface FileRoutesByTo {
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
+  '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
   '/tecnicos': typeof TecnicosRoute
@@ -186,6 +194,7 @@ export interface FileRoutesById {
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
+  '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
   '/tecnicos': typeof TecnicosRoute
@@ -210,6 +219,7 @@ export interface FileRouteTypes {
     | '/estoque-fisico-btp'
     | '/historico'
     | '/login'
+    | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
     | '/tecnicos'
@@ -231,6 +241,7 @@ export interface FileRouteTypes {
     | '/estoque-fisico-btp'
     | '/historico'
     | '/login'
+    | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
     | '/tecnicos'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/estoque-fisico-btp'
     | '/historico'
     | '/login'
+    | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
     | '/tecnicos'
@@ -276,6 +288,7 @@ export interface RootRouteChildren {
   EstoqueFisicoBtpRoute: typeof EstoqueFisicoBtpRoute
   HistoricoRoute: typeof HistoricoRoute
   LoginRoute: typeof LoginRoute
+  MediaBaixaTecnicoRoute: typeof MediaBaixaTecnicoRoute
   MetragemRoute: typeof MetragemRoute
   PrevisaoReservaRoute: typeof PrevisaoReservaRoute
   TecnicosRoute: typeof TecnicosRoute
@@ -314,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/metragem'
       fullPath: '/metragem'
       preLoaderRoute: typeof MetragemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/media-baixa-tecnico': {
+      id: '/media-baixa-tecnico'
+      path: '/media-baixa-tecnico'
+      fullPath: '/media-baixa-tecnico'
+      preLoaderRoute: typeof MediaBaixaTecnicoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -457,6 +477,7 @@ const rootRouteChildren: RootRouteChildren = {
   EstoqueFisicoBtpRoute: EstoqueFisicoBtpRoute,
   HistoricoRoute: HistoricoRoute,
   LoginRoute: LoginRoute,
+  MediaBaixaTecnicoRoute: MediaBaixaTecnicoRoute,
   MetragemRoute: MetragemRoute,
   PrevisaoReservaRoute: PrevisaoReservaRoute,
   TecnicosRoute: TecnicosRoute,

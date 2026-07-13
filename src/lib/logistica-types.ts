@@ -136,3 +136,18 @@ export type HistoricoLancamento = {
   nome_tecnico: string;
   enviado_por_admin: boolean;
 };
+
+export type MediaBaixaTecnicoFiltro = {
+  mes: number | null;
+  ano: number | null;
+};
+
+export type MediaBaixaTecnicoItem = {
+  id_tecnico: string;
+  nome_tecnico: string;
+  material: string;
+  descr_material: string;
+  estoque_tecnico: number;
+  media_consumo: number;
+  autonomia_dias: number | null;
+};

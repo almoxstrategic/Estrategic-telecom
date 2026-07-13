@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Filter, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Filter, Target, X } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -624,12 +624,6 @@ function PrevisaoReservaPage() {
             ) : null}
           </div>
 
-          {temFiltroAtivo ? (
-            <Button type="button" variant="ghost" size="sm" onClick={limparFiltros}>
-              Limpar todos os filtros
-            </Button>
-          ) : null}
-
           <select
             aria-label="Status: Todos"
             value={filtroStatus}
@@ -642,6 +636,17 @@ function PrevisaoReservaPage() {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            onClick={() =>
+              alert("Em breve: Configuração do ponto de ressuprimento e estoque de segurança.")
+            }
+          >
+            <Target className="h-4 w-4" />
+            Definir ponto de ressuprimento
+          </button>
 
           <Button
             type="button"
@@ -668,6 +673,12 @@ function PrevisaoReservaPage() {
               {modalBody}
             </DialogContent>
           </Dialog>
+
+          {temFiltroAtivo ? (
+            <Button type="button" variant="ghost" size="sm" onClick={limparFiltros}>
+              Limpar todos os filtros
+            </Button>
+          ) : null}
         </div>
 
         {loading ? (

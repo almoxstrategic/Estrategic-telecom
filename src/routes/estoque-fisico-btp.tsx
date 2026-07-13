@@ -71,34 +71,34 @@ type SortDirection = "asc" | "desc";
 
 type ModalView = "selecao" | "definicao";
 
-type FiltroStatus = "Todos" | "Falta" | "Sobra" | "Neutro";
+type FiltroStatus = "Todos" | "Falta Físico" | "Sobra Físico" | "Neutro";
 
-const FILTRO_STATUS_OPCOES: FiltroStatus[] = ["Todos", "Falta", "Sobra", "Neutro"];
+const FILTRO_STATUS_OPCOES: FiltroStatus[] = ["Todos", "Falta Físico", "Sobra Físico", "Neutro"];
 
 function statusLabel(diferenca: number): string {
   if (diferenca === 0) return "Neutro";
-  if (diferenca < 0) return "Falta";
-  return "Sobra";
+  if (diferenca < 0) return "Falta Físico";
+  return "Sobra Físico";
 }
 
 function StatusBadge({ diferenca }: { diferenca: number }) {
   if (diferenca === 0) {
     return (
-      <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">
+      <span className="whitespace-nowrap rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
         Neutro
       </span>
     );
   }
   if (diferenca < 0) {
     return (
-      <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
-        Falta
+      <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
+        Falta Físico
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
-      Sobra
+    <span className="whitespace-nowrap rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">
+      Sobra Físico
     </span>
   );
 }
@@ -166,7 +166,7 @@ function FinanceiroCell({
   // Falta (diferença < 0) → prejuízo
   if (diferenca < 0) {
     return (
-      <span className="font-bold tabular-nums text-red-600">
+      <span className="whitespace-nowrap font-bold tabular-nums text-red-600">
         -R$ {formatMoedaBr(valorFinanceiro)}
       </span>
     );
@@ -174,12 +174,14 @@ function FinanceiroCell({
   // Sobra (diferença > 0) → crédito
   if (diferenca > 0) {
     return (
-      <span className="font-bold tabular-nums text-green-600">
+      <span className="whitespace-nowrap font-bold tabular-nums text-green-600">
         R$ {formatMoedaBr(valorFinanceiro)}
       </span>
     );
   }
-  return <span className="font-bold tabular-nums text-green-600">R$ 0,00</span>;
+  return (
+    <span className="whitespace-nowrap font-bold tabular-nums text-green-600">R$ 0,00</span>
+  );
 }
 
 function SortableHead({
@@ -360,8 +362,8 @@ function EstoqueFisicoBtpPage() {
       if (itensSelecionados.length > 0 && !itensSelecionados.includes(row.codigo)) {
         return false;
       }
-      if (filtroStatus === "Falta" && !(row.diferenca < 0)) return false;
-      if (filtroStatus === "Sobra" && !(row.diferenca > 0)) return false;
+      if (filtroStatus === "Falta Físico" && !(row.diferenca < 0)) return false;
+      if (filtroStatus === "Sobra Físico" && !(row.diferenca > 0)) return false;
       if (filtroStatus === "Neutro" && row.diferenca !== 0) return false;
       return true;
     });
@@ -723,12 +725,6 @@ function EstoqueFisicoBtpPage() {
             ) : null}
           </div>
 
-          {temFiltroAtivo ? (
-            <Button type="button" variant="ghost" size="sm" onClick={limparFiltros}>
-              Limpar filtro
-            </Button>
-          ) : null}
-
           <select
             aria-label="Status: Todos"
             value={filtroStatus}
@@ -767,6 +763,12 @@ function EstoqueFisicoBtpPage() {
               {modalBody}
             </DialogContent>
           </Dialog>
+
+          {temFiltroAtivo ? (
+            <Button type="button" variant="ghost" size="sm" onClick={limparFiltros}>
+              Limpar filtro
+            </Button>
+          ) : null}
         </div>
 
         {loading ? (
@@ -869,7 +871,7 @@ function EstoqueFisicoBtpPage() {
                     <TableRow key={row.codigo}>
                       <TableCell className="text-left font-mono text-sm">{row.codigo}</TableCell>
                       <TableCell className="text-left">{row.descricao}</TableCell>
-                      <TableCell className="text-center tabular-nums">
+                      <TableCell className="whitespace-nowrap text-center tabular-nums">
                         R$ {formatMoedaBr(custoSeguro(row.custoUnitario))}
                       </TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueBTP}</TableCell>
@@ -884,7 +886,7 @@ function EstoqueFisicoBtpPage() {
                       <TableCell className="text-center">
                         <StatusBadge diferenca={row.diferenca} />
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="whitespace-nowrap text-center">
                         <FinanceiroCell
                           diferenca={row.diferenca}
                           custoUnitario={row.custoUnitario}

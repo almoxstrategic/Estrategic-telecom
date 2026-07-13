@@ -11,6 +11,7 @@ import {
   Send,
   ShieldCheck,
   Database,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { Logo } from "./Logo";
@@ -113,6 +114,15 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             >
               <CalendarClock className="h-5 w-5 text-primary" />
               Previsão de Reserva
+            </Link>
+            <Link
+              to="/media-baixa-tecnico"
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Média de Baixa por Técnico
             </Link>
             <Link
               to="/admin/importacao"
