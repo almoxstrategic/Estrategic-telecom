@@ -221,7 +221,7 @@ const CONTAINER_STYLE =
   "width:100%;max-width:600px;margin:0 auto;box-sizing:border-box;";
 
 const IMG_STYLE =
-  "width:100%;max-width:250px;height:auto;border-radius:6px;border:1px solid #ccc;display:block;margin:0 auto;";
+  "max-width:100%;width:250px;height:auto;display:block;border-radius:8px;margin:10px auto;border:1px solid #ccc;";
 
 function renderCabecalhoEmpresa(): string {
   return `
@@ -262,11 +262,11 @@ function renderMaterialBlock(material: MaterialEmailRender): string {
           <tr>
             <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
               <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
-              <img src="cid:${cidInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
+              <img src="cid:${cidInicio}" width="250" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
             </td>
             <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
               <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
-              <img src="cid:${cidFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+              <img src="cid:${cidFim}" width="250" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
             </td>
           </tr>
         </table>
@@ -279,16 +279,15 @@ function renderMaterialBlock(material: MaterialEmailRender): string {
 }
 
 function renderObservacao(observacao: string): string {
-  const texto = escapeHtml(observacao);
+  const texto = escapeHtml(observacao.trim()).replaceAll("\n", "<br />");
+  if (!texto) return "";
+
+  // Bloco só com texto — sem <img> e sem tabelas aninhadas (Outlook/Word
+  // às vezes interpreta o bloco seguinte a CIDs como imagem quebrada).
   return `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${CONTAINER_STYLE}margin:16px auto 0 auto;">
-    <tr>
-      <td style="background-color:#f4f7f9;border-radius:8px;padding:15px;">
-        <p style="margin:0 0 6px 0;font-weight:bold;color:#0f172a;">Observação do Técnico:</p>
-        <p style="margin:0;color:#334155;line-height:1.5;">${texto}</p>
-      </td>
-    </tr>
-  </table>
+  <p style="margin-top:20px;margin-bottom:0;max-width:600px;margin-left:auto;margin-right:auto;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333333;line-height:1.5;text-align:left;">
+    <strong>Observação do Técnico:</strong> ${texto}
+  </p>
   `;
 }
 
@@ -407,7 +406,10 @@ export async function buildEvidenciaEmail(
   }
 
   const materiaisHtml = materiaisRender.map(renderMaterialBlock).join("");
-  const observacaoHtml = data.observacao ? renderObservacao(data.observacao) : "";
+  const observacaoHtml =
+    data.observacao && data.observacao.trim()
+      ? renderObservacao(data.observacao)
+      : "";
 
   const html = `
 <!DOCTYPE html>

@@ -16,7 +16,7 @@ const corsHeaders = {
 };
 
 /** Remetente de teste Resend (sandbox) — domínio verificado da plataforma. */
-const RESEND_FROM = "Sistema BTP <onboarding@resend.dev>";
+const RESEND_FROM = "Almox Estrategic <onboarding@resend.dev>";
 
 function resolveRecipients(): string[] {
   const raw = Deno.env.get("RESEND_TO_EMAIL")?.trim() ?? "";
