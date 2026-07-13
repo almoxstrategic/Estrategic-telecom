@@ -15,6 +15,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-evidencia-webhook-secret",
 };
 
+/** Remetente de teste Resend (sandbox) — domínio verificado da plataforma. */
+const RESEND_FROM = "Sistema BTP <onboarding@resend.dev>";
+
+function resolveRecipients(): string[] {
+  const raw = Deno.env.get("RESEND_TO_EMAIL")?.trim() ?? "";
+  const recipients = parseRecipients(raw);
+  if (recipients.length === 0) {
+    throw new Error(
+      "RESEND_TO_EMAIL não configurado. Defina o secret na Edge Function (ex: almoxstrategic@gmail.com).",
+    );
+  }
+  return recipients;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -30,30 +44,45 @@ Deno.serve(async (req) => {
   try {
     assertWebhookSecret(req);
 
+    const recipients = resolveRecipients();
     const payload = await req.json();
+
+    // Rota de isolamento: texto puro, sem HTML e sem anexos.
+    if (payload?.type === "CONNECTION_TEST") {
+      const result = await sendResendEmail({
+        from: RESEND_FROM,
+        to: recipients,
+        subject: "Teste de conexao de email",
+        text: "Hello World",
+      });
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          mode: "CONNECTION_TEST",
+          email_id: result.id ?? null,
+          from: RESEND_FROM,
+          to: recipients,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const { data: partial, tecnicoId } = extractEvidenciaData(payload);
     const tecnico = await resolveTecnicoInfo(tecnicoId, partial.nome_tecnico);
     const emailData = finalizeEmailData(partial, tecnico);
-    const { subject, html } = buildEvidenciaEmail(emailData);
     const anexos = parseAnexos(payload?.anexos);
-
-    const from = Deno.env.get("RESEND_FROM_EMAIL");
-    const toRaw = Deno.env.get("RESEND_TO_EMAIL");
-
-    if (!from) throw new Error("RESEND_FROM_EMAIL não configurado.");
-    if (!toRaw) throw new Error("RESEND_TO_EMAIL não configurado.");
-
-    const recipients = parseRecipients(toRaw);
-    if (recipients.length === 0) {
-      throw new Error("RESEND_TO_EMAIL não contém destinatários válidos.");
-    }
+    const { subject, html, attachments } = await buildEvidenciaEmail(emailData, anexos);
 
     const result = await sendResendEmail({
-      from,
+      from: RESEND_FROM,
       to: recipients,
       subject,
       html,
-      attachments: anexos,
+      attachments,
     });
 
     return new Response(
@@ -62,7 +91,9 @@ Deno.serve(async (req) => {
         email_id: result.id ?? null,
         contrato: emailData.contrato,
         wo: emailData.wo,
-        anexos: anexos.length,
+        anexos: attachments.length,
+        from: RESEND_FROM,
+        to: recipients,
       }),
       {
         status: 200,

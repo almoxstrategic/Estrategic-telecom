@@ -67,3 +67,40 @@ export async function notifySapEvidenciaBatch(
     throw new Error(detail || "Falha no envio do e-mail. Webhook não autorizado ou indisponível.");
   }
 }
+
+/** Disparo mínimo (só texto) para isolar bloqueio Exchange / @resend.dev. */
+export async function testSapEmailConnection(
+  webhookSecretOverride?: string,
+): Promise<{ email_id: string | null }> {
+  const url = `${getSupabaseUrl()}/functions/v1/notify-sap-evidencia`;
+  const webhookSecret = resolveEvidenciaWebhookSecret(webhookSecretOverride);
+  if (!webhookSecret) {
+    throw new Error(
+      "Configure NEXT_PUBLIC_EVIDENCIA_WEBHOOK_SECRET (ou EVIDENCIA_WEBHOOK_SECRET) no ambiente de produção.",
+    );
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getSupabaseAnonKey()}`,
+      "x-evidencia-webhook-secret": webhookSecret,
+    },
+    body: JSON.stringify({ type: "CONNECTION_TEST" }),
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | { ok?: boolean; email_id?: string | null; error?: string }
+    | null;
+
+  if (!response.ok) {
+    const detail = body?.error?.trim();
+    if (response.status === 401 || detail === "Webhook não autorizado.") {
+      throw new Error("Falha no envio do e-mail. Webhook não autorizado ou indisponível.");
+    }
+    throw new Error(detail || "Falha no teste de conexão de e-mail.");
+  }
+
+  return { email_id: body?.email_id ?? null };
+}

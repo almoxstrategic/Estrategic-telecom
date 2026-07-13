@@ -235,11 +235,18 @@ function renderCabecalhoEmpresa(): string {
   `;
 }
 
-function renderMaterialBlock(material: MaterialEmailData): string {
+type MaterialEmailRender = {
+  tipo_material: string;
+  total_utilizado: string;
+  foto_inicio_cid: string;
+  foto_fim_cid: string;
+};
+
+function renderMaterialBlock(material: MaterialEmailRender): string {
   const tipo = escapeHtml(material.tipo_material);
   const metragem = escapeHtml(material.total_utilizado);
-  const urlFotoInicio = escapeHtml(material.foto_inicio_url);
-  const urlFotoFim = escapeHtml(material.foto_fim_url);
+  const cidInicio = escapeHtml(material.foto_inicio_cid);
+  const cidFim = escapeHtml(material.foto_fim_cid);
 
   return `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${CONTAINER_STYLE}margin:24px auto 0 auto;">
@@ -255,11 +262,11 @@ function renderMaterialBlock(material: MaterialEmailData): string {
           <tr>
             <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
               <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Início:</p>
-              <img src="${urlFotoInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
+              <img src="cid:${cidInicio}" alt="Foto Início — ${tipo}" style="${IMG_STYLE}" />
             </td>
             <td width="50%" style="width:50%;vertical-align:top;text-align:center;">
               <p style="margin:0 0 8px 0;font-weight:bold;color:#0f172a;">Fim:</p>
-              <img src="${urlFotoFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
+              <img src="cid:${cidFim}" alt="Foto Fim — ${tipo}" style="${IMG_STYLE}" />
             </td>
           </tr>
         </table>
@@ -321,9 +328,85 @@ function renderDadosOperacao(data: EvidenciaEmailData): string {
   `;
 }
 
-export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string; html: string } {
+export type ResendInlineAttachment = {
+  filename: string;
+  /** Content-ID referenciado no HTML como cid:... */
+  content_id: string;
+  content_type: string;
+  /** Base64 limpo (sem prefixo data:) — obrigatório para inline CID no Resend. */
+  content: string;
+};
+
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Falha ao baixar imagem para CID (${response.status}).`);
+  }
+  const buffer = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < buffer.length; i++) {
+    binary += String.fromCharCode(buffer[i]!);
+  }
+  return btoa(binary);
+}
+
+function resolveAnexoContent(
+  anexo: EmailAnexo | undefined,
+  fallbackUrl: string,
+): Promise<string> {
+  if (anexo?.content) return Promise.resolve(anexo.content);
+  return fetchImageAsBase64(fallbackUrl);
+}
+
+/**
+ * Monta HTML com imagens via cid: e anexos Resend com content_id correspondente.
+ * Nenhuma tag <img> usa http(s) externo nem data: URI.
+ */
+export async function buildEvidenciaEmail(
+  data: EvidenciaEmailData,
+  anexos: EmailAnexo[] = [],
+): Promise<{ subject: string; html: string; attachments: ResendInlineAttachment[] }> {
   const subject = `Evidência BTP - Contrato: ${data.contrato} / WO: ${data.wo}`;
-  const materiaisHtml = data.materiais.map(renderMaterialBlock).join("");
+  const attachments: ResendInlineAttachment[] = [];
+  let fotoSeq = 0;
+
+  const materiaisRender: MaterialEmailRender[] = [];
+
+  for (let materialIndex = 0; materialIndex < data.materiais.length; materialIndex++) {
+    const material = data.materiais[materialIndex]!;
+    const inicioCid = `evidencia${++fotoSeq}`;
+    const fimCid = `evidencia${++fotoSeq}`;
+
+    const anexoInicio = anexos[materialIndex * 2];
+    const anexoFim = anexos[materialIndex * 2 + 1];
+
+    const [inicioContent, fimContent] = await Promise.all([
+      resolveAnexoContent(anexoInicio, material.foto_inicio_url),
+      resolveAnexoContent(anexoFim, material.foto_fim_url),
+    ]);
+
+    attachments.push({
+      filename: anexoInicio?.filename || `${inicioCid}_Inicio.jpg`,
+      content: inicioContent,
+      content_id: inicioCid,
+      content_type: "image/jpeg",
+    });
+    attachments.push({
+      filename: anexoFim?.filename || `${fimCid}_Fim.jpg`,
+      content: fimContent,
+      content_id: fimCid,
+      content_type: "image/jpeg",
+    });
+
+    materiaisRender.push({
+      tipo_material: material.tipo_material,
+      total_utilizado: material.total_utilizado,
+      foto_inicio_cid: inicioCid,
+      foto_fim_cid: fimCid,
+    });
+  }
+
+  const materiaisHtml = materiaisRender.map(renderMaterialBlock).join("");
   const observacaoHtml = data.observacao ? renderObservacao(data.observacao) : "";
 
   const html = `
@@ -344,7 +427,7 @@ export function buildEvidenciaEmail(data: EvidenciaEmailData): { subject: string
 </html>
   `.trim();
 
-  return { subject, html };
+  return { subject, html, attachments };
 }
 
 export function finalizeEmailData(
@@ -422,11 +505,56 @@ export async function sendResendEmail(input: {
   from: string;
   to: string[];
   subject: string;
-  html: string;
-  attachments?: EmailAnexo[];
+  /** Texto simples (teste mínimo). Não combinar com html/attachments no teste. */
+  text?: string;
+  html?: string;
+  attachments?: ResendInlineAttachment[];
 }): Promise<{ id?: string }> {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("RESEND_API_KEY não configurada.");
+
+  const hasText = typeof input.text === "string";
+  const hasHtml = typeof input.html === "string" && input.html.trim().length > 0;
+
+  if (!hasText && !hasHtml) {
+    throw new Error("Informe text ou html para o e-mail.");
+  }
+
+  // API REST do Resend: content_id embute a imagem (inline).
+  // HTML deve usar src="cid:<content_id>" — nunca http(s) nem data: URI.
+  const attachments = (input.attachments ?? []).map((attachment) => {
+    if (!attachment.content?.trim()) {
+      throw new Error(`Anexo CID sem content Base64: ${attachment.content_id}`);
+    }
+    if (!attachment.content_id?.trim()) {
+      throw new Error(`Anexo sem content_id: ${attachment.filename}`);
+    }
+    return {
+      filename: attachment.filename,
+      content: attachment.content,
+      content_id: attachment.content_id,
+      content_type: attachment.content_type || "image/jpeg",
+    };
+  });
+
+  // Payload mínimo: from / to / subject / html|text / attachments.
+  // Sem reply_to, cc ou bcc (sandbox Resend rejeita outros destinatários).
+  const bodyPayload: Record<string, unknown> = {
+    from: input.from,
+    to: input.to,
+    subject: input.subject,
+  };
+
+  if (hasText) {
+    bodyPayload.text = input.text;
+  }
+  if (hasHtml) {
+    bodyPayload.html = input.html;
+  }
+  if (attachments.length > 0) {
+    // Anexos com content (Base64) + content_id para CID no HTML.
+    bodyPayload.attachments = attachments;
+  }
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -434,15 +562,7 @@ export async function sendResendEmail(input: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: input.from,
-      to: input.to,
-      subject: input.subject,
-      html: input.html,
-      ...(input.attachments && input.attachments.length > 0
-        ? { attachments: input.attachments }
-        : {}),
-    }),
+    body: JSON.stringify(bodyPayload),
   });
 
   const body = await response.json().catch(() => ({}));

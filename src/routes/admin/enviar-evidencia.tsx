@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, Trash2, Mail } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -88,6 +88,7 @@ function EnviarEvidenciaPage() {
   const [materiais, setMateriais] = useState<MaterialEvidencia[]>([]);
   const [observacao, setObservacao] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [showIncompleteAlert, setShowIncompleteAlert] = useState(false);
 
   const adicionarMaterial = (tipo: string) => {
@@ -244,6 +245,46 @@ function EnviarEvidenciaPage() {
     if (!canSubmit) setShowIncompleteAlert(true);
   };
 
+  const onTestEmailConnection = async () => {
+    setTestingEmail(true);
+    try {
+      const accessToken = getAccessToken();
+      if (!accessToken) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const response = await fetch("/api/evidencias/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: accessToken }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        email_id?: string | null;
+        error?: string;
+        message?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(body?.error || "Falha no teste de conexão de e-mail.");
+      }
+
+      toast.success(
+        body?.message ||
+          `Teste enviado (id: ${body?.email_id ?? "n/a"}). Verifique inbox e quarentena.`,
+        {
+          icon: <CheckCircle2 className="h-5 w-5" />,
+          className: "!bg-success !text-success-foreground !border-success",
+        },
+      );
+    } catch (err) {
+      toast.error(`Teste de e-mail: ${(err as Error).message || "tente novamente"}`, {
+        icon: <AlertCircle className="h-5 w-5" />,
+        className: "!bg-destructive !text-destructive-foreground !border-destructive",
+      });
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -261,6 +302,25 @@ function EnviarEvidenciaPage() {
             Registre uma evidência em nome de um técnico que não conseguiu enviar em campo.
           </p>
         </header>
+
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm">
+          <p className="text-sm font-semibold text-amber-950">Debug temporário — Silent Drop</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-900">
+            Envia apenas texto (&quot;Hello World&quot;), sem HTML e sem anexos, para isolar bloqueio
+            do Exchange / domínio @resend.dev.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3 border-amber-300 bg-white"
+            disabled={testingEmail || submitting}
+            onClick={() => void onTestEmailConnection()}
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            {testingEmail ? "Testando..." : "Testar Conexão de Email"}
+          </Button>
+        </div>
 
         <form id="admin-evidencia-form" onSubmit={onSubmit} className="space-y-5">
           <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
