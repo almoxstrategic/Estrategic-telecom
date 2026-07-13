@@ -120,7 +120,7 @@ function parseNotifyBody(body: unknown): NotifyEmailBody & { webhook_secret?: st
   };
 }
 
-async function assertTecnico(accessToken: string, tecnicoId: string) {
+async function assertSenderAuthorized(accessToken: string, tecnicoId: string) {
   const client = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, persistSession: false },
@@ -134,7 +134,16 @@ async function assertTecnico(accessToken: string, tecnicoId: string) {
   if (error || !user) {
     throw new Error("Sessão inválida. Faça login novamente.");
   }
-  if (user.id !== tecnicoId) {
+  if (user.id === tecnicoId) return;
+
+  const { data: profile, error: profileError } = await client
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+  if (profile?.role !== "admin") {
     throw new Error("Técnico não autorizado para este envio.");
   }
 }
@@ -145,7 +154,7 @@ export const Route = createFileRoute("/api/evidencias/notify-email")({
       POST: async ({ request }) => {
         try {
           const payload = parseNotifyBody(await request.json());
-          await assertTecnico(payload.access_token, payload.tecnico_id);
+          await assertSenderAuthorized(payload.access_token, payload.tecnico_id);
 
           const webhookSecret = resolveEvidenciaWebhookSecret(
             request.headers.get("x-evidencia-webhook-secret") ??

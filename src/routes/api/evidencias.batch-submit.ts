@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isStoragePublicUrl } from "@/lib/evidencias-grouping";
 import {
   getSupabaseAnonKey,
+  getSupabaseServiceRoleKey,
   getSupabaseUrl,
 } from "@/lib/server-env";
 
@@ -117,8 +118,11 @@ function parseBatchBody(body: unknown): BatchSubmitBody {
   };
 }
 
-async function assertTecnico(accessToken: string, tecnicoId: string) {
-  const client = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+async function resolveSubmitClient(
+  accessToken: string,
+  tecnicoId: string,
+): Promise<{ client: SupabaseClient; enviadoPorAdmin: boolean }> {
+  const authClient = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -126,16 +130,43 @@ async function assertTecnico(accessToken: string, tecnicoId: string) {
   const {
     data: { user },
     error,
-  } = await client.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (error || !user) {
     throw new Error("Sessão inválida. Faça login novamente.");
   }
-  if (user.id !== tecnicoId) {
+
+  if (user.id === tecnicoId) {
+    return { client: authClient, enviadoPorAdmin: false };
+  }
+
+  const { data: profile, error: profileError } = await authClient
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+  if (profile?.role !== "admin") {
     throw new Error("Técnico não autorizado para este envio.");
   }
 
-  return client;
+  const serviceClient = createClient(getSupabaseUrl(), getSupabaseServiceRoleKey(), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: tecnico, error: tecnicoError } = await serviceClient
+    .from("profiles")
+    .select("id, role")
+    .eq("id", tecnicoId)
+    .maybeSingle();
+
+  if (tecnicoError) throw tecnicoError;
+  if (!tecnico || tecnico.role !== "tecnico") {
+    throw new Error("Técnico selecionado inválido.");
+  }
+
+  return { client: serviceClient, enviadoPorAdmin: true };
 }
 
 export const Route = createFileRoute("/api/evidencias/batch-submit")({
@@ -144,11 +175,14 @@ export const Route = createFileRoute("/api/evidencias/batch-submit")({
       POST: async ({ request }) => {
         try {
           const payload = parseBatchBody(await request.json());
-          const authedClient = await assertTecnico(payload.access_token, payload.tecnico_id);
+          const { client, enviadoPorAdmin } = await resolveSubmitClient(
+            payload.access_token,
+            payload.tecnico_id,
+          );
 
           for (const material of payload.materiais) {
             const total = Number(material.metragem.replace(",", "."));
-            const { error } = await authedClient.from("evidencias").insert({
+            const { error } = await client.from("evidencias").insert({
               contrato: payload.contrato,
               wo: payload.wo,
               metragem_inicial: total,
@@ -159,7 +193,7 @@ export const Route = createFileRoute("/api/evidencias/batch-submit")({
               foto_inicio_path: material.foto_inicio_path,
               foto_fim_path: material.foto_fim_path,
               tecnico_id: payload.tecnico_id,
-              enviado_por_admin: false,
+              enviado_por_admin: enviadoPorAdmin,
               tipo_material: material.tipo,
               observacao: payload.observacao ?? null,
               envio_grupo_id: payload.envio_grupo_id,
@@ -177,7 +211,10 @@ export const Route = createFileRoute("/api/evidencias/batch-submit")({
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Erro ao salvar evidências.";
-          const status = message.includes("Sessão inválida") ? 401 : 400;
+          const status =
+            message.includes("Sessão inválida") || message.includes("administradores")
+              ? 401
+              : 400;
           return jsonError(message, status);
         }
       },
