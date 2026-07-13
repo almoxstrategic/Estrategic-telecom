@@ -58,6 +58,7 @@ type LinhaMockEstoque = {
 
 type SortColumn =
   | "descricao"
+  | "custoUnitario"
   | "estoqueBTP"
   | "estoqueFisicoCampo"
   | "estoqueFisico"
@@ -370,6 +371,8 @@ function EstoqueFisicoBtpPage() {
       switch (sortColumn) {
         case "descricao":
           return a.descricao.localeCompare(b.descricao, "pt-BR") * dir;
+        case "custoUnitario":
+          return (custoSeguro(a.custoUnitario) - custoSeguro(b.custoUnitario)) * dir;
         case "status":
           return statusLabel(a.diferenca).localeCompare(statusLabel(b.diferenca), "pt-BR") * dir;
         case "estoqueBTP":
@@ -394,7 +397,22 @@ function EstoqueFisicoBtpPage() {
     });
   }, [linhas, busca, itensSelecionados, filtroStatus, sortColumn, sortDirection]);
 
-  const somaFinanceiro = useMemo(() => {
+  const valorEsperadoBtp = useMemo(() => {
+    return linhasFiltradas.reduce(
+      (acc, row) => acc + row.estoqueBTP * custoSeguro(row.custoUnitario),
+      0,
+    );
+  }, [linhasFiltradas]);
+
+  const valorFisicoReal = useMemo(() => {
+    return linhasFiltradas.reduce(
+      (acc, row) =>
+        acc + (row.estoqueFisico + row.estoqueCampo) * custoSeguro(row.custoUnitario),
+      0,
+    );
+  }, [linhasFiltradas]);
+
+  const saldoDivergencia = useMemo(() => {
     return linhasFiltradas.reduce(
       (acc, row) => acc + impactoFinanceiro(row.diferenca, row.custoUnitario),
       0,
@@ -649,19 +667,37 @@ function EstoqueFisicoBtpPage() {
             <p className="mt-1 text-sm text-muted-foreground">(Esse modulo é um protótipo)</p>
           </header>
 
-          <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Soma Financeiro
-            </span>
-            {somaFinanceiro < 0 ? (
-              <span className="text-xl font-bold text-red-600">
-                -R$ {formatMoedaBr(somaFinanceiro)}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Valor Esperado (BTP)
               </span>
-            ) : (
-              <span className="text-xl font-bold text-green-600">
-                R$ {formatMoedaBr(somaFinanceiro)}
+              <span className="text-xl font-bold text-gray-800">
+                R$ {formatMoedaBr(valorEsperadoBtp)}
               </span>
-            )}
+            </div>
+            <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Valor Físico Real
+              </span>
+              <span className="text-xl font-bold text-gray-800">
+                R$ {formatMoedaBr(valorFisicoReal)}
+              </span>
+            </div>
+            <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Saldo da Divergência
+              </span>
+              {saldoDivergencia < 0 ? (
+                <span className="text-xl font-bold text-red-600">
+                  -R$ {formatMoedaBr(saldoDivergencia)}
+                </span>
+              ) : (
+                <span className="text-xl font-bold text-green-600">
+                  R$ {formatMoedaBr(saldoDivergencia)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -756,6 +792,13 @@ function EstoqueFisicoBtpPage() {
                     align="left"
                   />
                   <SortableHead
+                    label="Valor unit."
+                    column="custoUnitario"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
                     label="Estoque BTP"
                     column="estoqueBTP"
                     activeColumn={sortColumn}
@@ -817,7 +860,7 @@ function EstoqueFisicoBtpPage() {
               <TableBody>
                 {linhasFiltradas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                       Nenhum material corresponde aos filtros.
                     </TableCell>
                   </TableRow>
@@ -826,6 +869,9 @@ function EstoqueFisicoBtpPage() {
                     <TableRow key={row.codigo}>
                       <TableCell className="text-left font-mono text-sm">{row.codigo}</TableCell>
                       <TableCell className="text-left">{row.descricao}</TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        R$ {formatMoedaBr(custoSeguro(row.custoUnitario))}
+                      </TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueBTP}</TableCell>
                       <TableCell className="text-center tabular-nums">
                         {row.estoqueFisico + row.estoqueCampo}
