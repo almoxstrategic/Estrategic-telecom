@@ -30,7 +30,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-sidebar-border p-5">
+      <div className="shrink-0 border-b border-sidebar-border p-5">
         <Logo />
         {user && (
           <div className="mt-4">
@@ -49,7 +49,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </div>
 
-      <div className="flex-1 space-y-1 p-3">
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
         {isAdmin ? (
           <>
             <Link
@@ -167,7 +167,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </div>
 
-      <div className="border-t border-sidebar-border p-3">
+      <div className="mt-auto shrink-0 border-t border-sidebar-border p-4">
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-destructive hover:bg-destructive/10"
