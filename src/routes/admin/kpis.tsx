@@ -383,7 +383,10 @@ function KpisPage() {
   );
 
   const criticosDataConsolidados = useMemo(
-    () => consolidarMateriaisPorCodigo(criticosData),
+    () =>
+      consolidarMateriaisPorCodigo(criticosData).sort(
+        (a, b) => Number(b.total) - Number(a.total),
+      ),
     [criticosData],
   );
 
