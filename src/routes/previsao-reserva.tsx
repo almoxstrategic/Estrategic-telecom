@@ -64,14 +64,49 @@ type ModalView = "selecao" | "definicao";
 type SortColumn =
   | "descricao"
   | "estoqueBTP"
+  | "estoqueFisicoCampo"
   | "estoqueFisico"
   | "estoqueCampo"
   | "mediaConsumo"
   | "autonomia"
   | "pontoRessuprimento"
-  | "diasParaReserva";
+  | "diasParaReserva"
+  | "status";
 
 type SortDirection = "asc" | "desc";
+
+type FiltroStatus = "Todos" | "Urgente" | "Reservar" | "Saudável";
+
+const FILTRO_STATUS_OPCOES: FiltroStatus[] = ["Todos", "Urgente", "Reservar", "Saudável"];
+
+function statusLabel(diasParaReserva: number): Exclude<FiltroStatus, "Todos"> {
+  if (diasParaReserva < 0) return "Urgente";
+  if (diasParaReserva <= 7) return "Reservar";
+  return "Saudável";
+}
+
+function StatusBadge({ diasParaReserva }: { diasParaReserva: number }) {
+  const status = statusLabel(diasParaReserva);
+  if (status === "Urgente") {
+    return (
+      <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
+        Urgente
+      </span>
+    );
+  }
+  if (status === "Reservar") {
+    return (
+      <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
+        Reservar
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">
+      Saudável
+    </span>
+  );
+}
 
 /** Mock saudável: BTP acima do ponto de ressuprimento na maioria dos casos. */
 function gerarLinhaPrevisao(codigo: string, descricao: string): LinhaPrevisao {
@@ -116,17 +151,19 @@ function SortableHead({
   direction,
   onSort,
   align = "center",
+  className,
 }: {
-  label: string;
+  label: ReactNode;
   column: SortColumn;
   activeColumn: SortColumn;
   direction: SortDirection;
   onSort: (column: SortColumn) => void;
   align?: "left" | "center";
+  className?: string;
 }) {
   const active = activeColumn === column;
   return (
-    <TableHead className={align === "left" ? "text-left" : "text-center"}>
+    <TableHead className={cn(align === "left" ? "text-left" : "text-center", className)}>
       <button
         type="button"
         className={cn(
@@ -136,7 +173,9 @@ function SortableHead({
         )}
         onClick={() => onSort(column)}
       >
-        {label}
+        <span className={align === "center" ? "text-center leading-tight" : undefined}>
+          {label}
+        </span>
         {active ? (
           direction === "asc" ? (
             <ArrowUp className="h-3.5 w-3.5 shrink-0" />
@@ -194,6 +233,7 @@ function PrevisaoReservaPage() {
   const [viewAtual, setViewAtual] = useState<ModalView>("selecao");
   const [buscaPopover, setBuscaPopover] = useState("");
   const [buscaCriticos, setBuscaCriticos] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("Todos");
 
   const [sortColumn, setSortColumn] = useState<SortColumn>("descricao");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -273,6 +313,10 @@ function PrevisaoReservaPage() {
       if (itensSelecionados.length > 0 && !itensSelecionados.includes(row.codigo)) {
         return false;
       }
+      if (filtroStatus !== "Todos") {
+        const status = statusLabel(row.diasParaReserva);
+        if (status !== filtroStatus) return false;
+      }
       return true;
     });
 
@@ -283,6 +327,10 @@ function PrevisaoReservaPage() {
           return a.descricao.localeCompare(b.descricao, "pt-BR") * dir;
         case "estoqueBTP":
           return (a.estoqueBTP - b.estoqueBTP) * dir;
+        case "estoqueFisicoCampo":
+          return (
+            (a.estoqueFisico + a.estoqueCampo - (b.estoqueFisico + b.estoqueCampo)) * dir
+          );
         case "estoqueFisico":
           return (a.estoqueFisico - b.estoqueFisico) * dir;
         case "estoqueCampo":
@@ -295,13 +343,17 @@ function PrevisaoReservaPage() {
           return (a.pontoRessuprimento - b.pontoRessuprimento) * dir;
         case "diasParaReserva":
           return (a.diasParaReserva - b.diasParaReserva) * dir;
+        case "status":
+          // Ordena por diasParaReserva (Urgente → Reservar → Saudável)
+          return (a.diasParaReserva - b.diasParaReserva) * dir;
         default:
           return 0;
       }
     });
-  }, [linhas, busca, itensSelecionados, sortColumn, sortDirection]);
+  }, [linhas, busca, itensSelecionados, filtroStatus, sortColumn, sortDirection]);
 
-  const temFiltroAtivo = busca.trim().length > 0 || itensSelecionados.length > 0;
+  const temFiltroAtivo =
+    busca.trim().length > 0 || itensSelecionados.length > 0 || filtroStatus !== "Todos";
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -315,6 +367,7 @@ function PrevisaoReservaPage() {
   const limparFiltros = () => {
     setBusca("");
     setItensSelecionados([]);
+    setFiltroStatus("Todos");
   };
 
   const adicionarItemSelecionado = (codigo: string) => {
@@ -561,8 +614,8 @@ function PrevisaoReservaPage() {
             {temFiltroAtivo ? (
               <button
                 type="button"
-                aria-label="Limpar filtro"
-                title="Limpar filtro"
+                aria-label="Limpar todos os filtros"
+                title="Limpar todos os filtros"
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                 onClick={limparFiltros}
               >
@@ -573,9 +626,22 @@ function PrevisaoReservaPage() {
 
           {temFiltroAtivo ? (
             <Button type="button" variant="ghost" size="sm" onClick={limparFiltros}>
-              Limpar filtro
+              Limpar todos os filtros
             </Button>
           ) : null}
+
+          <select
+            aria-label="Status: Todos"
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)}
+            className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            {FILTRO_STATUS_OPCOES.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao === "Todos" ? "Status: Todos" : opcao}
+              </option>
+            ))}
+          </select>
 
           <Button
             type="button"
@@ -634,6 +700,21 @@ function PrevisaoReservaPage() {
                     onSort={handleSort}
                   />
                   <SortableHead
+                    label={
+                      <>
+                        Estoque
+                        <br />
+                        <span className="text-sm font-normal">(Físico + Campo)</span>
+                      </>
+                    }
+                    column="estoqueFisicoCampo"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                    align="center"
+                    className="text-center"
+                  />
+                  <SortableHead
                     label="Estoque Físico"
                     column="estoqueFisico"
                     activeColumn={sortColumn}
@@ -675,12 +756,19 @@ function PrevisaoReservaPage() {
                     direction={sortDirection}
                     onSort={handleSort}
                   />
+                  <SortableHead
+                    label="Status"
+                    column="status"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {linhasFiltradas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                       Nenhum material corresponde aos filtros.
                     </TableCell>
                   </TableRow>
@@ -690,6 +778,9 @@ function PrevisaoReservaPage() {
                       <TableCell className="text-left font-mono text-sm">{row.codigo}</TableCell>
                       <TableCell className="text-left">{row.descricao}</TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueBTP}</TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {row.estoqueFisico + row.estoqueCampo}
+                      </TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueFisico}</TableCell>
                       <TableCell className="text-center tabular-nums">{row.estoqueCampo}</TableCell>
                       <TableCell className="text-center tabular-nums">{row.mediaConsumo}</TableCell>
@@ -701,6 +792,9 @@ function PrevisaoReservaPage() {
                       </TableCell>
                       <TableCell className="text-center font-medium tabular-nums">
                         {row.diasParaReserva} dias
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <StatusBadge diasParaReserva={row.diasParaReserva} />
                       </TableCell>
                     </TableRow>
                   ))
