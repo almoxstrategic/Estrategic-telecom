@@ -4,11 +4,13 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  CheckCircle2,
   ClipboardList,
   Copy,
   MessageCircle,
   Users,
   X,
+  XCircle,
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -179,6 +181,14 @@ function textoStatusEvidencia(temEvidencia: boolean): string {
   return temEvidencia ? "Evidenciado" : "Pendente";
 }
 
+type FiltroStatusEvidencia = "Todos" | "Evidenciados" | "Pendentes";
+
+const FILTRO_STATUS_EVIDENCIA_OPCOES: FiltroStatusEvidencia[] = [
+  "Todos",
+  "Evidenciados",
+  "Pendentes",
+];
+
 function textoStatusCobranca(ultimaDataCobranca: string | null): string {
   const dias = calcularDiasDesdeCobranca(ultimaDataCobranca);
 
@@ -213,6 +223,7 @@ function PendenciasPage() {
     direcao: "asc",
   });
   const [buscaNomeTecnico, setBuscaNomeTecnico] = useState("");
+  const [statusFilter, setStatusFilter] = useState<FiltroStatusEvidencia>("Todos");
 
   const [engajamento, setEngajamento] = useState<EngajamentoTecnico[]>([]);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
@@ -622,11 +633,38 @@ ${listaDeWOsFormatada}
     return contagem;
   }, [rows]);
 
+  const totalEvidenciados = useMemo(
+    () => rows.filter((row) => row.tem_evidencia).length,
+    [rows],
+  );
+  const totalPendentes = useMemo(
+    () => rows.filter((row) => !row.tem_evidencia).length,
+    [rows],
+  );
+
+  const temFiltroAtivo =
+    buscaNomeTecnico.trim() !== "" || statusFilter !== "Todos";
+
+  const limparFiltros = () => {
+    setBuscaNomeTecnico("");
+    setStatusFilter("Todos");
+  };
+
   const rowsFiltradas = useMemo(() => {
     const termo = buscaNomeTecnico.trim().toLowerCase();
-    if (!termo) return rows;
-    return rows.filter((row) => row.nome_tecnico.toLowerCase().includes(termo));
-  }, [rows, buscaNomeTecnico]);
+
+    return rows.filter((row) => {
+      const matchNome =
+        !termo || row.nome_tecnico.toLowerCase().includes(termo);
+
+      const matchStatus =
+        statusFilter === "Todos" ||
+        (statusFilter === "Evidenciados" && row.tem_evidencia) ||
+        (statusFilter === "Pendentes" && !row.tem_evidencia);
+
+      return matchNome && matchStatus;
+    });
+  }, [rows, buscaNomeTecnico, statusFilter]);
 
   const rowsOrdenadas = useMemo(() => {
     const { coluna, direcao } = configOrdenacao;
@@ -727,13 +765,62 @@ ${listaDeWOsFormatada}
           </p>
         ) : (
           <div className="space-y-3">
-            <Input
-              type="search"
-              placeholder="Buscar por nome do técnico..."
-              value={buscaNomeTecnico}
-              onChange={(e) => setBuscaNomeTecnico(e.target.value)}
-              className="max-w-md rounded-md border border-input bg-background px-3 py-2"
-            />
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  Evidenciados
+                </div>
+                <div className="mt-2 text-3xl font-black text-primary">
+                  {totalEvidenciados}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <XCircle className="h-4 w-4 text-destructive" />
+                  Não Evidenciados
+                </div>
+                <div className="mt-2 text-3xl font-black text-destructive">
+                  {totalPendentes}
+                </div>
+              </div>
+            </section>
+
+            <div className="mb-3 flex flex-wrap items-center gap-4">
+              <Input
+                type="search"
+                placeholder="Buscar por nome do técnico..."
+                value={buscaNomeTecnico}
+                onChange={(e) => setBuscaNomeTecnico(e.target.value)}
+                className="max-w-md flex-1 rounded-md border border-input bg-background px-3 py-2"
+              />
+              <select
+                aria-label="Filtrar por status de evidência"
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as FiltroStatusEvidencia)
+                }
+                className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {FILTRO_STATUS_EVIDENCIA_OPCOES.map((opcao) => (
+                  <option key={opcao} value={opcao}>
+                    {opcao === "Todos" ? "Status: Todos" : opcao}
+                  </option>
+                ))}
+              </select>
+              {temFiltroAtivo ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={limparFiltros}
+                >
+                  Limpar filtros
+                </Button>
+              ) : null}
+            </div>
+
             <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
             <Table>
               <TableHeader>
