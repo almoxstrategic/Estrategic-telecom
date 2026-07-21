@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Copy,
+  Download,
   MessageCircle,
   Users,
   X,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { AppHeader } from "@/components/AppHeader";
 import { celularToWhatsAppUrl } from "@/lib/auth-identificacao";
 import { fetchEngajamentoEvidencias, fetchHistoricoLancamentos } from "@/lib/evidencias-service";
@@ -703,6 +705,30 @@ ${listaDeWOsFormatada}
     });
   }, [rowsFiltradas, configOrdenacao]);
 
+  const handleExportExcel = () => {
+    if (rowsOrdenadas.length === 0) {
+      toast.error("Não há dados para exportar com os filtros atuais.");
+      return;
+    }
+
+    const dadosExcel = rowsOrdenadas.map((row) => ({
+      WO: row.work_order_id,
+      "ID Técnico": row.id_tecnico,
+      "Nome do Técnico": row.nome_tecnico,
+      "SLA (dias)": row.sla,
+      "Status da Evidência": textoStatusEvidencia(row.tem_evidencia),
+      "Nº de Cobranças": row.numero_cobrancas ?? 0,
+      "Status da Cobrança": textoStatusCobranca(row.ultima_data_cobranca),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pendências");
+
+    const hoje = obterDataHojeIso();
+    XLSX.writeFile(workbook, `Pendencias_Evidencias_${hoje}.xlsx`);
+  };
+
   const alternarOrdenacaoPendencias = (coluna: PendenciasSortColumn) => {
     setConfigOrdenacao((prev) => {
       if (prev.coluna === coluna) {
@@ -808,6 +834,16 @@ ${listaDeWOsFormatada}
                   </option>
                 ))}
               </select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 shrink-0 gap-2"
+                onClick={handleExportExcel}
+              >
+                <Download className="h-4 w-4" />
+                Exportar Excel
+              </Button>
               {temFiltroAtivo ? (
                 <Button
                   type="button"
