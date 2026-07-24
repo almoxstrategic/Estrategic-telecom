@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { replaceWoCabecalho, upsertDimMateriais, upsertEstoqueFisico, upsertWoConsumo } from "@/lib/logistica-service";
 import {
   parseDimMateriaisFile,
+  parseEstoqueAtlasFile,
   parseEstoqueFisicoFile,
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
+import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { cn } from "@/lib/utils";
 
 function formatImportError(scope: string, err: unknown): string {
@@ -159,6 +161,7 @@ function ImportacaoPage() {
   const [fileCampo, setFileCampo] = useState<File | null>(null);
   const [fileFisico, setFileFisico] = useState<File | null>(null);
   const [fileConsolidado, setFileConsolidado] = useState<File | null>(null);
+  const [busyAtlas, setBusyAtlas] = useState(false);
 
   useEffect(() => {
     console.info(
@@ -167,6 +170,23 @@ function ImportacaoPage() {
         "Script completo: supabase/scripts/limpar_wos_consumo.sql",
     );
   }, []);
+
+  const handleEstoqueAtlas = async (file: File) => {
+    setBusyAtlas(true);
+    try {
+      const rows = await parseEstoqueAtlasFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada no Estoque Atlas.");
+        return;
+      }
+      saveEstoqueAtlas(rows);
+      toast.success(`Estoque Atlas importado: ${rows.length} registros carregados.`);
+    } catch (err) {
+      toast.error(formatImportError("estoque-atlas", err));
+    } finally {
+      setBusyAtlas(false);
+    }
+  };
 
   const handleCabecalho = async (file: File) => {
     setBusyCabecalho(true);
@@ -327,6 +347,8 @@ function ImportacaoPage() {
               description="Planilha de estoque Atlas (BTP / sistema)."
               file={fileAtlas}
               onFileChange={setFileAtlas}
+              busy={busyAtlas}
+              onImport={handleEstoqueAtlas}
             />
             <ImportFileCard
               title="Estoque Campo"

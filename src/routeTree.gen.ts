@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as TecnicosRouteImport } from './routes/tecnicos'
+import { Route as RelacaoCampoRouteImport } from './routes/relacao-campo'
 import { Route as PrevisaoReservaRouteImport } from './routes/previsao-reserva'
 import { Route as MetragemRouteImport } from './routes/metragem'
 import { Route as MediaBaixaTecnicoRouteImport } from './routes/media-baixa-tecnico'
@@ -40,6 +41,11 @@ const TodosRoute = TodosRouteImport.update({
 const TecnicosRoute = TecnicosRouteImport.update({
   id: '/tecnicos',
   path: '/tecnicos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelacaoCampoRoute = RelacaoCampoRouteImport.update({
+  id: '/relacao-campo',
+  path: '/relacao-campo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrevisaoReservaRoute = PrevisaoReservaRouteImport.update({
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
+  '/relacao-campo': typeof RelacaoCampoRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
+  '/relacao-campo': typeof RelacaoCampoRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
+  '/relacao-campo': typeof RelacaoCampoRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
+    | '/relacao-campo'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
+    | '/relacao-campo'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
+    | '/relacao-campo'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -303,6 +315,7 @@ export interface RootRouteChildren {
   MediaBaixaTecnicoRoute: typeof MediaBaixaTecnicoRoute
   MetragemRoute: typeof MetragemRoute
   PrevisaoReservaRoute: typeof PrevisaoReservaRoute
+  RelacaoCampoRoute: typeof RelacaoCampoRoute
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
   ApiEvidenciasAdminSubmitRoute: typeof ApiEvidenciasAdminSubmitRoute
@@ -326,6 +339,13 @@ declare module '@tanstack/react-router' {
       path: '/tecnicos'
       fullPath: '/tecnicos'
       preLoaderRoute: typeof TecnicosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relacao-campo': {
+      id: '/relacao-campo'
+      path: '/relacao-campo'
+      fullPath: '/relacao-campo'
+      preLoaderRoute: typeof RelacaoCampoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/previsao-reserva': {
@@ -500,6 +520,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediaBaixaTecnicoRoute: MediaBaixaTecnicoRoute,
   MetragemRoute: MetragemRoute,
   PrevisaoReservaRoute: PrevisaoReservaRoute,
+  RelacaoCampoRoute: RelacaoCampoRoute,
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
   ApiEvidenciasAdminSubmitRoute: ApiEvidenciasAdminSubmitRoute,

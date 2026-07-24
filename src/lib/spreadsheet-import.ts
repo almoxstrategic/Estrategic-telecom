@@ -351,3 +351,50 @@ export async function parseEstoqueFisicoFile(file: File): Promise<EstoqueFisicoR
 
   return [...map.values()];
 }
+
+export type EstoqueAtlasRow = {
+  tipo: string;
+  modelo: string;
+  numeroSerie: string;
+  estado: string;
+};
+
+/** Serializados — Estoque Atlas: Tipo, Modelo, Número de Serie, Estado */
+function mapEstoqueAtlasRow(row: RawRow): EstoqueAtlasRow | null {
+  const tipo = pick(row, "Tipo");
+  const modelo = pick(row, "Modelo");
+  const numeroSerie = pick(
+    row,
+    "Número de Serie",
+    "Numero de Serie",
+    "Número de Série",
+    "Nº Serie",
+    "N° Serie",
+    "No Serie",
+    "Numero Serie",
+    "Serial",
+    "Nº de Série",
+  );
+  const estado = pick(row, "Estado", "Status");
+
+  if (!tipo && !modelo && !numeroSerie) return null;
+
+  return {
+    tipo: tipo || "—",
+    modelo: modelo || "—",
+    numeroSerie: numeroSerie || "—",
+    estado: estado || "—",
+  };
+}
+
+export async function parseEstoqueAtlasFile(file: File): Promise<EstoqueAtlasRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const rows: EstoqueAtlasRow[] = [];
+
+  for (const row of raw) {
+    const mapped = mapEstoqueAtlasRow(row);
+    if (mapped) rows.push(mapped);
+  }
+
+  return rows;
+}

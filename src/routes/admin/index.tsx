@@ -204,17 +204,19 @@ function AdminHome() {
               </div>
             </div>
 
-            <div className="block w-full">
+            <Link to="/relacao-campo" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
                   <Map className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="font-bold text-foreground">Relação de campo</div>
-                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Estoque Atlas detalhado e contagem agregada
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
 
             <div className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
