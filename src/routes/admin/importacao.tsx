@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useId, useState, type ChangeEvent } from "react";
-import { FileSpreadsheet, FileUp } from "lucide-react";
+import { FileSpreadsheet, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
-import { FileDropzone } from "@/components/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { replaceWoCabecalho, upsertDimMateriais, upsertEstoqueFisico, upsertWoConsumo } from "@/lib/logistica-service";
 import {
@@ -47,14 +46,23 @@ export const Route = createFileRoute("/admin/importacao")({
   component: ImportacaoPage,
 });
 
-type TerminalImportCardProps = {
+type ImportFileCardProps = {
   title: string;
   description: string;
   file: File | null;
   onFileChange: (file: File | null) => void;
+  busy?: boolean;
+  onImport?: (file: File) => Promise<void>;
 };
 
-function TerminalImportCard({ title, description, file, onFileChange }: TerminalImportCardProps) {
+function ImportFileCard({
+  title,
+  description,
+  file,
+  onFileChange,
+  busy,
+  onImport,
+}: ImportFileCardProps) {
   const inputId = useId();
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +73,11 @@ function TerminalImportCard({ title, description, file, onFileChange }: Terminal
     <div className="flex h-full flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-          <FileSpreadsheet className="h-6 w-6" />
+          {busy ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="h-6 w-6" />
+          )}
         </div>
         <h2 className="font-bold text-foreground">{title}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{description}</p>
@@ -76,6 +88,7 @@ function TerminalImportCard({ title, description, file, onFileChange }: Terminal
           htmlFor={inputId}
           className={cn(
             "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-primary/50",
+            busy && "pointer-events-none opacity-60",
           )}
         >
           <span className="text-sm font-medium text-foreground">Selecionar Arquivo</span>
@@ -85,6 +98,7 @@ function TerminalImportCard({ title, description, file, onFileChange }: Terminal
             type="file"
             accept=".xlsx,.xls,.csv"
             className="sr-only"
+            disabled={busy}
             onChange={handleChange}
           />
         </label>
@@ -93,16 +107,50 @@ function TerminalImportCard({ title, description, file, onFileChange }: Terminal
           {file ? file.name : "Nenhum arquivo selecionado."}
         </p>
 
-        <Button type="button" variant="outline" className="w-full" disabled={!file}>
-          Importar
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={!file || busy}
+          onClick={() => {
+            if (file && onImport) void onImport(file);
+          }}
+        >
+          {busy ? "Importando…" : "Importar"}
         </Button>
       </div>
     </div>
   );
 }
 
+/** Card de Miscelâneas: mesma casca visual; seleção local só para a UI, upload via handler existente. */
+function MiscelaneaImportCard({
+  title,
+  description,
+  busy,
+  onImport,
+}: {
+  title: string;
+  description: string;
+  busy?: boolean;
+  onImport: (file: File) => Promise<void>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+
+  return (
+    <ImportFileCard
+      title={title}
+      description={description}
+      file={file}
+      onFileChange={setFile}
+      busy={busy}
+      onImport={onImport}
+    />
+  );
+}
+
 function ImportacaoPage() {
-  const [activeTab, setActiveTab] = useState<"miscelaneas" | "terminais">("miscelaneas");
+  const [activeTab, setActiveTab] = useState<"miscelaneas" | "serializados">("miscelaneas");
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoque, setBusyEstoque] = useState(false);
@@ -234,88 +282,65 @@ function ImportacaoPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("terminais")}
+            onClick={() => setActiveTab("serializados")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === "terminais"
+              activeTab === "serializados"
                 ? "border-b-2 border-primary text-foreground"
                 : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            Terminais
+            Serializados
           </button>
         </div>
 
         {activeTab === "miscelaneas" ? (
-          <div className="space-y-8">
-            <section>
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                Upload A — Cabeçalho da WO
-              </h2>
-              <FileDropzone
-                title="Arquivo de Cabeçalho (Auditoria)"
-                description="Colunas: workOrderID, idTecnico, status, sla, dataAtendimento. Alimenta a tela de Pendências."
-                busy={busyCabecalho}
-                onFile={handleCabecalho}
-              />
-            </section>
-
-            <section>
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                Upload B — Consolidado de Consumo
-              </h2>
-              <FileDropzone
-                title="Consolidado Revisado (Consumo)"
-                description="Colunas legado: WO, Técnico, Material, Descr. Material, Qtd Baixada. Alimenta os KPIs."
-                busy={busyConsumo}
-                onFile={handleConsumo}
-              />
-            </section>
-
-            <section>
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                Upload C — Consulta de Estoque
-              </h2>
-              <FileDropzone
-                title="Catálogo Mestre de Materiais"
-                description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
-                busy={busyEstoque}
-                onFile={handleEstoque}
-              />
-            </section>
-
-            <section>
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                Upload D — Estoque Físico
-              </h2>
-              <FileDropzone
-                title="Estoque Físico e Campo"
-                description="Colunas: Material, Descr. Material, Qtd Física, Qtd Campo. Alimenta o módulo Estoque Físico X BTP."
-                busy={busyEstoqueFisico}
-                onFile={handleEstoqueFisico}
-              />
-            </section>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <MiscelaneaImportCard
+              title="Cabeçalho da WO"
+              description="Colunas: workOrderID, idTecnico, status, sla, dataAtendimento. Alimenta a tela de Pendências."
+              busy={busyCabecalho}
+              onImport={handleCabecalho}
+            />
+            <MiscelaneaImportCard
+              title="Consolidado de Consumo"
+              description="Colunas legado: WO, Técnico, Material, Descr. Material, Qtd Baixada. Alimenta os KPIs."
+              busy={busyConsumo}
+              onImport={handleConsumo}
+            />
+            <MiscelaneaImportCard
+              title="Consulta de Estoque"
+              description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
+              busy={busyEstoque}
+              onImport={handleEstoque}
+            />
+            <MiscelaneaImportCard
+              title="Estoque Físico"
+              description="Colunas: Material, Descr. Material, Qtd Física, Qtd Campo. Alimenta o módulo Estoque Físico X BTP."
+              busy={busyEstoqueFisico}
+              onImport={handleEstoqueFisico}
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <TerminalImportCard
+            <ImportFileCard
               title="Estoque Atlas"
               description="Planilha de estoque Atlas (BTP / sistema)."
               file={fileAtlas}
               onFileChange={setFileAtlas}
             />
-            <TerminalImportCard
+            <ImportFileCard
               title="Estoque Campo"
               description="Quantidades em poder das equipes de campo."
               file={fileCampo}
               onFileChange={setFileCampo}
             />
-            <TerminalImportCard
+            <ImportFileCard
               title="Estoque Físico"
               description="Inventário físico do almoxarifado."
               file={fileFisico}
               onFileChange={setFileFisico}
             />
-            <TerminalImportCard
+            <ImportFileCard
               title="Consolidado de consumo"
               description="Consolidado revisado de consumo por WO e material."
               file={fileConsolidado}
