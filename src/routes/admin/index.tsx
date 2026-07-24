@@ -32,7 +32,7 @@ const MODULE_CARD_CLASS =
   "relative flex h-40 w-full flex-col justify-between rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md";
 
 function AdminHome() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("Miscelâneas");
+  const [activeTab, setActiveTab] = useState<AdminTab>("Início");
 
   return (
     <div className="min-h-screen bg-surface">

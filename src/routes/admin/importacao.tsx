@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Construction, FileUp } from "lucide-react";
+import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { FileSpreadsheet, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { FileDropzone } from "@/components/FileDropzone";
+import { Button } from "@/components/ui/button";
 import { replaceWoCabecalho, upsertDimMateriais, upsertEstoqueFisico, upsertWoConsumo } from "@/lib/logistica-service";
 import {
   parseDimMateriaisFile,
@@ -11,6 +12,7 @@ import {
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
+import { cn } from "@/lib/utils";
 
 function formatImportError(scope: string, err: unknown): string {
   console.error(`[importacao/${scope}]`, err);
@@ -45,12 +47,70 @@ export const Route = createFileRoute("/admin/importacao")({
   component: ImportacaoPage,
 });
 
+type TerminalImportCardProps = {
+  title: string;
+  description: string;
+  file: File | null;
+  onFileChange: (file: File | null) => void;
+};
+
+function TerminalImportCard({ title, description, file, onFileChange }: TerminalImportCardProps) {
+  const inputId = useId();
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    onFileChange(e.target.files?.[0] ?? null);
+  };
+
+  return (
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="mb-4">
+        <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+          <FileSpreadsheet className="h-6 w-6" />
+        </div>
+        <h2 className="font-bold text-foreground">{title}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+
+      <div className="space-y-3">
+        <label
+          htmlFor={inputId}
+          className={cn(
+            "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-primary/50",
+          )}
+        >
+          <span className="text-sm font-medium text-foreground">Selecionar Arquivo</span>
+          <span className="text-xs text-muted-foreground">.xlsx, .xls ou .csv</span>
+          <input
+            id={inputId}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="sr-only"
+            onChange={handleChange}
+          />
+        </label>
+
+        <p className="truncate text-xs text-muted-foreground" title={file?.name}>
+          {file ? file.name : "Nenhum arquivo selecionado."}
+        </p>
+
+        <Button type="button" variant="outline" className="w-full" disabled={!file}>
+          Importar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ImportacaoPage() {
-  const [activeTab, setActiveTab] = useState<"miscelanea" | "terminais">("miscelanea");
+  const [activeTab, setActiveTab] = useState<"miscelaneas" | "terminais">("miscelaneas");
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoque, setBusyEstoque] = useState(false);
   const [busyEstoqueFisico, setBusyEstoqueFisico] = useState(false);
+  const [fileAtlas, setFileAtlas] = useState<File | null>(null);
+  const [fileCampo, setFileCampo] = useState<File | null>(null);
+  const [fileFisico, setFileFisico] = useState<File | null>(null);
+  const [fileConsolidado, setFileConsolidado] = useState<File | null>(null);
 
   useEffect(() => {
     console.info(
@@ -144,7 +204,7 @@ function ImportacaoPage() {
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
-      <main className="mx-auto max-w-3xl px-5 pb-10 pt-6">
+      <main className="mx-auto max-w-5xl px-5 pb-10 pt-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
@@ -163,14 +223,14 @@ function ImportacaoPage() {
         <div className="mb-6 flex gap-1 border-b border-border">
           <button
             type="button"
-            onClick={() => setActiveTab("miscelanea")}
+            onClick={() => setActiveTab("miscelaneas")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === "miscelanea"
+              activeTab === "miscelaneas"
                 ? "border-b-2 border-primary text-foreground"
                 : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            Miscelânea
+            Miscelâneas
           </button>
           <button
             type="button"
@@ -185,7 +245,7 @@ function ImportacaoPage() {
           </button>
         </div>
 
-        {activeTab === "miscelanea" ? (
+        {activeTab === "miscelaneas" ? (
           <div className="space-y-8">
             <section>
               <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
@@ -236,14 +296,32 @@ function ImportacaoPage() {
             </section>
           </div>
         ) : (
-          <section className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-muted text-muted-foreground">
-              <Construction className="h-7 w-7" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Módulo de importação de Terminais em desenvolvimento.
-            </p>
-          </section>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <TerminalImportCard
+              title="Estoque Atlas"
+              description="Planilha de estoque Atlas (BTP / sistema)."
+              file={fileAtlas}
+              onFileChange={setFileAtlas}
+            />
+            <TerminalImportCard
+              title="Estoque Campo"
+              description="Quantidades em poder das equipes de campo."
+              file={fileCampo}
+              onFileChange={setFileCampo}
+            />
+            <TerminalImportCard
+              title="Estoque Físico"
+              description="Inventário físico do almoxarifado."
+              file={fileFisico}
+              onFileChange={setFileFisico}
+            />
+            <TerminalImportCard
+              title="Consolidado de consumo"
+              description="Consolidado revisado de consumo por WO e material."
+              file={fileConsolidado}
+              onFileChange={setFileConsolidado}
+            />
+          </div>
         )}
       </main>
     </div>
