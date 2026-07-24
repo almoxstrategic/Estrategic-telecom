@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   BarChart3,
   CalendarClock,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   FileUp,
   LogOut,
@@ -21,6 +24,8 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useApp();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
+  const [isMiscelaneaOpen, setIsMiscelaneaOpen] = useState(true);
+  const [isTerminaisOpen, setIsTerminaisOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -61,87 +66,142 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <ShieldCheck className="h-5 w-5 text-primary" />
               Painel Admin
             </Link>
-            <Link
-              to="/todos"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <Database className="h-5 w-5 text-primary" />
-              Todas as Metragens
-            </Link>
-            <Link
-              to="/tecnicos"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <Users className="h-5 w-5 text-primary" />
-              Gestão de Equipe
-            </Link>
-            <Link
-              to="/admin/kpis"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <BarChart3 className="h-5 w-5 text-primary" />
-              KPI&apos;s
-            </Link>
-            <Link
-              to="/admin/pendencias"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Pendências
-            </Link>
-            <Link
-              to="/estoque-fisico-btp"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <Package className="h-5 w-5 text-primary" />
-              Estoque Físico X BTP
-            </Link>
-            <Link
-              to="/previsao-reserva"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <CalendarClock className="h-5 w-5 text-primary" />
-              Previsão de Reserva
-            </Link>
-            <Link
-              to="/media-baixa-tecnico"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Média de Baixa por Técnico
-            </Link>
-            <Link
-              to="/admin/importacao"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <FileUp className="h-5 w-5 text-primary" />
-              Importação
-            </Link>
-            <Link
-              to="/admin/enviar-evidencia"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <Send className="h-5 w-5 text-primary" />
-              Envio pelo Técnico
-            </Link>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsMiscelaneaOpen((open) => !open)}
+                className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              >
+                <span>Miscelânea</span>
+                {isMiscelaneaOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+                )}
+              </button>
+              <div
+                className={`grid transition-all duration-200 ease-in-out ${
+                  isMiscelaneaOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="space-y-1 pl-8 pt-1">
+                    <Link
+                      to="/todos"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <Database className="h-5 w-5 text-primary" />
+                      Todas as Metragens
+                    </Link>
+                    <Link
+                      to="/tecnicos"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <Users className="h-5 w-5 text-primary" />
+                      Gestão de Equipe
+                    </Link>
+                    <Link
+                      to="/admin/kpis"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      KPI&apos;s
+                    </Link>
+                    <Link
+                      to="/admin/pendencias"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                      Pendências
+                    </Link>
+                    <Link
+                      to="/estoque-fisico-btp"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <Package className="h-5 w-5 text-primary" />
+                      Estoque Físico X BTP
+                    </Link>
+                    <Link
+                      to="/previsao-reserva"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <CalendarClock className="h-5 w-5 text-primary" />
+                      Previsão de Reserva
+                    </Link>
+                    <Link
+                      to="/media-baixa-tecnico"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      Média de Baixa por Técnico
+                    </Link>
+                    <Link
+                      to="/admin/importacao"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <FileUp className="h-5 w-5 text-primary" />
+                      Importação
+                    </Link>
+                    <Link
+                      to="/admin/enviar-evidencia"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <Send className="h-5 w-5 text-primary" />
+                      Envio pelo Técnico
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsTerminaisOpen((open) => !open)}
+                className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+              >
+                <span>Terminais</span>
+                {isTerminaisOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+                )}
+              </button>
+              <div
+                className={`grid transition-all duration-200 ease-in-out ${
+                  isTerminaisOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="pl-8 pt-1">
+                    <p className="px-3 py-3 text-sm italic text-gray-400">Em breve...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </>
         ) : (
           <>
