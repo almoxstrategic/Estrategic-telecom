@@ -1,14 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Filter, Target, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Download } from "lucide-react";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -36,89 +32,225 @@ export const Route = createFileRoute("/previsao-reserva")({
   component: PrevisaoReservaPage,
 });
 
-const ITENS_CRITICOS_INICIAIS = [
-  "22026219",
-  "22026223",
-  "22026189",
-  "22061736",
-  "22065513",
-] as const;
-
 const LEAD_TIME_DIAS = 15;
 
 type LinhaPrevisao = {
   codigo: string;
   descricao: string;
+  custoUnitario: number;
   estoqueBTP: number;
+  bloqueioBTP: number;
+  transito: number;
+  estoqueEmpreiteiraParceira: number;
   estoqueFisico: number;
   estoqueCampo: number;
   estoqueTotalReal: number;
-  mediaConsumo: number;
+  mediaConsumoMensal: number;
+  mediaConsumoSemanal: number;
   autonomia: number;
   pontoRessuprimento: number;
   diasParaReserva: number;
 };
 
-type ModalView = "selecao" | "definicao";
-
 type SortColumn =
   | "descricao"
+  | "custoUnitario"
+  | "estoqueLiquido"
   | "estoqueBTP"
+  | "bloqueioBTP"
+  | "transito"
+  | "estoqueEmpreiteiraParceira"
   | "estoqueFisicoCampo"
   | "estoqueFisico"
   | "estoqueCampo"
-  | "mediaConsumo"
+  | "diferenca"
+  | "statusDivergencia"
+  | "mediaConsumoMensal"
+  | "mediaConsumoSemanal"
   | "autonomia"
   | "pontoRessuprimento"
   | "diasParaReserva"
-  | "status";
+  | "status"
+  | "financeiro";
 
 type SortDirection = "asc" | "desc";
 
-type FiltroStatus = "Todos" | "Urgente" | "Reservar" | "Saudável";
+type FiltroDivergencia = "Todos" | "Neutro" | "Sobra Física" | "Falta Física";
+type FiltroReserva = "Todos" | "Reservar" | "Urgente" | "Saudável";
 
-const FILTRO_STATUS_OPCOES: FiltroStatus[] = ["Todos", "Urgente", "Reservar", "Saudável"];
+const FILTRO_DIVERGENCIA_OPCOES: FiltroDivergencia[] = [
+  "Todos",
+  "Neutro",
+  "Sobra Física",
+  "Falta Física",
+];
+const FILTRO_RESERVA_OPCOES: FiltroReserva[] = ["Todos", "Reservar", "Urgente", "Saudável"];
 
-function statusLabel(diasParaReserva: number): Exclude<FiltroStatus, "Todos"> {
+function statusLabel(diasParaReserva: number): Exclude<FiltroReserva, "Todos"> {
   if (diasParaReserva < 0) return "Urgente";
   if (diasParaReserva <= 7) return "Reservar";
   return "Saudável";
 }
 
-function StatusBadge({ diasParaReserva }: { diasParaReserva: number }) {
-  const status = statusLabel(diasParaReserva);
+function StatusReservaBadge({ diasParaReserva }: { diasParaReserva: number }) {
+  const status = statusLabel(numOrZero(diasParaReserva));
   if (status === "Urgente") {
     return (
-      <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
+      <span className="whitespace-nowrap rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-semibold text-red-800">
         Urgente
       </span>
     );
   }
   if (status === "Reservar") {
     return (
-      <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
+      <span className="whitespace-nowrap rounded-full bg-yellow-100 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-800">
         Reservar
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">
+    <span className="whitespace-nowrap rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold text-green-800">
       Saudável
     </span>
   );
 }
 
+function statusDivergenciaLabel(diferenca: number): string {
+  const d = numOrZero(diferenca);
+  if (d === 0) return "Neutro";
+  if (d > 0) return "Falta Físico";
+  return "Sobra Físico";
+}
+
+function matchesFiltroDivergencia(diferenca: number, filtro: FiltroDivergencia): boolean {
+  if (filtro === "Todos") return true;
+  const label = statusDivergenciaLabel(diferenca);
+  if (filtro === "Neutro") return label === "Neutro";
+  if (filtro === "Sobra Física") return label === "Sobra Físico";
+  if (filtro === "Falta Física") return label === "Falta Físico";
+  return true;
+}
+
+function StatusDivergenciaBadge({ diferenca }: { diferenca: number }) {
+  const d = numOrZero(diferenca);
+  if (d === 0) {
+    return (
+      <span className="whitespace-nowrap rounded-full bg-yellow-100 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-800">
+        Neutro
+      </span>
+    );
+  }
+  if (d > 0) {
+    return (
+      <span className="whitespace-nowrap rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-semibold text-red-800">
+        Falta Físico
+      </span>
+    );
+  }
+  return (
+    <span className="whitespace-nowrap rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold text-green-800">
+      Sobra Físico
+    </span>
+  );
+}
+
+function formatMoedaBr(valor: number): string {
+  const n = Number.isFinite(valor) ? valor : 0;
+  return Math.abs(n).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function numOrZero(valor: number | null | undefined): number {
+  return typeof valor === "number" && Number.isFinite(valor) ? valor : 0;
+}
+
+function custoSeguro(custoUnitario: number | null | undefined): number {
+  const n = numOrZero(custoUnitario);
+  return n > 0 ? n : 10;
+}
+
+/** Inteiro aleatório inclusivo entre min e max. */
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function estoqueFisicoCampoOf(row: Pick<LinhaPrevisao, "estoqueFisico" | "estoqueCampo">): number {
+  return numOrZero(row.estoqueFisico) + numOrZero(row.estoqueCampo);
+}
+
+/** Cálculo A: Estoque líquido BTP */
+function estoqueLiquidoBTPOf(
+  row: Pick<
+    LinhaPrevisao,
+    "estoqueBTP" | "bloqueioBTP" | "transito" | "estoqueEmpreiteiraParceira"
+  >,
+): number {
+  return (
+    numOrZero(row.estoqueBTP) -
+    numOrZero(row.bloqueioBTP) -
+    numOrZero(row.transito) -
+    numOrZero(row.estoqueEmpreiteiraParceira)
+  );
+}
+
+/** Cálculo B: Diferença BTP x Físico */
+function diferencaBtpXFisicoOf(row: LinhaPrevisao): number {
+  return estoqueLiquidoBTPOf(row) - estoqueFisicoCampoOf(row);
+}
+
+/** Impacto financeiro: Cálculo B × valor unitário (Falta > 0 → prejuízo; Sobra < 0 → crédito). */
+function impactoFinanceiro(diferenca: number, custoUnitario: number): number {
+  return numOrZero(diferenca) * custoSeguro(custoUnitario);
+}
+
+function FinanceiroCell({
+  diferenca,
+  custoUnitario,
+}: {
+  diferenca: number;
+  custoUnitario: number;
+}) {
+  const diff = numOrZero(diferenca);
+  const valorFinanceiro = Math.abs(diff * custoSeguro(custoUnitario));
+
+  // Falta físico (diferença > 0) → prejuízo
+  if (diff > 0) {
+    return (
+      <span className="font-bold tabular-nums text-red-600">
+        -R$ {formatMoedaBr(valorFinanceiro)}
+      </span>
+    );
+  }
+  // Sobra físico (diferença < 0) → crédito
+  if (diff < 0) {
+    return (
+      <span className="font-bold tabular-nums text-green-600">
+        R$ {formatMoedaBr(valorFinanceiro)}
+      </span>
+    );
+  }
+  return <span className="font-bold tabular-nums text-green-600">R$ 0,00</span>;
+}
+
 /** Mock saudável: BTP acima do ponto de ressuprimento na maioria dos casos. */
 function gerarLinhaPrevisao(codigo: string, descricao: string): LinhaPrevisao {
   const leadTime = LEAD_TIME_DIAS;
-  const mediaConsumo = Math.floor(Math.random() * 30) + 1; // 1–30
-  const pontoRessuprimento = mediaConsumo * leadTime;
+  const mediaConsumoMensal = randInt(5, 50);
+  const mediaConsumoSemanal = randInt(5, 50);
+  const mediaDiaria = mediaConsumoMensal / 30;
+  const pontoRessuprimento = Math.max(1, Math.round(mediaDiaria * leadTime));
 
   // ~90% com estoque acima do ponto; ~10% abaixo (exceção para demo)
   const estoqueBTP =
     Math.random() < 0.1
-      ? Math.max(1, pontoRessuprimento - Math.floor(Math.random() * mediaConsumo * 5))
+      ? Math.max(1, pontoRessuprimento - Math.floor(Math.random() * mediaConsumoMensal * 2))
       : pontoRessuprimento + Math.floor(Math.random() * 200);
+
+  const bloqueioBTP = randInt(5, 50);
+  const transito = randInt(5, 50);
+  const estoqueEmpreiteiraParceira = randInt(5, 50);
 
   // Físico + Campo próximos ao BTP (±10%)
   const desvio = Math.floor(estoqueBTP * 0.1);
@@ -127,17 +259,23 @@ function gerarLinhaPrevisao(codigo: string, descricao: string): LinhaPrevisao {
   const estoqueFisico = Math.floor(Math.random() * (estoqueTotalReal + 1));
   const estoqueCampo = estoqueTotalReal - estoqueFisico;
 
-  const autonomia = mediaConsumo === 0 ? 999 : Math.floor(estoqueBTP / mediaConsumo);
+  const autonomia = mediaDiaria === 0 ? 999 : Math.floor(estoqueBTP / mediaDiaria);
   const diasParaReserva = autonomia - leadTime;
+  const custoUnitario = Math.floor(Math.random() * 90) + 10; // R$ 10–99
 
   return {
     codigo,
     descricao,
+    custoUnitario,
     estoqueBTP,
+    bloqueioBTP,
+    transito,
+    estoqueEmpreiteiraParceira,
     estoqueFisico,
     estoqueCampo,
     estoqueTotalReal,
-    mediaConsumo,
+    mediaConsumoMensal,
+    mediaConsumoSemanal,
     autonomia,
     pontoRessuprimento,
     diasParaReserva,
@@ -163,61 +301,32 @@ function SortableHead({
 }) {
   const active = activeColumn === column;
   return (
-    <TableHead className={cn(align === "left" ? "text-left" : "text-center", className)}>
+    <TableHead
+      className={cn(
+        "break-words whitespace-normal leading-tight",
+        align === "left" ? "text-left" : "text-center",
+        className,
+      )}
+    >
       <button
         type="button"
         className={cn(
-          "inline-flex w-full items-center gap-1 font-medium hover:text-foreground",
-          align === "left" ? "justify-start" : "justify-center",
+          "inline-flex w-full items-start gap-0.5 font-medium hover:text-foreground",
+          align === "left" ? "justify-start" : "justify-center text-center",
           active ? "text-foreground" : "text-muted-foreground",
         )}
         onClick={() => onSort(column)}
       >
-        <span className={align === "center" ? "text-center leading-tight" : undefined}>
-          {label}
-        </span>
+        <span className="break-words whitespace-normal leading-tight">{label}</span>
         {active ? (
           direction === "asc" ? (
-            <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+            <ArrowUp className="mt-0.5 h-2.5 w-2.5 shrink-0" />
           ) : (
-            <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+            <ArrowDown className="mt-0.5 h-2.5 w-2.5 shrink-0" />
           )
         ) : null}
       </button>
     </TableHead>
-  );
-}
-
-function Chip({
-  codigo,
-  descricao,
-  onRemove,
-}: {
-  codigo: string;
-  descricao?: string;
-  onRemove: () => void;
-}) {
-  return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-xs">
-      <span className="truncate font-mono">{codigo}</span>
-      {descricao ? (
-        <span className="hidden max-w-[8rem] truncate text-muted-foreground sm:inline">
-          {descricao}
-        </span>
-      ) : null}
-      <button
-        type="button"
-        aria-label={`Remover ${codigo}`}
-        className="rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onRemove();
-        }}
-      >
-        <X className="h-3 w-3" />
-      </button>
-    </span>
   );
 }
 
@@ -226,15 +335,8 @@ function PrevisaoReservaPage() {
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-
-  const [itensSelecionados, setItensSelecionados] = useState<string[]>([]);
-  const [itensCriticos, setItensCriticos] = useState<string[]>([...ITENS_CRITICOS_INICIAIS]);
-  const [isModalAberto, setIsModalAberto] = useState(false);
-  const [viewAtual, setViewAtual] = useState<ModalView>("selecao");
-  const [buscaPopover, setBuscaPopover] = useState("");
-  const [buscaCriticos, setBuscaCriticos] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("Todos");
-
+  const [filtroDivergencia, setFiltroDivergencia] = useState<FiltroDivergencia>("Todos");
+  const [filtroReserva, setFiltroReserva] = useState<FiltroReserva>("Todos");
   const [sortColumn, setSortColumn] = useState<SortColumn>("descricao");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -265,42 +367,6 @@ function PrevisaoReservaPage() {
     };
   }, []);
 
-  const labelsPorCodigo = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const row of linhas) map.set(row.codigo, row.descricao);
-    return map;
-  }, [linhas]);
-
-  const opcoesSelecao = useMemo(() => {
-    const termo = buscaPopover.trim().toLowerCase();
-    const selecionados = new Set(itensSelecionados);
-    return linhas
-      .filter((row) => !selecionados.has(row.codigo))
-      .filter((row) => {
-        if (!termo) return true;
-        return (
-          row.codigo.toLowerCase().includes(termo) ||
-          row.descricao.toLowerCase().includes(termo)
-        );
-      })
-      .slice(0, 40);
-  }, [linhas, buscaPopover, itensSelecionados]);
-
-  const opcoesCriticos = useMemo(() => {
-    const termo = buscaCriticos.trim().toLowerCase();
-    const criticos = new Set(itensCriticos);
-    return linhas
-      .filter((row) => !criticos.has(row.codigo))
-      .filter((row) => {
-        if (!termo) return true;
-        return (
-          row.codigo.toLowerCase().includes(termo) ||
-          row.descricao.toLowerCase().includes(termo)
-        );
-      })
-      .slice(0, 40);
-  }, [linhas, buscaCriticos, itensCriticos]);
-
   const linhasFiltradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     const filtradas = linhas.filter((row) => {
@@ -310,12 +376,11 @@ function PrevisaoReservaPage() {
           row.descricao.toLowerCase().includes(termo);
         if (!matchTexto) return false;
       }
-      if (itensSelecionados.length > 0 && !itensSelecionados.includes(row.codigo)) {
+      if (!matchesFiltroDivergencia(diferencaBtpXFisicoOf(row), filtroDivergencia)) {
         return false;
       }
-      if (filtroStatus !== "Todos") {
-        const status = statusLabel(row.diasParaReserva);
-        if (status !== filtroStatus) return false;
+      if (filtroReserva !== "Todos") {
+        if (statusLabel(row.diasParaReserva) !== filtroReserva) return false;
       }
       return true;
     });
@@ -325,18 +390,37 @@ function PrevisaoReservaPage() {
       switch (sortColumn) {
         case "descricao":
           return a.descricao.localeCompare(b.descricao, "pt-BR") * dir;
+        case "custoUnitario":
+          return (custoSeguro(a.custoUnitario) - custoSeguro(b.custoUnitario)) * dir;
+        case "estoqueLiquido":
+          return (estoqueLiquidoBTPOf(a) - estoqueLiquidoBTPOf(b)) * dir;
         case "estoqueBTP":
           return (a.estoqueBTP - b.estoqueBTP) * dir;
+        case "bloqueioBTP":
+          return (a.bloqueioBTP - b.bloqueioBTP) * dir;
+        case "transito":
+          return (a.transito - b.transito) * dir;
+        case "estoqueEmpreiteiraParceira":
+          return (a.estoqueEmpreiteiraParceira - b.estoqueEmpreiteiraParceira) * dir;
         case "estoqueFisicoCampo":
-          return (
-            (a.estoqueFisico + a.estoqueCampo - (b.estoqueFisico + b.estoqueCampo)) * dir
-          );
+          return (estoqueFisicoCampoOf(a) - estoqueFisicoCampoOf(b)) * dir;
         case "estoqueFisico":
           return (a.estoqueFisico - b.estoqueFisico) * dir;
         case "estoqueCampo":
           return (a.estoqueCampo - b.estoqueCampo) * dir;
-        case "mediaConsumo":
-          return (a.mediaConsumo - b.mediaConsumo) * dir;
+        case "diferenca":
+          return (diferencaBtpXFisicoOf(a) - diferencaBtpXFisicoOf(b)) * dir;
+        case "statusDivergencia":
+          return (
+            statusDivergenciaLabel(diferencaBtpXFisicoOf(a)).localeCompare(
+              statusDivergenciaLabel(diferencaBtpXFisicoOf(b)),
+              "pt-BR",
+            ) * dir
+          );
+        case "mediaConsumoMensal":
+          return (a.mediaConsumoMensal - b.mediaConsumoMensal) * dir;
+        case "mediaConsumoSemanal":
+          return (a.mediaConsumoSemanal - b.mediaConsumoSemanal) * dir;
         case "autonomia":
           return (a.autonomia - b.autonomia) * dir;
         case "pontoRessuprimento":
@@ -344,16 +428,39 @@ function PrevisaoReservaPage() {
         case "diasParaReserva":
           return (a.diasParaReserva - b.diasParaReserva) * dir;
         case "status":
-          // Ordena por diasParaReserva (Urgente → Reservar → Saudável)
           return (a.diasParaReserva - b.diasParaReserva) * dir;
+        case "financeiro":
+          return (
+            (impactoFinanceiro(diferencaBtpXFisicoOf(a), a.custoUnitario) -
+              impactoFinanceiro(diferencaBtpXFisicoOf(b), b.custoUnitario)) *
+            dir
+          );
         default:
           return 0;
       }
     });
-  }, [linhas, busca, itensSelecionados, filtroStatus, sortColumn, sortDirection]);
+  }, [linhas, busca, filtroDivergencia, filtroReserva, sortColumn, sortDirection]);
 
-  const temFiltroAtivo =
-    busca.trim().length > 0 || itensSelecionados.length > 0 || filtroStatus !== "Todos";
+  const valorEsperadoBtp = useMemo(() => {
+    return linhasFiltradas.reduce(
+      (acc, row) => acc + numOrZero(row.estoqueBTP) * custoSeguro(row.custoUnitario),
+      0,
+    );
+  }, [linhasFiltradas]);
+
+  const valorFisicoReal = useMemo(() => {
+    return linhasFiltradas.reduce(
+      (acc, row) => acc + estoqueFisicoCampoOf(row) * custoSeguro(row.custoUnitario),
+      0,
+    );
+  }, [linhasFiltradas]);
+
+  const saldoDivergencia = useMemo(() => {
+    return linhasFiltradas.reduce((acc, row) => {
+      const diferenca = diferencaBtpXFisicoOf(row);
+      return acc + -numOrZero(diferenca) * custoSeguro(row.custoUnitario);
+    }, 0);
+  }, [linhasFiltradas]);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -366,224 +473,65 @@ function PrevisaoReservaPage() {
 
   const limparFiltros = () => {
     setBusca("");
-    setItensSelecionados([]);
-    setFiltroStatus("Todos");
+    setFiltroDivergencia("Todos");
+    setFiltroReserva("Todos");
   };
 
-  const adicionarItemSelecionado = (codigo: string) => {
-    setItensSelecionados((prev) => (prev.includes(codigo) ? prev : [...prev, codigo]));
-    setBuscaPopover("");
-  };
-
-  const removerItemSelecionado = (codigo: string) => {
-    setItensSelecionados((prev) => prev.filter((c) => c !== codigo));
-  };
-
-  const adicionarItemCritico = (codigo: string) => {
-    setItensCriticos((prev) => (prev.includes(codigo) ? prev : [...prev, codigo]));
-    setBuscaCriticos("");
-  };
-
-  const removerItemCritico = (codigo: string) => {
-    setItensCriticos((prev) => prev.filter((c) => c !== codigo));
-  };
-
-  const handleModalOpenChange = (open: boolean) => {
-    setIsModalAberto(open);
-    if (!open) {
-      setViewAtual("selecao");
-      setBuscaPopover("");
-      setBuscaCriticos("");
+  const handleExportExcel = () => {
+    if (linhasFiltradas.length === 0) {
+      toast.error("Não há dados para exportar com os filtros atuais.");
+      return;
     }
+
+    const dadosExcel = linhasFiltradas.map((item) => {
+      const estoqueBTP = item.estoqueBTP || 0;
+      const bloqueioBTP = item.bloqueioBTP || 0;
+      const transito = item.transito || 0;
+      const estoqueEmpreiteiraParceira = item.estoqueEmpreiteiraParceira || 0;
+      const estoqueFisico = item.estoqueFisico || 0;
+      const estoqueCampo = item.estoqueCampo || 0;
+      const estoqueFisicoCampo = estoqueFisico + estoqueCampo;
+      const estoqueLiquidoBTP =
+        estoqueBTP - bloqueioBTP - transito - estoqueEmpreiteiraParceira;
+      const diferenca = estoqueLiquidoBTP - estoqueFisicoCampo;
+      const financeiro = diferenca * custoSeguro(item.custoUnitario);
+
+      return {
+        "Código": item.codigo,
+        "Descrição": item.descricao,
+        "Valor Unit. (R$)": Number(custoSeguro(item.custoUnitario).toFixed(2)),
+        "Estoque Líquido BTP": estoqueLiquidoBTP,
+        "Estoque BTP": estoqueBTP,
+        "Bloqueio BTP": bloqueioBTP,
+        Transito: transito,
+        "Estoque Parc.": estoqueEmpreiteiraParceira,
+        "Estoque (Físico+Campo)": estoqueFisicoCampo,
+        "Estoque Físico": estoqueFisico,
+        "Estoque Campo": estoqueCampo,
+        "Diferença BTP x Físico": diferenca,
+        "Status Divergência": statusDivergenciaLabel(diferenca),
+        "Média Cons. Mensal": item.mediaConsumoMensal || 0,
+        "Média Cons. Semanal": item.mediaConsumoSemanal || 0,
+        "Autonomia (dias)": item.autonomia || 0,
+        "Ponto Ressup.": item.pontoRessuprimento || 0,
+        "Dias para Reserva": item.diasParaReserva || 0,
+        "Status Reserva": statusLabel(item.diasParaReserva || 0),
+        "Financeiro (R$)": Number(financeiro.toFixed(2)),
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Previsão Reserva");
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Previsao_Reserva_Estoque_${hoje}.xlsx`);
   };
-
-  const fecharModal = () => handleModalOpenChange(false);
-
-  let modalBody: ReactNode;
-
-  if (viewAtual === "definicao") {
-    modalBody = (
-      <>
-        <div className="shrink-0 border-b bg-white px-4 py-3">
-          <div className="pr-6">
-            <DialogTitle className="text-sm font-semibold text-foreground">
-              Definir itens críticos
-            </DialogTitle>
-            <DialogDescription className="text-[11px] text-muted-foreground">
-              Gerencie a lista salva usada pelo atalho de seleção.
-            </DialogDescription>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="flex flex-col gap-4">
-            {itensCriticos.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {itensCriticos.map((codigo) => (
-                  <Chip
-                    key={codigo}
-                    codigo={codigo}
-                    descricao={labelsPorCodigo.get(codigo)}
-                    onRemove={() => removerItemCritico(codigo)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Nenhum item crítico na lista.</p>
-            )}
-
-            <Input
-              type="search"
-              placeholder="Procure por nome ou código os itens..."
-              value={buscaCriticos}
-              onChange={(e) => setBuscaCriticos(e.target.value)}
-              className="h-9 bg-white"
-            />
-
-            <div className="rounded-md border border-border">
-              {opcoesCriticos.length === 0 ? (
-                <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-                  Nenhum material encontrado.
-                </p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {opcoesCriticos.map((row) => (
-                    <li key={row.codigo}>
-                      <button
-                        type="button"
-                        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm hover:bg-accent"
-                        onClick={() => adicionarItemCritico(row.codigo)}
-                      >
-                        <span className="font-mono text-xs text-muted-foreground">{row.codigo}</span>
-                        <span className="line-clamp-1">{row.descricao}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="shrink-0 space-y-2 border-t bg-white p-4">
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            className="w-full"
-            onClick={() => setItensCriticos([])}
-          >
-            Limpar todos os itens
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="w-full"
-            onClick={() => {
-              setViewAtual("selecao");
-              setBuscaCriticos("");
-            }}
-          >
-            Salvar/Voltar
-          </Button>
-        </div>
-      </>
-    );
-  } else {
-    modalBody = (
-      <>
-        <div className="shrink-0 space-y-3 border-b bg-white px-4 py-3">
-          <DialogTitle className="pr-6 text-sm font-semibold text-foreground">
-            Selecionar itens
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Filtre a tabela por materiais específicos ou itens críticos.
-          </DialogDescription>
-          <Input
-            type="search"
-            placeholder="Procure por nome ou código os itens..."
-            value={buscaPopover}
-            onChange={(e) => setBuscaPopover(e.target.value)}
-            className="h-9 bg-white"
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {itensSelecionados.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 border-b border-border px-4 py-3">
-              {itensSelecionados.map((codigo) => (
-                <Chip
-                  key={codigo}
-                  codigo={codigo}
-                  onRemove={() => removerItemSelecionado(codigo)}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          {opcoesSelecao.length === 0 ? (
-            <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-              Nenhum material encontrado.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {opcoesSelecao.map((row) => (
-                <li key={row.codigo}>
-                  <button
-                    type="button"
-                    className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm hover:bg-accent"
-                    onClick={() => adicionarItemSelecionado(row.codigo)}
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">{row.codigo}</span>
-                    <span className="line-clamp-1">{row.descricao}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="shrink-0 space-y-2 border-t bg-white p-4">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={itensCriticos.length === 0}
-              onClick={() => {
-                setItensSelecionados([...itensCriticos]);
-                fecharModal();
-              }}
-            >
-              Selecionar itens críticos
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setViewAtual("definicao");
-                setBuscaCriticos("");
-              }}
-            >
-              Definir itens críticos
-            </Button>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {itensCriticos.length > 0
-              ? `${itensCriticos.length} item(ns) crítico(s) configurado(s).`
-              : "Nenhum item crítico definido."}
-          </p>
-        </div>
-      </>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
-      <main className="mx-auto min-h-[80vh] max-w-7xl px-5 pb-10 pt-6">
+      <main className="mx-auto min-h-[80vh] w-full max-w-[1800px] px-2 pb-10 pt-6">
         <Link
           to="/admin"
           className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -591,13 +539,48 @@ function PrevisaoReservaPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar ao painel
         </Link>
 
-        <header className="mb-6">
-          <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
-            <CalendarClock className="h-6 w-6 text-primary" />
-            Previsão de Reserva
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">(Esse modulo é um protótipo)</p>
-        </header>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <header>
+            <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
+              <CalendarClock className="h-6 w-6 text-primary" />
+              Previsão de Reserva
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">(Esse modulo é um protótipo)</p>
+          </header>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Valor Esperado (BTP)
+              </span>
+              <span className="text-xl font-bold text-gray-800">
+                R$ {formatMoedaBr(valorEsperadoBtp)}
+              </span>
+            </div>
+            <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Valor Físico Real
+              </span>
+              <span className="text-xl font-bold text-gray-800">
+                R$ {formatMoedaBr(valorFisicoReal)}
+              </span>
+            </div>
+            <div className="flex min-w-[200px] flex-col items-center justify-center rounded-lg border border-gray-100 bg-white p-4 shadow">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Saldo da Divergência
+              </span>
+              {saldoDivergencia < 0 ? (
+                <span className="text-xl font-bold text-red-600">
+                  -R$ {formatMoedaBr(saldoDivergencia)}
+                </span>
+              ) : (
+                <span className="text-xl font-bold text-green-600">
+                  R$ {formatMoedaBr(saldoDivergencia)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative max-w-md flex-1">
@@ -606,79 +589,54 @@ function PrevisaoReservaPage() {
               placeholder="Buscar por Código ou Descrição do Material..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className={cn(
-                "rounded-md border border-input bg-background px-3 py-2",
-                temFiltroAtivo ? "pr-9" : "",
-              )}
+              className="rounded-md border border-input bg-background px-3 py-2"
             />
-            {temFiltroAtivo ? (
-              <button
-                type="button"
-                aria-label="Limpar todos os filtros"
-                title="Limpar todos os filtros"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                onClick={limparFiltros}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
           </div>
 
           <select
-            aria-label="Status: Todos"
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)}
+            aria-label="Status de Divergência"
+            value={filtroDivergencia}
+            onChange={(e) => setFiltroDivergencia(e.target.value as FiltroDivergencia)}
             className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            {FILTRO_STATUS_OPCOES.map((opcao) => (
+            {FILTRO_DIVERGENCIA_OPCOES.map((opcao) => (
               <option key={opcao} value={opcao}>
-                {opcao === "Todos" ? "Status: Todos" : opcao}
+                {opcao === "Todos" ? "Status de Divergência" : opcao}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Status de Reserva"
+            value={filtroReserva}
+            onChange={(e) => setFiltroReserva(e.target.value as FiltroReserva)}
+            className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            {FILTRO_RESERVA_OPCOES.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao === "Todos" ? "Status de Reserva" : opcao}
               </option>
             ))}
           </select>
 
           <button
             type="button"
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            onClick={() =>
-              alert("Em breve: Configuração do ponto de ressuprimento e estoque de segurança.")
-            }
+            onClick={limparFiltros}
+            className="shrink-0 text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
-            <Target className="h-4 w-4" />
-            Definir ponto de ressuprimento
+            Limpar todos os filtros
           </button>
 
           <Button
             type="button"
             variant="outline"
-            className="shrink-0"
-            onClick={() => setIsModalAberto(true)}
+            className="ml-auto h-9 shrink-0 gap-2 border-gray-300 bg-white"
+            onClick={handleExportExcel}
+            disabled={linhasFiltradas.length === 0}
           >
-            <Filter className="h-4 w-4" />
-            Selecionar itens
-            {itensSelecionados.length > 0 ? (
-              <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
-                {itensSelecionados.length}
-              </span>
-            ) : null}
+            <Download className="h-4 w-4 text-green-600" />
+            Exportar Excel
           </Button>
-
-          <Dialog open={isModalAberto} onOpenChange={handleModalOpenChange}>
-            <DialogContent
-              className={cn(
-                "flex max-h-[min(85vh,720px)] w-[min(100vw-2rem,28rem)] flex-col gap-0 overflow-hidden p-0 sm:rounded-lg",
-                "[&>button]:right-3 [&>button]:top-3",
-              )}
-            >
-              {modalBody}
-            </DialogContent>
-          </Dialog>
-
-          {temFiltroAtivo ? (
-            <Button type="button" variant="ghost" size="sm" onClick={limparFiltros}>
-              Limpar todos os filtros
-            </Button>
-          ) : null}
         </div>
 
         {loading ? (
@@ -690,11 +648,13 @@ function PrevisaoReservaPage() {
             Nenhum material encontrado. Importe o Upload C — Consulta de Estoque primeiro.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
-            <Table>
+          <div className="w-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <Table className="w-full table-fixed text-[10px] [&_th]:h-auto [&_th]:break-words [&_th]:px-1 [&_th]:py-0.5 [&_th]:leading-tight [&_th]:whitespace-normal [&_td]:px-1 [&_td]:py-0.5">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-left">Código</TableHead>
+                  <TableHead className="break-words text-left leading-tight whitespace-normal">
+                    Código
+                  </TableHead>
                   <SortableHead
                     label="Descrição"
                     column="descricao"
@@ -702,6 +662,21 @@ function PrevisaoReservaPage() {
                     direction={sortDirection}
                     onSort={handleSort}
                     align="left"
+                    className="max-w-[150px]"
+                  />
+                  <SortableHead
+                    label="Valor unit."
+                    column="custoUnitario"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Estoque (BTP - Bloqueio BTP - Transito - Estoq. Parceira)"
+                    column="estoqueLiquido"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
                   />
                   <SortableHead
                     label="Estoque BTP"
@@ -711,19 +686,32 @@ function PrevisaoReservaPage() {
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label={
-                      <>
-                        Estoque
-                        <br />
-                        <span className="text-sm font-normal">(Físico + Campo)</span>
-                      </>
-                    }
+                    label="Bloqueio BTP"
+                    column="bloqueioBTP"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Transito"
+                    column="transito"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Estoque Empreteira parceira"
+                    column="estoqueEmpreiteiraParceira"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Estoque (Físico + Campo)"
                     column="estoqueFisicoCampo"
                     activeColumn={sortColumn}
                     direction={sortDirection}
                     onSort={handleSort}
-                    align="center"
-                    className="text-center"
                   />
                   <SortableHead
                     label="Estoque Físico"
@@ -740,8 +728,29 @@ function PrevisaoReservaPage() {
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label="Média de consumo"
-                    column="mediaConsumo"
+                    label="Diferença BTP x Físico"
+                    column="diferenca"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Status Divergência"
+                    column="statusDivergencia"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Média de consumo Mensal"
+                    column="mediaConsumoMensal"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Média de consumo Semanal"
+                    column="mediaConsumoSemanal"
                     activeColumn={sortColumn}
                     direction={sortDirection}
                     onSort={handleSort}
@@ -768,8 +777,15 @@ function PrevisaoReservaPage() {
                     onSort={handleSort}
                   />
                   <SortableHead
-                    label="Status"
+                    label="Status Reserva"
                     column="status"
+                    activeColumn={sortColumn}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHead
+                    label="Financeiro"
+                    column="financeiro"
                     activeColumn={sortColumn}
                     direction={sortDirection}
                     onSort={handleSort}
@@ -779,36 +795,79 @@ function PrevisaoReservaPage() {
               <TableBody>
                 {linhasFiltradas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={20} className="py-8 text-center text-muted-foreground">
                       Nenhum material corresponde aos filtros.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  linhasFiltradas.map((row) => (
-                    <TableRow key={row.codigo}>
-                      <TableCell className="text-left font-mono text-sm">{row.codigo}</TableCell>
-                      <TableCell className="text-left">{row.descricao}</TableCell>
-                      <TableCell className="text-center tabular-nums">{row.estoqueBTP}</TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {row.estoqueFisico + row.estoqueCampo}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">{row.estoqueFisico}</TableCell>
-                      <TableCell className="text-center tabular-nums">{row.estoqueCampo}</TableCell>
-                      <TableCell className="text-center tabular-nums">{row.mediaConsumo}</TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {row.autonomia} dias
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {row.pontoRessuprimento}
-                      </TableCell>
-                      <TableCell className="text-center font-medium tabular-nums">
-                        {row.diasParaReserva} dias
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <StatusBadge diasParaReserva={row.diasParaReserva} />
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  linhasFiltradas.map((item) => {
+                    const estoqueBTP = item.estoqueBTP || 0;
+                    const bloqueioBTP = item.bloqueioBTP || 0;
+                    const transito = item.transito || 0;
+                    const estoqueEmpreiteiraParceira = item.estoqueEmpreiteiraParceira || 0;
+                    const estoqueFisico = item.estoqueFisico || 0;
+                    const estoqueCampo = item.estoqueCampo || 0;
+                    const estoqueFisicoCampo = estoqueFisico + estoqueCampo;
+                    const estoqueLiquidoBTP =
+                      estoqueBTP - bloqueioBTP - transito - estoqueEmpreiteiraParceira;
+                    const diferenca = estoqueLiquidoBTP - estoqueFisicoCampo;
+
+                    return (
+                      <TableRow key={item.codigo}>
+                        <TableCell className="text-left font-mono">{item.codigo}</TableCell>
+                        <TableCell className="max-w-[150px] truncate text-left">
+                          {item.descricao}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          R$ {formatMoedaBr(custoSeguro(item.custoUnitario))}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {estoqueLiquidoBTP}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">{estoqueBTP}</TableCell>
+                        <TableCell className="text-center tabular-nums">{bloqueioBTP}</TableCell>
+                        <TableCell className="text-center tabular-nums">{transito}</TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {estoqueEmpreiteiraParceira}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {estoqueFisicoCampo}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">{estoqueFisico}</TableCell>
+                        <TableCell className="text-center tabular-nums">{estoqueCampo}</TableCell>
+                        <TableCell className="text-center font-medium tabular-nums">
+                          {diferenca}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <StatusDivergenciaBadge diferenca={diferenca} />
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {item.mediaConsumoMensal || 0}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {item.mediaConsumoSemanal || 0}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {item.autonomia || 0} dias
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {item.pontoRessuprimento || 0}
+                        </TableCell>
+                        <TableCell className="text-center font-medium tabular-nums">
+                          {item.diasParaReserva || 0} dias
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <StatusReservaBadge diasParaReserva={item.diasParaReserva || 0} />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <FinanceiroCell
+                            diferenca={diferenca}
+                            custoUnitario={item.custoUnitario}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
