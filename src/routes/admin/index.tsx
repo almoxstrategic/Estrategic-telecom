@@ -2,14 +2,18 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ArrowLeftRight,
   BarChart3,
+  Building2,
   CalendarClock,
+  ChartColumn,
   Database,
   FileUp,
-  Monitor,
+  Map,
   Package,
   Send,
   TrendingUp,
+  UserSearch,
   Users,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
@@ -188,13 +192,64 @@ function AdminHome() {
           </section>
         ) : (
           <section className={MODULE_GRID_CLASS}>
-            <div className="col-span-full flex min-h-[280px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
-              <div className="grid h-14 w-14 place-items-center rounded-full bg-muted text-muted-foreground">
-                <Monitor className="h-7 w-7" />
+            <div className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <ArrowLeftRight className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Estoque Base X Campo</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Módulos de Serializados em desenvolvimento.
-              </p>
+            </div>
+
+            <div className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Map className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Relação de campo</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Relação de base</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <ChartColumn className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Média de baixa por técnico</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <UserSearch className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Pendência de suspeito</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                </div>
+              </div>
             </div>
           </section>
         )}

@@ -2,19 +2,24 @@ import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ArrowLeftRight,
   BarChart3,
+  Building2,
   CalendarClock,
+  ChartColumn,
   ChevronDown,
   ChevronRight,
   ClipboardList,
   FileUp,
   LogOut,
   Home,
+  Map,
   Package,
   Send,
   ShieldCheck,
   Database,
   TrendingUp,
+  UserSearch,
   Users,
 } from "lucide-react";
 import { Logo } from "./Logo";
@@ -73,7 +78,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 onClick={() => setIsMiscelaneaOpen((open) => !open)}
                 className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
               >
-                <span>Miscelânea</span>
+                <span>Miscelâneas</span>
                 {isMiscelaneaOpen ? (
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
                 ) : (
@@ -181,7 +186,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 onClick={() => setIsTerminaisOpen((open) => !open)}
                 className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
               >
-                <span>Terminais</span>
+                <span>Serializados</span>
                 {isTerminaisOpen ? (
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
                 ) : (
@@ -196,8 +201,42 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 }`}
               >
                 <div className="overflow-hidden">
-                  <div className="pl-8 pt-1">
-                    <p className="px-3 py-3 text-sm italic text-gray-400">Em breve...</p>
+                  <div className="space-y-1 pl-8 pt-1">
+                    <div
+                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
+                      title="Em desenvolvimento"
+                    >
+                      <ArrowLeftRight className="h-5 w-5 text-primary" />
+                      Estoque Base X Campo
+                    </div>
+                    <div
+                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
+                      title="Em desenvolvimento"
+                    >
+                      <Map className="h-5 w-5 text-primary" />
+                      Relação de campo
+                    </div>
+                    <div
+                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
+                      title="Em desenvolvimento"
+                    >
+                      <Building2 className="h-5 w-5 text-primary" />
+                      Relação de base
+                    </div>
+                    <div
+                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
+                      title="Em desenvolvimento"
+                    >
+                      <ChartColumn className="h-5 w-5 text-primary" />
+                      Média de baixa por técnico
+                    </div>
+                    <div
+                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
+                      title="Em desenvolvimento"
+                    >
+                      <UserSearch className="h-5 w-5 text-primary" />
+                      Pendência de suspeito
+                    </div>
                   </div>
                 </div>
               </div>
