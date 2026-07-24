@@ -75,18 +75,10 @@ type SortColumn =
 
 type SortDirection = "asc" | "desc";
 
-type FiltroDivergencia = "Todos" | "Neutro" | "Sobra Física" | "Falta Física";
-type FiltroReserva = "Todos" | "Reservar" | "Urgente" | "Saudável";
+type FiltroDivergencia = "" | "Neutro" | "Sobra Física" | "Falta Física";
+type FiltroReserva = "" | "Reservar" | "Urgente" | "Saudável";
 
-const FILTRO_DIVERGENCIA_OPCOES: FiltroDivergencia[] = [
-  "Todos",
-  "Neutro",
-  "Sobra Física",
-  "Falta Física",
-];
-const FILTRO_RESERVA_OPCOES: FiltroReserva[] = ["Todos", "Reservar", "Urgente", "Saudável"];
-
-function statusLabel(diasParaReserva: number): Exclude<FiltroReserva, "Todos"> {
+function statusLabel(diasParaReserva: number): Exclude<FiltroReserva, ""> {
   if (diasParaReserva < 0) return "Urgente";
   if (diasParaReserva <= 7) return "Reservar";
   return "Saudável";
@@ -123,7 +115,7 @@ function statusDivergenciaLabel(diferenca: number): string {
 }
 
 function matchesFiltroDivergencia(diferenca: number, filtro: FiltroDivergencia): boolean {
-  if (filtro === "Todos") return true;
+  if (filtro === "") return true;
   const label = statusDivergenciaLabel(diferenca);
   if (filtro === "Neutro") return label === "Neutro";
   if (filtro === "Sobra Física") return label === "Sobra Físico";
@@ -335,8 +327,8 @@ function PrevisaoReservaPage() {
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [filtroDivergencia, setFiltroDivergencia] = useState<FiltroDivergencia>("Todos");
-  const [filtroReserva, setFiltroReserva] = useState<FiltroReserva>("Todos");
+  const [filtroDivergencia, setFiltroDivergencia] = useState<FiltroDivergencia>("");
+  const [filtroReserva, setFiltroReserva] = useState<FiltroReserva>("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("descricao");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -379,7 +371,7 @@ function PrevisaoReservaPage() {
       if (!matchesFiltroDivergencia(diferencaBtpXFisicoOf(row), filtroDivergencia)) {
         return false;
       }
-      if (filtroReserva !== "Todos") {
+      if (filtroReserva !== "") {
         if (statusLabel(row.diasParaReserva) !== filtroReserva) return false;
       }
       return true;
@@ -473,8 +465,8 @@ function PrevisaoReservaPage() {
 
   const limparFiltros = () => {
     setBusca("");
-    setFiltroDivergencia("Todos");
-    setFiltroReserva("Todos");
+    setFiltroDivergencia("");
+    setFiltroReserva("");
   };
 
   const handleExportExcel = () => {
@@ -582,47 +574,63 @@ function PrevisaoReservaPage() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative max-w-md flex-1">
+        <div className="mb-4 flex flex-wrap items-end gap-4">
+          <div className="relative max-w-md min-w-[220px] flex-1">
             <Input
               type="search"
               placeholder="Buscar por Código ou Descrição do Material..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="rounded-md border border-input bg-background px-3 py-2"
+              className="h-9 rounded-md border border-input bg-background px-3 py-2"
             />
           </div>
 
-          <select
-            aria-label="Status de Divergência"
-            value={filtroDivergencia}
-            onChange={(e) => setFiltroDivergencia(e.target.value as FiltroDivergencia)}
-            className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {FILTRO_DIVERGENCIA_OPCOES.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao === "Todos" ? "Status de Divergência" : opcao}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="filtro-divergencia"
+              className="text-left text-xs font-semibold text-gray-700"
+            >
+              Status de Divergência:
+            </label>
+            <select
+              id="filtro-divergencia"
+              aria-label="Status de Divergência"
+              value={filtroDivergencia}
+              onChange={(e) => setFiltroDivergencia(e.target.value as FiltroDivergencia)}
+              className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Todos</option>
+              <option value="Neutro">Neutro</option>
+              <option value="Sobra Física">Sobra Física</option>
+              <option value="Falta Física">Falta Física</option>
+            </select>
+          </div>
 
-          <select
-            aria-label="Status de Reserva"
-            value={filtroReserva}
-            onChange={(e) => setFiltroReserva(e.target.value as FiltroReserva)}
-            className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {FILTRO_RESERVA_OPCOES.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao === "Todos" ? "Status de Reserva" : opcao}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="filtro-reserva"
+              className="text-left text-xs font-semibold text-gray-700"
+            >
+              Status de Reserva:
+            </label>
+            <select
+              id="filtro-reserva"
+              aria-label="Status de Reserva"
+              value={filtroReserva}
+              onChange={(e) => setFiltroReserva(e.target.value as FiltroReserva)}
+              className="h-9 shrink-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Todos</option>
+              <option value="Reservar">Reservar</option>
+              <option value="Urgente">Urgente</option>
+              <option value="Saudável">Saudável</option>
+            </select>
+          </div>
 
           <button
             type="button"
             onClick={limparFiltros}
-            className="shrink-0 text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            className="mb-2 shrink-0 text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
             Limpar todos os filtros
           </button>
@@ -815,7 +823,10 @@ function PrevisaoReservaPage() {
                     return (
                       <TableRow key={item.codigo}>
                         <TableCell className="text-left font-mono">{item.codigo}</TableCell>
-                        <TableCell className="max-w-[150px] truncate text-left">
+                        <TableCell
+                          title={item.descricao}
+                          className="max-w-[150px] truncate text-left"
+                        >
                           {item.descricao}
                         </TableCell>
                         <TableCell className="text-center tabular-nums">
