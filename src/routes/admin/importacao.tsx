@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { FileUp } from "lucide-react";
+import { Construction, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { FileDropzone } from "@/components/FileDropzone";
@@ -46,6 +46,7 @@ export const Route = createFileRoute("/admin/importacao")({
 });
 
 function ImportacaoPage() {
+  const [activeTab, setActiveTab] = useState<"miscelanea" | "terminais">("miscelanea");
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoque, setBusyEstoque] = useState(false);
@@ -159,55 +160,91 @@ function ImportacaoPage() {
           </Link>
         </div>
 
-        <div className="space-y-8">
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Upload A — Cabeçalho da WO
-            </h2>
-            <FileDropzone
-              title="Arquivo de Cabeçalho (Auditoria)"
-              description="Colunas: workOrderID, idTecnico, status, sla, dataAtendimento. Alimenta a tela de Pendências."
-              busy={busyCabecalho}
-              onFile={handleCabecalho}
-            />
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Upload B — Consolidado de Consumo
-            </h2>
-            <FileDropzone
-              title="Consolidado Revisado (Consumo)"
-              description="Colunas legado: WO, Técnico, Material, Descr. Material, Qtd Baixada. Alimenta os KPIs."
-              busy={busyConsumo}
-              onFile={handleConsumo}
-            />
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Upload C — Consulta de Estoque
-            </h2>
-            <FileDropzone
-              title="Catálogo Mestre de Materiais"
-              description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
-              busy={busyEstoque}
-              onFile={handleEstoque}
-            />
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Upload D — Estoque Físico
-            </h2>
-            <FileDropzone
-              title="Estoque Físico e Campo"
-              description="Colunas: Material, Descr. Material, Qtd Física, Qtd Campo. Alimenta o módulo Estoque Físico X BTP."
-              busy={busyEstoqueFisico}
-              onFile={handleEstoqueFisico}
-            />
-          </section>
+        <div className="mb-6 flex gap-1 border-b border-border">
+          <button
+            type="button"
+            onClick={() => setActiveTab("miscelanea")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "miscelanea"
+                ? "border-b-2 border-primary text-foreground"
+                : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Miscelânea
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("terminais")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "terminais"
+                ? "border-b-2 border-primary text-foreground"
+                : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Terminais
+          </button>
         </div>
+
+        {activeTab === "miscelanea" ? (
+          <div className="space-y-8">
+            <section>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Upload A — Cabeçalho da WO
+              </h2>
+              <FileDropzone
+                title="Arquivo de Cabeçalho (Auditoria)"
+                description="Colunas: workOrderID, idTecnico, status, sla, dataAtendimento. Alimenta a tela de Pendências."
+                busy={busyCabecalho}
+                onFile={handleCabecalho}
+              />
+            </section>
+
+            <section>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Upload B — Consolidado de Consumo
+              </h2>
+              <FileDropzone
+                title="Consolidado Revisado (Consumo)"
+                description="Colunas legado: WO, Técnico, Material, Descr. Material, Qtd Baixada. Alimenta os KPIs."
+                busy={busyConsumo}
+                onFile={handleConsumo}
+              />
+            </section>
+
+            <section>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Upload C — Consulta de Estoque
+              </h2>
+              <FileDropzone
+                title="Catálogo Mestre de Materiais"
+                description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
+                busy={busyEstoque}
+                onFile={handleEstoque}
+              />
+            </section>
+
+            <section>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Upload D — Estoque Físico
+              </h2>
+              <FileDropzone
+                title="Estoque Físico e Campo"
+                description="Colunas: Material, Descr. Material, Qtd Física, Qtd Campo. Alimenta o módulo Estoque Físico X BTP."
+                busy={busyEstoqueFisico}
+                onFile={handleEstoqueFisico}
+              />
+            </section>
+          </div>
+        ) : (
+          <section className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Construction className="h-7 w-7" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Módulo de importação de Terminais em desenvolvimento.
+            </p>
+          </section>
+        )}
       </main>
     </div>
   );
