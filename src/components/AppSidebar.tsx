@@ -218,13 +218,15 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <Map className="h-5 w-5 text-primary" />
                       Estoque Atlas
                     </Link>
-                    <div
-                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
-                      title="Em desenvolvimento"
+                    <Link
+                      to="/estoque-tecnico"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
                     >
                       <Building2 className="h-5 w-5 text-primary" />
                       Estoque serializado - Técnico
-                    </div>
+                    </Link>
                     <div
                       className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
                       title="Em desenvolvimento"

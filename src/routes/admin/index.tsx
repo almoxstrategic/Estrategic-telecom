@@ -218,17 +218,19 @@ function AdminHome() {
               </div>
             </Link>
 
-            <div className="block w-full">
+            <Link to="/estoque-tecnico" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
                   <Building2 className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="font-bold text-foreground">Estoque serializado - Técnico</div>
-                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Estoque Campo detalhado e contagem agregada
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
 
             <div className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>

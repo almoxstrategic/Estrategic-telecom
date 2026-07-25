@@ -529,3 +529,117 @@ export async function parseEstoqueAtlasFile(file: File): Promise<EstoqueAtlasRow
 
   return rows;
 }
+
+export type EstoqueCampoRow = {
+  nome: string;
+  descricao: string;
+  modelo: string;
+  numeroSerie: string;
+  status: string;
+  dataRetirada: string;
+};
+
+/** Colunas exatas do Excel — Estoque Campo (Serializados). */
+const CAMPO_EXACT_COLUMNS = {
+  nome: ["Nome"],
+  descricao: ["DESCRIÇÃO"],
+  modelo: ["MODELO", "Modelo"],
+  numeroSerie: ["N° DE SERIE"],
+  status: ["STATUS"],
+  dataRetirada: ["DATA DE RETIRADA"],
+} as const;
+
+function findCampoHeaderRowIndex(matrix: string[][]): number {
+  const maxScan = Math.min(matrix.length, 40);
+  for (let i = 0; i < maxScan; i++) {
+    const cells = matrix[i] ?? [];
+    if (isBlankMatrixRow(cells)) continue;
+
+    const trimmed = cells.map((c) => trimCell(c));
+    const normalized = trimmed.map((c) => normalizeHeader(c));
+
+    const hasNome = trimmed.includes("Nome") || normalized.includes("nome");
+    const hasDescricao =
+      trimmed.includes("DESCRIÇÃO") ||
+      normalized.includes("descricao") ||
+      normalized.includes("descricao");
+    const hasSerie =
+      trimmed.includes("N° DE SERIE") ||
+      normalized.some(
+        (h) =>
+          h === "n de serie" ||
+          h === "no de serie" ||
+          h === "n° de serie" ||
+          h === "numero de serie" ||
+          h === "n serie",
+      );
+    const hasStatus = trimmed.includes("STATUS") || normalized.includes("status");
+
+    if (hasNome && (hasDescricao || hasSerie || hasStatus)) return i;
+  }
+  return -1;
+}
+
+/**
+ * Serializados — Estoque Campo.
+ * Planilha: Nome | DESCRIÇÃO | N° DE SERIE | STATUS | DATA DE RETIRADA (+ MODELO opcional)
+ */
+function mapEstoqueCampoRow(row: RawRow): EstoqueCampoRow | null {
+  const nome = atlasPick(row, CAMPO_EXACT_COLUMNS.nome);
+  const descricao = atlasPick(
+    row,
+    CAMPO_EXACT_COLUMNS.descricao,
+    "DESCRICAO",
+    "Descrição",
+    "Descricao",
+  );
+  const modelo = atlasPick(row, CAMPO_EXACT_COLUMNS.modelo);
+  const numeroSerie = atlasPick(
+    row,
+    CAMPO_EXACT_COLUMNS.numeroSerie,
+    "Nº DE SERIE",
+    "N° DE SÉRIE",
+    "N DE SERIE",
+    "NUMERO DE SERIE",
+    "Número de Série",
+  );
+  const status = atlasPick(row, CAMPO_EXACT_COLUMNS.status, "Status");
+  const dataRetirada = atlasPick(
+    row,
+    CAMPO_EXACT_COLUMNS.dataRetirada,
+    "Data de Retirada",
+    "DATA DE RETIRADA",
+  );
+
+  if (!nome && !descricao && !numeroSerie) return null;
+
+  return {
+    nome: nome || "—",
+    descricao: descricao || "—",
+    modelo: modelo || "",
+    numeroSerie: numeroSerie || "—",
+    status: status || "—",
+    dataRetirada: dataRetirada || "—",
+  };
+}
+
+export async function parseEstoqueCampoFile(file: File): Promise<EstoqueCampoRow[]> {
+  const matrix = await parseAtlasSpreadsheetMatrix(file);
+  if (matrix.length === 0) return [];
+
+  let headerIndex = findCampoHeaderRowIndex(matrix);
+  if (headerIndex < 0) {
+    headerIndex = matrix.findIndex((row) => !isBlankMatrixRow(row));
+  }
+  if (headerIndex < 0) return [];
+
+  const raw = matrixToRawRowsFromHeader(matrix, headerIndex);
+  const rows: EstoqueCampoRow[] = [];
+
+  for (const row of raw) {
+    const mapped = mapEstoqueCampoRow(row);
+    if (mapped) rows.push(mapped);
+  }
+
+  return rows;
+}

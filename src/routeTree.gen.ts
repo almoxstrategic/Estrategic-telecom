@@ -16,6 +16,7 @@ import { Route as MetragemRouteImport } from './routes/metragem'
 import { Route as MediaBaixaTecnicoRouteImport } from './routes/media-baixa-tecnico'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoricoRouteImport } from './routes/historico'
+import { Route as EstoqueTecnicoRouteImport } from './routes/estoque-tecnico'
 import { Route as EstoqueFisicoBtpRouteImport } from './routes/estoque-fisico-btp'
 import { Route as EstoqueAtlasRouteImport } from './routes/estoque-atlas'
 import { Route as CadastroRouteImport } from './routes/cadastro'
@@ -66,6 +67,11 @@ const LoginRoute = LoginRouteImport.update({
 const HistoricoRoute = HistoricoRouteImport.update({
   id: '/historico',
   path: '/historico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueTecnicoRoute = EstoqueTecnicoRouteImport.update({
+  id: '/estoque-tecnico',
+  path: '/estoque-tecnico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstoqueFisicoBtpRoute = EstoqueFisicoBtpRouteImport.update({
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/cadastro': typeof CadastroRoute
   '/estoque-atlas': typeof EstoqueAtlasRoute
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
+  '/estoque-tecnico': typeof EstoqueTecnicoRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
   '/estoque-atlas': typeof EstoqueAtlasRoute
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
+  '/estoque-tecnico': typeof EstoqueTecnicoRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
@@ -209,6 +217,7 @@ export interface FileRoutesById {
   '/cadastro': typeof CadastroRoute
   '/estoque-atlas': typeof EstoqueAtlasRoute
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
+  '/estoque-tecnico': typeof EstoqueTecnicoRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
@@ -236,6 +245,7 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/estoque-atlas'
     | '/estoque-fisico-btp'
+    | '/estoque-tecnico'
     | '/historico'
     | '/login'
     | '/media-baixa-tecnico'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/estoque-atlas'
     | '/estoque-fisico-btp'
+    | '/estoque-tecnico'
     | '/historico'
     | '/login'
     | '/media-baixa-tecnico'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/estoque-atlas'
     | '/estoque-fisico-btp'
+    | '/estoque-tecnico'
     | '/historico'
     | '/login'
     | '/media-baixa-tecnico'
@@ -311,6 +323,7 @@ export interface RootRouteChildren {
   CadastroRoute: typeof CadastroRoute
   EstoqueAtlasRoute: typeof EstoqueAtlasRoute
   EstoqueFisicoBtpRoute: typeof EstoqueFisicoBtpRoute
+  EstoqueTecnicoRoute: typeof EstoqueTecnicoRoute
   HistoricoRoute: typeof HistoricoRoute
   LoginRoute: typeof LoginRoute
   MediaBaixaTecnicoRoute: typeof MediaBaixaTecnicoRoute
@@ -374,6 +387,13 @@ declare module '@tanstack/react-router' {
       path: '/historico'
       fullPath: '/historico'
       preLoaderRoute: typeof HistoricoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque-tecnico': {
+      id: '/estoque-tecnico'
+      path: '/estoque-tecnico'
+      fullPath: '/estoque-tecnico'
+      preLoaderRoute: typeof EstoqueTecnicoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estoque-fisico-btp': {
@@ -516,6 +536,7 @@ const rootRouteChildren: RootRouteChildren = {
   CadastroRoute: CadastroRoute,
   EstoqueAtlasRoute: EstoqueAtlasRoute,
   EstoqueFisicoBtpRoute: EstoqueFisicoBtpRoute,
+  EstoqueTecnicoRoute: EstoqueTecnicoRoute,
   HistoricoRoute: HistoricoRoute,
   LoginRoute: LoginRoute,
   MediaBaixaTecnicoRoute: MediaBaixaTecnicoRoute,

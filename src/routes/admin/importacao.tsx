@@ -8,11 +8,13 @@ import { replaceWoCabecalho, upsertDimMateriais, upsertEstoqueFisico, upsertWoCo
 import {
   parseDimMateriaisFile,
   parseEstoqueAtlasFile,
+  parseEstoqueCampoFile,
   parseEstoqueFisicoFile,
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
+import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
 import { cn } from "@/lib/utils";
 
 function formatImportError(scope: string, err: unknown): string {
@@ -162,6 +164,7 @@ function ImportacaoPage() {
   const [fileFisico, setFileFisico] = useState<File | null>(null);
   const [fileConsolidado, setFileConsolidado] = useState<File | null>(null);
   const [busyAtlas, setBusyAtlas] = useState(false);
+  const [busyCampo, setBusyCampo] = useState(false);
 
   useEffect(() => {
     console.info(
@@ -185,6 +188,23 @@ function ImportacaoPage() {
       toast.error(formatImportError("estoque-atlas", err));
     } finally {
       setBusyAtlas(false);
+    }
+  };
+
+  const handleEstoqueCampo = async (file: File) => {
+    setBusyCampo(true);
+    try {
+      const rows = await parseEstoqueCampoFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada no Estoque Campo.");
+        return;
+      }
+      saveEstoqueCampo(rows);
+      toast.success(`Estoque Campo importado: ${rows.length} registros carregados.`);
+    } catch (err) {
+      toast.error(formatImportError("estoque-campo", err));
+    } finally {
+      setBusyCampo(false);
     }
   };
 
@@ -352,9 +372,11 @@ function ImportacaoPage() {
             />
             <ImportFileCard
               title="Estoque Campo"
-              description="Quantidades em poder das equipes de campo."
+              description="Colunas: Nome, DESCRIÇÃO, N° DE SERIE, STATUS, DATA DE RETIRADA."
               file={fileCampo}
               onFileChange={setFileCampo}
+              busy={busyCampo}
+              onImport={handleEstoqueCampo}
             />
             <ImportFileCard
               title="Estoque Físico"
