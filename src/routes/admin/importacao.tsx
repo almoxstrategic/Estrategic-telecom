@@ -344,7 +344,7 @@ function ImportacaoPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Estoque Atlas"
-              description="Planilha de estoque Atlas (BTP / sistema)."
+              description="Colunas: Tipo, Modelo, Número Série, Estado, Data Última Alteração, Responsavél."
               file={fileAtlas}
               onFileChange={setFileAtlas}
               busy={busyAtlas}

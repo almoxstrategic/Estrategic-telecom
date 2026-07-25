@@ -3,8 +3,11 @@
 export type EstoqueAtlasItem = {
   tipo: string;
   modelo: string;
+  /** Mapeado da coluna da planilha `Número Série`. */
   numeroSerie: string;
   estado: string;
+  dataUltimaAlteracao: string;
+  responsavel: string;
 };
 
 export type EstoqueAtlasContagem = {
@@ -14,36 +17,76 @@ export type EstoqueAtlasContagem = {
   status: string;
 };
 
+export type EstoqueAtlasSnapshot = {
+  items: EstoqueAtlasItem[];
+  updatedAt: string | null;
+};
+
 const STORAGE_KEY = "estrategic.serializados.estoque-atlas";
 
 function isClient(): boolean {
   return typeof window !== "undefined";
 }
 
-export function loadEstoqueAtlas(): EstoqueAtlasItem[] {
-  if (!isClient()) return [];
+function normalizeItem(row: unknown): EstoqueAtlasItem | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  if (typeof r.tipo !== "string" || typeof r.modelo !== "string") return null;
+  if (typeof r.numeroSerie !== "string" || typeof r.estado !== "string") return null;
+
+  return {
+    tipo: r.tipo,
+    modelo: r.modelo,
+    numeroSerie: r.numeroSerie,
+    estado: r.estado,
+    dataUltimaAlteracao:
+      typeof r.dataUltimaAlteracao === "string" ? r.dataUltimaAlteracao : "—",
+    responsavel: typeof r.responsavel === "string" ? r.responsavel : "—",
+  };
+}
+
+export function loadEstoqueAtlasSnapshot(): EstoqueAtlasSnapshot {
+  if (!isClient()) return { items: [], updatedAt: null };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return { items: [], updatedAt: null };
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (row): row is EstoqueAtlasItem =>
-        !!row &&
-        typeof row === "object" &&
-        typeof (row as EstoqueAtlasItem).tipo === "string" &&
-        typeof (row as EstoqueAtlasItem).modelo === "string" &&
-        typeof (row as EstoqueAtlasItem).numeroSerie === "string" &&
-        typeof (row as EstoqueAtlasItem).estado === "string",
-    );
+
+    // Formato legado: array puro
+    if (Array.isArray(parsed)) {
+      return {
+        items: parsed.map(normalizeItem).filter((x): x is EstoqueAtlasItem => x !== null),
+        updatedAt: null,
+      };
+    }
+
+    if (parsed && typeof parsed === "object") {
+      const payload = parsed as { items?: unknown; updatedAt?: unknown };
+      const items = Array.isArray(payload.items)
+        ? payload.items.map(normalizeItem).filter((x): x is EstoqueAtlasItem => x !== null)
+        : [];
+      const updatedAt =
+        typeof payload.updatedAt === "string" && payload.updatedAt ? payload.updatedAt : null;
+      return { items, updatedAt };
+    }
+
+    return { items: [], updatedAt: null };
   } catch {
-    return [];
+    return { items: [], updatedAt: null };
   }
+}
+
+export function loadEstoqueAtlas(): EstoqueAtlasItem[] {
+  return loadEstoqueAtlasSnapshot().items;
 }
 
 export function saveEstoqueAtlas(items: EstoqueAtlasItem[]): void {
   if (!isClient()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  const snapshot: EstoqueAtlasSnapshot = {
+    items,
+    updatedAt: new Date().toISOString(),
+  };
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   window.dispatchEvent(new CustomEvent("estoque-atlas-updated"));
 }
 
@@ -79,4 +122,22 @@ export function aggregateEstoqueAtlasContagem(items: EstoqueAtlasItem[]): Estoqu
     if (byModelo !== 0) return byModelo;
     return a.status.localeCompare(b.status, "pt-BR");
   });
+}
+
+/** Formata ISO → `DD/MM/YYYY - HH:mm` (pt-BR). */
+export function formatAtualizacaoAtlas(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  const data = date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const hora = date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${data} - ${hora}`;
 }

@@ -355,27 +355,147 @@ export async function parseEstoqueFisicoFile(file: File): Promise<EstoqueFisicoR
 export type EstoqueAtlasRow = {
   tipo: string;
   modelo: string;
+  /** Coluna da planilha `Número Série` → estado `numeroSerie` (UI: Nº Serie). */
   numeroSerie: string;
   estado: string;
+  dataUltimaAlteracao: string;
+  /** Coluna da planilha `Responsavél` (typo do arquivo) → estado `responsavel`. */
+  responsavel: string;
 };
 
-/** Serializados — Estoque Atlas: Tipo, Modelo, Número de Serie, Estado */
+/** Colunas exatas do Excel de origem (Serializados / Estoque Atlas). */
+const ATLAS_EXACT_COLUMNS = {
+  tipo: ["Tipo"],
+  modelo: ["Modelo"],
+  numeroSerie: ["Número Série"],
+  estado: ["Estado"],
+  dataUltimaAlteracao: ["Data Última Alteração"],
+  /** Grafia com erro de digitação no arquivo físico (acento no 'e'). */
+  responsavel: ["Responsavél"],
+} as const;
+
+function isBlankMatrixRow(cells: string[]): boolean {
+  return cells.every((c) => trimCell(c) === "");
+}
+
+/**
+ * Prioriza match exato do cabeçalho (trim), depois aliases normalizados.
+ * Necessário para grafias com typo do Excel (ex: Responsavél).
+ */
+function atlasPick(row: RawRow, exactNames: readonly string[], ...aliases: string[]): string {
+  for (const exact of exactNames) {
+    for (const [key, value] of Object.entries(row)) {
+      if (trimCell(key) === exact) {
+        const text = trimCell(value);
+        if (text) return text;
+      }
+    }
+  }
+  return pick(row, ...exactNames, ...aliases);
+}
+
+function findAtlasHeaderRowIndex(matrix: string[][]): number {
+  const maxScan = Math.min(matrix.length, 40);
+  for (let i = 0; i < maxScan; i++) {
+    const cells = matrix[i] ?? [];
+    if (isBlankMatrixRow(cells)) continue;
+
+    const trimmed = cells.map((c) => trimCell(c));
+    const normalized = trimmed.map((c) => normalizeHeader(c));
+
+    const hasTipo =
+      trimmed.includes("Tipo") || normalized.includes("tipo");
+    const hasModelo =
+      trimmed.includes("Modelo") || normalized.includes("modelo");
+    const hasSerie =
+      trimmed.includes("Número Série") ||
+      normalized.some(
+        (h) =>
+          h === "numero serie" ||
+          h === "numero de serie" ||
+          h === "n serie" ||
+          h === "no serie",
+      );
+    const hasEstado =
+      trimmed.includes("Estado") || normalized.includes("estado");
+
+    if (hasTipo && hasModelo && hasSerie) return i;
+    if (hasTipo && hasModelo && hasEstado) return i;
+  }
+  return -1;
+}
+
+function matrixToRawRowsFromHeader(matrix: string[][], headerIndex: number): RawRow[] {
+  const headerCells = (matrix[headerIndex] ?? []).map((h) => trimCell(h));
+  const rows: RawRow[] = [];
+
+  for (let r = headerIndex + 1; r < matrix.length; r++) {
+    const cells = matrix[r] ?? [];
+    if (isBlankMatrixRow(cells)) continue;
+
+    const row: RawRow = {};
+    let hasAny = false;
+    headerCells.forEach((header, i) => {
+      if (!header) return;
+      const value = trimCell(cells[i]);
+      // Mantém a grafia exata do Excel (ex: "Responsavél", "Número Série")
+      row[header] = value;
+      if (value) hasAny = true;
+    });
+    if (hasAny) rows.push(row);
+  }
+
+  return rows;
+}
+
+async function parseAtlasSpreadsheetMatrix(file: File): Promise<string[][]> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    const XLSX = await import("xlsx");
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return [];
+    const sheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json<string[]>(sheet, {
+      header: 1,
+      defval: "",
+      raw: false,
+      blankrows: false,
+    }) as string[][];
+  }
+
+  const text = await file.text();
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+  if (lines.length === 0) return [];
+  const delimiter = detectDelimiter(lines.find((l) => l.trim()) ?? ",");
+  return lines
+    .filter((l) => l.trim())
+    .map((line) => splitCsvLine(line, delimiter).map((c) => trimCell(c)));
+}
+
+/**
+ * Serializados — Estoque Atlas.
+ * Planilha: Tipo | Modelo | Número Série | Estado | Data Última Alteração | Responsavél
+ * Estado: tipo | modelo | numeroSerie | estado | dataUltimaAlteracao | responsavel
+ */
 function mapEstoqueAtlasRow(row: RawRow): EstoqueAtlasRow | null {
-  const tipo = pick(row, "Tipo");
-  const modelo = pick(row, "Modelo");
-  const numeroSerie = pick(
+  const tipo = atlasPick(row, ATLAS_EXACT_COLUMNS.tipo);
+  const modelo = atlasPick(row, ATLAS_EXACT_COLUMNS.modelo);
+  const numeroSerie = atlasPick(row, ATLAS_EXACT_COLUMNS.numeroSerie, "Numero Serie", "Número Serie");
+  const estado = atlasPick(row, ATLAS_EXACT_COLUMNS.estado);
+  const dataUltimaAlteracao = atlasPick(
     row,
-    "Número de Serie",
-    "Numero de Serie",
-    "Número de Série",
-    "Nº Serie",
-    "N° Serie",
-    "No Serie",
-    "Numero Serie",
-    "Serial",
-    "Nº de Série",
+    ATLAS_EXACT_COLUMNS.dataUltimaAlteracao,
+    "Data Ultima Alteracao",
   );
-  const estado = pick(row, "Estado", "Status");
+  // Typo do arquivo: "Responsavél" — também aceita a grafia correta como fallback
+  const responsavel = atlasPick(
+    row,
+    ATLAS_EXACT_COLUMNS.responsavel,
+    "Responsável",
+    "Responsavel",
+  );
 
   if (!tipo && !modelo && !numeroSerie) return null;
 
@@ -384,11 +504,22 @@ function mapEstoqueAtlasRow(row: RawRow): EstoqueAtlasRow | null {
     modelo: modelo || "—",
     numeroSerie: numeroSerie || "—",
     estado: estado || "—",
+    dataUltimaAlteracao: dataUltimaAlteracao || "—",
+    responsavel: responsavel || "—",
   };
 }
 
 export async function parseEstoqueAtlasFile(file: File): Promise<EstoqueAtlasRow[]> {
-  const raw = await parseSpreadsheet(file);
+  const matrix = await parseAtlasSpreadsheetMatrix(file);
+  if (matrix.length === 0) return [];
+
+  let headerIndex = findAtlasHeaderRowIndex(matrix);
+  if (headerIndex < 0) {
+    headerIndex = matrix.findIndex((row) => !isBlankMatrixRow(row));
+  }
+  if (headerIndex < 0) return [];
+
+  const raw = matrixToRawRowsFromHeader(matrix, headerIndex);
   const rows: EstoqueAtlasRow[] = [];
 
   for (const row of raw) {

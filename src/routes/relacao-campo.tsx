@@ -14,7 +14,8 @@ import {
 import { requireAdmin } from "@/lib/auth-guards";
 import {
   aggregateEstoqueAtlasContagem,
-  loadEstoqueAtlas,
+  formatAtualizacaoAtlas,
+  loadEstoqueAtlasSnapshot,
   type EstoqueAtlasItem,
 } from "@/lib/serializados-atlas-store";
 
@@ -39,13 +40,18 @@ const STICKY_HEAD_CLASS =
 
 function RelacaoCampoPage() {
   const [items, setItems] = useState<EstoqueAtlasItem[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InnerTab>("estoque-atlas");
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroModelo, setFiltroModelo] = useState("");
   const [filtroSerie, setFiltroSerie] = useState("");
 
   useEffect(() => {
-    const refresh = () => setItems(loadEstoqueAtlas());
+    const refresh = () => {
+      const snapshot = loadEstoqueAtlasSnapshot();
+      setItems(snapshot.items);
+      setUpdatedAt(snapshot.updatedAt);
+    };
     refresh();
     window.addEventListener("estoque-atlas-updated", refresh);
     window.addEventListener("storage", refresh);
@@ -82,6 +88,9 @@ function RelacaoCampoPage() {
     () => aggregateEstoqueAtlasContagem(filteredForContagem),
     [filteredForContagem],
   );
+
+  const qntItens = activeTab === "estoque-atlas" ? filteredItems.length : contagem.length;
+  const ultimaAtualizacaoLabel = formatAtualizacaoAtlas(updatedAt);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -144,29 +153,34 @@ function RelacaoCampoPage() {
         </section>
 
         <section className="rounded-2xl border border-border bg-card shadow-sm">
-          <div className="flex gap-1 border-b border-border px-4 pt-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("estoque-atlas")}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === "estoque-atlas"
-                  ? "border-b-2 border-primary text-foreground"
-                  : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Estoque Atlas
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("contagem")}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === "contagem"
-                  ? "border-b-2 border-primary text-foreground"
-                  : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Contagem Estoque atlas
-            </button>
+          <div className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-border px-4 pt-2 pb-0">
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("estoque-atlas")}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                  activeTab === "estoque-atlas"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Estoque Atlas
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("contagem")}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                  activeTab === "contagem"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Contagem Estoque atlas
+              </button>
+            </div>
+            <span className="shrink-0 pb-2 text-xs font-medium text-muted-foreground">
+              última atualização: {ultimaAtualizacaoLabel} ; Qnt de itens: {qntItens}
+            </span>
           </div>
 
           <div className="p-4">
