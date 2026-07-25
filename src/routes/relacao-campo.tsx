@@ -241,13 +241,14 @@ function RelacaoCampoPage() {
     return items.filter((item) => {
       if (tipoQ && !item.tipo.toLowerCase().includes(tipoQ)) return false;
       if (modeloQ && !item.modelo.toLowerCase().includes(modeloQ)) return false;
+      if (filtroStatus !== "Todos" && item.estado.trim() !== filtroStatus) return false;
       if (serieQ && !item.numeroSerie.toLowerCase().includes(serieQ)) return false;
       if (filtroMovimentacao !== "Todos" && item.responsavel.trim() !== filtroMovimentacao) {
         return false;
       }
       return true;
     });
-  }, [items, filtroTipo, filtroModelo, filtroSerie, filtroMovimentacao]);
+  }, [items, filtroTipo, filtroModelo, filtroSerie, filtroStatus, filtroMovimentacao]);
 
   const contagem = useMemo(() => {
     const tipoQ = filtroTipo.trim().toLowerCase();
@@ -275,7 +276,7 @@ function RelacaoCampoPage() {
         Tipo: row.tipo,
         Modelo: row.modelo,
         "Nº Serie": row.numeroSerie,
-        Estado: row.estado,
+        Status: row.estado,
         "Última Movimentação": formatarResponsavel(row.responsavel, tecnicosByMatricula),
         "Data Última Alteração": row.dataUltimaAlteracao,
       }));
@@ -330,7 +331,7 @@ function RelacaoCampoPage() {
             Filtros
           </h2>
           {activeTab === "estoque-atlas" ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
               <div className="space-y-1.5">
                 <Label htmlFor="filtro-tipo">Tipo</Label>
                 <Input
@@ -348,6 +349,22 @@ function RelacaoCampoPage() {
                   value={filtroModelo}
                   onChange={(e) => setFiltroModelo(e.target.value)}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="filtro-status-atlas">Status</Label>
+                <select
+                  id="filtro-status-atlas"
+                  className={SELECT_CLASS}
+                  value={filtroStatus}
+                  onChange={(e) => setFiltroStatus(e.target.value)}
+                >
+                  <option value="Todos">Todos</option>
+                  {opcoesStatus.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="filtro-serie">Nº Serie</Label>
@@ -469,7 +486,7 @@ function RelacaoCampoPage() {
                       <TableHead className={STICKY_HEAD_CLASS}>Tipo</TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>Modelo</TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>Nº Serie</TableHead>
-                      <TableHead className={STICKY_HEAD_CLASS}>Estado</TableHead>
+                      <TableHead className={STICKY_HEAD_CLASS}>Status</TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>Última Movimentação</TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>Data Última Alteração</TableHead>
                     </TableRow>
