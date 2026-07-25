@@ -38,12 +38,58 @@ export const Route = createFileRoute("/estoque-tecnico")({
 });
 
 type InnerTab = "estoque-tecnico" | "contagem";
+type OrdemQuantidade = "desc" | "asc" | null;
 
 const STICKY_HEAD_CLASS =
   "sticky top-0 z-10 bg-card text-center text-muted-foreground shadow-sm";
 
 const SELECT_CLASS =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+/** Converte datas (ex: 3/18/26) para DD/MM/YYYY. */
+function formatDataRetiradaBr(value: string): string {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw === "—") return "—";
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slash) {
+    let a = Number(slash[1]);
+    let b = Number(slash[2]);
+    let y = Number(slash[3]);
+    if (y < 100) y += 2000;
+
+    let day: number;
+    let month: number;
+    if (a > 12) {
+      day = a;
+      month = b;
+    } else if (b > 12) {
+      month = a;
+      day = b;
+    } else {
+      // Ambíguo: planilha vem em formato americano M/D/YY
+      month = a;
+      day = b;
+    }
+
+    if (month < 1 || month > 12 || day < 1 || day > 31) return "—";
+    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${y}`;
+  }
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }
+
+  return "—";
+}
 
 function EstoqueTecnicoPage() {
   const [items, setItems] = useState<EstoqueCampoItem[]>([]);
@@ -53,6 +99,7 @@ function EstoqueTecnicoPage() {
   const [filtroDescricao, setFiltroDescricao] = useState("");
   const [filtroSerie, setFiltroSerie] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const [ordemQuantidade, setOrdemQuantidade] = useState<OrdemQuantidade>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -99,10 +146,18 @@ function EstoqueTecnicoPage() {
       if (descQ && !item.descricao.toLowerCase().includes(descQ)) return false;
       return true;
     });
-    const aggregated = aggregateEstoqueCampoContagem(base);
-    if (filtroStatus === "Todos") return aggregated;
-    return aggregated.filter((row) => row.status === filtroStatus);
-  }, [items, filtroNome, filtroDescricao, filtroStatus]);
+    let aggregated = aggregateEstoqueCampoContagem(base);
+    if (filtroStatus !== "Todos") {
+      aggregated = aggregated.filter((row) => row.status === filtroStatus);
+    }
+    if (ordemQuantidade === "desc") {
+      return [...aggregated].sort((a, b) => b.quantidade - a.quantidade);
+    }
+    if (ordemQuantidade === "asc") {
+      return [...aggregated].sort((a, b) => a.quantidade - b.quantidade);
+    }
+    return aggregated;
+  }, [items, filtroNome, filtroDescricao, filtroStatus, ordemQuantidade]);
 
   const qntItens = activeTab === "estoque-tecnico" ? filteredItems.length : contagem.length;
   const ultimaAtualizacaoLabel = formatAtualizacaoCampo(updatedAt);
@@ -112,6 +167,14 @@ function EstoqueTecnicoPage() {
     setFiltroDescricao("");
     setFiltroSerie("");
     setFiltroStatus("Todos");
+  };
+
+  const alternarOrdemQuantidade = () => {
+    setOrdemQuantidade((prev) => {
+      if (prev === null) return "desc";
+      if (prev === "desc") return "asc";
+      return null;
+    });
   };
 
   const handleExportExcel = () => {
@@ -125,7 +188,7 @@ function EstoqueTecnicoPage() {
         DESCRIÇÃO: row.descricao,
         "N° DE SERIE": row.numeroSerie,
         STATUS: row.status,
-        "DATA DE RETIRADA": row.dataRetirada,
+        "DATA DE RETIRADA": formatDataRetiradaBr(row.dataRetirada),
       }));
       const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
       const workbook = XLSX.utils.book_new();
@@ -143,7 +206,6 @@ function EstoqueTecnicoPage() {
     const dadosExcel = contagem.map((row: EstoqueCampoContagem) => ({
       NOME: row.nome,
       DESCRIÇÃO: row.descricao,
-      MODELO: row.modelo,
       QUANTIDADE: row.quantidade,
       STATUS: row.status,
     }));
@@ -354,7 +416,9 @@ function EstoqueTecnicoPage() {
                           <TableCell className="text-center text-sm">{row.descricao}</TableCell>
                           <TableCell className="text-center text-sm">{row.numeroSerie}</TableCell>
                           <TableCell className="text-center text-sm">{row.status}</TableCell>
-                          <TableCell className="text-center text-sm">{row.dataRetirada}</TableCell>
+                          <TableCell className="text-center text-sm">
+                            {formatDataRetiradaBr(row.dataRetirada)}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -368,26 +432,36 @@ function EstoqueTecnicoPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className={STICKY_HEAD_CLASS}>NOME</TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>DESCRIÇÃO</TableHead>
-                      <TableHead className={STICKY_HEAD_CLASS}>MODELO</TableHead>
-                      <TableHead className={STICKY_HEAD_CLASS}>QUANTIDADE</TableHead>
+                      <TableHead
+                        className={`${STICKY_HEAD_CLASS} cursor-pointer select-none hover:bg-muted/60`}
+                        onClick={alternarOrdemQuantidade}
+                      >
+                        <span className="inline-flex items-center justify-center gap-1">
+                          QUANTIDADE
+                          <span className="text-xs" aria-hidden>
+                            {ordemQuantidade === "desc"
+                              ? "↓"
+                              : ordemQuantidade === "asc"
+                                ? "↑"
+                                : "↕"}
+                          </span>
+                        </span>
+                      </TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {contagem.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                           Nenhum registro corresponde aos filtros.
                         </TableCell>
                       </TableRow>
                     ) : (
                       contagem.map((row) => (
-                        <TableRow
-                          key={`${row.nome}-${row.descricao}-${row.modelo}-${row.status}`}
-                        >
+                        <TableRow key={`${row.nome}-${row.descricao}-${row.status}`}>
                           <TableCell className="text-center text-sm">{row.nome}</TableCell>
                           <TableCell className="text-center text-sm">{row.descricao}</TableCell>
-                          <TableCell className="text-center text-sm">{row.modelo || "—"}</TableCell>
                           <TableCell className="text-center text-sm">{row.quantidade}</TableCell>
                           <TableCell className="text-center text-sm">{row.status}</TableCell>
                         </TableRow>

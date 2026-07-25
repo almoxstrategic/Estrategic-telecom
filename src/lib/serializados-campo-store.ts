@@ -12,7 +12,6 @@ export type EstoqueCampoItem = {
 export type EstoqueCampoContagem = {
   nome: string;
   descricao: string;
-  modelo: string;
   quantidade: number;
   status: string;
 };
@@ -86,21 +85,20 @@ export function saveEstoqueCampo(items: EstoqueCampoItem[]): void {
 }
 
 /**
- * Agrupa por Nome + DESCRIÇÃO + MODELO + STATUS.
+ * Agrupa por Nome + DESCRIÇÃO + STATUS.
  * Quantidade = contagem do grupo.
  */
 export function aggregateEstoqueCampoContagem(items: EstoqueCampoItem[]): EstoqueCampoContagem[] {
   const groups = items.reduce<Map<string, EstoqueCampoContagem>>((acc, item) => {
     const nome = item.nome.trim();
     const descricao = item.descricao.trim();
-    const modelo = item.modelo.trim();
     const status = item.status.trim();
-    const key = `${nome.toLowerCase()}|${descricao.toLowerCase()}|${modelo.toLowerCase()}|${status.toLowerCase()}`;
+    const key = `${nome.toLowerCase()}|${descricao.toLowerCase()}|${status.toLowerCase()}`;
     const existing = acc.get(key);
     if (existing) {
       existing.quantidade += 1;
     } else {
-      acc.set(key, { nome, descricao, modelo, quantidade: 1, status });
+      acc.set(key, { nome, descricao, quantidade: 1, status });
     }
     return acc;
   }, new Map());
@@ -110,8 +108,6 @@ export function aggregateEstoqueCampoContagem(items: EstoqueCampoItem[]): Estoqu
     if (byNome !== 0) return byNome;
     const byDesc = a.descricao.localeCompare(b.descricao, "pt-BR");
     if (byDesc !== 0) return byDesc;
-    const byModelo = a.modelo.localeCompare(b.modelo, "pt-BR");
-    if (byModelo !== 0) return byModelo;
     return a.status.localeCompare(b.status, "pt-BR");
   });
 }

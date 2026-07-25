@@ -13,6 +13,7 @@ import {
   Package,
   Send,
   TrendingUp,
+  Warehouse,
   UserSearch,
   Users,
 } from "lucide-react";
@@ -198,7 +199,9 @@ function AdminHome() {
                   <ArrowLeftRight className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="font-bold text-foreground">Estoque Base X Campo</div>
+                  <div className="font-bold text-foreground">
+                    Estoque Real: Atlas - (Base - Campo)
+                  </div>
                   <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
                 </div>
               </div>
@@ -228,6 +231,18 @@ function AdminHome() {
                   <div className="text-xs text-muted-foreground">
                     Estoque Campo detalhado e contagem agregada
                   </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/estoque-base" className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Warehouse className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Estoque Base</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
                 </div>
               </div>
             </Link>

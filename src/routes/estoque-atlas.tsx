@@ -50,6 +50,7 @@ export const Route = createFileRoute("/estoque-atlas")({
 });
 
 type InnerTab = "estoque-atlas" | "contagem";
+type OrdemQuantidadeAtlas = "desc" | "asc" | null;
 
 const STICKY_HEAD_CLASS =
   "sticky top-0 z-10 bg-card text-center text-muted-foreground shadow-sm";
@@ -171,6 +172,7 @@ function EstoqueAtlasPage() {
   const [filtroSerie, setFiltroSerie] = useState("");
   const [filtroMovimentacao, setFiltroMovimentacao] = useState("Todos");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const [ordemQuantidadeAtlas, setOrdemQuantidadeAtlas] = useState<OrdemQuantidadeAtlas>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -258,10 +260,18 @@ function EstoqueAtlasPage() {
       if (modeloQ && !item.modelo.toLowerCase().includes(modeloQ)) return false;
       return true;
     });
-    const aggregated = aggregateEstoqueAtlasContagem(base);
-    if (filtroStatus === "Todos") return aggregated;
-    return aggregated.filter((row) => row.status === filtroStatus);
-  }, [items, filtroTipo, filtroModelo, filtroStatus]);
+    let aggregated = aggregateEstoqueAtlasContagem(base);
+    if (filtroStatus !== "Todos") {
+      aggregated = aggregated.filter((row) => row.status === filtroStatus);
+    }
+    if (ordemQuantidadeAtlas === "desc") {
+      return [...aggregated].sort((a, b) => b.quantidade - a.quantidade);
+    }
+    if (ordemQuantidadeAtlas === "asc") {
+      return [...aggregated].sort((a, b) => a.quantidade - b.quantidade);
+    }
+    return aggregated;
+  }, [items, filtroTipo, filtroModelo, filtroStatus, ordemQuantidadeAtlas]);
 
   const qntItens = activeTab === "estoque-atlas" ? filteredItems.length : contagem.length;
   const ultimaAtualizacaoLabel = formatAtualizacaoAtlas(updatedAt);
@@ -272,6 +282,14 @@ function EstoqueAtlasPage() {
     setFiltroSerie("");
     setFiltroStatus("Todos");
     setFiltroMovimentacao("Todos");
+  };
+
+  const alternarOrdemQuantidadeAtlas = () => {
+    setOrdemQuantidadeAtlas((prev) => {
+      if (prev === null) return "desc";
+      if (prev === "desc") return "asc";
+      return null;
+    });
   };
 
   const handleExportExcel = () => {
@@ -542,7 +560,21 @@ function EstoqueAtlasPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className={STICKY_HEAD_CLASS}>Tipo</TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>Modelo</TableHead>
-                      <TableHead className={STICKY_HEAD_CLASS}>Quantidade</TableHead>
+                      <TableHead
+                        className={`${STICKY_HEAD_CLASS} cursor-pointer select-none transition-colors hover:bg-muted/60`}
+                        onClick={alternarOrdemQuantidadeAtlas}
+                      >
+                        <span className="inline-flex items-center justify-center gap-1">
+                          Quantidade
+                          <span className="text-xs" aria-hidden>
+                            {ordemQuantidadeAtlas === "desc"
+                              ? "↓"
+                              : ordemQuantidadeAtlas === "asc"
+                                ? "↑"
+                                : "↕"}
+                          </span>
+                        </span>
+                      </TableHead>
                       <TableHead className={STICKY_HEAD_CLASS}>Status</TableHead>
                     </TableRow>
                   </TableHeader>

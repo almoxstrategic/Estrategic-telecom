@@ -21,6 +21,7 @@ import {
   TrendingUp,
   UserSearch,
   Users,
+  Warehouse,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import { useApp } from "@/lib/app-store";
@@ -207,7 +208,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       title="Em desenvolvimento"
                     >
                       <ArrowLeftRight className="h-5 w-5 text-primary" />
-                      Estoque Base X Campo
+                      Estoque Real: Atlas - (Base - Campo)
                     </div>
                     <Link
                       to="/estoque-atlas"
@@ -226,6 +227,15 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     >
                       <Building2 className="h-5 w-5 text-primary" />
                       Estoque serializado - Técnico
+                    </Link>
+                    <Link
+                      to="/estoque-base"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <Warehouse className="h-5 w-5 text-primary" />
+                      Estoque Base
                     </Link>
                     <div
                       className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
