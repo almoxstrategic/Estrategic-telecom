@@ -223,7 +223,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       title="Em desenvolvimento"
                     >
                       <Building2 className="h-5 w-5 text-primary" />
-                      Relação de base
+                      Estoque serializado - Técnico
                     </div>
                     <div
                       className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"

@@ -224,7 +224,7 @@ function AdminHome() {
                   <Building2 className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="font-bold text-foreground">Relação de base</div>
+                  <div className="font-bold text-foreground">Estoque serializado - Técnico</div>
                   <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
                 </div>
               </div>
