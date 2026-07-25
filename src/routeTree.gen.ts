@@ -11,13 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as TecnicosRouteImport } from './routes/tecnicos'
-import { Route as RelacaoCampoRouteImport } from './routes/relacao-campo'
 import { Route as PrevisaoReservaRouteImport } from './routes/previsao-reserva'
 import { Route as MetragemRouteImport } from './routes/metragem'
 import { Route as MediaBaixaTecnicoRouteImport } from './routes/media-baixa-tecnico'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as EstoqueFisicoBtpRouteImport } from './routes/estoque-fisico-btp'
+import { Route as EstoqueAtlasRouteImport } from './routes/estoque-atlas'
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as AlterarRouteImport } from './routes/alterar'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -41,11 +41,6 @@ const TodosRoute = TodosRouteImport.update({
 const TecnicosRoute = TecnicosRouteImport.update({
   id: '/tecnicos',
   path: '/tecnicos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RelacaoCampoRoute = RelacaoCampoRouteImport.update({
-  id: '/relacao-campo',
-  path: '/relacao-campo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrevisaoReservaRoute = PrevisaoReservaRouteImport.update({
@@ -76,6 +71,11 @@ const HistoricoRoute = HistoricoRouteImport.update({
 const EstoqueFisicoBtpRoute = EstoqueFisicoBtpRouteImport.update({
   id: '/estoque-fisico-btp',
   path: '/estoque-fisico-btp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueAtlasRoute = EstoqueAtlasRouteImport.update({
+  id: '/estoque-atlas',
+  path: '/estoque-atlas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CadastroRoute = CadastroRouteImport.update({
@@ -157,13 +157,13 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/alterar': typeof AlterarRoute
   '/cadastro': typeof CadastroRoute
+  '/estoque-atlas': typeof EstoqueAtlasRoute
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
-  '/relacao-campo': typeof RelacaoCampoRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -181,13 +181,13 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alterar': typeof AlterarRoute
   '/cadastro': typeof CadastroRoute
+  '/estoque-atlas': typeof EstoqueAtlasRoute
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
-  '/relacao-campo': typeof RelacaoCampoRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -207,13 +207,13 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/alterar': typeof AlterarRoute
   '/cadastro': typeof CadastroRoute
+  '/estoque-atlas': typeof EstoqueAtlasRoute
   '/estoque-fisico-btp': typeof EstoqueFisicoBtpRoute
   '/historico': typeof HistoricoRoute
   '/login': typeof LoginRoute
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
-  '/relacao-campo': typeof RelacaoCampoRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
@@ -234,13 +234,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alterar'
     | '/cadastro'
+    | '/estoque-atlas'
     | '/estoque-fisico-btp'
     | '/historico'
     | '/login'
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
-    | '/relacao-campo'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -258,13 +258,13 @@ export interface FileRouteTypes {
     | '/'
     | '/alterar'
     | '/cadastro'
+    | '/estoque-atlas'
     | '/estoque-fisico-btp'
     | '/historico'
     | '/login'
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
-    | '/relacao-campo'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -283,13 +283,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alterar'
     | '/cadastro'
+    | '/estoque-atlas'
     | '/estoque-fisico-btp'
     | '/historico'
     | '/login'
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
-    | '/relacao-campo'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
@@ -309,13 +309,13 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AlterarRoute: typeof AlterarRoute
   CadastroRoute: typeof CadastroRoute
+  EstoqueAtlasRoute: typeof EstoqueAtlasRoute
   EstoqueFisicoBtpRoute: typeof EstoqueFisicoBtpRoute
   HistoricoRoute: typeof HistoricoRoute
   LoginRoute: typeof LoginRoute
   MediaBaixaTecnicoRoute: typeof MediaBaixaTecnicoRoute
   MetragemRoute: typeof MetragemRoute
   PrevisaoReservaRoute: typeof PrevisaoReservaRoute
-  RelacaoCampoRoute: typeof RelacaoCampoRoute
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
   ApiEvidenciasAdminSubmitRoute: typeof ApiEvidenciasAdminSubmitRoute
@@ -339,13 +339,6 @@ declare module '@tanstack/react-router' {
       path: '/tecnicos'
       fullPath: '/tecnicos'
       preLoaderRoute: typeof TecnicosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/relacao-campo': {
-      id: '/relacao-campo'
-      path: '/relacao-campo'
-      fullPath: '/relacao-campo'
-      preLoaderRoute: typeof RelacaoCampoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/previsao-reserva': {
@@ -388,6 +381,13 @@ declare module '@tanstack/react-router' {
       path: '/estoque-fisico-btp'
       fullPath: '/estoque-fisico-btp'
       preLoaderRoute: typeof EstoqueFisicoBtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque-atlas': {
+      id: '/estoque-atlas'
+      path: '/estoque-atlas'
+      fullPath: '/estoque-atlas'
+      preLoaderRoute: typeof EstoqueAtlasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cadastro': {
@@ -514,13 +514,13 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AlterarRoute: AlterarRoute,
   CadastroRoute: CadastroRoute,
+  EstoqueAtlasRoute: EstoqueAtlasRoute,
   EstoqueFisicoBtpRoute: EstoqueFisicoBtpRoute,
   HistoricoRoute: HistoricoRoute,
   LoginRoute: LoginRoute,
   MediaBaixaTecnicoRoute: MediaBaixaTecnicoRoute,
   MetragemRoute: MetragemRoute,
   PrevisaoReservaRoute: PrevisaoReservaRoute,
-  RelacaoCampoRoute: RelacaoCampoRoute,
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
   ApiEvidenciasAdminSubmitRoute: ApiEvidenciasAdminSubmitRoute,

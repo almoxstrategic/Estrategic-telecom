@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronsUpDown, FileSpreadsheet, Map as MapIcon } from "lucide-react";
+import { ChevronsUpDown, Eraser, FileSpreadsheet, Map as MapIcon } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
@@ -35,18 +35,18 @@ import {
 import { fetchTecnicos, type TecnicoProfile } from "@/lib/team-service";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/relacao-campo")({
+export const Route = createFileRoute("/estoque-atlas")({
   beforeLoad: () => requireAdmin(),
   head: () => ({
     meta: [
-      { title: "Relação de campo — Estrategic Field" },
+      { title: "Estoque Atlas — Estrategic Field" },
       {
         name: "description",
         content: "Visão detalhada e agregada do Estoque Atlas importado.",
       },
     ],
   }),
-  component: RelacaoCampoPage,
+  component: EstoqueAtlasPage,
 });
 
 type InnerTab = "estoque-atlas" | "contagem";
@@ -161,7 +161,7 @@ function MovimentacaoCombobox({
   );
 }
 
-function RelacaoCampoPage() {
+function EstoqueAtlasPage() {
   const [items, setItems] = useState<EstoqueAtlasItem[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
@@ -194,7 +194,7 @@ function RelacaoCampoPage() {
         const list = await fetchTecnicos();
         if (!cancelled) setTecnicos(list);
       } catch (err) {
-        console.error("[relacao-campo] falha ao carregar técnicos", err);
+        console.error("[estoque-atlas] falha ao carregar técnicos", err);
       }
     })();
     return () => {
@@ -266,6 +266,14 @@ function RelacaoCampoPage() {
   const qntItens = activeTab === "estoque-atlas" ? filteredItems.length : contagem.length;
   const ultimaAtualizacaoLabel = formatAtualizacaoAtlas(updatedAt);
 
+  const limparFiltros = () => {
+    setFiltroTipo("");
+    setFiltroModelo("");
+    setFiltroSerie("");
+    setFiltroStatus("Todos");
+    setFiltroMovimentacao("Todos");
+  };
+
   const handleExportExcel = () => {
     if (activeTab === "estoque-atlas") {
       if (filteredItems.length === 0) {
@@ -315,7 +323,7 @@ function RelacaoCampoPage() {
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight">
               <MapIcon className="h-6 w-6 text-primary" />
-              Relação de campo
+              Estoque Atlas
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Dados do Estoque Atlas importado em Serializados.
@@ -327,9 +335,19 @@ function RelacaoCampoPage() {
         </div>
 
         <section className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-            Filtros
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              Filtros
+            </h2>
+            <button
+              type="button"
+              onClick={limparFiltros}
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+            >
+              <Eraser className="h-3.5 w-3.5" />
+              Limpar filtros
+            </button>
+          </div>
           {activeTab === "estoque-atlas" ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
               <div className="space-y-1.5">
