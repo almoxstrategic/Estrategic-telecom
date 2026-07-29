@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ClipboardList,
   Copy,
+  FileSpreadsheet,
   Pencil,
   Search,
   Trash2,
@@ -12,6 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { PasswordInput } from "@/components/PasswordInput";
@@ -113,6 +115,32 @@ function TecnicosPage() {
       return nome.includes(q) || matricula.includes(q);
     });
   }, [tecnicos, query]);
+
+  const exportarTecnicosParaExcel = () => {
+    if (tecnicos.length === 0) {
+      toast.error("Nenhum técnico para exportar.");
+      return;
+    }
+
+    const dadosExcel = tecnicos.map((tecnico) => ({
+      Nome: tecnico.nome,
+      Matrícula: tecnico.identificacao ?? "—",
+      Login: tecnico.login ?? "—",
+      Celular: formatCelularExibicao(tecnico.celular),
+      "Data de Cadastro": formatDataCadastro(tecnico.created_at),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Técnicos");
+
+    const agora = new Date();
+    const dd = String(agora.getDate()).padStart(2, "0");
+    const mm = String(agora.getMonth() + 1).padStart(2, "0");
+    const yyyy = String(agora.getFullYear());
+    XLSX.writeFile(workbook, `tecnicos_export_${dd}_${mm}_${yyyy}.xlsx`);
+    toast.success(`Excel exportado: ${tecnicos.length} técnicos.`);
+  };
 
   const handleConfirmDelete = async () => {
     if (!confirmTarget) return;
@@ -227,13 +255,26 @@ function TecnicosPage() {
               Técnicos cadastrados no sistema. A exclusão remove acesso, histórico e fotos.
             </p>
           </div>
-          <Link
-            to="/cadastro"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover"
-          >
-            <UserPlus className="h-4 w-4" />
-            Adicionar colaborador
-          </Link>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={loading || tecnicos.length === 0}
+              onClick={exportarTecnicosParaExcel}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Exportar Excel
+            </Button>
+            <Link
+              to="/cadastro"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover"
+            >
+              <UserPlus className="h-4 w-4" />
+              Adicionar colaborador
+            </Link>
+          </div>
         </header>
 
         {!loading && tecnicos.length > 0 && (
