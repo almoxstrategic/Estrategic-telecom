@@ -41,7 +41,13 @@ import { useApp } from "@/lib/app-store";
 import { requireAdmin } from "@/lib/auth-guards";
 import { formatCelularMask, isValidCelular } from "@/lib/auth-identificacao";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
-import { deleteTecnico, fetchTecnicos, type TecnicoProfile } from "@/lib/team-service";
+import {
+  deleteTecnico,
+  fetchTecnicos,
+  updateTecnicoStatus,
+  type TecnicoProfile,
+  type TecnicoStatus,
+} from "@/lib/team-service";
 
 export const Route = createFileRoute("/tecnicos")({
   beforeLoad: () => requireAdmin(),
@@ -80,7 +86,9 @@ function TecnicosPage() {
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [abaAtiva, setAbaAtiva] = useState<"ativos" | "demitidos">("ativos");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<TecnicoProfile | null>(null);
   const [profileTarget, setProfileTarget] = useState<TecnicoProfile | null>(null);
   const [editTarget, setEditTarget] = useState<TecnicoProfile | null>(null);
@@ -105,41 +113,50 @@ function TecnicosPage() {
     void loadTecnicos();
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return tecnicos;
+  const tecnicosFiltrados = useMemo(() => {
+    const porAba = tecnicos.filter((tecnico) =>
+      abaAtiva === "ativos" ? tecnico.status === "ATIVO" : tecnico.status === "DEMITIDO",
+    );
 
-    return tecnicos.filter((tecnico) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return porAba;
+
+    return porAba.filter((tecnico) => {
       const nome = tecnico.nome.toLowerCase();
       const matricula = (tecnico.identificacao ?? "").toLowerCase();
       return nome.includes(q) || matricula.includes(q);
     });
-  }, [tecnicos, query]);
+  }, [tecnicos, abaAtiva, query]);
 
   const exportarTecnicosParaExcel = () => {
-    if (tecnicos.length === 0) {
-      toast.error("Nenhum técnico para exportar.");
+    if (tecnicosFiltrados.length === 0) {
+      toast.error("Nenhum técnico para exportar nesta aba.");
       return;
     }
 
-    const dadosExcel = tecnicos.map((tecnico) => ({
+    const dadosExcel = tecnicosFiltrados.map((tecnico) => ({
       Nome: tecnico.nome,
       Matrícula: tecnico.identificacao ?? "—",
       Login: tecnico.login ?? "—",
       Celular: formatCelularExibicao(tecnico.celular),
+      Status: tecnico.status,
       "Data de Cadastro": formatDataCadastro(tecnico.created_at),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Técnicos");
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      abaAtiva === "ativos" ? "Ativos" : "Demitidos",
+    );
 
     const agora = new Date();
     const dd = String(agora.getDate()).padStart(2, "0");
     const mm = String(agora.getMonth() + 1).padStart(2, "0");
     const yyyy = String(agora.getFullYear());
     XLSX.writeFile(workbook, `tecnicos_export_${dd}_${mm}_${yyyy}.xlsx`);
-    toast.success(`Excel exportado: ${tecnicos.length} técnicos.`);
+    toast.success(`Excel exportado: ${tecnicosFiltrados.length} técnicos.`);
   };
 
   const handleConfirmDelete = async () => {
@@ -155,6 +172,26 @@ function TecnicosPage() {
       toast.error((err as Error).message || "Erro ao excluir técnico.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const alternarStatusTecnico = async (id: string, statusAtual: TecnicoStatus) => {
+    const novoStatus: TecnicoStatus = statusAtual === "ATIVO" ? "DEMITIDO" : "ATIVO";
+    setStatusUpdatingId(id);
+    try {
+      await updateTecnicoStatus(id, novoStatus);
+      setTecnicos((atual) =>
+        atual.map((tecnico) =>
+          tecnico.id === id ? { ...tecnico, status: novoStatus } : tecnico,
+        ),
+      );
+      toast.success(
+        novoStatus === "DEMITIDO" ? "Técnico marcado como demitido." : "Técnico recontratado.",
+      );
+    } catch (err) {
+      toast.error((err as Error).message || "Erro ao alterar status do técnico.");
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -261,7 +298,7 @@ function TecnicosPage() {
               variant="outline"
               size="sm"
               className="gap-1.5"
-              disabled={loading || tecnicos.length === 0}
+              disabled={loading || tecnicosFiltrados.length === 0}
               onClick={exportarTecnicosParaExcel}
             >
               <FileSpreadsheet className="h-4 w-4" />
@@ -276,6 +313,21 @@ function TecnicosPage() {
             </Link>
           </div>
         </header>
+
+        {!loading && (
+          <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Total de Funcionários
+            </div>
+            <div className="mt-1 text-3xl font-black tracking-tight text-foreground">
+              {tecnicosFiltrados.length}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {abaAtiva === "ativos" ? "Colaboradores ativos" : "Colaboradores demitidos"}
+              {query.trim() ? " (com filtro de busca)" : ""}
+            </p>
+          </div>
+        )}
 
         {!loading && tecnicos.length > 0 && (
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm focus-within:ring-1 focus-within:ring-primary">
@@ -308,82 +360,138 @@ function TecnicosPage() {
               Cadastrar técnico
             </Link>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              Nenhum técnico encontrado para &quot;{query}&quot;.
-            </p>
-          </div>
         ) : (
-          <ul className="space-y-2">
-            {filtered.map((tecnico) => (
-              <li
-                key={tecnico.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{tecnico.nome}</div>
-                  <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                    <span>Matrícula: {tecnico.identificacao ?? "—"}</span>
-                    <span>Login: {tecnico.login ?? "—"}</span>
-                  </div>
+          <section className="rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-border px-4 pt-2">
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("ativos")}
+                  className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                    abaAtiva === "ativos"
+                      ? "border-b-2 border-primary text-foreground"
+                      : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Ativos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("demitidos")}
+                  className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                    abaAtiva === "demitidos"
+                      ? "border-b-2 border-primary text-foreground"
+                      : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Demitidos
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4">
+              {tecnicosFiltrados.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-background/50 p-10 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {query.trim()
+                      ? `Nenhum técnico encontrado para "${query}" nesta aba.`
+                      : abaAtiva === "ativos"
+                        ? "Nenhum técnico ativo."
+                        : "Nenhum técnico demitido."}
+                  </p>
                 </div>
-
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => abrirPerfil(tecnico)}
-                    aria-label={`Perfil de ${tecnico.nome}`}
-                    title="Perfil"
-                    className="inline-flex h-10 items-center justify-center gap-1 rounded-lg px-2 text-primary transition hover:bg-primary/10 sm:px-3"
-                  >
-                    <User className="h-5 w-5" />
-                    <span className="hidden text-xs font-semibold sm:inline">Perfil</span>
-                  </button>
-
-                  {tecnico.login ? (
-                    <Link
-                      to="/todos"
-                      search={{ login: tecnico.login }}
-                      aria-label={`Ver WOs de ${tecnico.nome}`}
-                      title="Ver WOs"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-primary transition hover:bg-primary/10"
+              ) : (
+                <ul className="space-y-2">
+                  {tecnicosFiltrados.map((tecnico) => (
+                    <li
+                      key={tecnico.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-4 shadow-sm"
                     >
-                      <ClipboardList className="h-5 w-5" />
-                    </Link>
-                  ) : (
-                    <span
-                      title="Login não cadastrado"
-                      className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-lg text-muted-foreground/40"
-                    >
-                      <ClipboardList className="h-5 w-5" />
-                    </span>
-                  )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold">{tecnico.nome}</div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                          <span>Matrícula: {tecnico.identificacao ?? "—"}</span>
+                          <span>Login: {tecnico.login ?? "—"}</span>
+                        </div>
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={() => abrirEdicao(tecnico)}
-                    aria-label={`Editar ${tecnico.nome}`}
-                    title="Editar"
-                    className="inline-flex h-10 items-center justify-center gap-1 rounded-lg px-2 text-primary transition hover:bg-primary/10 sm:px-3"
-                  >
-                    <Pencil className="h-5 w-5" />
-                    <span className="hidden text-xs font-semibold sm:inline">Editar</span>
-                  </button>
+                      <div className="flex shrink-0 items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => abrirPerfil(tecnico)}
+                          aria-label={`Perfil de ${tecnico.nome}`}
+                          title="Perfil"
+                          className="inline-flex h-10 items-center justify-center gap-1 rounded-lg px-2 text-primary transition hover:bg-primary/10 sm:px-3"
+                        >
+                          <User className="h-5 w-5" />
+                          <span className="hidden text-xs font-semibold sm:inline">Perfil</span>
+                        </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setConfirmTarget(tecnico)}
-                    disabled={deletingId === tecnico.id}
-                    aria-label={`Excluir ${tecnico.nome}`}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                        {tecnico.login ? (
+                          <Link
+                            to="/todos"
+                            search={{ login: tecnico.login }}
+                            aria-label={`Ver WOs de ${tecnico.nome}`}
+                            title="Ver WOs"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-primary transition hover:bg-primary/10"
+                          >
+                            <ClipboardList className="h-5 w-5" />
+                          </Link>
+                        ) : (
+                          <span
+                            title="Login não cadastrado"
+                            className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-lg text-muted-foreground/40"
+                          >
+                            <ClipboardList className="h-5 w-5" />
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicao(tecnico)}
+                          aria-label={`Editar ${tecnico.nome}`}
+                          title="Editar"
+                          className="inline-flex h-10 items-center justify-center gap-1 rounded-lg px-2 text-primary transition hover:bg-primary/10 sm:px-3"
+                        >
+                          <Pencil className="h-5 w-5" />
+                          <span className="hidden text-xs font-semibold sm:inline">Editar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setConfirmTarget(tecnico)}
+                          disabled={deletingId === tecnico.id || statusUpdatingId === tecnico.id}
+                          aria-label={`Excluir ${tecnico.nome}`}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void alternarStatusTecnico(tecnico.id, tecnico.status)}
+                          disabled={statusUpdatingId === tecnico.id || deletingId === tecnico.id}
+                          aria-label={
+                            abaAtiva === "ativos"
+                              ? `Demitir ${tecnico.nome}`
+                              : `Contratar ${tecnico.nome}`
+                          }
+                          title={abaAtiva === "ativos" ? "Demitir" : "Contratar"}
+                          className={`inline-flex h-10 items-center justify-center rounded-lg px-2 text-xs font-semibold transition disabled:opacity-50 sm:px-3 ${
+                            abaAtiva === "ativos"
+                              ? "text-orange-600 hover:bg-orange-500/10 hover:text-orange-800"
+                              : "text-green-600 hover:bg-green-500/10 hover:text-green-800"
+                          }`}
+                        >
+                          {abaAtiva === "ativos" ? "Demitir" : "Contratar"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
         )}
       </main>
 
