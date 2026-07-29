@@ -14,7 +14,6 @@ import {
   LogOut,
   Home,
   Map,
-  Package,
   Send,
   ShieldCheck,
   Database,
@@ -132,22 +131,13 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       Pendências
                     </Link>
                     <Link
-                      to="/estoque-fisico-btp"
-                      onClick={onNavigate}
-                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-                    >
-                      <Package className="h-5 w-5 text-primary" />
-                      Estoque Físico X BTP
-                    </Link>
-                    <Link
                       to="/previsao-reserva"
                       onClick={onNavigate}
                       className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
                       activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
                     >
                       <CalendarClock className="h-5 w-5 text-primary" />
-                      Previsão de Reserva
+                      Modelo e Previsão
                     </Link>
                     <Link
                       to="/media-baixa-tecnico"
@@ -156,7 +146,16 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
                     >
                       <TrendingUp className="h-5 w-5 text-primary" />
-                      Média de Baixa por Técnico
+                      Estoque Campo e Consumo
+                    </Link>
+                    <Link
+                      to="/estoque-base"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <Warehouse className="h-5 w-5 text-primary" />
+                      Estoque Base
                     </Link>
                     <Link
                       to="/admin/importacao"
@@ -228,21 +227,12 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <Building2 className="h-5 w-5 text-primary" />
                       Estoque serializado - Técnico
                     </Link>
-                    <Link
-                      to="/estoque-base"
-                      onClick={onNavigate}
-                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-                    >
-                      <Warehouse className="h-5 w-5 text-primary" />
-                      Estoque Base
-                    </Link>
                     <div
                       className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"
                       title="Em desenvolvimento"
                     >
                       <ChartColumn className="h-5 w-5 text-primary" />
-                      Média de baixa por técnico
+                      Estoque Base
                     </div>
                     <div
                       className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground opacity-70"

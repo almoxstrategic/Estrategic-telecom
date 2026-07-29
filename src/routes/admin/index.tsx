@@ -10,7 +10,6 @@ import {
   Database,
   FileUp,
   Map,
-  Package,
   Send,
   TrendingUp,
   Warehouse,
@@ -97,25 +96,13 @@ function AdminHome() {
               </div>
             </Link>
 
-            <Link to="/estoque-fisico-btp" className="block w-full">
-              <div className={`${MODULE_CARD_CLASS} border-border`}>
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <Package className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-foreground">Estoque Físico X BTP</div>
-                  <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
-                </div>
-              </div>
-            </Link>
-
             <Link to="/previsao-reserva" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
                   <CalendarClock className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="font-bold text-foreground">Previsão de Reserva</div>
+                  <div className="font-bold text-foreground">Modelo e Previsão</div>
                   <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
                 </div>
               </div>
@@ -127,8 +114,20 @@ function AdminHome() {
                   <TrendingUp className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="font-bold text-foreground">Média de Baixa por Técnico</div>
+                  <div className="font-bold text-foreground">Estoque Campo e Consumo</div>
                   <div className="text-xs text-muted-foreground">(Esse modulo é um protótipo)</div>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/estoque-base" className="block w-full">
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Warehouse className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Estoque Base</div>
+                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
                 </div>
               </div>
             </Link>
@@ -235,25 +234,13 @@ function AdminHome() {
               </div>
             </Link>
 
-            <Link to="/estoque-base" className="block w-full">
-              <div className={`${MODULE_CARD_CLASS} border-border`}>
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <Warehouse className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-foreground">Estoque Base</div>
-                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
-                </div>
-              </div>
-            </Link>
-
             <div className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
                   <ChartColumn className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="font-bold text-foreground">Média de baixa por técnico</div>
+                  <div className="font-bold text-foreground">Estoque Base</div>
                   <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
                 </div>
               </div>
