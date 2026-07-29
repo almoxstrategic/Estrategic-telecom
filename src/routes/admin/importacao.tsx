@@ -4,15 +4,17 @@ import { FileSpreadsheet, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { replaceWoCabecalho, upsertDimMateriais, upsertEstoqueFisico, upsertWoConsumo } from "@/lib/logistica-service";
+import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
 import {
   parseDimMateriaisFile,
   parseEstoqueAtlasFile,
+  parseEstoqueBaseFile,
   parseEstoqueCampoFile,
-  parseEstoqueFisicoFile,
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
+import { saveConsultaEstoque } from "@/lib/consulta-estoque-store";
+import { saveEstoqueBase } from "@/lib/estoque-base-store";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
 import { cn } from "@/lib/utils";
@@ -158,7 +160,7 @@ function ImportacaoPage() {
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoque, setBusyEstoque] = useState(false);
-  const [busyEstoqueFisico, setBusyEstoqueFisico] = useState(false);
+  const [busyEstoqueBase, setBusyEstoqueBase] = useState(false);
   const [fileAtlas, setFileAtlas] = useState<File | null>(null);
   const [fileCampo, setFileCampo] = useState<File | null>(null);
   const [fileFisico, setFileFisico] = useState<File | null>(null);
@@ -259,6 +261,12 @@ function ImportacaoPage() {
         toast.error("Nenhuma linha válida encontrada na consulta de estoque.");
         return;
       }
+      saveConsultaEstoque(
+        rows.map((row) => ({
+          codMaterial: row.material,
+          nome: row.descr_material,
+        })),
+      );
       const result = await upsertDimMateriais(rows);
       toast.success(
         `Estoque importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
@@ -270,22 +278,20 @@ function ImportacaoPage() {
     }
   };
 
-  const handleEstoqueFisico = async (file: File) => {
-    setBusyEstoqueFisico(true);
+  const handleEstoqueBase = async (file: File) => {
+    setBusyEstoqueBase(true);
     try {
-      const rows = await parseEstoqueFisicoFile(file);
+      const rows = await parseEstoqueBaseFile(file);
       if (rows.length === 0) {
-        toast.error("Nenhuma linha válida encontrada no estoque físico.");
+        toast.error("Nenhuma linha válida encontrada no Estoque Base.");
         return;
       }
-      const result = await upsertEstoqueFisico(rows);
-      toast.success(
-        `Estoque físico importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
-      );
+      saveEstoqueBase(rows);
+      toast.success(`Estoque Base importado: ${rows.length} registros carregados.`);
     } catch (err) {
-      toast.error(formatImportError("estoque-fisico", err));
+      toast.error(formatImportError("estoque-base", err));
     } finally {
-      setBusyEstoqueFisico(false);
+      setBusyEstoqueBase(false);
     }
   };
 
@@ -349,15 +355,15 @@ function ImportacaoPage() {
             />
             <MiscelaneaImportCard
               title="Consulta de Estoque"
-              description="Colunas: Material, Descr. Material. Alimenta o autocomplete de itens críticos nos KPIs."
+              description="Colunas: Material (Cod material), Descr. Material. Alimenta o autocomplete de KPIs e o cruzamento do Estoque Base."
               busy={busyEstoque}
               onImport={handleEstoque}
             />
             <MiscelaneaImportCard
-              title="Estoque Físico"
-              description="Colunas: Material, Descr. Material, Qtd Física, Qtd Campo. Alimenta o módulo Estoque Físico X BTP."
-              busy={busyEstoqueFisico}
-              onImport={handleEstoqueFisico}
+              title="Estoque Base"
+              description="Colunas: Código Alternativo, Estoque Atual, Estoque Reservado, Estoque Disponível. Alimenta o módulo Estoque Base."
+              busy={busyEstoqueBase}
+              onImport={handleEstoqueBase}
             />
           </div>
         ) : (

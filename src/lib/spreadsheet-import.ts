@@ -286,10 +286,10 @@ export async function parseWoConsumoFile(file: File): Promise<WoConsumoRow[]> {
   return rows;
 }
 
-/** Consulta de Estoque: Material + Descr. Material */
+/** Consulta de Estoque: Material / Cod material + Descr. Material */
 function mapEstoqueRow(row: RawRow): DimMaterialRow | null {
-  const material = pick(row, "Material");
-  const descr = pick(row, "Descr. Material", "Descr.Material", "Descr Material");
+  const material = pick(row, "Material", "Cod material", "Cod. material", "Código material");
+  const descr = pick(row, "Descr. Material", "Descr.Material", "Descr Material", "Nomenclatura");
 
   if (!material) return null;
 
@@ -347,6 +347,71 @@ export async function parseEstoqueFisicoFile(file: File): Promise<EstoqueFisicoR
   for (const row of raw) {
     const mapped = mapEstoqueFisicoRow(row);
     if (mapped) map.set(mapped.material, mapped);
+  }
+
+  return [...map.values()];
+}
+
+export type EstoqueBaseImportRow = {
+  codigoAlternativo: string;
+  estoqueAtual: number;
+  estoqueReservado: number;
+  estoqueDisponivel: number;
+};
+
+/** Miscelâneas — Estoque Base: colunas exatas da planilha. */
+const ESTOQUE_BASE_EXACT_COLUMNS = {
+  codigoAlternativo: ["Código Alternativo"],
+  estoqueAtual: ["Estoque Atual"],
+  estoqueReservado: ["Estoque Reservado"],
+  estoqueDisponivel: ["Estoque Disponível"],
+} as const;
+
+function estoqueBasePick(row: RawRow, exactNames: readonly string[], ...aliases: string[]): string {
+  for (const exact of exactNames) {
+    for (const [key, value] of Object.entries(row)) {
+      if (trimCell(key) === exact) {
+        const text = trimCell(value);
+        if (text) return text;
+      }
+    }
+  }
+  return pick(row, ...exactNames, ...aliases);
+}
+
+function mapEstoqueBaseRow(row: RawRow): EstoqueBaseImportRow | null {
+  const codigoRaw = estoqueBasePick(
+    row,
+    ESTOQUE_BASE_EXACT_COLUMNS.codigoAlternativo,
+    "Codigo Alternativo",
+    "Código Alternativo",
+  );
+  if (!codigoRaw) return null;
+
+  const codigoAlternativo = normalizeMaterialCode(codigoRaw);
+  if (!codigoAlternativo) return null;
+
+  return {
+    codigoAlternativo,
+    estoqueAtual: parseNumber(
+      estoqueBasePick(row, ESTOQUE_BASE_EXACT_COLUMNS.estoqueAtual, "Estoque Atual"),
+    ),
+    estoqueReservado: parseNumber(
+      estoqueBasePick(row, ESTOQUE_BASE_EXACT_COLUMNS.estoqueReservado, "Estoque Reservado"),
+    ),
+    estoqueDisponivel: parseNumber(
+      estoqueBasePick(row, ESTOQUE_BASE_EXACT_COLUMNS.estoqueDisponivel, "Estoque Disponivel", "Estoque Disponível"),
+    ),
+  };
+}
+
+export async function parseEstoqueBaseFile(file: File): Promise<EstoqueBaseImportRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const map = new Map<string, EstoqueBaseImportRow>();
+
+  for (const row of raw) {
+    const mapped = mapEstoqueBaseRow(row);
+    if (mapped) map.set(mapped.codigoAlternativo, mapped);
   }
 
   return [...map.values()];

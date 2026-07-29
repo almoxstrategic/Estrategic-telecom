@@ -127,7 +127,9 @@ function AdminHome() {
                 </div>
                 <div>
                   <div className="font-bold text-foreground">Estoque Base</div>
-                  <div className="text-xs text-muted-foreground">(Em desenvolvimento)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Cruzamento com Consulta de Estoque
+                  </div>
                 </div>
               </div>
             </Link>
