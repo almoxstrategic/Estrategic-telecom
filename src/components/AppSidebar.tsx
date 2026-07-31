@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -25,12 +25,79 @@ import {
 import { Logo } from "./Logo";
 import { useApp } from "@/lib/app-store";
 
+const MISCELANEAS_PATHS = [
+  "/todos",
+  "/tecnicos",
+  "/admin/kpis",
+  "/admin/pendencias",
+  "/previsao-reserva",
+  "/media-baixa-tecnico",
+  "/estoque-base",
+  "/admin/enviar-evidencia",
+] as const;
+
+const SERIALIZADOS_PATHS = ["/estoque-atlas", "/estoque-tecnico"] as const;
+
+function isAdminHomePath(pathname: string): boolean {
+  return pathname === "/admin" || pathname === "/admin/";
+}
+
+function pathMatches(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+function matchesMiscelaneasGroup(
+  pathname: string,
+  tab: string | undefined,
+): boolean {
+  if (isAdminHomePath(pathname)) return false;
+  if (MISCELANEAS_PATHS.some((p) => pathMatches(pathname, p))) return true;
+  if (pathMatches(pathname, "/admin/importacao")) {
+    return tab !== "serializados";
+  }
+  return false;
+}
+
+function matchesSerializadosGroup(
+  pathname: string,
+  tab: string | undefined,
+): boolean {
+  if (isAdminHomePath(pathname)) return false;
+  if (SERIALIZADOS_PATHS.some((p) => pathMatches(pathname, p))) return true;
+  if (pathMatches(pathname, "/admin/importacao")) {
+    return tab === "serializados";
+  }
+  return false;
+}
+
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useApp();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
-  const [isMiscelaneaOpen, setIsMiscelaneaOpen] = useState(true);
-  const [isTerminaisOpen, setIsTerminaisOpen] = useState(false);
+  const { pathname, search } = useRouterState({
+    select: (s) => ({
+      pathname: s.location.pathname,
+      search: s.location.search as { tab?: string },
+    }),
+  });
+  const tab = typeof search.tab === "string" ? search.tab : undefined;
+
+  const [isMiscelaneaOpen, setIsMiscelaneaOpen] = useState(() =>
+    matchesMiscelaneasGroup(pathname, tab),
+  );
+  const [isSerializadosOpen, setIsSerializadosOpen] = useState(() =>
+    matchesSerializadosGroup(pathname, tab),
+  );
+
+  useEffect(() => {
+    if (isAdminHomePath(pathname)) {
+      setIsMiscelaneaOpen(false);
+      setIsSerializadosOpen(false);
+      return;
+    }
+    setIsMiscelaneaOpen(matchesMiscelaneasGroup(pathname, tab));
+    setIsSerializadosOpen(matchesSerializadosGroup(pathname, tab));
+  }, [pathname, tab]);
 
   const handleLogout = async () => {
     await logout();
@@ -184,11 +251,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div>
               <button
                 type="button"
-                onClick={() => setIsTerminaisOpen((open) => !open)}
+                onClick={() => setIsSerializadosOpen((open) => !open)}
                 className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
               >
                 <span>Serializados</span>
-                {isTerminaisOpen ? (
+                {isSerializadosOpen ? (
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
                 ) : (
                   <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
@@ -196,7 +263,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </button>
               <div
                 className={`grid transition-all duration-200 ease-in-out ${
-                  isTerminaisOpen
+                  isSerializadosOpen
                     ? "grid-rows-[1fr] opacity-100"
                     : "grid-rows-[0fr] opacity-0"
                 }`}
