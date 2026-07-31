@@ -159,6 +159,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     </Link>
                     <Link
                       to="/admin/importacao"
+                      search={{ tab: "miscelaneas" }}
                       onClick={onNavigate}
                       className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
                       activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
@@ -241,6 +242,16 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <UserSearch className="h-5 w-5 text-primary" />
                       Pendência de suspeito
                     </div>
+                    <Link
+                      to="/admin/importacao"
+                      search={{ tab: "serializados" }}
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                    >
+                      <FileUp className="h-5 w-5 text-primary" />
+                      Importação
+                    </Link>
                   </div>
                 </div>
               </div>

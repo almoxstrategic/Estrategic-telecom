@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useState, type ChangeEvent, type DragEvent } from "react";
 import { FileSpreadsheet, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,7 +42,14 @@ function formatImportError(scope: string, err: unknown): string {
   return String(err);
 }
 
+type ImportacaoSearch = {
+  tab: "miscelaneas" | "serializados";
+};
+
 export const Route = createFileRoute("/admin/importacao")({
+  validateSearch: (search: Record<string, unknown>): ImportacaoSearch => ({
+    tab: search.tab === "serializados" ? "serializados" : "miscelaneas",
+  }),
   head: () => ({
     meta: [
       { title: "Importação — Estrategic Field" },
@@ -189,7 +196,19 @@ function MiscelaneaImportCard({
 }
 
 function ImportacaoPage() {
-  const [activeTab, setActiveTab] = useState<"miscelaneas" | "serializados">("miscelaneas");
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const [activeTab, setActiveTab] = useState<"miscelaneas" | "serializados">(tab);
+
+  useEffect(() => {
+    setActiveTab(tab);
+  }, [tab]);
+
+  const selecionarAba = (next: "miscelaneas" | "serializados") => {
+    setActiveTab(next);
+    void navigate({ search: { tab: next }, replace: true });
+  };
+
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoqueBtp, setBusyEstoqueBtp] = useState(false);
@@ -351,7 +370,7 @@ function ImportacaoPage() {
         <div className="mb-6 flex gap-1 border-b border-border">
           <button
             type="button"
-            onClick={() => setActiveTab("miscelaneas")}
+            onClick={() => selecionarAba("miscelaneas")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === "miscelaneas"
                 ? "border-b-2 border-primary text-foreground"
@@ -362,7 +381,7 @@ function ImportacaoPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("serializados")}
+            onClick={() => selecionarAba("serializados")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === "serializados"
                 ? "border-b-2 border-primary text-foreground"
