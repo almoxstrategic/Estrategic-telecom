@@ -128,7 +128,7 @@ function AdminHome() {
                 <div>
                   <div className="font-bold text-foreground">Estoque Base</div>
                   <div className="text-xs text-muted-foreground">
-                    Cruzamento com Consulta de Estoque
+                    Cruzamento com Estoque BTP
                   </div>
                 </div>
               </div>

@@ -653,7 +653,7 @@ function PrevisaoReservaPage() {
           <p className="text-sm text-destructive">{erro}</p>
         ) : linhas.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nenhum material encontrado. Importe o Upload C — Consulta de Estoque primeiro.
+            Nenhum material encontrado. Importe o Estoque BTP primeiro.
           </p>
         ) : (
           <div className="w-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm">

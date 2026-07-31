@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/table";
 import { requireAdmin } from "@/lib/auth-guards";
 import {
-  loadConsultaEstoqueSnapshot,
-  type ConsultaEstoqueItem,
-} from "@/lib/consulta-estoque-store";
+  loadEstoqueBtpSnapshot,
+  type EstoqueBtpItem,
+} from "@/lib/estoque-btp-store";
 import {
   cruzarDadosEstoque,
   formatAtualizacaoEstoqueBase,
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/estoque-base")({
       { title: "Estoque Base — Estrategic Field" },
       {
         name: "description",
-        content: "Visão consolidada do Estoque Base cruzada com a Consulta de Estoque.",
+        content: "Visão consolidada do Estoque Base cruzada com o Estoque BTP.",
       },
     ],
   }),
@@ -48,20 +48,20 @@ function formatQtd(value: number): string {
 function EstoqueBasePage() {
   const [query, setQuery] = useState("");
   const [dadosEstoqueBase, setDadosEstoqueBase] = useState<EstoqueBaseItem[]>([]);
-  const [dadosConsultaEstoque, setDadosConsultaEstoque] = useState<ConsultaEstoqueItem[]>([]);
+  const [dadosEstoqueBtp, setDadosEstoqueBtp] = useState<EstoqueBtpItem[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     const baseSnap = loadEstoqueBaseSnapshot();
-    const consultaSnap = loadConsultaEstoqueSnapshot();
+    const btpSnap = loadEstoqueBtpSnapshot();
     setDadosEstoqueBase(baseSnap.items);
-    setDadosConsultaEstoque(consultaSnap.items);
+    setDadosEstoqueBtp(btpSnap.items);
     setUpdatedAt(baseSnap.updatedAt);
   }, []);
 
   const cruzados = useMemo(
-    () => cruzarDadosEstoque(dadosEstoqueBase, dadosConsultaEstoque),
-    [dadosEstoqueBase, dadosConsultaEstoque],
+    () => cruzarDadosEstoque(dadosEstoqueBase, dadosEstoqueBtp),
+    [dadosEstoqueBase, dadosEstoqueBtp],
   );
 
   const filtrados = useMemo(() => {
@@ -89,8 +89,7 @@ function EstoqueBasePage() {
               Estoque Base
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cruzamento do Estoque Base com a Consulta de Estoque (Código Alternativo = Cod
-              material).
+              Cruzamento do Estoque Base com o Estoque BTP (Código Alternativo = Cod material).
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -133,7 +132,7 @@ function EstoqueBasePage() {
                   to="/admin/importacao"
                   className="font-semibold text-primary hover:underline"
                 >
-                  Consulta de Estoque
+                  Estoque BTP
                 </Link>{" "}
                 e{" "}
                 <Link

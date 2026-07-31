@@ -286,7 +286,7 @@ export async function parseWoConsumoFile(file: File): Promise<WoConsumoRow[]> {
   return rows;
 }
 
-/** Consulta de Estoque: Material / Cod material + Descr. Material */
+/** Estoque BTP: Material / Cod material + Descr. Material */
 function mapEstoqueRow(row: RawRow): DimMaterialRow | null {
   const material = pick(row, "Material", "Cod material", "Cod. material", "Código material");
   const descr = pick(row, "Descr. Material", "Descr.Material", "Descr Material", "Nomenclatura");

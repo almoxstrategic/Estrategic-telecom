@@ -1,6 +1,6 @@
 /** MVP: Estoque Base (Miscelâneas) persistido em localStorage. */
 
-import type { ConsultaEstoqueItem } from "./consulta-estoque-store";
+import type { EstoqueBtpItem } from "./estoque-btp-store";
 import { normalizeMaterialCode } from "./material-code";
 
 export type EstoqueBaseItem = {
@@ -94,22 +94,22 @@ export function getDadosEstoqueBase(): EstoqueBaseItem[] {
 }
 
 /**
- * Cruza Estoque Base com Consulta de Estoque.
+ * Cruza Estoque Base com Estoque BTP.
  * Chave: Código Alternativo === Cod material.
  */
 export function cruzarDadosEstoque(
   dadosEstoqueBase: EstoqueBaseItem[],
-  dadosConsultaEstoque: ConsultaEstoqueItem[],
+  dadosEstoqueBtp: EstoqueBtpItem[],
 ): EstoqueBaseCruzado[] {
-  const consultaByCode = new Map<string, ConsultaEstoqueItem>();
-  for (const item of dadosConsultaEstoque) {
+  const btpByCode = new Map<string, EstoqueBtpItem>();
+  for (const item of dadosEstoqueBtp) {
     const key = normalizeMaterialCode(item.codMaterial);
-    if (key && !consultaByCode.has(key)) consultaByCode.set(key, item);
+    if (key && !btpByCode.has(key)) btpByCode.set(key, item);
   }
 
   return dadosEstoqueBase.map((base) => {
     const key = normalizeMaterialCode(base.codigoAlternativo);
-    const match = consultaByCode.get(key);
+    const match = btpByCode.get(key);
     return {
       material: match?.nome?.trim() ? match.nome.trim() : "Nome não encontrado",
       codigo: base.codigoAlternativo,

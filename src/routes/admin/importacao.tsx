@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useState, type ChangeEvent, type DragEvent } from "react";
 import { FileSpreadsheet, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
@@ -13,7 +13,7 @@ import {
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
-import { saveConsultaEstoque } from "@/lib/consulta-estoque-store";
+import { saveEstoqueBtp } from "@/lib/estoque-btp-store";
 import { saveEstoqueBase } from "@/lib/estoque-base-store";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
@@ -70,9 +70,32 @@ function ImportFileCard({
   onImport,
 }: ImportFileCardProps) {
   const inputId = useId();
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     onFileChange(e.target.files?.[0] ?? null);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (busy) return;
+    const dropped = e.dataTransfer.files?.[0] ?? null;
+    onFileChange(dropped);
   };
 
   return (
@@ -92,13 +115,23 @@ function ImportFileCard({
       <div className="space-y-3">
         <label
           htmlFor={inputId}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           className={cn(
-            "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-primary/50",
+            "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-5 text-center transition",
+            isDragging
+              ? "border-green-500 bg-green-50"
+              : "border-border bg-background hover:border-primary/50",
             busy && "pointer-events-none opacity-60",
           )}
         >
-          <span className="text-sm font-medium text-foreground">Selecionar Arquivo</span>
-          <span className="text-xs text-muted-foreground">.xlsx, .xls ou .csv</span>
+          <span className="text-sm font-medium text-foreground">
+            {isDragging ? "Solte o arquivo aqui" : "Selecionar Arquivo"}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Arraste e solte ou clique · .xlsx, .xls ou .csv
+          </span>
           <input
             id={inputId}
             type="file"
@@ -117,12 +150,12 @@ function ImportFileCard({
           type="button"
           variant="outline"
           className="w-full"
-          disabled={!file || busy}
+          disabled={!file || busy || !onImport}
           onClick={() => {
             if (file && onImport) void onImport(file);
           }}
         >
-          {busy ? "Importando…" : "Importar"}
+          {busy ? "Importando…" : onImport ? "Importar" : "Em breve"}
         </Button>
       </div>
     </div>
@@ -159,12 +192,13 @@ function ImportacaoPage() {
   const [activeTab, setActiveTab] = useState<"miscelaneas" | "serializados">("miscelaneas");
   const [busyCabecalho, setBusyCabecalho] = useState(false);
   const [busyConsumo, setBusyConsumo] = useState(false);
-  const [busyEstoque, setBusyEstoque] = useState(false);
+  const [busyEstoqueBtp, setBusyEstoqueBtp] = useState(false);
   const [busyEstoqueBase, setBusyEstoqueBase] = useState(false);
   const [fileAtlas, setFileAtlas] = useState<File | null>(null);
   const [fileCampo, setFileCampo] = useState<File | null>(null);
   const [fileFisico, setFileFisico] = useState<File | null>(null);
   const [fileConsolidado, setFileConsolidado] = useState<File | null>(null);
+  const [arquivoEstoqueTecnico, setArquivoEstoqueTecnico] = useState<File | null>(null);
   const [busyAtlas, setBusyAtlas] = useState(false);
   const [busyCampo, setBusyCampo] = useState(false);
 
@@ -253,15 +287,15 @@ function ImportacaoPage() {
     }
   };
 
-  const handleEstoque = async (file: File) => {
-    setBusyEstoque(true);
+  const handleEstoqueBtp = async (file: File) => {
+    setBusyEstoqueBtp(true);
     try {
       const rows = await parseDimMateriaisFile(file);
       if (rows.length === 0) {
-        toast.error("Nenhuma linha válida encontrada na consulta de estoque.");
+        toast.error("Nenhuma linha válida encontrada no Estoque BTP.");
         return;
       }
-      saveConsultaEstoque(
+      saveEstoqueBtp(
         rows.map((row) => ({
           codMaterial: row.material,
           nome: row.descr_material,
@@ -269,12 +303,12 @@ function ImportacaoPage() {
       );
       const result = await upsertDimMateriais(rows);
       toast.success(
-        `Estoque importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
+        `Estoque BTP importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
       );
     } catch (err) {
-      toast.error(formatImportError("estoque", err));
+      toast.error(formatImportError("estoque-btp", err));
     } finally {
-      setBusyEstoque(false);
+      setBusyEstoqueBtp(false);
     }
   };
 
@@ -354,16 +388,22 @@ function ImportacaoPage() {
               onImport={handleConsumo}
             />
             <MiscelaneaImportCard
-              title="Consulta de Estoque"
+              title="Estoque BTP"
               description="Colunas: Material (Cod material), Descr. Material. Alimenta o autocomplete de KPIs e o cruzamento do Estoque Base."
-              busy={busyEstoque}
-              onImport={handleEstoque}
+              busy={busyEstoqueBtp}
+              onImport={handleEstoqueBtp}
             />
             <MiscelaneaImportCard
               title="Estoque Base"
               description="Colunas: Código Alternativo, Estoque Atual, Estoque Reservado, Estoque Disponível. Alimenta o módulo Estoque Base."
               busy={busyEstoqueBase}
               onImport={handleEstoqueBase}
+            />
+            <ImportFileCard
+              title="Estoque técnico"
+              description="(Em breve) Importação do estoque em posse do técnico."
+              file={arquivoEstoqueTecnico}
+              onFileChange={setArquivoEstoqueTecnico}
             />
           </div>
         ) : (
