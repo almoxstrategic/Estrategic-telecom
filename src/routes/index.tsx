@@ -16,16 +16,18 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-primary">
       <AppHeader />
       <main className="mx-auto max-w-2xl px-5 pb-10 pt-6">
         <section className="mb-6">
-          <h1 className="text-2xl font-black tracking-tight">Escolha um módulo para iniciar</h1>
+          <h1 className="text-2xl font-black tracking-tight text-primary-foreground">
+            Escolha um módulo para iniciar
+          </h1>
         </section>
 
         <section className="grid grid-cols-1 gap-4">
           <Link to="/metragem" className="block">
-            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary-foreground/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
                 <Ruler className="h-6 w-6" />
               </div>
