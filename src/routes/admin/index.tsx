@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -31,12 +31,38 @@ export const Route = createFileRoute("/admin/")({
 const ADMIN_TABS = ["Início", "Miscelâneas", "Serializados"] as const;
 type AdminTab = (typeof ADMIN_TABS)[number];
 
+const ADMIN_LAST_TAB_KEY = "adminLastTab";
+
+function isAdminTab(value: string | null): value is AdminTab {
+  return ADMIN_TABS.includes(value as AdminTab);
+}
+
 const MODULE_GRID_CLASS = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
 const MODULE_CARD_CLASS =
   "relative flex h-40 w-full flex-col justify-between rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md";
 
 function AdminHome() {
   const [activeTab, setActiveTab] = useState<AdminTab>("Início");
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(ADMIN_LAST_TAB_KEY);
+      if (isAdminTab(saved)) {
+        setActiveTab(saved);
+      }
+    } catch {
+      // sessionStorage indisponível (SSR / privacidade)
+    }
+  }, []);
+
+  const selecionarAba = (tab: AdminTab) => {
+    setActiveTab(tab);
+    try {
+      sessionStorage.setItem(ADMIN_LAST_TAB_KEY, tab);
+    } catch {
+      // sessionStorage indisponível (SSR / privacidade)
+    }
+  };
 
   return (
     <div className="min-h-screen bg-surface">
@@ -53,7 +79,7 @@ function AdminHome() {
               <button
                 key={tab}
                 type="button"
-                onClick={() => setActiveTab(tab)}
+                onClick={() => selecionarAba(tab)}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab
                     ? "border-b-2 border-primary text-foreground"
