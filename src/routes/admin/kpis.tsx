@@ -703,42 +703,50 @@ function KpisPage() {
                   <button
                     type="button"
                     onClick={abrirModalTotalItens}
-                    className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-shadow cursor-pointer hover:shadow-md"
+                    className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
                   >
-                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                      <Package className="h-4 w-4 shrink-0 text-primary" />
-                      Total de itens (misc) Consumidos
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5 shrink-0 text-primary" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Total de itens (misc) Consumidos
+                      </span>
                     </div>
-                    <div className="mt-2 text-3xl font-black text-foreground">
+                    <div className="mt-3 text-3xl font-black text-foreground">
                       {formatQuantidade(kpis?.total_itens ?? 0)}
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={abrirModalTotalWos}
-                    className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-shadow cursor-pointer hover:shadow-md"
+                    className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
                   >
-                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                      <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
-                      Total de WOs Processadas
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Total de WOs Processadas
+                      </span>
                     </div>
-                    <div className="mt-2 text-3xl font-black text-foreground">
+                    <div className="mt-3 text-3xl font-black text-foreground">
                       {formatQuantidade(kpis?.total_wos ?? 0)}
                     </div>
                   </button>
-                  <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                      <ClipboardCheck className="h-4 w-4 shrink-0 text-primary" />
-                      Total de notas produtivas (TOA)
+                  <div className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-5 w-5 shrink-0 text-primary" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Total de notas produtivas (TOA)
+                      </span>
                     </div>
-                    <div className="mt-2 text-3xl font-black text-foreground">0</div>
+                    <div className="mt-3 text-3xl font-black text-foreground">0</div>
                   </div>
-                  <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                      <XCircle className="h-4 w-4 shrink-0 text-primary" />
-                      Total de perda de notas (TOA)
+                  <div className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 shrink-0 text-primary" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Total de perda de notas (TOA)
+                      </span>
                     </div>
-                    <div className="mt-2 text-3xl font-black text-foreground">0</div>
+                    <div className="mt-3 text-3xl font-black text-foreground">0</div>
                   </div>
                 </section>
 
