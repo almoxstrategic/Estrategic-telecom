@@ -744,7 +744,7 @@ function KpisPage() {
 
                 <section className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
                   <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <div className="mb-4 flex min-h-16 shrink-0 flex-col justify-end">
+                    <div className="mb-4 shrink-0">
                       <h2 className="flex items-center gap-2 font-bold">
                         <Package className="h-4 w-4 text-primary" />
                         Top 7 Materiais Mais Consumidos
@@ -824,7 +824,7 @@ function KpisPage() {
                   </div>
 
                   <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <div className="mb-4 flex min-h-16 shrink-0 flex-col justify-end">
+                    <div className="mb-4 shrink-0">
                       <h2 className="flex items-center gap-2 font-bold">
                         <Users className="h-4 w-4 text-primary" />
                         Técnicos por Volume de Baixa
