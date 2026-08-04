@@ -81,19 +81,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Portal do Técnico" },
+      { title: "ADMIN - Estrategic IAT" },
       { name: "description", content: "App para técnicos de campo de telecom da Estrategic." },
       { name: "author", content: "Estrategic" },
-      { property: "og:title", content: "Portal do Técnico" },
+      { property: "og:title", content: "ADMIN - Estrategic IAT" },
       { property: "og:description", content: "App para técnicos de campo de telecom da Estrategic." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Portal do Técnico" },
+      { name: "twitter:title", content: "ADMIN - Estrategic IAT" },
       { name: "twitter:description", content: "App para técnicos de campo de telecom da Estrategic." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7af36abe-4037-4fce-b9c3-5fa98fd9b5eb/id-preview-a59fd3ad--a685ca21-1396-4b80-b6d4-3c4d6a055755.lovable.app-1781879783354.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7af36abe-4037-4fce-b9c3-5fa98fd9b5eb/id-preview-a59fd3ad--a685ca21-1396-4b80-b6d4-3c4d6a055755.lovable.app-1781879783354.png" },
     ],
     links: [
+      {
+        rel: "icon",
+        href: "/favicon.svg",
+        type: "image/svg+xml",
+      },
       {
         rel: "stylesheet",
         href: appCss,

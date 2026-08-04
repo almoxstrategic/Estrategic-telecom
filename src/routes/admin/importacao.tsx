@@ -42,13 +42,20 @@ function formatImportError(scope: string, err: unknown): string {
   return String(err);
 }
 
+type ImportacaoTab = "miscelaneas" | "serializados" | "toa";
+
 type ImportacaoSearch = {
-  tab: "miscelaneas" | "serializados";
+  tab: ImportacaoTab;
 };
+
+function normalizeImportacaoTab(value: unknown): ImportacaoTab {
+  if (value === "serializados" || value === "toa") return value;
+  return "miscelaneas";
+}
 
 export const Route = createFileRoute("/admin/importacao")({
   validateSearch: (search: Record<string, unknown>): ImportacaoSearch => ({
-    tab: search.tab === "serializados" ? "serializados" : "miscelaneas",
+    tab: normalizeImportacaoTab(search.tab),
   }),
   head: () => ({
     meta: [
@@ -198,13 +205,13 @@ function MiscelaneaImportCard({
 function ImportacaoPage() {
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const [activeTab, setActiveTab] = useState<"miscelaneas" | "serializados">(tab);
+  const [activeTab, setActiveTab] = useState<ImportacaoTab>(tab);
 
   useEffect(() => {
     setActiveTab(tab);
   }, [tab]);
 
-  const selecionarAba = (next: "miscelaneas" | "serializados") => {
+  const selecionarAba = (next: ImportacaoTab) => {
     setActiveTab(next);
     void navigate({ search: { tab: next }, replace: true });
   };
@@ -218,6 +225,7 @@ function ImportacaoPage() {
   const [fileFisico, setFileFisico] = useState<File | null>(null);
   const [fileConsolidado, setFileConsolidado] = useState<File | null>(null);
   const [arquivoEstoqueTecnico, setArquivoEstoqueTecnico] = useState<File | null>(null);
+  const [arquivoToa, setArquivoToa] = useState<File | null>(null);
   const [busyAtlas, setBusyAtlas] = useState(false);
   const [busyCampo, setBusyCampo] = useState(false);
 
@@ -395,6 +403,17 @@ function ImportacaoPage() {
           >
             Serializados
           </button>
+          <button
+            type="button"
+            onClick={() => selecionarAba("toa")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "toa"
+                ? "border-b-2 border-primary text-foreground"
+                : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            TOA
+          </button>
         </div>
 
         {activeTab === "miscelaneas" ? (
@@ -430,7 +449,7 @@ function ImportacaoPage() {
               onFileChange={setArquivoEstoqueTecnico}
             />
           </div>
-        ) : (
+        ) : activeTab === "serializados" ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Estoque Atlas"
@@ -459,6 +478,15 @@ function ImportacaoPage() {
               description="Consolidado revisado de consumo por WO e material."
               file={fileConsolidado}
               onFileChange={setFileConsolidado}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <ImportFileCard
+              title="Importação TOA"
+              description="(Em breve) Importação de dados do TOA para consolidação de notas e desempenho."
+              file={arquivoToa}
+              onFileChange={setArquivoToa}
             />
           </div>
         )}

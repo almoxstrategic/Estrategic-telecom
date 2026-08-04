@@ -40,7 +40,7 @@ export const Route = createFileRoute("/admin/")({
   },
   head: () => ({
     meta: [
-      { title: "Admin — Estrategic Field" },
+      { title: "ADMIN - Estrategic IAT" },
       { name: "description", content: "Painel do administrador Estrategic." },
     ],
   }),
