@@ -57,11 +57,22 @@ export function KpiDesempenhoTecnicos({
   dia,
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
+  const [buscaTecnico, setBuscaTecnico] = useState("");
 
   const enriquecidos = useMemo(
     () => gerarDesempenhoMock(tecnicos, { ano, mes, dia }),
     [tecnicos, ano, mes, dia],
   );
+
+  const tecnicosFiltrados = useMemo(() => {
+    const termo = buscaTecnico.trim().toLowerCase();
+    if (!termo) return enriquecidos;
+    return enriquecidos.filter((tecnico) => {
+      const nome = (tecnico.nome || "").toLowerCase();
+      const matricula = (tecnico.id_tecnico || "").toLowerCase();
+      return nome.includes(termo) || matricula.includes(termo);
+    });
+  }, [enriquecidos, buscaTecnico]);
 
   const { totalNotasProdutivas, totalPerdaNotas } = useMemo(
     () => somarToaMock(enriquecidos),
@@ -209,10 +220,27 @@ export function KpiDesempenhoTecnicos({
                   }}
                 />
                 <Legend
-                  wrapperStyle={{
-                    gap: "2rem",
-                    display: "flex",
-                    justifyContent: "center",
+                  verticalAlign="bottom"
+                  align="center"
+                  content={({ payload }) => {
+                    if (!payload?.length) return null;
+                    return (
+                      <ul className="mt-2 flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
+                        {payload.map((entry) => (
+                          <li
+                            key={String(entry.value)}
+                            className="inline-flex items-center gap-2 text-sm text-muted-foreground"
+                          >
+                            <span
+                              className="inline-block h-3 w-3 shrink-0 rounded-sm"
+                              style={{ backgroundColor: entry.color }}
+                              aria-hidden
+                            />
+                            <span>{entry.value}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    );
                   }}
                 />
                 <Bar
@@ -250,13 +278,26 @@ export function KpiDesempenhoTecnicos({
           Detalhamento por Técnico
         </h2>
 
+        <input
+          type="search"
+          value={buscaTecnico}
+          onChange={(e) => setBuscaTecnico(e.target.value)}
+          placeholder="Buscar por nome ou matrícula (Z)..."
+          aria-label="Buscar técnico por nome ou matrícula"
+          className="mb-4 w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-72"
+        />
+
         {enriquecidos.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
             Nenhum técnico com baixa no período selecionado.
           </p>
+        ) : tecnicosFiltrados.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Nenhum técnico encontrado para “{buscaTecnico.trim()}”.
+          </p>
         ) : (
           <div className="overflow-x-auto">
-            <div className="grid min-w-[1080px] grid-cols-9 gap-3 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground">
+            <div className="grid min-w-[1200px] grid-cols-10 gap-3 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground">
               <span className="text-left">Nome</span>
               <span className="text-center">Total de Notas</span>
               <span className="text-center">Notas feitas</span>
@@ -265,20 +306,22 @@ export function KpiDesempenhoTecnicos({
               <span className="text-center">% Freq. Absoluta</span>
               <span className="text-center">Aproveitamento</span>
               <span className="text-center">Receita Perda</span>
-              <span className="text-center">Receita Ganha</span>
+              <span className="text-center">Receita Bruta</span>
+              <span className="text-center">Receita Líquida</span>
             </div>
 
-            <ul className="min-w-[1080px]">
-              {enriquecidos.map((tecnico) => {
+            <ul className="min-w-[1200px]">
+              {tecnicosFiltrados.map((tecnico) => {
                 const isDemitido = isTecnicoDemitido(
                   demitidosKeys,
                   tecnico.id_tecnico,
                   tecnico.nome,
                 );
+                const receitaLiquida = tecnico.receita - tecnico.receitaPerda;
                 return (
                 <li
                   key={tecnico.id_tecnico}
-                  className="grid grid-cols-9 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
+                  className="grid grid-cols-10 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
                 >
                   <span
                     className={
@@ -311,8 +354,11 @@ export function KpiDesempenhoTecnicos({
                   <span className="text-center font-medium tabular-nums text-red-600">
                     {formatReceita(tecnico.receitaPerda)}
                   </span>
-                  <span className="text-center font-medium tabular-nums text-green-600">
+                  <span className="text-center font-bold tabular-nums text-gray-900">
                     {formatReceita(tecnico.receita)}
+                  </span>
+                  <span className="text-center font-bold tabular-nums text-green-600">
+                    {formatReceita(receitaLiquida)}
                   </span>
                 </li>
                 );
