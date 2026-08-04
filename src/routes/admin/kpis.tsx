@@ -703,9 +703,9 @@ function KpisPage() {
                   <button
                     type="button"
                     onClick={abrirModalTotalItens}
-                    className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
+                    className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-shadow cursor-pointer hover:shadow-md"
                   >
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                       <Package className="h-4 w-4 shrink-0 text-primary" />
                       Total de itens (misc) Consumidos
                     </div>
@@ -716,9 +716,9 @@ function KpisPage() {
                   <button
                     type="button"
                     onClick={abrirModalTotalWos}
-                    className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
+                    className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-shadow cursor-pointer hover:shadow-md"
                   >
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                       <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
                       Total de WOs Processadas
                     </div>
@@ -726,15 +726,15 @@ function KpisPage() {
                       {formatQuantidade(kpis?.total_wos ?? 0)}
                     </div>
                   </button>
-                  <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
+                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                       <ClipboardCheck className="h-4 w-4 shrink-0 text-primary" />
                       Total de notas produtivas (TOA)
                     </div>
                     <div className="mt-2 text-3xl font-black text-foreground">0</div>
                   </div>
-                  <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
+                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                       <XCircle className="h-4 w-4 shrink-0 text-primary" />
                       Total de perda de notas (TOA)
                     </div>
@@ -777,12 +777,12 @@ function KpisPage() {
                     <Table className="mt-4 table-fixed">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[40%]">Item</TableHead>
-                          <TableHead className="w-[20%] text-right">Quant</TableHead>
-                          <TableHead className="w-[22%] text-right whitespace-nowrap">
+                          <TableHead className="w-[40%] text-left">Item</TableHead>
+                          <TableHead className="w-[20%] text-center">Quant</TableHead>
+                          <TableHead className="w-[22%] whitespace-nowrap text-center">
                             Média consumo
                           </TableHead>
-                          <TableHead className="w-[18%] text-right whitespace-nowrap">
+                          <TableHead className="w-[18%] whitespace-nowrap text-center">
                             % Total
                           </TableHead>
                         </TableRow>
@@ -790,16 +790,16 @@ function KpisPage() {
                       <TableBody>
                         {topMateriaisConsolidados.map((m) => (
                           <TableRow key={m.sku}>
-                            <TableCell className="max-w-0 truncate text-sm" title={m.descricao}>
+                            <TableCell className="max-w-0 truncate text-left text-sm" title={m.descricao}>
                               {m.descricao}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-semibold">
+                            <TableCell className="text-center text-sm font-semibold">
                               {formatKpiNumero(m.total)}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-semibold text-muted-foreground">
+                            <TableCell className="text-center text-sm font-semibold text-muted-foreground">
                               {formatKpiNumero(m.total / 4)}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-semibold text-primary">
+                            <TableCell className="text-center text-sm font-semibold text-primary">
                               {formatKpiRepresentatividade(m.total, totalGeralItens)}
                             </TableCell>
                           </TableRow>
@@ -868,18 +868,32 @@ function KpisPage() {
                           </ChartContainer>
                         </div>
                         <div className="mt-4 overflow-y-auto max-h-96 pr-2">
-                          <ul className="space-y-2">
+                          <div className="grid grid-cols-4 gap-4 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground">
+                            <span className="text-left">Nome</span>
+                            <span className="text-center">Baixa Misc</span>
+                            <span className="text-center">Notas feitas</span>
+                            <span className="text-center">Receita</span>
+                          </div>
+                          <ul>
                             {(kpis?.top_tecnicos ?? []).map((t) => (
-                              <li key={t.id_tecnico}>
+                              <li key={t.id_tecnico} className="border-b border-border last:border-b-0">
                                 <button
                                   type="button"
                                   onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
-                                  className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                                  className="grid w-full cursor-pointer grid-cols-4 items-center gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/60"
                                 >
-                                  <span className="font-medium text-primary">
+                                  <span className="truncate text-left font-medium text-primary">
                                     {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
                                   </span>
-                                  <Badge variant="outline">{formatQuantidade(t.total)} itens</Badge>
+                                  <span className="text-center text-sm font-semibold tabular-nums text-foreground">
+                                    {formatQuantidade(t.total)}
+                                  </span>
+                                  <span className="text-center text-sm font-normal tabular-nums text-muted-foreground">
+                                    0
+                                  </span>
+                                  <span className="text-center text-sm font-semibold tabular-nums text-green-600">
+                                    R$ 0,00
+                                  </span>
                                 </button>
                               </li>
                             ))}
@@ -989,9 +1003,9 @@ function KpisPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Código</TableHead>
-                              <TableHead>Descrição</TableHead>
-                              <TableHead className="text-right">Qtd Baixada</TableHead>
+                              <TableHead className="text-center">Código</TableHead>
+                              <TableHead className="text-center">Descrição</TableHead>
+                              <TableHead className="text-center">Qtd Baixada</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1001,11 +1015,13 @@ function KpisPage() {
                                 className="cursor-pointer hover:bg-muted/50"
                                 onClick={() => abrirTopConsumidoresMaterial(item.material)}
                               >
-                                <TableCell className="font-mono text-xs">{item.material}</TableCell>
-                                <TableCell className="max-w-[180px] truncate text-sm">
+                                <TableCell className="text-center font-mono text-xs">
+                                  {item.material}
+                                </TableCell>
+                                <TableCell className="max-w-[180px] truncate text-center text-sm">
                                   {item.descr_material}
                                 </TableCell>
-                                <TableCell className="text-right font-semibold">
+                                <TableCell className="text-center font-semibold">
                                   {formatQuantidade(item.total)}
                                 </TableCell>
                               </TableRow>
