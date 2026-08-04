@@ -581,7 +581,7 @@ function KpisPage() {
     <div className="min-h-screen bg-surface">
       <AppHeader />
       <main className="mx-auto max-w-7xl px-4 pb-10 pt-6 lg:px-6">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">KPI&apos;s</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -593,99 +593,100 @@ function KpisPage() {
           </Link>
         </div>
 
-        <div className="flex flex-col items-start gap-6 lg:flex-row lg:items-stretch">
-          <aside className="w-full shrink-0 lg:w-48 lg:min-w-[200px] lg:max-w-[220px]">
-            <div className="sticky top-6 z-20 h-fit rounded-2xl border border-border bg-card/95 p-4 shadow-sm backdrop-blur-md">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-bold">Filtros de Período</h2>
-                {filtrosLimpos && (
-                  <Badge variant="secondary" className="text-xs">
-                    Histórico geral
-                  </Badge>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="filtro-ano">Ano</Label>
-                  <Select
-                    value={filtro.ano !== null ? String(filtro.ano) : "todos"}
-                    disabled={anosComDados.length === 0}
-                    onValueChange={(v) => {
-                      if (v === "todos") {
-                        setFiltro({ mes: null, ano: null });
-                        return;
-                      }
-                      const ano = Number(v);
-                      const meses = periodos
-                        .filter((p) => p.ano === ano)
-                        .map((p) => p.mes)
-                        .sort((a, b) => a - b);
-                      setFiltro({
-                        ano,
-                        mes: meses[meses.length - 1] ?? null,
-                      });
-                    }}
-                  >
-                    <SelectTrigger id="filtro-ano" className="w-full">
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {anosComDados.map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                          {y}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="filtro-mes">Mês</Label>
-                  <Select
-                    value={filtro.mes !== null ? String(filtro.mes) : "todos"}
-                    disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
-                    onValueChange={(v) =>
-                      setFiltro((prev) => ({
-                        ...prev,
-                        mes: Number(v),
-                      }))
-                    }
-                  >
-                    <SelectTrigger id="filtro-mes" className="w-full">
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mesesDoAnoSelecionado.map((mes) => {
-                        const label =
-                          MESES.find((m) => m.value === String(mes))?.label ?? String(mes);
-                        return (
-                          <SelectItem key={mes} value={String(mes)}>
-                            {label}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-1.5"
-                  onClick={() => setFiltro({ mes: null, ano: null })}
-                >
-                  <FilterX className="h-4 w-4" />
-                  Limpar Filtros
-                </Button>
-              </div>
+        <div className="sticky top-16 z-40 -mx-4 mb-6 w-auto border-b border-border bg-background px-4 py-3 shadow-sm lg:-mx-6 lg:px-6">
+          <div className="flex flex-row flex-wrap items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-sm font-bold text-foreground">Filtro de período</span>
+              {filtrosLimpos && (
+                <Badge variant="secondary" className="text-xs">
+                  Histórico geral
+                </Badge>
+              )}
             </div>
-          </aside>
 
-          <div className="min-w-0 w-full flex-1 space-y-6">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-ano" className="shrink-0 text-sm font-medium">
+                Ano:
+              </Label>
+              <Select
+                value={filtro.ano !== null ? String(filtro.ano) : "todos"}
+                disabled={anosComDados.length === 0}
+                onValueChange={(v) => {
+                  if (v === "todos") {
+                    setFiltro({ mes: null, ano: null });
+                    return;
+                  }
+                  const ano = Number(v);
+                  const meses = periodos
+                    .filter((p) => p.ano === ano)
+                    .map((p) => p.mes)
+                    .sort((a, b) => a - b);
+                  setFiltro({
+                    ano,
+                    mes: meses[meses.length - 1] ?? null,
+                  });
+                }}
+              >
+                <SelectTrigger id="filtro-ano" className="w-[140px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {anosComDados.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-mes" className="shrink-0 text-sm font-medium">
+                Mês:
+              </Label>
+              <Select
+                value={filtro.mes !== null ? String(filtro.mes) : "todos"}
+                disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
+                onValueChange={(v) =>
+                  setFiltro((prev) => ({
+                    ...prev,
+                    mes: Number(v),
+                  }))
+                }
+              >
+                <SelectTrigger id="filtro-mes" className="w-[160px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mesesDoAnoSelecionado.map((mes) => {
+                    const label =
+                      MESES.find((m) => m.value === String(mes))?.label ?? String(mes);
+                    return (
+                      <SelectItem key={mes} value={String(mes)}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto gap-1.5"
+              onClick={() => setFiltro({ mes: null, ano: null })}
+            >
+              <FilterX className="h-4 w-4" />
+              Limpar Filtros
+            </Button>
+          </div>
+        </div>
+
+        <div className="w-full space-y-6">
             {!filtroReady || loading ? (
               <p className="text-sm text-muted-foreground">Carregando métricas...</p>
             ) : error ? (
@@ -1003,7 +1004,6 @@ function KpisPage() {
                 </section>
               </>
             )}
-          </div>
         </div>
       </main>
 
