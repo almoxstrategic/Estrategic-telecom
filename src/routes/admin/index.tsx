@@ -17,8 +17,27 @@ import {
   Users,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import {
+  ADMIN_TABS,
+  adminTabFromSearch,
+  loadPersistedAdminTab,
+  persistAdminTab,
+  type AdminTab,
+  type AdminTabSearch,
+} from "@/lib/admin-tab";
+
+type AdminSearch = {
+  tab?: AdminTabSearch;
+};
 
 export const Route = createFileRoute("/admin/")({
+  validateSearch: (search: Record<string, unknown>): AdminSearch => {
+    const tab = search.tab;
+    if (tab === "inicio" || tab === "miscelaneas" || tab === "serializados") {
+      return { tab };
+    }
+    return {};
+  },
   head: () => ({
     meta: [
       { title: "Admin — Estrategic Field" },
@@ -28,40 +47,30 @@ export const Route = createFileRoute("/admin/")({
   component: AdminHome,
 });
 
-const ADMIN_TABS = ["Início", "Miscelâneas", "Serializados"] as const;
-type AdminTab = (typeof ADMIN_TABS)[number];
-
-const ADMIN_LAST_TAB_KEY = "adminLastTab";
-
-function isAdminTab(value: string | null): value is AdminTab {
-  return ADMIN_TABS.includes(value as AdminTab);
-}
-
 const MODULE_GRID_CLASS = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
 const MODULE_CARD_CLASS =
   "relative flex h-40 w-full flex-col justify-between rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md";
 
 function AdminHome() {
+  const { tab: tabSearch } = Route.useSearch();
   const [activeTab, setActiveTab] = useState<AdminTab>("Início");
 
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(ADMIN_LAST_TAB_KEY);
-      if (isAdminTab(saved)) {
-        setActiveTab(saved);
-      }
-    } catch {
-      // sessionStorage indisponível (SSR / privacidade)
+    const fromSearch = adminTabFromSearch(tabSearch);
+    if (fromSearch) {
+      setActiveTab(fromSearch);
+      persistAdminTab(fromSearch);
+      return;
     }
-  }, []);
+    const saved = loadPersistedAdminTab();
+    if (saved) {
+      setActiveTab(saved);
+    }
+  }, [tabSearch]);
 
   const selecionarAba = (tab: AdminTab) => {
     setActiveTab(tab);
-    try {
-      sessionStorage.setItem(ADMIN_LAST_TAB_KEY, tab);
-    } catch {
-      // sessionStorage indisponível (SSR / privacidade)
-    }
+    persistAdminTab(tab);
   };
 
   return (

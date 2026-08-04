@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import { Logo } from "./Logo";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppSidebar } from "./AppSidebar";
+import { resetAdminTabToInicio } from "@/lib/admin-tab";
 
 export function AppHeader() {
   const [open, setOpen] = useState(false);
@@ -23,8 +24,10 @@ export function AppHeader() {
       <div className="flex justify-center">
         <Link
           to="/admin"
+          search={{ tab: "inicio" }}
           aria-label="Ir para o Início do painel"
           className="cursor-pointer transition-opacity hover:opacity-80"
+          onClick={() => resetAdminTabToInicio()}
         >
           <Logo />
         </Link>

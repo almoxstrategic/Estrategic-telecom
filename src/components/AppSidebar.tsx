@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Logo } from "./Logo";
 import { useApp } from "@/lib/app-store";
+import { resetAdminTabToInicio } from "@/lib/admin-tab";
 
 const MISCELANEAS_PATHS = [
   "/todos",
@@ -133,7 +134,18 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="shrink-0 border-b border-sidebar-border p-5">
-        <Logo />
+        <Link
+          to="/admin"
+          search={{ tab: "inicio" }}
+          aria-label="Ir para o Início do painel"
+          className="inline-flex cursor-pointer transition-opacity hover:opacity-80"
+          onClick={() => {
+            resetAdminTabToInicio();
+            onNavigate?.();
+          }}
+        >
+          <Logo />
+        </Link>
         {user && (
           <div className="mt-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -178,7 +190,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <div className="space-y-1 pl-8 pt-1">
                   <Link
                     to="/admin"
-                    onClick={onNavigate}
+                    search={{ tab: "inicio" }}
+                    onClick={() => {
+                      resetAdminTabToInicio();
+                      onNavigate?.();
+                    }}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
                       isAdminHomePath(pathname)
                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
