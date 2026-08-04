@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, Copy, FilterX, Package, Search, Users, X } from "lucide-react";
+import { AlertTriangle, BarChart3, ClipboardCheck, Copy, FilterX, Package, Search, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
@@ -698,15 +698,15 @@ function KpisPage() {
               </p>
             ) : (
               <>
-                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <button
                     type="button"
                     onClick={abrirModalTotalItens}
                     className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
                   >
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Package className="h-4 w-4 text-primary" />
-                      Total de Itens Consumidos
+                      <Package className="h-4 w-4 shrink-0 text-primary" />
+                      Total de itens (misc) Consumidos
                     </div>
                     <div className="mt-2 text-3xl font-black text-foreground">
                       {formatQuantidade(kpis?.total_itens ?? 0)}
@@ -718,13 +718,27 @@ function KpisPage() {
                     className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-shadow cursor-pointer hover:shadow-md"
                   >
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
                       Total de WOs Processadas
                     </div>
                     <div className="mt-2 text-3xl font-black text-foreground">
                       {formatQuantidade(kpis?.total_wos ?? 0)}
                     </div>
                   </button>
+                  <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <ClipboardCheck className="h-4 w-4 shrink-0 text-primary" />
+                      Total de notas produtivas (TOA)
+                    </div>
+                    <div className="mt-2 text-3xl font-black text-foreground">0</div>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <XCircle className="h-4 w-4 shrink-0 text-primary" />
+                      Total de perda de notas (TOA)
+                    </div>
+                    <div className="mt-2 text-3xl font-black text-foreground">0</div>
+                  </div>
                 </section>
 
                 <section className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
