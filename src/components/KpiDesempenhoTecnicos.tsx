@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BarChart3, ClipboardCheck, Users, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ClipboardCheck, Users, XCircle } from "lucide-react";
 import {
   Bar,
   CartesianGrid,
@@ -15,6 +15,7 @@ import type { KpiTopTecnico } from "@/lib/logistica-types";
 import {
   gerarDesempenhoMock,
   somarToaMock,
+  type TecnicoDesempenhoMock,
 } from "@/lib/kpi-desempenho-mock";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import { isTecnicoDemitido } from "@/lib/team-service";
@@ -28,6 +29,17 @@ type KpiDesempenhoTecnicosProps = {
 };
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
+
+type SortKey =
+  | "aproveitamento"
+  | "receitaPerda"
+  | "receitaBruta"
+  | "receitaLiquida";
+
+type SortConfig = {
+  key: SortKey | null;
+  direction: "asc" | "desc";
+};
 
 function formatReceita(valor: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -49,6 +61,21 @@ function limiteDoFiltro(filtro: FiltroTop): number | null {
   }
 }
 
+function valorOrdenacao(tecnico: TecnicoDesempenhoMock, key: SortKey): number {
+  switch (key) {
+    case "aproveitamento": {
+      const total = tecnico.notasFeitas + tecnico.perdasNotas;
+      return total > 0 ? tecnico.notasFeitas / total : 0;
+    }
+    case "receitaPerda":
+      return tecnico.receitaPerda;
+    case "receitaBruta":
+      return tecnico.receita;
+    case "receitaLiquida":
+      return tecnico.receita - tecnico.receitaPerda;
+  }
+}
+
 export function KpiDesempenhoTecnicos({
   tecnicos,
   demitidosKeys,
@@ -58,6 +85,10 @@ export function KpiDesempenhoTecnicos({
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: null,
+    direction: "asc",
+  });
 
   const enriquecidos = useMemo(
     () => gerarDesempenhoMock(tecnicos, { ano, mes, dia }),
@@ -73,6 +104,48 @@ export function KpiDesempenhoTecnicos({
       return nome.includes(termo) || matricula.includes(termo);
     });
   }, [enriquecidos, buscaTecnico]);
+
+  const tecnicosOrdenados = useMemo(() => {
+    if (!sortConfig.key) return tecnicosFiltrados;
+    const key = sortConfig.key;
+    const fator = sortConfig.direction === "asc" ? 1 : -1;
+    return [...tecnicosFiltrados].sort((a, b) => {
+      const valorA = valorOrdenacao(a, key);
+      const valorB = valorOrdenacao(b, key);
+      if (valorA < valorB) return -1 * fator;
+      if (valorA > valorB) return 1 * fator;
+      return 0;
+    });
+  }, [tecnicosFiltrados, sortConfig]);
+
+  const requestSort = (key: SortKey) => {
+    setSortConfig((prev) => {
+      if (prev.key === key && prev.direction === "asc") {
+        return { key, direction: "desc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const iconeOrdenacao = (key: SortKey) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+    );
+  };
+
+  const cabecalhoOrdenavel = (label: string, key: SortKey) => (
+    <button
+      type="button"
+      onClick={() => requestSort(key)}
+      className="inline-flex w-full cursor-pointer select-none items-center justify-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100"
+    >
+      <span>{label}</span>
+      {iconeOrdenacao(key)}
+    </button>
+  );
 
   const { totalNotasProdutivas, totalPerdaNotas } = useMemo(
     () => somarToaMock(enriquecidos),
@@ -304,14 +377,22 @@ export function KpiDesempenhoTecnicos({
               <span className="text-center">Perdas de Notas</span>
               <span className="text-center">% Freq. Relativa</span>
               <span className="text-center">% Freq. Absoluta</span>
-              <span className="text-center">Aproveitamento</span>
-              <span className="text-center">Receita Perda</span>
-              <span className="text-center">Receita Bruta</span>
-              <span className="text-center">Receita Líquida</span>
+              <span className="text-center">
+                {cabecalhoOrdenavel("Aproveitamento", "aproveitamento")}
+              </span>
+              <span className="text-center">
+                {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
+              </span>
+              <span className="text-center">
+                {cabecalhoOrdenavel("Receita Bruta", "receitaBruta")}
+              </span>
+              <span className="text-center">
+                {cabecalhoOrdenavel("Receita Líquida", "receitaLiquida")}
+              </span>
             </div>
 
             <ul className="min-w-[1200px]">
-              {tecnicosFiltrados.map((tecnico) => {
+              {tecnicosOrdenados.map((tecnico) => {
                 const isDemitido = isTecnicoDemitido(
                   demitidosKeys,
                   tecnico.id_tecnico,
@@ -319,48 +400,48 @@ export function KpiDesempenhoTecnicos({
                 );
                 const receitaLiquida = tecnico.receita - tecnico.receitaPerda;
                 return (
-                <li
-                  key={tecnico.id_tecnico}
-                  className="grid grid-cols-10 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
-                >
-                  <span
-                    className={
-                      isDemitido
-                        ? "truncate text-left font-medium text-gray-500"
-                        : "truncate text-left font-medium text-primary"
-                    }
-                    title={tecnico.nome}
+                  <li
+                    key={tecnico.id_tecnico}
+                    className="grid grid-cols-10 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
                   >
-                    {tecnico.nome}
-                  </span>
-                  <span className="text-center font-bold tabular-nums text-gray-900">
-                    {formatQuantidade(tecnico.notasFeitas + tecnico.perdasNotas)}
-                  </span>
-                  <span className="text-center font-normal tabular-nums text-gray-500">
-                    {tecnico.notasFeitas}
-                  </span>
-                  <span className="text-center font-normal tabular-nums text-gray-500">
-                    {tecnico.perdasNotas}
-                  </span>
-                  <span className="text-center font-normal tabular-nums text-gray-600">
-                    {tecnico.freqRelativa}
-                  </span>
-                  <span className="text-center font-normal tabular-nums text-gray-600">
-                    {tecnico.freqAbsoluta}
-                  </span>
-                  <span className="text-center font-semibold tabular-nums text-gray-800">
-                    {tecnico.mediaAproveitamento}
-                  </span>
-                  <span className="text-center font-medium tabular-nums text-red-600">
-                    {formatReceita(tecnico.receitaPerda)}
-                  </span>
-                  <span className="text-center font-bold tabular-nums text-gray-900">
-                    {formatReceita(tecnico.receita)}
-                  </span>
-                  <span className="text-center font-bold tabular-nums text-green-600">
-                    {formatReceita(receitaLiquida)}
-                  </span>
-                </li>
+                    <span
+                      className={
+                        isDemitido
+                          ? "truncate text-left font-medium text-gray-500"
+                          : "truncate text-left font-medium text-primary"
+                      }
+                      title={tecnico.nome}
+                    >
+                      {tecnico.nome}
+                    </span>
+                    <span className="text-center font-bold tabular-nums text-gray-900">
+                      {formatQuantidade(tecnico.notasFeitas + tecnico.perdasNotas)}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-500">
+                      {tecnico.notasFeitas}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-500">
+                      {tecnico.perdasNotas}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-600">
+                      {tecnico.freqRelativa}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-600">
+                      {tecnico.freqAbsoluta}
+                    </span>
+                    <span className="text-center font-semibold tabular-nums text-gray-800">
+                      {tecnico.mediaAproveitamento}
+                    </span>
+                    <span className="text-center font-medium tabular-nums text-red-600">
+                      {formatReceita(tecnico.receitaPerda)}
+                    </span>
+                    <span className="text-center font-bold tabular-nums text-gray-900">
+                      {formatReceita(tecnico.receita)}
+                    </span>
+                    <span className="text-center font-bold tabular-nums text-green-600">
+                      {formatReceita(receitaLiquida)}
+                    </span>
+                  </li>
                 );
               })}
             </ul>
