@@ -28,7 +28,10 @@ type KpiDesempenhoTecnicosProps = {
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
 
 function formatReceita(valor: number): string {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(valor);
 }
 
 function limiteDoFiltro(filtro: FiltroTop): number | null {
@@ -81,6 +84,8 @@ export function KpiDesempenhoTecnicos({
         nomeCompleto: t.nome,
         notasFeitas: t.notasFeitas,
         perdasNotas: t.perdasNotas,
+        receitaGanha: t.receita,
+        receitaPerda: t.receitaPerda,
         pareto,
       };
     });
@@ -173,16 +178,20 @@ export function KpiDesempenhoTecnicos({
                       nomeCompleto: string;
                       notasFeitas: number;
                       perdasNotas: number;
+                      receitaGanha: number;
+                      receitaPerda: number;
                       pareto: number;
                     };
                     return (
                       <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
                         <p className="font-semibold">{item.nomeCompleto}</p>
                         <p className="text-green-600">
-                          Notas Feitas: {formatQuantidade(item.notasFeitas)}
+                          Notas Feitas: {formatQuantidade(item.notasFeitas)} -{" "}
+                          {formatReceita(item.receitaGanha)}
                         </p>
                         <p className="text-red-600">
-                          Notas Perdidas: {formatQuantidade(item.perdasNotas)}
+                          Notas Perdidas: {formatQuantidade(item.perdasNotas)} -{" "}
+                          {formatReceita(item.receitaPerda)}
                         </p>
                         <p className="text-amber-500">
                           Pareto:{" "}
@@ -244,22 +253,23 @@ export function KpiDesempenhoTecnicos({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <div className="grid grid-cols-8 gap-3 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground min-w-[960px]">
+            <div className="grid min-w-[1080px] grid-cols-9 gap-3 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground">
               <span className="text-left">Nome</span>
-              <span className="text-center">Baixa misc</span>
+              <span className="text-center">Total de Notas</span>
               <span className="text-center">Notas feitas</span>
               <span className="text-center">Perdas de Notas</span>
-              <span className="text-center">Receita Perda</span>
-              <span className="text-center">Receita</span>
               <span className="text-center">% Freq. Relativa</span>
               <span className="text-center">% Freq. Absoluta</span>
+              <span className="text-center">Aproveitamento</span>
+              <span className="text-center">Receita Perda</span>
+              <span className="text-center">Receita Ganha</span>
             </div>
 
-            <ul className="min-w-[960px]">
+            <ul className="min-w-[1080px]">
               {enriquecidos.map((tecnico) => (
                 <li
                   key={tecnico.id_tecnico}
-                  className="grid grid-cols-8 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
+                  className="grid grid-cols-9 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
                 >
                   <span
                     className="truncate text-left font-medium text-primary"
@@ -268,7 +278,7 @@ export function KpiDesempenhoTecnicos({
                     {tecnico.nome}
                   </span>
                   <span className="text-center font-bold tabular-nums text-gray-900">
-                    {formatQuantidade(tecnico.baixaMisc)}
+                    {formatQuantidade(tecnico.notasFeitas + tecnico.perdasNotas)}
                   </span>
                   <span className="text-center font-normal tabular-nums text-gray-500">
                     {tecnico.notasFeitas}
@@ -276,17 +286,20 @@ export function KpiDesempenhoTecnicos({
                   <span className="text-center font-normal tabular-nums text-gray-500">
                     {tecnico.perdasNotas}
                   </span>
-                  <span className="text-center font-medium tabular-nums text-red-600">
-                    {formatReceita(tecnico.receitaPerda)}
-                  </span>
-                  <span className="text-center font-medium tabular-nums text-green-600">
-                    {formatReceita(tecnico.receita)}
-                  </span>
                   <span className="text-center font-normal tabular-nums text-gray-600">
                     {tecnico.freqRelativa}
                   </span>
                   <span className="text-center font-normal tabular-nums text-gray-600">
                     {tecnico.freqAbsoluta}
+                  </span>
+                  <span className="text-center font-semibold tabular-nums text-gray-800">
+                    {tecnico.mediaAproveitamento}
+                  </span>
+                  <span className="text-center font-medium tabular-nums text-red-600">
+                    {formatReceita(tecnico.receitaPerda)}
+                  </span>
+                  <span className="text-center font-medium tabular-nums text-green-600">
+                    {formatReceita(tecnico.receita)}
                   </span>
                 </li>
               ))}

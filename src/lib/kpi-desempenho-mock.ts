@@ -14,6 +14,7 @@ export type TecnicoDesempenhoMock = {
   baixaMisc: number;
   notasFeitas: number;
   perdasNotas: number;
+  mediaAproveitamento: string;
   receita: number;
   receitaPerda: number;
   freqRelativa: string;
@@ -58,6 +59,11 @@ export function gerarDesempenhoMock(
     const perdasNotas = Math.floor(rand() * 20);
     const receita = notasFeitas * 85.5;
     const receitaPerda = perdasNotas * 85.5;
+    const denominador = notasFeitas + perdasNotas;
+    const mediaAproveitamento =
+      denominador === 0
+        ? formatPct(0)
+        : formatPct((notasFeitas / denominador) * 100);
     const nome = formatTecnicoLabel(tecnico.nome_tecnico, tecnico.id_tecnico);
     const primeiroNome = nome.trim().split(/\s+/)[0] ?? nome;
 
@@ -68,6 +74,7 @@ export function gerarDesempenhoMock(
       baixaMisc: tecnico.total,
       notasFeitas,
       perdasNotas,
+      mediaAproveitamento,
       receita,
       receitaPerda,
     };
