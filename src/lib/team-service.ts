@@ -41,6 +41,30 @@ function mapTecnicoRow(row: {
   };
 }
 
+/** Chaves normalizadas (matrícula, login, id, nome) dos técnicos demitidos. */
+export function buildTecnicosDemitidosKeys(tecnicos: TecnicoProfile[]): Set<string> {
+  const keys = new Set<string>();
+  for (const tecnico of tecnicos) {
+    if (tecnico.status !== "DEMITIDO") continue;
+    for (const raw of [tecnico.identificacao, tecnico.login, tecnico.id, tecnico.nome]) {
+      const key = raw?.trim().toUpperCase();
+      if (key) keys.add(key);
+    }
+  }
+  return keys;
+}
+
+export function isTecnicoDemitido(
+  demitidosKeys: Set<string>,
+  idTecnico: string,
+  nomeTecnico?: string | null,
+): boolean {
+  if (demitidosKeys.has(idTecnico.trim().toUpperCase())) return true;
+  const nome = nomeTecnico?.trim();
+  if (nome && demitidosKeys.has(nome.toUpperCase())) return true;
+  return false;
+}
+
 export async function fetchTecnicos(): Promise<TecnicoProfile[]> {
   const supabase = getSupabaseClient();
   const withStatus = await supabase

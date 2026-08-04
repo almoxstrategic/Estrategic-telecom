@@ -73,6 +73,12 @@ import {
   normalizeMaterialCode,
 } from "@/lib/material-code";
 import { formatQuantidade } from "@/lib/parse-locale-number";
+import {
+  buildTecnicosDemitidosKeys,
+  fetchTecnicos,
+  isTecnicoDemitido,
+  type TecnicoProfile,
+} from "@/lib/team-service";
 import { formatTecnicoLabel, formatTecnicoModalTitle } from "@/lib/tecnico-label";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
@@ -202,6 +208,7 @@ function KpisPage() {
   const [criticosData, setCriticosData] = useState<ConsumoItemCritico[]>([]);
   const [loadingCriticos, setLoadingCriticos] = useState(false);
   const [isKpiNavOpen, setIsKpiNavOpen] = useState(false);
+  const [tecnicosEquipe, setTecnicosEquipe] = useState<TecnicoProfile[]>([]);
   const { modulo: kpiModulo } = Route.useParams();
   const isDesempenho = kpiModulo === "desempenho-tecnico";
 
@@ -210,6 +217,21 @@ function KpisPage() {
       setKpiFiltro((prev) => ({ ...prev, dia: null }));
     }
   }, [isDesempenho, filtro.dia]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setTecnicosEquipe(await fetchTecnicos());
+      } catch {
+        setTecnicosEquipe([]);
+      }
+    })();
+  }, []);
+
+  const tecnicosDemitidosKeys = useMemo(
+    () => buildTecnicosDemitidosKeys(tecnicosEquipe),
+    [tecnicosEquipe],
+  );
 
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(null);
   const [tecnicoSelecionadoLabel, setTecnicoSelecionadoLabel] = useState("");
@@ -861,6 +883,7 @@ function KpisPage() {
           ) : (
             <KpiDesempenhoTecnicos
               tecnicos={kpis?.top_tecnicos ?? []}
+              demitidosKeys={tecnicosDemitidosKeys}
               ano={filtro.ano}
               mes={filtro.mes}
               dia={filtro.dia}
@@ -1085,7 +1108,13 @@ function KpisPage() {
                             <span className="text-center">Receita</span>
                           </div>
                           <ul>
-                            {(kpis?.top_tecnicos ?? []).map((t) => (
+                            {(kpis?.top_tecnicos ?? []).map((t) => {
+                              const isDemitido = isTecnicoDemitido(
+                                tecnicosDemitidosKeys,
+                                t.id_tecnico,
+                                t.nome_tecnico,
+                              );
+                              return (
                               <li
                                 key={t.id_tecnico}
                                 className="border-b border-border last:border-b-0"
@@ -1098,7 +1127,11 @@ function KpisPage() {
                                   className="grid w-full cursor-pointer grid-cols-4 items-center gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/60"
                                 >
                                   <span
-                                    className="truncate text-left font-medium text-primary"
+                                    className={
+                                      isDemitido
+                                        ? "truncate text-left font-medium text-gray-500"
+                                        : "truncate text-left font-medium text-primary"
+                                    }
                                     title={formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
                                   >
                                     {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
@@ -1114,7 +1147,8 @@ function KpisPage() {
                                   </span>
                                 </button>
                               </li>
-                            ))}
+                              );
+                            })}
                           </ul>
                         </div>
                       </>

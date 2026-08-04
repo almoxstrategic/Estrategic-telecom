@@ -17,9 +17,11 @@ import {
   somarToaMock,
 } from "@/lib/kpi-desempenho-mock";
 import { formatQuantidade } from "@/lib/parse-locale-number";
+import { isTecnicoDemitido } from "@/lib/team-service";
 
 type KpiDesempenhoTecnicosProps = {
   tecnicos: KpiTopTecnico[];
+  demitidosKeys: Set<string>;
   ano: number | null;
   mes: number | null;
   dia: number | null;
@@ -49,6 +51,7 @@ function limiteDoFiltro(filtro: FiltroTop): number | null {
 
 export function KpiDesempenhoTecnicos({
   tecnicos,
+  demitidosKeys,
   ano,
   mes,
   dia,
@@ -266,13 +269,23 @@ export function KpiDesempenhoTecnicos({
             </div>
 
             <ul className="min-w-[1080px]">
-              {enriquecidos.map((tecnico) => (
+              {enriquecidos.map((tecnico) => {
+                const isDemitido = isTecnicoDemitido(
+                  demitidosKeys,
+                  tecnico.id_tecnico,
+                  tecnico.nome,
+                );
+                return (
                 <li
                   key={tecnico.id_tecnico}
                   className="grid grid-cols-9 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
                 >
                   <span
-                    className="truncate text-left font-medium text-primary"
+                    className={
+                      isDemitido
+                        ? "truncate text-left font-medium text-gray-500"
+                        : "truncate text-left font-medium text-primary"
+                    }
                     title={tecnico.nome}
                   >
                     {tecnico.nome}
@@ -302,7 +315,8 @@ export function KpiDesempenhoTecnicos({
                     {formatReceita(tecnico.receita)}
                   </span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}
