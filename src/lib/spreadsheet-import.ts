@@ -286,7 +286,7 @@ export async function parseWoConsumoFile(file: File): Promise<WoConsumoRow[]> {
   return rows;
 }
 
-/** Estoque BTP: Material / Cod material + Descr. Material */
+/** Estoque BTP / dim_materiais: Material + Descr. Material (e aliases). */
 function mapEstoqueRow(row: RawRow): DimMaterialRow | null {
   const material = pick(row, "Material", "Cod material", "Cod. material", "Código material");
   const descr = pick(row, "Descr. Material", "Descr.Material", "Descr Material", "Nomenclatura");
@@ -309,6 +309,60 @@ export async function parseDimMateriaisFile(file: File): Promise<DimMaterialRow[
   for (const row of raw) {
     const mapped = mapEstoqueRow(row);
     if (mapped) map.set(mapped.material, mapped);
+  }
+
+  return [...map.values()];
+}
+
+export type EstoqueBtpImportRow = {
+  codigo: string;
+  descricao: string;
+};
+
+/** Miscelâneas — Estoque BTP: cabeçalhos exatos `Material` e `Descr. Material`. */
+const ESTOQUE_BTP_EXACT_COLUMNS = {
+  codigo: ["Material"],
+  descricao: ["Descr. Material"],
+} as const;
+
+function estoqueBtpPick(row: RawRow, exactNames: readonly string[], ...aliases: string[]): string {
+  for (const exact of exactNames) {
+    for (const [key, value] of Object.entries(row)) {
+      if (trimCell(key) === exact) {
+        const text = trimCell(value);
+        if (text) return text;
+      }
+    }
+  }
+  return pick(row, ...exactNames, ...aliases);
+}
+
+function mapEstoqueBtpRow(row: RawRow): EstoqueBtpImportRow | null {
+  const codigoRaw = estoqueBtpPick(row, ESTOQUE_BTP_EXACT_COLUMNS.codigo, "Material");
+  if (!codigoRaw) return null;
+
+  const codigo = normalizeMaterialCode(codigoRaw);
+  if (!codigo) return null;
+
+  const descricao =
+    estoqueBtpPick(
+      row,
+      ESTOQUE_BTP_EXACT_COLUMNS.descricao,
+      "Descr. Material",
+      "Descr.Material",
+      "Descr Material",
+    ) || codigo;
+
+  return { codigo, descricao: descricao.trim() };
+}
+
+export async function parseEstoqueBtpFile(file: File): Promise<EstoqueBtpImportRow[]> {
+  const raw = await parseSpreadsheet(file);
+  const map = new Map<string, EstoqueBtpImportRow>();
+
+  for (const row of raw) {
+    const mapped = mapEstoqueBtpRow(row);
+    if (mapped) map.set(mapped.codigo, mapped);
   }
 
   return [...map.values()];

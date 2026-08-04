@@ -1,10 +1,10 @@
 /** MVP: Estoque BTP (Miscelâneas) persistido em localStorage. */
 
 export type EstoqueBtpItem = {
-  /** Equivalente a "Cod material" / "Material" da planilha. */
-  codMaterial: string;
-  /** Nomenclatura / Descr. Material. */
-  nome: string;
+  /** Coluna `Material` da planilha (código do item). */
+  codigo: string;
+  /** Coluna `Descr. Material` da planilha (nomenclatura). */
+  descricao: string;
 };
 
 export type EstoqueBtpSnapshot = {
@@ -24,10 +24,25 @@ function isClient(): boolean {
 function normalizeItem(row: unknown): EstoqueBtpItem | null {
   if (!row || typeof row !== "object") return null;
   const r = row as Record<string, unknown>;
-  if (typeof r.codMaterial !== "string" || typeof r.nome !== "string") return null;
-  const codMaterial = r.codMaterial.trim();
-  if (!codMaterial) return null;
-  return { codMaterial, nome: r.nome.trim() || codMaterial };
+
+  const codigoRaw =
+    typeof r.codigo === "string"
+      ? r.codigo
+      : typeof r.codMaterial === "string"
+        ? r.codMaterial
+        : null;
+  const descricaoRaw =
+    typeof r.descricao === "string"
+      ? r.descricao
+      : typeof r.nome === "string"
+        ? r.nome
+        : null;
+
+  if (codigoRaw === null) return null;
+  const codigo = codigoRaw.trim();
+  if (!codigo) return null;
+  const descricao = (descricaoRaw ?? codigo).toString().trim() || codigo;
+  return { codigo, descricao };
 }
 
 function parseSnapshot(raw: string): EstoqueBtpSnapshot {

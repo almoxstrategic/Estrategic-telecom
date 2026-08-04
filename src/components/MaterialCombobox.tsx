@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { searchDimMateriais } from "@/lib/logistica-service";
+import {
+  getDadosEstoqueBtp,
+  type EstoqueBtpItem,
+} from "@/lib/estoque-btp-store";
 import type { DimMaterial } from "@/lib/logistica-types";
 import { formatMaterialLabel, normalizeMaterialCode } from "@/lib/material-code";
 import { cn } from "@/lib/utils";
@@ -22,6 +25,19 @@ type MaterialComboboxProps = {
   className?: string;
 };
 
+function dedupeEstoqueBtpPorCodigo(items: EstoqueBtpItem[]): EstoqueBtpItem[] {
+  const map = new Map<string, EstoqueBtpItem>();
+  for (const item of items) {
+    const codigo = normalizeMaterialCode(item.codigo?.toString() ?? "");
+    if (!codigo || map.has(codigo)) continue;
+    map.set(codigo, {
+      codigo,
+      descricao: (item.descricao ?? codigo).toString().trim() || codigo,
+    });
+  }
+  return [...map.values()];
+}
+
 export function MaterialCombobox({
   onSelect,
   exclude = [],
@@ -30,30 +46,43 @@ export function MaterialCombobox({
 }: MaterialComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<DimMaterial[]>([]);
+  const [dadosEstoqueBtp, setDadosEstoqueBtp] = useState<EstoqueBtpItem[]>([]);
 
   useEffect(() => {
     if (!open) return;
+    setDadosEstoqueBtp(dedupeEstoqueBtpPorCodigo(getDadosEstoqueBtp()));
+  }, [open]);
 
-    const excluded = new Set(exclude.map(normalizeMaterialCode));
+  const excluded = useMemo(
+    () => new Set(exclude.map((c) => normalizeMaterialCode(c?.toString() ?? ""))),
+    [exclude],
+  );
 
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        setLoading(true);
-        try {
-          const items = await searchDimMateriais(query);
-          setResults(items.filter((item) => !excluded.has(item.material)));
-        } catch {
-          setResults([]);
-        } finally {
-          setLoading(false);
-        }
-      })();
-    }, 250);
+  const listaUnica = useMemo(
+    () => dadosEstoqueBtp.filter((item) => !excluded.has(item.codigo)),
+    [dadosEstoqueBtp, excluded],
+  );
 
-    return () => window.clearTimeout(timer);
-  }, [open, query, exclude]);
+  const filtrados = useMemo(() => {
+    const searchTerm = query.trim();
+    if (!searchTerm) return listaUnica;
+
+    const searchLower = searchTerm.toLowerCase();
+    const searchCode = normalizeMaterialCode(searchTerm).toLowerCase();
+
+    return listaUnica.filter((item) => {
+      const codigo = item.codigo?.toString().toLowerCase() ?? "";
+      const descricao = item.descricao?.toString().toLowerCase() ?? "";
+      return (
+        codigo.includes(searchTerm) ||
+        codigo.includes(searchLower) ||
+        (searchCode.length > 0 && codigo.includes(searchCode)) ||
+        descricao.includes(searchLower)
+      );
+    });
+  }, [listaUnica, query]);
+
+  const estoqueBtpVazio = !dadosEstoqueBtp || dadosEstoqueBtp.length === 0;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -81,23 +110,26 @@ export function MaterialCombobox({
           />
           <CommandList>
             <CommandEmpty>
-              {loading
-                ? "Buscando…"
-                : "Nenhum material encontrado. Importe o estoque (Upload C) primeiro."}
+              {estoqueBtpVazio
+                ? "Nenhum material encontrado. Importe o Estoque BTP primeiro."
+                : "Nenhum material corresponde à busca."}
             </CommandEmpty>
             <CommandGroup>
-              {results.map((item) => (
+              {filtrados.map((item) => (
                 <CommandItem
-                  key={item.material}
-                  value={`${item.material} ${item.descr_material}`}
+                  key={item.codigo}
+                  value={`${item.codigo} ${item.descricao}`}
                   onSelect={() => {
-                    onSelect(item);
+                    onSelect({
+                      material: item.codigo,
+                      descr_material: item.descricao,
+                    });
                     setOpen(false);
                     setQuery("");
                   }}
                 >
                   <span className="truncate text-sm">
-                    {formatMaterialLabel(item.material, item.descr_material)}
+                    {formatMaterialLabel(item.codigo, item.descricao)}
                   </span>
                 </CommandItem>
               ))}

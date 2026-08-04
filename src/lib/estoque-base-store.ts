@@ -95,7 +95,7 @@ export function getDadosEstoqueBase(): EstoqueBaseItem[] {
 
 /**
  * Cruza Estoque Base com Estoque BTP.
- * Chave: Código Alternativo === Cod material.
+ * Chave: Código Alternativo === Material (codigo).
  */
 export function cruzarDadosEstoque(
   dadosEstoqueBase: EstoqueBaseItem[],
@@ -103,7 +103,7 @@ export function cruzarDadosEstoque(
 ): EstoqueBaseCruzado[] {
   const btpByCode = new Map<string, EstoqueBtpItem>();
   for (const item of dadosEstoqueBtp) {
-    const key = normalizeMaterialCode(item.codMaterial);
+    const key = normalizeMaterialCode(item.codigo);
     if (key && !btpByCode.has(key)) btpByCode.set(key, item);
   }
 
@@ -111,7 +111,7 @@ export function cruzarDadosEstoque(
     const key = normalizeMaterialCode(base.codigoAlternativo);
     const match = btpByCode.get(key);
     return {
-      material: match?.nome?.trim() ? match.nome.trim() : "Nome não encontrado",
+      material: match?.descricao?.trim() ? match.descricao.trim() : "Nome não encontrado",
       codigo: base.codigoAlternativo,
       estoqueAtual: base.estoqueAtual,
       estoqueReservado: base.estoqueReservado,

@@ -6,9 +6,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
 import {
-  parseDimMateriaisFile,
   parseEstoqueAtlasFile,
   parseEstoqueBaseFile,
+  parseEstoqueBtpFile,
   parseEstoqueCampoFile,
   parseWoCabecalhoFile,
   parseWoConsumoFile,
@@ -309,18 +309,23 @@ function ImportacaoPage() {
   const handleEstoqueBtp = async (file: File) => {
     setBusyEstoqueBtp(true);
     try {
-      const rows = await parseDimMateriaisFile(file);
+      const rows = await parseEstoqueBtpFile(file);
       if (rows.length === 0) {
         toast.error("Nenhuma linha válida encontrada no Estoque BTP.");
         return;
       }
       saveEstoqueBtp(
         rows.map((row) => ({
-          codMaterial: row.material,
-          nome: row.descr_material,
+          codigo: row.codigo,
+          descricao: row.descricao,
         })),
       );
-      const result = await upsertDimMateriais(rows);
+      const result = await upsertDimMateriais(
+        rows.map((row) => ({
+          material: row.codigo,
+          descr_material: row.descricao,
+        })),
+      );
       toast.success(
         `Estoque BTP importado: ${result.inserted} inseridos, ${result.updated} atualizados (${rows.length} materiais).`,
       );
@@ -408,7 +413,7 @@ function ImportacaoPage() {
             />
             <MiscelaneaImportCard
               title="Estoque BTP"
-              description="Colunas: Material (Cod material), Descr. Material. Alimenta o autocomplete de KPIs e o cruzamento do Estoque Base."
+              description="Colunas: Material, Descr. Material. Alimenta o autocomplete de KPIs e o cruzamento do Estoque Base."
               busy={busyEstoqueBtp}
               onImport={handleEstoqueBtp}
             />
