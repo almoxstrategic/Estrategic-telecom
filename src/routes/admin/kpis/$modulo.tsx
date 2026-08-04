@@ -205,6 +205,12 @@ function KpisPage() {
   const { modulo: kpiModulo } = Route.useParams();
   const isDesempenho = kpiModulo === "desempenho-tecnico";
 
+  useEffect(() => {
+    if (!isDesempenho && filtro.dia !== null) {
+      setKpiFiltro((prev) => ({ ...prev, dia: null }));
+    }
+  }, [isDesempenho, filtro.dia]);
+
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(null);
   const [tecnicoSelecionadoLabel, setTecnicoSelecionadoLabel] = useState("");
   const [detalhesTecnico, setDetalhesTecnico] = useState<ConsumoTecnicoItem[]>([]);
@@ -787,33 +793,35 @@ function KpisPage() {
             </Select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Label htmlFor="filtro-dia" className="shrink-0 text-sm font-medium">
-              Dia:
-            </Label>
-            <Select
-              value={filtro.dia !== null ? String(filtro.dia) : "todos"}
-              onValueChange={(v) => {
-                if (v === "todos") {
-                  setKpiFiltro((prev) => ({ ...prev, dia: null }));
-                  return;
-                }
-                setKpiFiltro((prev) => ({ ...prev, dia: Number(v) }));
-              }}
-            >
-              <SelectTrigger id="filtro-dia" className="w-[140px]">
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
-                  <SelectItem key={dia} value={String(dia)}>
-                    {dia}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isDesempenho && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-dia" className="shrink-0 text-sm font-medium">
+                Dia:
+              </Label>
+              <Select
+                value={filtro.dia !== null ? String(filtro.dia) : "todos"}
+                onValueChange={(v) => {
+                  if (v === "todos") {
+                    setKpiFiltro((prev) => ({ ...prev, dia: null }));
+                    return;
+                  }
+                  setKpiFiltro((prev) => ({ ...prev, dia: Number(v) }));
+                }}
+              >
+                <SelectTrigger id="filtro-dia" className="w-[140px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
+                    <SelectItem key={dia} value={String(dia)}>
+                      {dia}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <Button
             type="button"
