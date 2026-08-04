@@ -190,7 +190,11 @@ function AdminHome() {
               </div>
             </Link>
 
-            <Link to="/admin/kpis" className="block w-full">
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "resumo-geral" }}
+              className="block w-full"
+            >
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
                   <BarChart3 className="h-6 w-6" />

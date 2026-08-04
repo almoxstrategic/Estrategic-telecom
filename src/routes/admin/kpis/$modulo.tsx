@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, ChevronRight, ClipboardCheck, Copy, FilterX, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,11 @@ import type {
 } from "@/lib/logistica-types";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import {
+  gerarDesempenhoMock,
+  somarToaMock,
+} from "@/lib/kpi-desempenho-mock";
+import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
+import {
   consolidarMateriaisPorCodigo,
   consolidarTopMateriaisPorCodigo,
   normalizeMaterialCode,
@@ -70,10 +76,30 @@ import { formatQuantidade } from "@/lib/parse-locale-number";
 import { formatTecnicoLabel, formatTecnicoModalTitle } from "@/lib/tecnico-label";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
-export const Route = createFileRoute("/admin/kpis")({
-  head: () => ({
+const KPI_MODULOS = ["resumo-geral", "desempenho-tecnico"] as const;
+type KpiModulo = (typeof KPI_MODULOS)[number];
+
+function isKpiModulo(value: string): value is KpiModulo {
+  return (KPI_MODULOS as readonly string[]).includes(value);
+}
+
+export const Route = createFileRoute("/admin/kpis/$modulo")({
+  beforeLoad: ({ params }) => {
+    if (!isKpiModulo(params.modulo)) {
+      throw redirect({
+        to: "/admin/kpis/$modulo",
+        params: { modulo: "resumo-geral" },
+      });
+    }
+  },
+  head: ({ params }) => ({
     meta: [
-      { title: "KPI's — Estrategic Field" },
+      {
+        title:
+          params.modulo === "desempenho-tecnico"
+            ? "Desempenho Técnicos — Estrategic Field"
+            : "KPI's — Estrategic Field",
+      },
       { name: "description", content: "Métricas de consumo de miscelâneas." },
     ],
   }),
@@ -165,7 +191,7 @@ async function copyTabela(headers: string[], rows: string[][]): Promise<void> {
 function KpisPage() {
   const [periodos, setPeriodos] = useState<PeriodoConsumo[]>([]);
   const [filtroReady, setFiltroReady] = useState(false);
-  const [filtro, setFiltro] = useState<KpisFiltro>({ mes: null, ano: null });
+  const filtro = useKpiFiltro();
   const [kpis, setKpis] = useState<KpisConsumo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +202,8 @@ function KpisPage() {
   const [criticosData, setCriticosData] = useState<ConsumoItemCritico[]>([]);
   const [loadingCriticos, setLoadingCriticos] = useState(false);
   const [isKpiNavOpen, setIsKpiNavOpen] = useState(false);
+  const { modulo: kpiModulo } = Route.useParams();
+  const isDesempenho = kpiModulo === "desempenho-tecnico";
 
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(null);
   const [tecnicoSelecionadoLabel, setTecnicoSelecionadoLabel] = useState("");
@@ -228,7 +256,14 @@ function KpisPage() {
         const lista = await fetchPeriodosConsumo();
         setPeriodos(lista);
         if (lista.length > 0) {
-          setFiltro({ mes: lista[0]!.mes, ano: lista[0]!.ano });
+          setKpiFiltro((prev) => {
+            if (prev.ano !== null && prev.mes !== null) return prev;
+            return {
+              ...prev,
+              mes: lista[0]!.mes,
+              ano: lista[0]!.ano,
+            };
+          });
         }
       } catch {
         setPeriodos([]);
@@ -267,7 +302,16 @@ function KpisPage() {
   useEffect(() => {
     if (!filtroReady) return;
     void carregarKpis(filtro);
-  }, [filtro, filtroReady, carregarKpis]);
+  }, [filtro.mes, filtro.ano, filtroReady, carregarKpis]);
+
+  const toaMockResumo = useMemo(() => {
+    const items = gerarDesempenhoMock(kpis?.top_tecnicos ?? [], {
+      ano: filtro.ano,
+      mes: filtro.mes,
+      dia: filtro.dia,
+    });
+    return somarToaMock(items);
+  }, [kpis?.top_tecnicos, filtro.ano, filtro.mes, filtro.dia]);
 
   useEffect(() => {
     if (itensCriticos.length === 0) {
@@ -284,7 +328,7 @@ function KpisPage() {
         setLoadingCriticos(false);
       }
     })();
-  }, [itensCriticos, filtro]);
+  }, [itensCriticos, filtro.mes, filtro.ano]);
 
   useEffect(() => {
     if (!tecnicoSelecionado) {
@@ -301,7 +345,7 @@ function KpisPage() {
         setLoadingDetalhes(false);
       }
     })();
-  }, [tecnicoSelecionado, filtro]);
+  }, [tecnicoSelecionado, filtro.mes, filtro.ano]);
 
   useEffect(() => {
     if (!materialSelecionado) {
@@ -318,7 +362,7 @@ function KpisPage() {
         setLoadingTopConsumidores(false);
       }
     })();
-  }, [materialSelecionado, filtro]);
+  }, [materialSelecionado, filtro.mes, filtro.ano]);
 
   useEffect(() => {
     if (!isProcessadasModalOpen) {
@@ -336,7 +380,7 @@ function KpisPage() {
         setLoadingDetalheTotal(false);
       }
     })();
-  }, [isProcessadasModalOpen, filtro]);
+  }, [isProcessadasModalOpen, filtro.mes, filtro.ano]);
 
   useEffect(() => {
     if (modalTotalTipo !== "itens") {
@@ -354,7 +398,7 @@ function KpisPage() {
         setLoadingDetalheTotal(false);
       }
     })();
-  }, [modalTotalTipo, filtro]);
+  }, [modalTotalTipo, filtro.mes, filtro.ano]);
 
   const topMateriaisConsolidados = useMemo(
     () => consolidarTopMateriaisPorCodigo(kpis?.top_materiais ?? []),
@@ -609,15 +653,47 @@ function KpisPage() {
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 rounded-lg bg-primary/10 px-3 py-2.5 text-left text-sm font-semibold text-primary"
+        <nav className="flex-1 overflow-y-auto p-3">
+          <Link
+            to="/admin/kpis/$modulo"
+            params={{ modulo: "resumo-geral" }}
+            className={`flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+              !isDesempenho
+                ? "bg-green-50 text-green-700"
+                : "cursor-pointer text-gray-600 hover:bg-gray-100"
+            }`}
             onClick={() => setIsKpiNavOpen(false)}
           >
-            <UserCheck className="h-5 w-5 shrink-0" />
-            Desempenho Técnicos
-          </button>
+            <LayoutDashboard
+              className={`h-5 w-5 shrink-0 ${
+                !isDesempenho ? "text-green-700" : "text-gray-500"
+              }`}
+            />
+            Resumo Geral
+          </Link>
+
+          <div className="mt-6 border-t border-gray-100 pt-2">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Detalhamento
+            </p>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "desempenho-tecnico" }}
+              className={`flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isDesempenho
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <UserCheck
+                className={`h-5 w-5 shrink-0 ${
+                  isDesempenho ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Desempenho Técnicos
+            </Link>
+          </div>
         </nav>
       </aside>
 
@@ -651,7 +727,7 @@ function KpisPage() {
               disabled={anosComDados.length === 0}
               onValueChange={(v) => {
                 if (v === "todos") {
-                  setFiltro({ mes: null, ano: null });
+                  setKpiFiltro({ mes: null, ano: null, dia: null });
                   return;
                 }
                 const ano = Number(v);
@@ -659,9 +735,10 @@ function KpisPage() {
                   .filter((p) => p.ano === ano)
                   .map((p) => p.mes)
                   .sort((a, b) => a - b);
-                setFiltro({
+                setKpiFiltro({
                   ano,
                   mes: meses[meses.length - 1] ?? null,
+                  dia: null,
                 });
               }}
             >
@@ -687,7 +764,7 @@ function KpisPage() {
               value={filtro.mes !== null ? String(filtro.mes) : "todos"}
               disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
               onValueChange={(v) =>
-                setFiltro((prev) => ({
+                setKpiFiltro((prev) => ({
                   ...prev,
                   mes: Number(v),
                 }))
@@ -710,12 +787,42 @@ function KpisPage() {
             </Select>
           </div>
 
+          <div className="flex items-center gap-2">
+            <Label htmlFor="filtro-dia" className="shrink-0 text-sm font-medium">
+              Dia:
+            </Label>
+            <Select
+              value={filtro.dia !== null ? String(filtro.dia) : "todos"}
+              onValueChange={(v) => {
+                if (v === "todos") {
+                  setKpiFiltro((prev) => ({ ...prev, dia: null }));
+                  return;
+                }
+                setKpiFiltro((prev) => ({ ...prev, dia: Number(v) }));
+              }}
+            >
+              <SelectTrigger id="filtro-dia" className="w-[140px]">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
+                  <SelectItem key={dia} value={String(dia)}>
+                    {dia}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="ml-auto gap-1.5"
-            onClick={() => setFiltro({ mes: null, ano: null })}
+            onClick={() => {
+              setKpiFiltro({ mes: null, ano: null, dia: null });
+            }}
           >
             <FilterX className="h-4 w-4" />
             Limpar Filtros
@@ -726,9 +833,13 @@ function KpisPage() {
       <main className="mx-auto max-w-7xl px-4 pb-10 pt-6 lg:px-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black tracking-tight">KPI&apos;s</h1>
+            <h1 className="text-2xl font-black tracking-tight">
+              {isDesempenho ? "Desempenho Técnicos" : "KPI's"}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Consolidado por data de atendimento da WO — {descricaoPeriodo(filtro)}.
+              {isDesempenho
+                ? "Visão detalhada de desempenho por técnico no período selecionado."
+                : `Consolidado por data de atendimento da WO — ${descricaoPeriodo(filtro)}.`}
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -736,6 +847,18 @@ function KpisPage() {
           </Link>
         </div>
 
+        {isDesempenho ? (
+          !filtroReady || loading ? (
+            <p className="text-sm text-muted-foreground">Carregando métricas...</p>
+          ) : (
+            <KpiDesempenhoTecnicos
+              tecnicos={kpis?.top_tecnicos ?? []}
+              ano={filtro.ano}
+              mes={filtro.mes}
+              dia={filtro.dia}
+            />
+          )
+        ) : (
         <div className="w-full space-y-6">
             {!filtroReady || loading ? (
               <p className="text-sm text-muted-foreground">Carregando métricas...</p>
@@ -787,7 +910,9 @@ function KpisPage() {
                         Total de notas produtivas (TOA)
                       </span>
                     </div>
-                    <div className="mt-3 text-3xl font-black text-foreground">0</div>
+                    <div className="mt-3 text-3xl font-black text-foreground">
+                      {formatQuantidade(toaMockResumo.totalNotasProdutivas)}
+                    </div>
                   </div>
                   <div className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm">
                     <div className="flex items-center gap-2">
@@ -796,7 +921,9 @@ function KpisPage() {
                         Total de perda de notas (TOA)
                       </span>
                     </div>
-                    <div className="mt-3 text-3xl font-black text-foreground">0</div>
+                    <div className="mt-3 text-3xl font-black text-foreground">
+                      {formatQuantidade(toaMockResumo.totalPerdaNotas)}
+                    </div>
                   </div>
                 </section>
 
@@ -1120,6 +1247,7 @@ function KpisPage() {
               </>
             )}
         </div>
+        )}
       </main>
 
       <Dialog

@@ -180,10 +180,14 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       Gestão de Equipe
                     </Link>
                     <Link
-                      to="/admin/kpis"
+                      to="/admin/kpis/$modulo"
+                      params={{ modulo: "resumo-geral" }}
                       onClick={onNavigate}
-                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                        pathMatches(pathname, "/admin/kpis")
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : ""
+                      }`}
                     >
                       <BarChart3 className="h-5 w-5 text-primary" />
                       KPI&apos;s

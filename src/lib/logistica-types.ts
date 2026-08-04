@@ -18,6 +18,7 @@ export type WoConsumoRow = {
 export type KpisFiltro = {
   mes: number | null;
   ano: number | null;
+  dia: number | null;
 };
 
 export type ConsumoTecnicoItem = {
