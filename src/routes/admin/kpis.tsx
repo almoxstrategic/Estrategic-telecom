@@ -744,86 +744,103 @@ function KpisPage() {
 
                 <section className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
                   <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <h2 className="mb-4 shrink-0 font-bold">Top 7 Materiais Mais Consumidos</h2>
+                    <div className="mb-4 flex min-h-16 shrink-0 flex-col justify-end">
+                      <h2 className="flex items-center gap-2 font-bold">
+                        <Package className="h-4 w-4 text-primary" />
+                        Top 7 Materiais Mais Consumidos
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        Acompanhe os itens com maior volume de saída no período.
+                      </p>
+                    </div>
                     {materiaisChart.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                     ) : (
-                      <ChartContainer config={CHART_CONFIG} className="h-64 w-full shrink-0">
-                        <BarChart data={materiaisChart} layout="vertical" margin={{ left: 8 }}>
-                          <CartesianGrid horizontal={false} />
-                          <XAxis type="number" hide />
-                          <YAxis
-                            type="category"
-                            dataKey="label"
-                            width={120}
-                            tick={{ fontSize: 11 }}
-                          />
-                          <ChartTooltip
-                            content={
-                              <ChartTooltipContent
-                                labelFormatter={(_, payload) => {
-                                  const item = payload?.[0]?.payload as
-                                    | { descricao?: string; label?: string }
-                                    | undefined;
-                                  return item?.descricao ?? item?.label ?? "";
-                                }}
-                              />
-                            }
-                          />
-                          <Bar dataKey="total" fill="var(--color-total)" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ChartContainer>
+                      <div className="h-64 w-full shrink-0">
+                        <ChartContainer config={CHART_CONFIG} className="h-full w-full">
+                          <BarChart data={materiaisChart} layout="vertical" margin={{ left: 8 }}>
+                            <CartesianGrid horizontal={false} />
+                            <XAxis type="number" hide />
+                            <YAxis
+                              type="category"
+                              dataKey="label"
+                              width={120}
+                              tick={{ fontSize: 11 }}
+                            />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  labelFormatter={(_, payload) => {
+                                    const item = payload?.[0]?.payload as
+                                      | { descricao?: string; label?: string }
+                                      | undefined;
+                                    return item?.descricao ?? item?.label ?? "";
+                                  }}
+                                />
+                              }
+                            />
+                            <Bar dataKey="total" fill="var(--color-total)" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ChartContainer>
+                      </div>
                     )}
-                    <Table className="mt-4 table-fixed">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[40%] text-left">Item</TableHead>
-                          <TableHead className="w-[20%] text-center">Quant</TableHead>
-                          <TableHead className="w-[22%] whitespace-nowrap text-center">
-                            Média consumo
-                          </TableHead>
-                          <TableHead className="w-[18%] whitespace-nowrap text-center">
-                            % Total
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {topMateriaisConsolidados.map((m) => (
-                          <TableRow key={m.sku}>
-                            <TableCell className="max-w-0 truncate text-left text-sm" title={m.descricao}>
-                              {m.descricao}
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-semibold">
-                              {formatKpiNumero(m.total)}
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-semibold text-muted-foreground">
-                              {formatKpiNumero(m.total / 4)}
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-semibold text-primary">
-                              {formatKpiRepresentatividade(m.total, totalGeralItens)}
-                            </TableCell>
+                    <div className="mt-4">
+                      <Table className="table-fixed">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[40%] text-left">Item</TableHead>
+                            <TableHead className="w-[20%] text-center">Quant</TableHead>
+                            <TableHead className="w-[22%] whitespace-nowrap text-center">
+                              Média consumo
+                            </TableHead>
+                            <TableHead className="w-[18%] whitespace-nowrap text-center">
+                              % Total
+                            </TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {topMateriaisConsolidados.map((m) => (
+                            <TableRow key={m.sku}>
+                              <TableCell
+                                className="max-w-0 truncate text-left text-sm"
+                                title={m.descricao}
+                              >
+                                {m.descricao}
+                              </TableCell>
+                              <TableCell className="text-center text-sm font-semibold">
+                                {formatKpiNumero(m.total)}
+                              </TableCell>
+                              <TableCell className="text-center text-sm font-semibold text-muted-foreground">
+                                {formatKpiNumero(m.total / 4)}
+                              </TableCell>
+                              <TableCell className="text-center text-sm font-semibold text-primary">
+                                {formatKpiRepresentatividade(m.total, totalGeralItens)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
 
                   <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <h2 className="mb-1 flex shrink-0 items-center gap-2 font-bold">
-                      <Users className="h-4 w-4 text-primary" />
-                      Técnicos por Volume de Baixa
-                    </h2>
-                    <p className="mb-4 shrink-0 text-xs text-muted-foreground">
-                      Clique em um técnico para ver o detalhamento.
-                    </p>
+                    <div className="mb-4 flex min-h-16 shrink-0 flex-col justify-end">
+                      <h2 className="flex items-center gap-2 font-bold">
+                        <Users className="h-4 w-4 text-primary" />
+                        Técnicos por Volume de Baixa
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        Clique em um técnico para ver o detalhamento.
+                      </p>
+                    </div>
                     {tecnicosChart.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nenhum dado no período.</p>
                     ) : (
-                      <div className="flex min-h-0 flex-1 flex-col">
-                        <div className="shrink-0 overflow-x-auto">
+                      <>
+                        <div className="h-64 w-full shrink-0 overflow-x-auto">
                           <ChartContainer
                             config={CHART_CONFIG}
-                            className="h-64 w-full"
+                            className="h-full w-full"
                             style={{ minWidth: Math.max(tecnicosChart.length * 56, 280) }}
                           >
                             <BarChart data={tecnicosChart}>
@@ -867,7 +884,7 @@ function KpisPage() {
                             </BarChart>
                           </ChartContainer>
                         </div>
-                        <div className="mt-4 overflow-y-auto max-h-96 pr-2">
+                        <div className="mt-4 min-h-0 flex-1 overflow-y-auto max-h-96 pr-2">
                           <div className="grid grid-cols-4 gap-4 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground">
                             <span className="text-left">Nome</span>
                             <span className="text-center">Baixa Misc</span>
@@ -876,13 +893,21 @@ function KpisPage() {
                           </div>
                           <ul>
                             {(kpis?.top_tecnicos ?? []).map((t) => (
-                              <li key={t.id_tecnico} className="border-b border-border last:border-b-0">
+                              <li
+                                key={t.id_tecnico}
+                                className="border-b border-border last:border-b-0"
+                              >
                                 <button
                                   type="button"
-                                  onClick={() => abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)}
+                                  onClick={() =>
+                                    abrirDetalheTecnico(t.id_tecnico, t.nome_tecnico)
+                                  }
                                   className="grid w-full cursor-pointer grid-cols-4 items-center gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/60"
                                 >
-                                  <span className="truncate text-left font-medium text-primary">
+                                  <span
+                                    className="truncate text-left font-medium text-primary"
+                                    title={formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
+                                  >
                                     {formatTecnicoLabel(t.nome_tecnico, t.id_tecnico)}
                                   </span>
                                   <span className="text-center text-sm font-semibold tabular-nums text-foreground">
@@ -899,7 +924,7 @@ function KpisPage() {
                             ))}
                           </ul>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 </section>
