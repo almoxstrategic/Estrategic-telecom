@@ -1,8 +1,9 @@
+import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { Logo } from "./Logo";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppSidebar } from "./AppSidebar";
-import { useState } from "react";
 
 export function AppHeader() {
   const [open, setOpen] = useState(false);
@@ -20,7 +21,13 @@ export function AppHeader() {
         </SheetContent>
       </Sheet>
       <div className="flex justify-center">
-        <Logo />
+        <Link
+          to="/admin"
+          aria-label="Ir para o Início do painel"
+          className="cursor-pointer transition-opacity hover:opacity-80"
+        >
+          <Logo />
+        </Link>
       </div>
       <div className="w-10" />
     </header>

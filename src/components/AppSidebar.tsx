@@ -27,8 +27,6 @@ import { useApp } from "@/lib/app-store";
 
 const MISCELANEAS_PATHS = [
   "/todos",
-  "/tecnicos",
-  "/admin/kpis",
   "/admin/pendencias",
   "/previsao-reserva",
   "/media-baixa-tecnico",
@@ -51,6 +49,8 @@ function matchesMiscelaneasGroup(
   tab: string | undefined,
 ): boolean {
   if (isAdminHomePath(pathname)) return false;
+  if (pathMatches(pathname, "/admin/kpis")) return false;
+  if (pathMatches(pathname, "/tecnicos")) return false;
   if (MISCELANEAS_PATHS.some((p) => pathMatches(pathname, p))) return true;
   if (pathMatches(pathname, "/admin/importacao")) {
     return tab !== "serializados";
@@ -76,6 +76,14 @@ function matchesKpiGroup(pathname: string): boolean {
   );
 }
 
+function matchesPainelAdminGroup(pathname: string): boolean {
+  return (
+    isAdminHomePath(pathname) ||
+    pathMatches(pathname, "/admin/kpis") ||
+    pathMatches(pathname, "/tecnicos")
+  );
+}
+
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useApp();
   const navigate = useNavigate();
@@ -88,6 +96,9 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   });
   const tab = typeof search.tab === "string" ? search.tab : undefined;
 
+  const [isAdminOpen, setIsAdminOpen] = useState(() =>
+    matchesPainelAdminGroup(pathname),
+  );
   const [isMiscelaneaOpen, setIsMiscelaneaOpen] = useState(() =>
     matchesMiscelaneasGroup(pathname, tab),
   );
@@ -100,10 +111,14 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
     if (isAdminHomePath(pathname)) {
       setIsMiscelaneaOpen(false);
       setIsSerializadosOpen(false);
+      setIsAdminOpen(true);
       return;
     }
     setIsMiscelaneaOpen(matchesMiscelaneasGroup(pathname, tab));
     setIsSerializadosOpen(matchesSerializadosGroup(pathname, tab));
+    if (matchesPainelAdminGroup(pathname)) {
+      setIsAdminOpen(true);
+    }
     if (matchesKpiGroup(pathname)) {
       setIsKpiOpen(true);
     }
@@ -139,15 +154,104 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
         {isAdmin ? (
           <>
-            <Link
-              to="/admin"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              Painel Admin
-            </Link>
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsAdminOpen((open) => !open)}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                  matchesPainelAdminGroup(pathname)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  Painel Admin
+                </span>
+                {isAdminOpen ? (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+                )}
+              </button>
+              {isAdminOpen && (
+                <div className="space-y-1 pl-8 pt-1">
+                  <Link
+                    to="/admin"
+                    onClick={onNavigate}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                      isAdminHomePath(pathname)
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : ""
+                    }`}
+                  >
+                    <Home className="h-5 w-5 text-primary" />
+                    Início
+                  </Link>
+                  <Link
+                    to="/tecnicos"
+                    onClick={onNavigate}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                      pathMatches(pathname, "/tecnicos")
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : ""
+                    }`}
+                  >
+                    <Users className="h-5 w-5 text-primary" />
+                    Gestão de Equipe
+                  </Link>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setIsKpiOpen((open) => !open)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                        matchesKpiGroup(pathname)
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : ""
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <BarChart3 className="h-5 w-5 text-primary" />
+                        KPI&apos;s
+                      </span>
+                      {isKpiOpen ? (
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+                      )}
+                    </button>
+                    {isKpiOpen && (
+                      <div className="mt-1 space-y-1 pl-10">
+                        <Link
+                          to="/admin/kpis/$modulo"
+                          params={{ modulo: "resumo-geral" }}
+                          onClick={onNavigate}
+                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                            pathname.includes("/resumo-geral")
+                              ? "bg-green-50 font-medium text-green-700"
+                              : ""
+                          }`}
+                        >
+                          Resumo geral
+                        </Link>
+                        <Link
+                          to="/admin/kpis/$modulo"
+                          params={{ modulo: "desempenho-tecnico" }}
+                          onClick={onNavigate}
+                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                            pathname.includes("/desempenho-tecnico")
+                              ? "bg-green-50 font-medium text-green-700"
+                              : ""
+                          }`}
+                        >
+                          Desempenho técnico
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div>
               <button
@@ -180,64 +284,6 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <Database className="h-5 w-5 text-primary" />
                       Todas as Metragens
                     </Link>
-                    <Link
-                      to="/tecnicos"
-                      onClick={onNavigate}
-                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-                      activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-                    >
-                      <Users className="h-5 w-5 text-primary" />
-                      Gestão de Equipe
-                    </Link>
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setIsKpiOpen((open) => !open)}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
-                          matchesKpiGroup(pathname)
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : ""
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <BarChart3 className="h-5 w-5 text-primary" />
-                          KPI&apos;s
-                        </span>
-                        {isKpiOpen ? (
-                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
-                        )}
-                      </button>
-                      {isKpiOpen && (
-                        <div className="mt-1 space-y-1 pl-10">
-                          <Link
-                            to="/admin/kpis/$modulo"
-                            params={{ modulo: "resumo-geral" }}
-                            onClick={onNavigate}
-                            className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
-                              pathname.includes("/resumo-geral")
-                                ? "bg-green-50 font-medium text-green-700"
-                                : ""
-                            }`}
-                          >
-                            Resumo geral
-                          </Link>
-                          <Link
-                            to="/admin/kpis/$modulo"
-                            params={{ modulo: "desempenho-tecnico" }}
-                            onClick={onNavigate}
-                            className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
-                              pathname.includes("/desempenho-tecnico")
-                                ? "bg-green-50 font-medium text-green-700"
-                                : ""
-                            }`}
-                          >
-                            Desempenho técnico
-                          </Link>
-                        </div>
-                      )}
-                    </div>
                     <Link
                       to="/admin/pendencias"
                       onClick={onNavigate}
