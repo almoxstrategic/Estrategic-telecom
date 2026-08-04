@@ -1003,26 +1003,28 @@ function KpisPage() {
                     </p>
                   ) : (
                     <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
-                      <ChartContainer config={CHART_CONFIG} className="h-56 w-full min-w-0">
-                        <BarChart data={criticosChart}>
-                          <CartesianGrid vertical={false} />
-                          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                          <YAxis tickFormatter={(v) => formatQuantidade(v)} />
-                          <ChartTooltip
-                            content={
-                              <ChartTooltipContent
-                                labelFormatter={(_, payload) => {
-                                  const item = payload?.[0]?.payload as
-                                    | { descricao?: string; label?: string }
-                                    | undefined;
-                                  return item?.descricao ?? item?.label ?? "";
-                                }}
-                              />
-                            }
-                          />
-                          <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ChartContainer>
+                      <div className="mt-4 min-w-0">
+                        <ChartContainer config={CHART_CONFIG} className="h-56 w-full min-w-0">
+                          <BarChart data={criticosChart}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                            <YAxis tickFormatter={(v) => formatQuantidade(v)} />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  labelFormatter={(_, payload) => {
+                                    const item = payload?.[0]?.payload as
+                                      | { descricao?: string; label?: string }
+                                      | undefined;
+                                    return item?.descricao ?? item?.label ?? "";
+                                  }}
+                                />
+                              }
+                            />
+                            <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ChartContainer>
+                      </div>
 
                       <div className="min-w-0 overflow-x-auto">
                         <Table>
