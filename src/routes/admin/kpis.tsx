@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, ClipboardCheck, Copy, FilterX, Package, Search, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, ChevronRight, ClipboardCheck, Copy, FilterX, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
@@ -175,6 +175,7 @@ function KpisPage() {
   const [itensCriticosLabels, setItensCriticosLabels] = useState<Record<string, string>>({});
   const [criticosData, setCriticosData] = useState<ConsumoItemCritico[]>([]);
   const [loadingCriticos, setLoadingCriticos] = useState(false);
+  const [isKpiNavOpen, setIsKpiNavOpen] = useState(false);
 
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(null);
   const [tecnicoSelecionadoLabel, setTecnicoSelecionadoLabel] = useState("");
@@ -581,9 +582,57 @@ function KpisPage() {
     <div className="min-h-screen bg-surface">
       <AppHeader />
 
+      {isKpiNavOpen && (
+        <button
+          type="button"
+          aria-label="Fechar módulos de KPI"
+          className="fixed inset-0 z-50 bg-black/40"
+          onClick={() => setIsKpiNavOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(100vw-3rem,20rem)] flex-col border-r border-border bg-background shadow-xl transition-transform duration-300 ease-in-out ${
+          isKpiNavOpen ? "translate-x-0" : "pointer-events-none -translate-x-full"
+        }`}
+        aria-hidden={!isKpiNavOpen}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-sm font-bold text-foreground">Módulos de KPI</h2>
+          <button
+            type="button"
+            aria-label="Fechar"
+            title="Fechar"
+            onClick={() => setIsKpiNavOpen(false)}
+            className="cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+        <nav className="flex-1 space-y-1 p-3">
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-lg bg-primary/10 px-3 py-2.5 text-left text-sm font-semibold text-primary"
+            onClick={() => setIsKpiNavOpen(false)}
+          >
+            <UserCheck className="h-5 w-5 shrink-0" />
+            Desempenho Técnicos
+          </button>
+        </nav>
+      </aside>
+
       <div className="sticky top-16 z-40 w-full border-b border-border bg-background shadow-sm">
         <div className="mx-auto flex w-full max-w-7xl flex-row flex-wrap items-center gap-4 px-4 py-3 sm:gap-6 lg:px-6">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              title="Abrir módulos de KPI"
+              aria-label="Abrir módulos de KPI"
+              onClick={() => setIsKpiNavOpen(true)}
+              className="mr-1 cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
+            >
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </button>
             <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
             <span className="text-sm font-bold text-foreground">Filtro de período</span>
             {filtrosLimpos && (
