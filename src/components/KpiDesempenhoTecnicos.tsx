@@ -5,6 +5,7 @@ import {
   BarChart3,
   ClipboardCheck,
   DollarSign,
+  FilterX,
   Users,
   X,
   XCircle,
@@ -731,7 +732,15 @@ export function KpiDesempenhoTecnicos({
                     <span className="text-center font-bold tabular-nums text-gray-900">
                       {formatReceita(tecnico.receita)}
                     </span>
-                    <span className="text-center font-bold tabular-nums text-green-600">
+                    <span
+                      className={`text-center font-bold tabular-nums ${
+                        receitaLiquida > 0
+                          ? "text-green-600"
+                          : receitaLiquida < 0
+                            ? "text-red-600"
+                            : "text-gray-500"
+                      }`}
+                    >
                       {formatReceita(receitaLiquida)}
                     </span>
                   </li>
@@ -857,6 +866,19 @@ export function KpiDesempenhoTecnicos({
                   ))}
                 </select>
               </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroLocalAno(null);
+                  setFiltroLocalMes(null);
+                  setFiltroLocalDia(null);
+                }}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
+              >
+                <FilterX className="h-4 w-4" />
+                Limpar filtros
+              </button>
             </div>
 
             <div className="mb-6 h-64 w-full rounded-lg border border-gray-200 p-3">
@@ -929,6 +951,7 @@ export function KpiDesempenhoTecnicos({
                     <th className="px-3 py-2 font-semibold">Data</th>
                     <th className="px-3 py-2 font-semibold">Número da WO</th>
                     <th className="px-3 py-2 font-semibold">Contrato</th>
+                    <th className="px-3 py-2 font-semibold">Tipo da OS</th>
                     <th className="px-3 py-2 font-semibold">Cód de Baixa</th>
                     <th className="px-3 py-2 font-semibold">Status</th>
                     <th className="px-3 py-2 font-semibold">Valor</th>
@@ -938,54 +961,67 @@ export function KpiDesempenhoTecnicos({
                   {notasDoTecnico.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-3 py-8 text-center text-muted-foreground"
                       >
                         Nenhuma nota para exibir.
                       </td>
                     </tr>
                   ) : (
-                    notasDoTecnico.map((nota, index) => (
-                      <tr
-                        key={`${nota.data}-${nota.numeroWo}-${nota.codBaixa}-${index}`}
-                        className="border-t border-gray-100"
-                      >
-                        <td className="px-3 py-2 tabular-nums text-gray-800">
-                          {formatDataBr(nota.data)}
-                        </td>
-                        <td className="px-3 py-2 font-medium text-gray-900">
-                          {nota.numeroWo || "—"}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">
-                          {nota.contrato || "—"}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">
-                          {nota.codBaixaBruto || String(nota.codBaixa)}
-                        </td>
-                        <td className="px-3 py-2">
-                          {nota.isProdutiva ? (
-                            <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                              Produtivo
-                            </span>
-                          ) : (
-                            <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                              Quebra/Improdutivo
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          className={
-                            nota.isProdutiva
-                              ? "px-3 py-2 font-semibold tabular-nums text-green-600"
-                              : "px-3 py-2 font-semibold tabular-nums text-red-600"
-                          }
+                    notasDoTecnico.map((nota, index) => {
+                      const valorNota = nota.isProdutiva
+                        ? nota.valorReceita
+                        : nota.valorPerda;
+                      const ganhoReal = nota.isProdutiva && valorNota > 0;
+                      const perdaReal = !nota.isProdutiva && valorNota > 0;
+
+                      return (
+                        <tr
+                          key={`${nota.data}-${nota.numeroWo}-${nota.codBaixa}-${index}`}
+                          className="border-t border-gray-100"
                         >
-                          {formatReceita(
-                            nota.isProdutiva ? nota.valorReceita : nota.valorPerda,
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                          <td className="px-3 py-2 tabular-nums text-gray-800">
+                            {formatDataBr(nota.data)}
+                          </td>
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {nota.numeroWo || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {nota.contrato || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {nota.tipoOs || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {nota.codBaixaBruto || String(nota.codBaixa)}
+                          </td>
+                          <td className="px-3 py-2">
+                            {nota.isProdutiva ? (
+                              <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                Produtivo
+                              </span>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                                Quebra/Improdutivo
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-3 py-2 tabular-nums ${
+                              ganhoReal
+                                ? "font-medium text-green-600"
+                                : perdaReal
+                                  ? "font-medium text-red-600"
+                                  : "font-normal text-gray-400"
+                            }`}
+                          >
+                            {formatReceita(
+                              perdaReal ? -Math.abs(valorNota) : valorNota,
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
