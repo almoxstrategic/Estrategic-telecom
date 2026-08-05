@@ -185,7 +185,7 @@ function valorOrdenacao(tecnico: TecnicoDesempenho, key: SortKey): number {
     case "receitaBruta":
       return tecnico.receita;
     case "receitaLiquida":
-      return tecnico.receita - tecnico.receitaPerda;
+      return tecnico.receita;
   }
 }
 
@@ -401,10 +401,6 @@ export function KpiDesempenhoTecnicos({
       (total, tecnico) => total + tecnico.receita,
       0,
     );
-    const receitaPerdaTotal = enriquecidos.reduce(
-      (total, tecnico) => total + tecnico.receitaPerda,
-      0,
-    );
 
     return {
       totalNotasProdutivas: enriquecidos.reduce(
@@ -415,7 +411,7 @@ export function KpiDesempenhoTecnicos({
         (total, tecnico) => total + tecnico.perdasNotas,
         0,
       ),
-      receitaLiquidaTotal: receitaBrutaTotal - receitaPerdaTotal,
+      receitaLiquidaTotal: receitaBrutaTotal,
     };
   }, [enriquecidos]);
 
@@ -536,21 +532,24 @@ export function KpiDesempenhoTecnicos({
         ...tecnico,
         receitaGanha,
         receitaPerda,
-        lucro: receitaGanha - receitaPerda,
+        // Lucro/Receita Líquida = apenas notas produtivas (sem descontar perdas).
+        lucro: receitaGanha,
       };
     });
 
-    const ordenados = [...comProjecao].sort((a, b) => b.lucro - a.lucro);
+    const ordenados = [...comProjecao].sort(
+      (a, b) => b.notasFeitas - a.notasFeitas,
+    );
     const limite = limiteDoFiltro(filtroTop);
     const fatia = limite === null ? ordenados : ordenados.slice(0, limite);
-    const lucroTotalFatia = fatia.reduce((acc, t) => acc + t.lucro, 0);
+    const totalNotasFatia = fatia.reduce((acc, t) => acc + t.notasFeitas, 0);
 
-    let lucroAcumulado = 0;
+    let notasAcumuladas = 0;
     return fatia.map((t) => {
-      lucroAcumulado += t.lucro;
+      notasAcumuladas += t.notasFeitas;
       const pareto =
-        lucroTotalFatia !== 0
-          ? Math.round((lucroAcumulado / lucroTotalFatia) * 1000) / 10
+        totalNotasFatia > 0
+          ? Math.round((notasAcumuladas / totalNotasFatia) * 1000) / 10
           : 0;
 
       return {
@@ -919,7 +918,7 @@ export function KpiDesempenhoTecnicos({
                   tecnico.id_tecnico,
                   tecnico.nome,
                 );
-                const receitaLiquida = tecnico.receita - tecnico.receitaPerda;
+                const receitaLiquida = tecnico.receita;
                 return (
                   <li
                     key={tecnico.id_tecnico}

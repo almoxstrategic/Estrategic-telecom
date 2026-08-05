@@ -1224,9 +1224,7 @@ function KpisPage() {
                                   normalizeToaLogin(t.id_tecnico)
                                 ];
                               const notasFeitas = resumoToa?.notasFeitas ?? 0;
-                              const receitaLiquida =
-                                (resumoToa?.receitaBruta ?? 0) -
-                                (resumoToa?.receitaPerda ?? 0);
+                              const receitaLiquida = resumoToa?.receitaBruta ?? 0;
                               return (
                               <li
                                 key={t.id_tecnico}
