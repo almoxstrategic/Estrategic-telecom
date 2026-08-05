@@ -10,6 +10,7 @@ import {
   parseEstoqueBaseFile,
   parseEstoqueBtpFile,
   parseEstoqueCampoFile,
+  parseToaFile,
   parseWoCabecalhoFile,
   parseWoConsumoFile,
 } from "@/lib/spreadsheet-import";
@@ -17,6 +18,7 @@ import { saveEstoqueBtp } from "@/lib/estoque-btp-store";
 import { saveEstoqueBase } from "@/lib/estoque-base-store";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
+import { agregarNotasToa, processarNotasTOA, saveToaNotas } from "@/lib/toa-store";
 import { cn } from "@/lib/utils";
 
 function formatImportError(scope: string, err: unknown): string {
@@ -220,6 +222,7 @@ function ImportacaoPage() {
   const [busyConsumo, setBusyConsumo] = useState(false);
   const [busyEstoqueBtp, setBusyEstoqueBtp] = useState(false);
   const [busyEstoqueBase, setBusyEstoqueBase] = useState(false);
+  const [busyToa, setBusyToa] = useState(false);
   const [fileAtlas, setFileAtlas] = useState<File | null>(null);
   const [fileCampo, setFileCampo] = useState<File | null>(null);
   const [fileFisico, setFileFisico] = useState<File | null>(null);
@@ -361,6 +364,32 @@ function ImportacaoPage() {
     }
   };
 
+  const handleToa = async (file: File) => {
+    setBusyToa(true);
+    try {
+      const linhas = await parseToaFile(file);
+      const notasProcessadas = processarNotasTOA(linhas);
+      const resultado = agregarNotasToa(notasProcessadas);
+      const totalClassificadas = resultado.totalProdutivas + resultado.totalPerdas;
+
+      if (totalClassificadas === 0) {
+        toast.error(
+          "Nenhuma linha válida encontrada na aba Page 1. Verifique Data, Login do Técnico e Cód de Baixa 1.",
+        );
+        return;
+      }
+
+      saveToaNotas(notasProcessadas);
+      toast.success(
+        `TOA importado: ${resultado.totalProdutivas} notas produtivas e ${resultado.totalPerdas} perdas.`,
+      );
+    } catch (err) {
+      toast.error(formatImportError("toa", err));
+    } finally {
+      setBusyToa(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -484,9 +513,11 @@ function ImportacaoPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Importação TOA"
-              description="(Em breve) Importação de dados do TOA para consolidação de notas e desempenho."
+              description='Lê exclusivamente a aba "Page 1": Data, Login do Técnico, Número da WO, Contrato e Cód de Baixa 1.'
               file={arquivoToa}
               onFileChange={setArquivoToa}
+              busy={busyToa}
+              onImport={handleToa}
             />
           </div>
         )}

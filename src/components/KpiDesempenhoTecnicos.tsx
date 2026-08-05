@@ -12,20 +12,18 @@ import {
   YAxis,
 } from "recharts";
 import type { KpiTopTecnico } from "@/lib/logistica-types";
-import {
-  gerarDesempenhoMock,
-  somarToaMock,
-  type TecnicoDesempenhoMock,
-} from "@/lib/kpi-desempenho-mock";
 import { formatQuantidade } from "@/lib/parse-locale-number";
-import { isTecnicoDemitido } from "@/lib/team-service";
+import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
+import {
+  normalizeToaLogin,
+  type ToaResumoTecnico,
+} from "@/lib/toa-store";
 
 type KpiDesempenhoTecnicosProps = {
   tecnicos: KpiTopTecnico[];
+  tecnicosEquipe: TecnicoProfile[];
+  resumoToa: Record<string, ToaResumoTecnico>;
   demitidosKeys: Set<string>;
-  ano: number | null;
-  mes: number | null;
-  dia: number | null;
 };
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
@@ -39,6 +37,21 @@ type SortKey =
 type SortConfig = {
   key: SortKey | null;
   direction: "asc" | "desc";
+};
+
+type TecnicoDesempenho = {
+  id_tecnico: string;
+  nome: string;
+  primeiroNome: string;
+  baixaMisc: number;
+  notasFeitas: number;
+  perdasNotas: number;
+  aproveitamento: number;
+  mediaAproveitamento: string;
+  receita: number;
+  receitaPerda: number;
+  freqRelativa: string;
+  freqAbsoluta: string;
 };
 
 function formatReceita(valor: number): string {
@@ -61,12 +74,17 @@ function limiteDoFiltro(filtro: FiltroTop): number | null {
   }
 }
 
-function valorOrdenacao(tecnico: TecnicoDesempenhoMock, key: SortKey): number {
+function formatPct(valor: number): string {
+  return `${valor.toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function valorOrdenacao(tecnico: TecnicoDesempenho, key: SortKey): number {
   switch (key) {
-    case "aproveitamento": {
-      const total = tecnico.notasFeitas + tecnico.perdasNotas;
-      return total > 0 ? tecnico.notasFeitas / total : 0;
-    }
+    case "aproveitamento":
+      return tecnico.aproveitamento;
     case "receitaPerda":
       return tecnico.receitaPerda;
     case "receitaBruta":
@@ -78,10 +96,9 @@ function valorOrdenacao(tecnico: TecnicoDesempenhoMock, key: SortKey): number {
 
 export function KpiDesempenhoTecnicos({
   tecnicos,
+  tecnicosEquipe,
+  resumoToa,
   demitidosKeys,
-  ano,
-  mes,
-  dia,
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
@@ -90,10 +107,73 @@ export function KpiDesempenhoTecnicos({
     direction: "asc",
   });
 
-  const enriquecidos = useMemo(
-    () => gerarDesempenhoMock(tecnicos, { ano, mes, dia }),
-    [tecnicos, ano, mes, dia],
-  );
+  const enriquecidos = useMemo<TecnicoDesempenho[]>(() => {
+    const kpisPorLogin = new Map(
+      tecnicos.map((tecnico) => [normalizeToaLogin(tecnico.id_tecnico), tecnico]),
+    );
+    const nomesPorLogin = new Map<string, string>();
+
+    for (const tecnico of tecnicosEquipe) {
+      for (const identificador of [
+        tecnico.identificacao,
+        tecnico.login,
+        tecnico.id,
+      ]) {
+        if (identificador?.trim()) {
+          nomesPorLogin.set(normalizeToaLogin(identificador), tecnico.nome);
+        }
+      }
+    }
+
+    const base = Object.entries(resumoToa).map(([login, resumo]) => {
+      const loginNormalizado = normalizeToaLogin(login);
+      const tecnicoKpi = kpisPorLogin.get(loginNormalizado);
+      const nome =
+        tecnicoKpi?.nome_tecnico?.trim() ||
+        nomesPorLogin.get(loginNormalizado) ||
+        loginNormalizado;
+      const totalNotas = resumo.notasFeitas + resumo.perdasNotas;
+      const aproveitamento =
+        totalNotas > 0 ? (resumo.notasFeitas / totalNotas) * 100 : 0;
+
+      return {
+        id_tecnico: loginNormalizado,
+        nome,
+        primeiroNome: nome.trim().split(/\s+/)[0] ?? nome,
+        baixaMisc: tecnicoKpi?.total ?? 0,
+        notasFeitas: resumo.notasFeitas,
+        perdasNotas: resumo.perdasNotas,
+        aproveitamento,
+        mediaAproveitamento: formatPct(aproveitamento),
+        receita: 0,
+        receitaPerda: 0,
+        freqRelativa: "",
+        freqAbsoluta: "",
+      };
+    });
+
+    const totalProdutivas = base.reduce(
+      (total, tecnico) => total + tecnico.notasFeitas,
+      0,
+    );
+    const ordenados = [...base].sort((a, b) => b.notasFeitas - a.notasFeitas);
+    let acumulado = 0;
+
+    return ordenados.map((tecnico) => {
+      acumulado += tecnico.notasFeitas;
+      return {
+        ...tecnico,
+        freqRelativa: formatPct(
+          totalProdutivas > 0
+            ? (tecnico.notasFeitas / totalProdutivas) * 100
+            : 0,
+        ),
+        freqAbsoluta: formatPct(
+          totalProdutivas > 0 ? (acumulado / totalProdutivas) * 100 : 0,
+        ),
+      };
+    });
+  }, [resumoToa, tecnicos, tecnicosEquipe]);
 
   const tecnicosFiltrados = useMemo(() => {
     const termo = buscaTecnico.trim().toLowerCase();
@@ -148,7 +228,16 @@ export function KpiDesempenhoTecnicos({
   );
 
   const { totalNotasProdutivas, totalPerdaNotas } = useMemo(
-    () => somarToaMock(enriquecidos),
+    () => ({
+      totalNotasProdutivas: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.notasFeitas,
+        0,
+      ),
+      totalPerdaNotas: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.perdasNotas,
+        0,
+      ),
+    }),
     [enriquecidos],
   );
 

@@ -2,6 +2,7 @@ import type { DimMaterialRow, WoCabecalhoRow, WoConsumoRow, EstoqueFisicoRow } f
 import { normalizeMatricula } from "./auth-identificacao";
 import { normalizeMaterialCode } from "./material-code";
 import { parseLocaleNumber } from "./parse-locale-number";
+import type { ToaLinha } from "./toa-store";
 
 type RawRow = Record<string, string>;
 
@@ -195,6 +196,72 @@ export async function parseSpreadsheet(file: File): Promise<RawRow[]> {
     return parseXlsx(file);
   }
   return parseCsv(file);
+}
+
+function parseToaData(value: string): string {
+  const raw = trimCell(value);
+  if (!raw) return "";
+
+  const brasileira = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})/);
+  if (brasileira) {
+    const [, dia, mes, anoRaw] = brasileira;
+    const ano = anoRaw!.length === 2 ? `20${anoRaw}` : anoRaw;
+    return `${ano}-${mes!.padStart(2, "0")}-${dia!.padStart(2, "0")}`;
+  }
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    return `${iso[1]}-${iso[2]!.padStart(2, "0")}-${iso[3]!.padStart(2, "0")}`;
+  }
+
+  const serial = Number(raw.replace(",", "."));
+  if (Number.isFinite(serial) && serial > 0) {
+    const excelEpochUtc = Date.UTC(1899, 11, 30);
+    const date = new Date(excelEpochUtc + Math.trunc(serial) * 86_400_000);
+    if (!Number.isNaN(date.getTime())) {
+      const ano = date.getUTCFullYear();
+      const mes = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const dia = String(date.getUTCDate()).padStart(2, "0");
+      return `${ano}-${mes}-${dia}`;
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Exportação TOA: por regra, somente a aba exatamente chamada `Page 1`
+ * pode alimentar os KPIs.
+ */
+export async function parseToaFile(file: File): Promise<ToaLinha[]> {
+  const name = file.name.toLowerCase();
+  if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+    throw new Error("A importação TOA aceita somente arquivos Excel (.xlsx ou .xls).");
+  }
+
+  const XLSX = await import("xlsx");
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheet = workbook.Sheets["Page 1"];
+
+  if (!sheet) {
+    throw new Error('A planilha deve conter uma aba chamada exatamente "Page 1".');
+  }
+
+  const matrix = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+    dateNF: "dd/mm/yyyy",
+  }) as string[][];
+
+  return rowsFromMatrix(matrix).map((row) => ({
+    data: parseToaData(pick(row, "Data")),
+    loginTecnico: normalizeMatricula(pick(row, "Login do Técnico")),
+    numeroWo: pick(row, "Número da WO"),
+    contrato: pick(row, "Contrato"),
+    codBaixaBruto: pick(row, "Cód de Baixa 1"),
+  }));
 }
 
 export async function parseWoCabecalhoFile(file: File): Promise<WoCabecalhoRow[]> {

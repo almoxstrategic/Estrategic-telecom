@@ -62,10 +62,6 @@ import type {
   TopConsumidorMaterial,
 } from "@/lib/logistica-types";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
-import {
-  gerarDesempenhoMock,
-  somarToaMock,
-} from "@/lib/kpi-desempenho-mock";
 import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
 import {
   consolidarMateriaisPorCodigo,
@@ -80,6 +76,12 @@ import {
   type TecnicoProfile,
 } from "@/lib/team-service";
 import { formatTecnicoLabel, formatTecnicoModalTitle } from "@/lib/tecnico-label";
+import {
+  agregarNotasToa,
+  filtrarNotasToa,
+  normalizeToaLogin,
+  useToaSnapshot,
+} from "@/lib/toa-store";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 const KPI_MODULOS = ["resumo-geral", "desempenho-tecnico"] as const;
@@ -198,6 +200,23 @@ function KpisPage() {
   const [periodos, setPeriodos] = useState<PeriodoConsumo[]>([]);
   const [filtroReady, setFiltroReady] = useState(false);
   const filtro = useKpiFiltro();
+  const toaSnapshot = useToaSnapshot();
+  const toaAgregado = useMemo(
+    () =>
+      agregarNotasToa(
+        filtrarNotasToa(toaSnapshot.notasProcessadas, {
+          ano: filtro.ano,
+          mes: filtro.mes,
+          dia: filtro.dia,
+        }),
+      ),
+    [
+      toaSnapshot.notasProcessadas,
+      filtro.ano,
+      filtro.mes,
+      filtro.dia,
+    ],
+  );
   const [kpis, setKpis] = useState<KpisConsumo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -301,18 +320,45 @@ function KpisPage() {
     })();
   }, []);
 
+  const periodosComDados = useMemo(() => {
+    const porChave = new Map<string, PeriodoConsumo>();
+    for (const periodo of periodos) {
+      porChave.set(`${periodo.ano}-${periodo.mes}`, periodo);
+    }
+    for (const nota of toaSnapshot.notasProcessadas) {
+      const [ano, mes] = nota.data.split("-").map(Number);
+      if (!ano || !mes) continue;
+      porChave.set(`${ano}-${mes}`, { ano, mes });
+    }
+    return [...porChave.values()].sort(
+      (a, b) => b.ano - a.ano || b.mes - a.mes,
+    );
+  }, [periodos, toaSnapshot.notasProcessadas]);
+
+  useEffect(() => {
+    if (periodosComDados.length === 0) return;
+    setKpiFiltro((prev) => {
+      if (prev.ano !== null && prev.mes !== null) return prev;
+      return {
+        ...prev,
+        ano: periodosComDados[0]!.ano,
+        mes: periodosComDados[0]!.mes,
+      };
+    });
+  }, [periodosComDados]);
+
   const anosComDados = useMemo(
-    () => [...new Set(periodos.map((p) => p.ano))].sort((a, b) => b - a),
-    [periodos],
+    () => [...new Set(periodosComDados.map((p) => p.ano))].sort((a, b) => b - a),
+    [periodosComDados],
   );
 
   const mesesDoAnoSelecionado = useMemo(() => {
     if (filtro.ano === null) return [];
-    return periodos
+    return periodosComDados
       .filter((p) => p.ano === filtro.ano)
       .map((p) => p.mes)
       .sort((a, b) => a - b);
-  }, [periodos, filtro.ano]);
+  }, [periodosComDados, filtro.ano]);
 
   const carregarKpis = useCallback(async (f: KpisFiltro) => {
     setLoading(true);
@@ -331,15 +377,6 @@ function KpisPage() {
     if (!filtroReady) return;
     void carregarKpis(filtro);
   }, [filtro.mes, filtro.ano, filtroReady, carregarKpis]);
-
-  const toaMockResumo = useMemo(() => {
-    const items = gerarDesempenhoMock(kpis?.top_tecnicos ?? [], {
-      ano: filtro.ano,
-      mes: filtro.mes,
-      dia: filtro.dia,
-    });
-    return somarToaMock(items);
-  }, [kpis?.top_tecnicos, filtro.ano, filtro.mes, filtro.dia]);
 
   useEffect(() => {
     if (itensCriticos.length === 0) {
@@ -759,7 +796,7 @@ function KpisPage() {
                   return;
                 }
                 const ano = Number(v);
-                const meses = periodos
+                const meses = periodosComDados
                   .filter((p) => p.ano === ano)
                   .map((p) => p.mes)
                   .sort((a, b) => a - b);
@@ -883,10 +920,9 @@ function KpisPage() {
           ) : (
             <KpiDesempenhoTecnicos
               tecnicos={kpis?.top_tecnicos ?? []}
+              tecnicosEquipe={tecnicosEquipe}
+              resumoToa={toaAgregado.resumoPorTecnico}
               demitidosKeys={tecnicosDemitidosKeys}
-              ano={filtro.ano}
-              mes={filtro.mes}
-              dia={filtro.dia}
             />
           )
         ) : (
@@ -897,9 +933,9 @@ function KpisPage() {
               <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </p>
-            ) : periodos.length === 0 ? (
+            ) : periodosComDados.length === 0 ? (
               <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                Nenhum período com consumo importado. Faça o Upload B na tela de Importação.
+                Nenhum período com dados importados. Faça uma importação de Consumo ou TOA.
               </p>
             ) : (
               <>
@@ -942,7 +978,7 @@ function KpisPage() {
                       </span>
                     </div>
                     <div className="mt-3 text-3xl font-black text-foreground">
-                      {formatQuantidade(toaMockResumo.totalNotasProdutivas)}
+                      {formatQuantidade(toaAgregado.totalProdutivas)}
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm">
@@ -953,7 +989,7 @@ function KpisPage() {
                       </span>
                     </div>
                     <div className="mt-3 text-3xl font-black text-foreground">
-                      {formatQuantidade(toaMockResumo.totalPerdaNotas)}
+                      {formatQuantidade(toaAgregado.totalPerdas)}
                     </div>
                   </div>
                 </section>
@@ -1114,6 +1150,10 @@ function KpisPage() {
                                 t.id_tecnico,
                                 t.nome_tecnico,
                               );
+                              const notasFeitas =
+                                toaAgregado.resumoPorTecnico[
+                                  normalizeToaLogin(t.id_tecnico)
+                                ]?.notasFeitas ?? 0;
                               return (
                               <li
                                 key={t.id_tecnico}
@@ -1140,7 +1180,7 @@ function KpisPage() {
                                     {formatQuantidade(t.total)}
                                   </span>
                                   <span className="text-center text-sm font-normal tabular-nums text-muted-foreground">
-                                    0
+                                    {formatQuantidade(notasFeitas)}
                                   </span>
                                   <span className="text-center text-sm font-semibold tabular-nums text-green-600">
                                     R$ 0,00
