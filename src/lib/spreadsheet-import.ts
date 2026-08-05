@@ -261,6 +261,7 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
     numeroWo: pick(row, "Número da WO"),
     contrato: pick(row, "Contrato"),
     codBaixaBruto: pick(row, "Cód de Baixa 1"),
+    tipoOs: pick(row, "Tipo O.S 1"),
   }));
 }
 

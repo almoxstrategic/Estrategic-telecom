@@ -192,8 +192,8 @@ export function KpiDesempenhoTecnicos({
         perdasNotas: resumo.perdasNotas,
         aproveitamento,
         mediaAproveitamento: formatPct(aproveitamento),
-        receita: 0,
-        receitaPerda: 0,
+        receita: resumo.receitaBruta,
+        receitaPerda: resumo.receitaPerda,
         freqRelativa: "",
         freqAbsoluta: "",
       };

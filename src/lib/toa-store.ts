@@ -6,6 +6,15 @@ export type ToaLinha = {
   numeroWo: string;
   contrato: string;
   codBaixaBruto: string;
+  tipoOs: string;
+};
+
+export const TABELA_PRECOS_TOA: Record<string, number> = {
+  "24 - MUDANCA DE PACOTE": 98.81,
+  "31 - REFAZER INSTALACAO": 218.48,
+  "15 - MUDANCA DE LOCAL DE PONTO": 167.07,
+  "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA": 174.78,
+  "1 - ADESAO - INSTALACAO DE ASSINATURA": 100,
 };
 
 export type ToaNotaProcessada = {
@@ -16,12 +25,17 @@ export type ToaNotaProcessada = {
   codBaixa: number;
   /** Texto original da planilha (código + descrição, quando houver). */
   codBaixaBruto: string;
+  tipoOs: string;
   isProdutiva: boolean;
+  valorReceita: number;
+  valorPerda: number;
 };
 
 export type ToaResumoTecnico = {
   notasFeitas: number;
   perdasNotas: number;
+  receitaBruta: number;
+  receitaPerda: number;
 };
 
 export type ToaAgregado = {
@@ -51,6 +65,15 @@ export function normalizeToaLogin(value: string): string {
   return value.trim().toUpperCase();
 }
 
+function normalizeTipoOs(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
 export function processarNotasTOA(linhas: ToaLinha[]): ToaNotaProcessada[] {
   const notasProcessadas: ToaNotaProcessada[] = [];
 
@@ -58,6 +81,7 @@ export function processarNotasTOA(linhas: ToaLinha[]): ToaNotaProcessada[] {
     const login = normalizeToaLogin(linha.loginTecnico);
     const codBaixaBruto = linha.codBaixaBruto.trim();
     const data = linha.data.trim();
+    const tipoOs = linha.tipoOs.trim();
 
     if (!login || !codBaixaBruto || !data) continue;
 
@@ -65,11 +89,16 @@ export function processarNotasTOA(linhas: ToaLinha[]): ToaNotaProcessada[] {
     if (!match) continue;
 
     const codBaixa = Number.parseInt(match[1]!, 10);
+    const isProdutiva = codBaixa >= 409 && codBaixa <= 599;
+    const valorServico = TABELA_PRECOS_TOA[normalizeTipoOs(tipoOs)] ?? 0;
     notasProcessadas.push({
       login,
       codBaixa,
       codBaixaBruto,
-      isProdutiva: codBaixa >= 409 && codBaixa <= 599,
+      tipoOs,
+      isProdutiva,
+      valorReceita: isProdutiva ? valorServico : 0,
+      valorPerda: isProdutiva ? 0 : valorServico,
       data,
       numeroWo: linha.numeroWo.trim(),
       contrato: linha.contrato.trim(),
@@ -103,7 +132,16 @@ function normalizeNota(value: unknown): ToaNotaProcessada | null {
       typeof nota.codBaixaBruto === "string" && nota.codBaixaBruto.trim()
         ? nota.codBaixaBruto.trim()
         : String(nota.codBaixa),
+    tipoOs: typeof nota.tipoOs === "string" ? nota.tipoOs.trim() : "",
     isProdutiva: nota.isProdutiva,
+    valorReceita:
+      typeof nota.valorReceita === "number" && Number.isFinite(nota.valorReceita)
+        ? nota.valorReceita
+        : 0,
+    valorPerda:
+      typeof nota.valorPerda === "number" && Number.isFinite(nota.valorPerda)
+        ? nota.valorPerda
+        : 0,
   };
 }
 
@@ -130,13 +168,17 @@ export function agregarNotasToa(notas: ToaNotaProcessada[]): ToaAgregado {
     const resumo = resumoPorTecnico[nota.login] ?? {
       notasFeitas: 0,
       perdasNotas: 0,
+      receitaBruta: 0,
+      receitaPerda: 0,
     };
 
     if (nota.isProdutiva) {
       resumo.notasFeitas += 1;
+      resumo.receitaBruta += nota.valorReceita;
       totalProdutivas += 1;
     } else {
       resumo.perdasNotas += 1;
+      resumo.receitaPerda += nota.valorPerda;
       totalPerdas += 1;
     }
     resumoPorTecnico[nota.login] = resumo;

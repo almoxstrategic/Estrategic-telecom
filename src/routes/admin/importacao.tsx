@@ -513,7 +513,7 @@ function ImportacaoPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Importação TOA"
-              description='Lê exclusivamente a aba "Page 1": Data, Login do Técnico, Número da WO, Contrato e Cód de Baixa 1.'
+              description='Lê exclusivamente a aba "Page 1": Data, Login do Técnico, Número da WO, Contrato, Cód de Baixa 1 e Tipo O.S 1.'
               file={arquivoToa}
               onFileChange={setArquivoToa}
               busy={busyToa}

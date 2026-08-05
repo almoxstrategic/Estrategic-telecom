@@ -171,6 +171,13 @@ function formatKpiRepresentatividade(quantidade: number, total: number): string 
   return `${pct.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
+function formatKpiMoeda(valor: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(valor);
+}
+
 function descricaoPeriodo(filtro: KpisFiltro): string {
   if (filtro.mes === null || filtro.ano === null) {
     return "Histórico completo";
@@ -1164,6 +1171,10 @@ function KpisPage() {
                                 toaAgregado.resumoPorTecnico[
                                   normalizeToaLogin(t.id_tecnico)
                                 ]?.notasFeitas ?? 0;
+                              const receitaBruta =
+                                toaAgregado.resumoPorTecnico[
+                                  normalizeToaLogin(t.id_tecnico)
+                                ]?.receitaBruta ?? 0;
                               return (
                               <li
                                 key={t.id_tecnico}
@@ -1193,7 +1204,7 @@ function KpisPage() {
                                     {formatQuantidade(notasFeitas)}
                                   </span>
                                   <span className="text-center text-sm font-semibold tabular-nums text-green-600">
-                                    R$ 0,00
+                                    {formatKpiMoeda(receitaBruta)}
                                   </span>
                                 </button>
                               </li>
