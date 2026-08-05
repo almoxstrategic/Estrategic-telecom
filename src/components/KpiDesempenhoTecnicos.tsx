@@ -100,6 +100,8 @@ type ChartBarPayload = {
   perdasNotas: number;
   receitaGanha: number;
   receitaPerda: number;
+  lucro: number;
+  mediaMaterialPorNota: number;
   pareto: number;
 };
 
@@ -527,17 +529,28 @@ export function KpiDesempenhoTecnicos({
   };
 
   const chartData = useMemo(() => {
-    const ordenados = [...enriquecidos].sort((a, b) => b.notasFeitas - a.notasFeitas);
+    const comProjecao = enriquecidos.map((tecnico) => {
+      const receitaGanha = tecnico.receita * fatorProjecao;
+      const receitaPerda = tecnico.receitaPerda * fatorProjecao;
+      return {
+        ...tecnico,
+        receitaGanha,
+        receitaPerda,
+        lucro: receitaGanha - receitaPerda,
+      };
+    });
+
+    const ordenados = [...comProjecao].sort((a, b) => b.lucro - a.lucro);
     const limite = limiteDoFiltro(filtroTop);
     const fatia = limite === null ? ordenados : ordenados.slice(0, limite);
-    const totalFatia = fatia.reduce((acc, t) => acc + t.notasFeitas, 0);
+    const lucroTotalFatia = fatia.reduce((acc, t) => acc + t.lucro, 0);
 
-    let acumulado = 0;
+    let lucroAcumulado = 0;
     return fatia.map((t) => {
-      acumulado += t.notasFeitas;
+      lucroAcumulado += t.lucro;
       const pareto =
-        totalFatia > 0
-          ? Math.round((acumulado / totalFatia) * 1000) / 10
+        lucroTotalFatia !== 0
+          ? Math.round((lucroAcumulado / lucroTotalFatia) * 1000) / 10
           : 0;
 
       return {
@@ -546,12 +559,14 @@ export function KpiDesempenhoTecnicos({
         nomeCompleto: t.nome,
         notasFeitas: t.notasFeitas,
         perdasNotas: t.perdasNotas,
-        receitaGanha: t.receita,
+        receitaGanha: t.receitaGanha,
         receitaPerda: t.receitaPerda,
+        lucro: t.lucro,
+        mediaMaterialPorNota: t.mediaMaterialPorNota,
         pareto,
       } satisfies ChartBarPayload;
     });
-  }, [enriquecidos, filtroTop]);
+  }, [enriquecidos, fatorProjecao, filtroTop]);
 
   const selecionarTecnicoDoGrafico = (data: unknown) => {
     const raw = data as ChartBarPayload & { payload?: ChartBarPayload };
@@ -731,6 +746,21 @@ export function KpiDesempenhoTecnicos({
                         <p className="text-red-600">
                           Notas Perdidas: {formatQuantidade(item.perdasNotas)} -{" "}
                           {formatReceita(item.receitaPerda)}
+                        </p>
+                        <p
+                          className={
+                            item.lucro > 0
+                              ? "text-green-600"
+                              : item.lucro < 0
+                                ? "text-red-600"
+                                : "text-gray-500"
+                          }
+                        >
+                          Lucro: {formatReceita(item.lucro)}
+                        </p>
+                        <p className="text-gray-700">
+                          Média Misc/Nota:{" "}
+                          {formatMediaMaterial(item.mediaMaterialPorNota)}
                         </p>
                         <p className="text-amber-500">
                           Pareto:{" "}
