@@ -4,6 +4,7 @@ import {
   ArrowUp,
   BarChart3,
   ClipboardCheck,
+  DollarSign,
   Users,
   X,
   XCircle,
@@ -274,8 +275,17 @@ export function KpiDesempenhoTecnicos({
     </button>
   );
 
-  const { totalNotasProdutivas, totalPerdaNotas } = useMemo(
-    () => ({
+  const { totalNotasProdutivas, totalPerdaNotas, receitaLiquidaTotal } = useMemo(() => {
+    const receitaBrutaTotal = enriquecidos.reduce(
+      (total, tecnico) => total + tecnico.receita,
+      0,
+    );
+    const receitaPerdaTotal = enriquecidos.reduce(
+      (total, tecnico) => total + tecnico.receitaPerda,
+      0,
+    );
+
+    return {
       totalNotasProdutivas: enriquecidos.reduce(
         (total, tecnico) => total + tecnico.notasFeitas,
         0,
@@ -284,9 +294,9 @@ export function KpiDesempenhoTecnicos({
         (total, tecnico) => total + tecnico.perdasNotas,
         0,
       ),
-    }),
-    [enriquecidos],
-  );
+      receitaLiquidaTotal: receitaBrutaTotal - receitaPerdaTotal,
+    };
+  }, [enriquecidos]);
 
   const chartData = useMemo(() => {
     const ordenados = [...enriquecidos].sort((a, b) => b.notasFeitas - a.notasFeitas);
@@ -360,7 +370,7 @@ export function KpiDesempenhoTecnicos({
 
   return (
     <div className="w-full space-y-6">
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <div className="flex items-center gap-2">
             <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
@@ -381,6 +391,17 @@ export function KpiDesempenhoTecnicos({
           </div>
           <div className="mt-3 text-3xl font-bold text-gray-900">
             {formatQuantidade(totalPerdaNotas)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
+            <span className="text-sm font-medium text-muted-foreground">
+              Receita Líquida total
+            </span>
+          </div>
+          <div className="mt-3 text-3xl font-bold text-green-600">
+            {formatReceita(receitaLiquidaTotal)}
           </div>
         </div>
       </div>
