@@ -63,6 +63,7 @@ import type {
 } from "@/lib/logistica-types";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
+import { useKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
 import {
   consolidarMateriaisPorCodigo,
   consolidarTopMateriaisPorCodigo,
@@ -178,6 +179,23 @@ function formatKpiMoeda(valor: number): string {
   }).format(valor);
 }
 
+function formatDataUltimaImportacao(iso: string | null): string {
+  if (!iso) return "Data da última importação: —";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Data da última importação: —";
+  const data = date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const hora = date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `Data da última importação: ${data} as ${hora} Horas`;
+}
+
 function descricaoPeriodo(filtro: KpisFiltro): string {
   if (filtro.mes === null || filtro.ano === null) {
     return "Histórico completo";
@@ -211,6 +229,7 @@ function KpisPage() {
   const [filtroReady, setFiltroReady] = useState(false);
   const filtro = useKpiFiltro();
   const toaSnapshot = useToaSnapshot();
+  const ultimaImportacaoAt = useKpiUltimaImportacao();
   const toaAgregado = useMemo(
     () =>
       agregarNotasToa(
@@ -911,12 +930,14 @@ function KpisPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              {isDesempenho ? "Desempenho Técnicos" : "KPI's"}
+              {isDesempenho ? "Desempenho Técnicos" : "Resumo geral"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isDesempenho
                 ? "Visão detalhada de desempenho por técnico no período selecionado."
-                : `Consolidado por data de atendimento da WO — ${descricaoPeriodo(filtro)}.`}
+                : formatDataUltimaImportacao(
+                    ultimaImportacaoAt ?? toaSnapshot.updatedAt,
+                  )}
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -1158,7 +1179,7 @@ function KpisPage() {
                             <span className="text-left">Nome</span>
                             <span className="text-center">Baixa Misc</span>
                             <span className="text-center">Notas feitas</span>
-                            <span className="text-center">Receita</span>
+                            <span className="text-center">Receita líquida</span>
                           </div>
                           <ul>
                             {(kpis?.top_tecnicos ?? []).map((t) => {
@@ -1167,14 +1188,14 @@ function KpisPage() {
                                 t.id_tecnico,
                                 t.nome_tecnico,
                               );
-                              const notasFeitas =
+                              const resumoToa =
                                 toaAgregado.resumoPorTecnico[
                                   normalizeToaLogin(t.id_tecnico)
-                                ]?.notasFeitas ?? 0;
-                              const receitaBruta =
-                                toaAgregado.resumoPorTecnico[
-                                  normalizeToaLogin(t.id_tecnico)
-                                ]?.receitaBruta ?? 0;
+                                ];
+                              const notasFeitas = resumoToa?.notasFeitas ?? 0;
+                              const receitaLiquida =
+                                (resumoToa?.receitaBruta ?? 0) -
+                                (resumoToa?.receitaPerda ?? 0);
                               return (
                               <li
                                 key={t.id_tecnico}
@@ -1204,7 +1225,7 @@ function KpisPage() {
                                     {formatQuantidade(notasFeitas)}
                                   </span>
                                   <span className="text-center text-sm font-semibold tabular-nums text-green-600">
-                                    {formatKpiMoeda(receitaBruta)}
+                                    {formatKpiMoeda(receitaLiquida)}
                                   </span>
                                 </button>
                               </li>

@@ -18,6 +18,7 @@ import { saveEstoqueBtp } from "@/lib/estoque-btp-store";
 import { saveEstoqueBase } from "@/lib/estoque-base-store";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
+import { markKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
 import { agregarNotasToa, processarNotasTOA, saveToaNotas } from "@/lib/toa-store";
 import { cn } from "@/lib/utils";
 
@@ -302,6 +303,7 @@ function ImportacaoPage() {
         return;
       }
       const result = await upsertWoConsumo(rows);
+      markKpiUltimaImportacao();
       const mergedNote =
         result.mergedDuplicates > 0
           ? ` (${result.mergedDuplicates} duplicatas na planilha foram somadas)`
@@ -380,6 +382,7 @@ function ImportacaoPage() {
       }
 
       saveToaNotas(notasProcessadas);
+      markKpiUltimaImportacao();
       toast.success(
         `TOA importado: ${resultado.totalProdutivas} notas produtivas e ${resultado.totalPerdas} perdas.`,
       );
