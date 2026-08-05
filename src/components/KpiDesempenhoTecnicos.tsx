@@ -48,7 +48,6 @@ type KpiDesempenhoTecnicosProps = {
   resumoToa: Record<string, ToaResumoTecnico>;
   notasProcessadas: ToaNotaProcessada[];
   filtroPeriodo: KpiFiltroPeriodo;
-  periodoLabel: string;
   demitidosKeys: Set<string>;
 };
 
@@ -91,6 +90,21 @@ type ChartBarPayload = {
   pareto: number;
 };
 
+const MESES_LABEL = [
+  { value: 1, label: "Janeiro" },
+  { value: 2, label: "Fevereiro" },
+  { value: 3, label: "Março" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Maio" },
+  { value: 6, label: "Junho" },
+  { value: 7, label: "Julho" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Setembro" },
+  { value: 10, label: "Outubro" },
+  { value: 11, label: "Novembro" },
+  { value: 12, label: "Dezembro" },
+] as const;
+
 function formatReceita(valor: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -102,6 +116,18 @@ function formatDataBr(isoDate: string): string {
   const [ano, mes, dia] = isoDate.split("-");
   if (!ano || !mes || !dia) return isoDate;
   return `${dia}/${mes}/${ano}`;
+}
+
+function descricaoPeriodoLocal(filtro: KpiFiltroPeriodo): string {
+  if (filtro.mes === null || filtro.ano === null) {
+    return "Histórico completo";
+  }
+  const mesLabel =
+    MESES_LABEL.find((m) => m.value === filtro.mes)?.label ?? String(filtro.mes);
+  if (filtro.dia !== null) {
+    return `${String(filtro.dia).padStart(2, "0")}/${String(filtro.mes).padStart(2, "0")}/${filtro.ano}`;
+  }
+  return `${mesLabel} de ${filtro.ano}`;
 }
 
 function limiteDoFiltro(filtro: FiltroTop): number | null {
@@ -143,17 +169,49 @@ export function KpiDesempenhoTecnicos({
   resumoToa,
   notasProcessadas,
   filtroPeriodo,
-  periodoLabel,
   demitidosKeys,
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
   const [tecnicoSelecionado, setTecnicoSelecionado] =
     useState<TecnicoSelecionado | null>(null);
+  const [filtroLocalAno, setFiltroLocalAno] = useState<number | null>(
+    filtroPeriodo.ano,
+  );
+  const [filtroLocalMes, setFiltroLocalMes] = useState<number | null>(
+    filtroPeriodo.mes,
+  );
+  const [filtroLocalDia, setFiltroLocalDia] = useState<number | null>(
+    filtroPeriodo.dia,
+  );
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: null,
     direction: "asc",
   });
+
+  const abrirDetalheTecnico = (login: string, nome: string) => {
+    setFiltroLocalAno(filtroPeriodo.ano);
+    setFiltroLocalMes(filtroPeriodo.mes);
+    setFiltroLocalDia(filtroPeriodo.dia);
+    setTecnicoSelecionado({
+      login: normalizeToaLogin(login),
+      nome,
+    });
+  };
+
+  const filtroLocalPeriodo = useMemo(
+    () => ({
+      ano: filtroLocalAno,
+      mes: filtroLocalMes,
+      dia: filtroLocalDia,
+    }),
+    [filtroLocalAno, filtroLocalMes, filtroLocalDia],
+  );
+
+  const periodoLabelLocal = useMemo(
+    () => descricaoPeriodoLocal(filtroLocalPeriodo),
+    [filtroLocalPeriodo],
+  );
 
   const enriquecidos = useMemo<TecnicoDesempenho[]>(() => {
     const kpisPorLogin = new Map(
@@ -329,23 +387,47 @@ export function KpiDesempenhoTecnicos({
     const raw = data as ChartBarPayload & { payload?: ChartBarPayload };
     const payload = raw?.payload ?? raw;
     if (!payload?.login) return;
-    setTecnicoSelecionado({
-      login: normalizeToaLogin(payload.login),
-      nome: payload.nomeCompleto || payload.nome || payload.login,
-    });
+    abrirDetalheTecnico(
+      payload.login,
+      payload.nomeCompleto || payload.nome || payload.login,
+    );
   };
+
+  const notasDoTecnicoBrutas = useMemo(() => {
+    if (!tecnicoSelecionado) return [];
+    const login = normalizeToaLogin(tecnicoSelecionado.login);
+    return notasProcessadas.filter((nota) => nota.login === login);
+  }, [tecnicoSelecionado, notasProcessadas]);
+
+  const anosDisponiveisModal = useMemo(() => {
+    const anos = new Set<number>();
+    for (const nota of notasDoTecnicoBrutas) {
+      const ano = Number(nota.data.split("-")[0]);
+      if (ano) anos.add(ano);
+    }
+    return [...anos].sort((a, b) => b - a);
+  }, [notasDoTecnicoBrutas]);
+
+  const mesesDisponiveisModal = useMemo(() => {
+    if (filtroLocalAno === null) return [];
+    const meses = new Set<number>();
+    for (const nota of notasDoTecnicoBrutas) {
+      const [ano, mes] = nota.data.split("-").map(Number);
+      if (ano === filtroLocalAno && mes) meses.add(mes);
+    }
+    return [...meses].sort((a, b) => a - b);
+  }, [notasDoTecnicoBrutas, filtroLocalAno]);
 
   const notasDoTecnico = useMemo(() => {
     if (!tecnicoSelecionado) return [];
-    const login = normalizeToaLogin(tecnicoSelecionado.login);
-    return filtrarNotasToa(notasProcessadas, filtroPeriodo)
-      .filter((nota) => nota.login === login)
-      .sort((a, b) => {
+    return filtrarNotasToa(notasDoTecnicoBrutas, filtroLocalPeriodo).sort(
+      (a, b) => {
         const byDate = a.data.localeCompare(b.data);
         if (byDate !== 0) return byDate;
         return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
-      });
-  }, [tecnicoSelecionado, notasProcessadas, filtroPeriodo]);
+      },
+    );
+  }, [tecnicoSelecionado, notasDoTecnicoBrutas, filtroLocalPeriodo]);
 
   const tendenciaPorData = useMemo(() => {
     const porData = new Map<
@@ -614,10 +696,7 @@ export function KpiDesempenhoTecnicos({
                     <button
                       type="button"
                       onClick={() =>
-                        setTecnicoSelecionado({
-                          login: tecnico.id_tecnico,
-                          nome: tecnico.nome,
-                        })
+                        abrirDetalheTecnico(tecnico.id_tecnico, tecnico.nome)
                       }
                       className={
                         isDemitido
@@ -682,7 +761,7 @@ export function KpiDesempenhoTecnicos({
                   className="text-lg font-bold text-gray-900"
                 >
                   {tecnicoSelecionado.login} - {tecnicoSelecionado.nome} -{" "}
-                  {periodoLabel}
+                  {periodoLabelLocal}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {formatQuantidade(notasDoTecnico.length)} notas no período
@@ -697,6 +776,87 @@ export function KpiDesempenhoTecnicos({
               >
                 <X className="h-5 w-5" />
               </button>
+            </div>
+
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                Ano:
+                <select
+                  value={filtroLocalAno !== null ? String(filtroLocalAno) : "todos"}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "todos") {
+                      setFiltroLocalAno(null);
+                      setFiltroLocalMes(null);
+                      setFiltroLocalDia(null);
+                      return;
+                    }
+                    const ano = Number(value);
+                    setFiltroLocalAno(ano);
+                    setFiltroLocalMes(null);
+                    setFiltroLocalDia(null);
+                  }}
+                  className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none"
+                >
+                  <option value="todos">Todos</option>
+                  {anosDisponiveisModal.map((ano) => (
+                    <option key={ano} value={ano}>
+                      {ano}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                Mês:
+                <select
+                  value={filtroLocalMes !== null ? String(filtroLocalMes) : "todos"}
+                  disabled={filtroLocalAno === null}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "todos") {
+                      setFiltroLocalMes(null);
+                      setFiltroLocalDia(null);
+                      return;
+                    }
+                    setFiltroLocalMes(Number(value));
+                    setFiltroLocalDia(null);
+                  }}
+                  className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none disabled:opacity-50"
+                >
+                  <option value="todos">Todos</option>
+                  {mesesDisponiveisModal.map((mes) => {
+                    const label =
+                      MESES_LABEL.find((item) => item.value === mes)?.label ??
+                      String(mes);
+                    return (
+                      <option key={mes} value={mes}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                Dia:
+                <select
+                  value={filtroLocalDia !== null ? String(filtroLocalDia) : "todos"}
+                  disabled={filtroLocalAno === null || filtroLocalMes === null}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFiltroLocalDia(value === "todos" ? null : Number(value));
+                  }}
+                  className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none disabled:opacity-50"
+                >
+                  <option value="todos">Todos</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
+                    <option key={dia} value={dia}>
+                      {dia}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="mb-6 h-64 w-full rounded-lg border border-gray-200 p-3">
@@ -771,13 +931,14 @@ export function KpiDesempenhoTecnicos({
                     <th className="px-3 py-2 font-semibold">Contrato</th>
                     <th className="px-3 py-2 font-semibold">Cód de Baixa</th>
                     <th className="px-3 py-2 font-semibold">Status</th>
+                    <th className="px-3 py-2 font-semibold">Valor</th>
                   </tr>
                 </thead>
                 <tbody>
                   {notasDoTecnico.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-3 py-8 text-center text-muted-foreground"
                       >
                         Nenhuma nota para exibir.
@@ -810,6 +971,17 @@ export function KpiDesempenhoTecnicos({
                             <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
                               Quebra/Improdutivo
                             </span>
+                          )}
+                        </td>
+                        <td
+                          className={
+                            nota.isProdutiva
+                              ? "px-3 py-2 font-semibold tabular-nums text-green-600"
+                              : "px-3 py-2 font-semibold tabular-nums text-red-600"
+                          }
+                        >
+                          {formatReceita(
+                            nota.isProdutiva ? nota.valorReceita : nota.valorPerda,
                           )}
                         </td>
                       </tr>

@@ -959,7 +959,6 @@ function KpisPage() {
                 mes: filtro.mes,
                 dia: filtro.dia,
               }}
-              periodoLabel={descricaoPeriodo(filtro)}
               demitidosKeys={tecnicosDemitidosKeys}
             />
           )
