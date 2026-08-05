@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import {
   ArrowDown,
   ArrowUp,
   BarChart3,
   ClipboardCheck,
   DollarSign,
+  Download,
   FilterX,
   TrendingUp,
   Users,
@@ -50,6 +52,19 @@ type KpiFiltroPeriodo = {
 type TecnicoSelecionado = {
   login: string;
   nome: string;
+};
+
+type TipoDetalheNotas = "produtivas" | "perdas";
+
+type NotaDetalheCard = {
+  data: string;
+  login: string;
+  colaborador: string;
+  contrato: string;
+  numeroWo: string;
+  tipoOs: string;
+  receita: number;
+  isProdutiva: boolean;
 };
 
 type KpiDesempenhoTecnicosProps = {
@@ -229,6 +244,9 @@ export function KpiDesempenhoTecnicos({
   );
   const [tecnicoSelecionado, setTecnicoSelecionado] =
     useState<TecnicoSelecionado | null>(null);
+  const [detalheNotasTipo, setDetalheNotasTipo] =
+    useState<TipoDetalheNotas | null>(null);
+  const [buscaDetalheNotas, setBuscaDetalheNotas] = useState("");
   const [filtroLocalAno, setFiltroLocalAno] = useState<number | null>(
     filtroPeriodo.ano,
   );
@@ -266,6 +284,16 @@ export function KpiDesempenhoTecnicos({
       login: normalizeToaLogin(login),
       nome,
     });
+  };
+
+  const abrirDetalheNotas = (tipo: TipoDetalheNotas) => {
+    setBuscaDetalheNotas("");
+    setDetalheNotasTipo(tipo);
+  };
+
+  const fecharDetalheNotas = () => {
+    setDetalheNotasTipo(null);
+    setBuscaDetalheNotas("");
   };
 
   const filtroLocalPeriodo = useMemo(
@@ -487,6 +515,19 @@ export function KpiDesempenhoTecnicos({
   }, [isTabelaPrecosOpen]);
 
   useEffect(() => {
+    if (!detalheNotasTipo) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        fecharDetalheNotas();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [detalheNotasTipo]);
+
+  useEffect(() => {
     if (!isTabelaPrecosOpen) return;
 
     setValoresEditados((atuais) => {
@@ -698,10 +739,152 @@ export function KpiDesempenhoTecnicos({
     return [...porData.values()].sort((a, b) => a.data.localeCompare(b.data));
   }, [notasDoTecnico]);
 
+  const nomesColaboradorPorLogin = useMemo(() => {
+    const nomes = new Map<string, string>();
+
+    for (const tecnico of tecnicosEquipe) {
+      for (const identificador of [
+        tecnico.identificacao,
+        tecnico.login,
+        tecnico.id,
+      ]) {
+        if (identificador?.trim()) {
+          nomes.set(normalizeToaLogin(identificador), tecnico.nome);
+        }
+      }
+    }
+
+    for (const tecnico of tecnicos) {
+      const login = normalizeToaLogin(tecnico.id_tecnico);
+      const nome = tecnico.nome_tecnico?.trim();
+      if (nome && !nomes.has(login)) {
+        nomes.set(login, nome);
+      }
+    }
+
+    for (const tecnico of enriquecidos) {
+      if (!nomes.has(tecnico.id_tecnico)) {
+        nomes.set(tecnico.id_tecnico, tecnico.nome);
+      }
+    }
+
+    return nomes;
+  }, [tecnicosEquipe, tecnicos, enriquecidos]);
+
+  const notasDetalheCard = useMemo<NotaDetalheCard[]>(() => {
+    if (!detalheNotasTipo) return [];
+
+    const desejaProdutiva = detalheNotasTipo === "produtivas";
+    const filtradas = filtrarNotasToa(notasProcessadas, filtroPeriodo).filter(
+      (nota) => nota.isProdutiva === desejaProdutiva,
+    );
+
+    return filtradas
+      .map((nota) => {
+        const login = normalizeToaLogin(nota.login);
+        const valorBase = precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
+        const receita = valorBase * fatorProjecao;
+
+        return {
+          data: nota.data,
+          login,
+          colaborador: nomesColaboradorPorLogin.get(login) || login,
+          contrato: nota.contrato,
+          numeroWo: nota.numeroWo,
+          tipoOs: nota.tipoOs,
+          receita,
+          isProdutiva: nota.isProdutiva,
+        };
+      })
+      .sort((a, b) => {
+        const byDate = a.data.localeCompare(b.data);
+        if (byDate !== 0) return byDate;
+        const byNome = a.colaborador.localeCompare(b.colaborador, "pt-BR");
+        if (byNome !== 0) return byNome;
+        return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+      });
+  }, [
+    detalheNotasTipo,
+    notasProcessadas,
+    filtroPeriodo,
+    precosOs,
+    fatorProjecao,
+    nomesColaboradorPorLogin,
+  ]);
+
+  const notasDetalheCardFiltradas = useMemo(() => {
+    const termo = buscaDetalheNotas.trim().toLowerCase();
+    if (!termo) return notasDetalheCard;
+
+    return notasDetalheCard.filter((nota) => {
+      const contrato = (nota.contrato || "").toLowerCase();
+      const wo = (nota.numeroWo || "").toLowerCase();
+      const nome = (nota.colaborador || "").toLowerCase();
+      return (
+        contrato.includes(termo) || wo.includes(termo) || nome.includes(termo)
+      );
+    });
+  }, [notasDetalheCard, buscaDetalheNotas]);
+
+  const exportarDetalheNotasExcel = () => {
+    if (!detalheNotasTipo) return;
+
+    if (notasDetalheCardFiltradas.length === 0) {
+      toast.error("Nenhuma nota visível para exportar.");
+      return;
+    }
+
+    const dadosExcel = notasDetalheCardFiltradas.map((nota) => {
+      const receitaExibida = nota.isProdutiva
+        ? nota.receita
+        : nota.receita > 0
+          ? -Math.abs(nota.receita)
+          : 0;
+
+      return {
+        Data: formatDataBr(nota.data),
+        Colaborador: nota.colaborador,
+        Contrato: nota.contrato || "—",
+        WO: nota.numeroWo || "—",
+        "Tipo OS": nota.tipoOs || "—",
+        Receita: Number(receitaExibida.toFixed(2)),
+        Status: nota.isProdutiva ? "Produtivo" : "Quebra/Improdutivo",
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const workbook = XLSX.utils.book_new();
+    const sheetName =
+      detalheNotasTipo === "produtivas" ? "Notas Produtivas" : "Perdas";
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const prefixo =
+      detalheNotasTipo === "produtivas"
+        ? "Detalhamento_Notas_Produtivas"
+        : "Detalhamento_Perdas";
+    XLSX.writeFile(workbook, `${prefixo}_${hoje}.xlsx`);
+    toast.success(
+      `Excel exportado: ${formatQuantidade(notasDetalheCardFiltradas.length)} notas.`,
+    );
+  };
+
+  const tituloDetalheNotas =
+    detalheNotasTipo === "produtivas"
+      ? "Detalhamento de Notas Produtivas"
+      : detalheNotasTipo === "perdas"
+        ? "Detalhamento de Perdas"
+        : "";
+
   return (
     <div className="w-full space-y-6">
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <button
+          type="button"
+          onClick={() => abrirDetalheNotas("produtivas")}
+          className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-green-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500"
+          aria-label="Abrir detalhamento de notas produtivas"
+        >
           <div className="flex items-center gap-2">
             <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
             <span className="text-sm font-medium text-muted-foreground">
@@ -711,8 +894,13 @@ export function KpiDesempenhoTecnicos({
           <div className="mt-3 text-3xl font-bold text-gray-900">
             {formatQuantidade(totalNotasProdutivas)}
           </div>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        </button>
+        <button
+          type="button"
+          onClick={() => abrirDetalheNotas("perdas")}
+          className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-red-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
+          aria-label="Abrir detalhamento de perdas de notas"
+        >
           <div className="flex items-center gap-2">
             <XCircle className="h-5 w-5 shrink-0 text-red-600" />
             <span className="text-sm font-medium text-muted-foreground">
@@ -722,7 +910,7 @@ export function KpiDesempenhoTecnicos({
           <div className="mt-3 text-3xl font-bold text-gray-900">
             {formatQuantidade(totalPerdaNotas)}
           </div>
-        </div>
+        </button>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
@@ -1043,6 +1231,147 @@ export function KpiDesempenhoTecnicos({
           </div>
         )}
       </div>
+
+      {detalheNotasTipo !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-detalhe-notas-titulo"
+          onClick={fecharDetalheNotas}
+        >
+          <div
+            className="max-h-[90vh] w-11/12 max-w-6xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3
+                  id="modal-detalhe-notas-titulo"
+                  className="text-lg font-bold text-gray-900"
+                >
+                  {tituloDetalheNotas}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatQuantidade(notasDetalheCardFiltradas.length)}
+                  {buscaDetalheNotas.trim()
+                    ? ` de ${formatQuantidade(notasDetalheCard.length)}`
+                    : ""}{" "}
+                  notas no período selecionado
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fecharDetalheNotas}
+                className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Fechar detalhamento de notas"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={buscaDetalheNotas}
+                onChange={(e) => setBuscaDetalheNotas(e.target.value)}
+                placeholder="Pesquisar por Contrato, WO ou Nome do Colaborador..."
+                aria-label="Pesquisar por Contrato, WO ou Nome do Colaborador"
+                className="w-full flex-1 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                type="button"
+                onClick={exportarDetalheNotasExcel}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Exportar para Excel
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Data</th>
+                    <th className="px-3 py-2 font-semibold">Colaborador</th>
+                    <th className="px-3 py-2 font-semibold">Contrato</th>
+                    <th className="px-3 py-2 font-semibold">WO</th>
+                    <th className="px-3 py-2 font-semibold">Tipo OS</th>
+                    <th className="px-3 py-2 font-semibold">Receita</th>
+                    <th className="px-3 py-2 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notasDetalheCardFiltradas.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-3 py-8 text-center text-muted-foreground"
+                      >
+                        Nenhuma nota para exibir.
+                      </td>
+                    </tr>
+                  ) : (
+                    notasDetalheCardFiltradas.map((nota, index) => {
+                      const ganhoReal = nota.isProdutiva && nota.receita > 0;
+                      const perdaReal = !nota.isProdutiva && nota.receita > 0;
+                      const receitaExibida = perdaReal
+                        ? -Math.abs(nota.receita)
+                        : nota.receita;
+
+                      return (
+                        <tr
+                          key={`${nota.data}-${nota.login}-${nota.numeroWo}-${index}`}
+                          className="border-t border-gray-100"
+                        >
+                          <td className="px-3 py-2 tabular-nums text-gray-800">
+                            {formatDataBr(nota.data)}
+                          </td>
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {nota.colaborador}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {nota.contrato || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {nota.numeroWo || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {nota.tipoOs || "—"}
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-3 py-2 tabular-nums ${
+                              ganhoReal
+                                ? "font-medium text-green-600"
+                                : perdaReal
+                                  ? "font-medium text-red-600"
+                                  : "font-normal text-gray-400"
+                            }`}
+                          >
+                            {formatReceita(receitaExibida)}
+                          </td>
+                          <td className="px-3 py-2">
+                            {nota.isProdutiva ? (
+                              <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                Produtivo
+                              </span>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                                Quebra/Improdutivo
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {tecnicoSelecionado !== null && (
         <div
