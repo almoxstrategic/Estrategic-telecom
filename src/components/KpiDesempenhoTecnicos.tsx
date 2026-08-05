@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowDown,
@@ -197,10 +197,16 @@ export function KpiDesempenhoTecnicos({
     direction: "asc",
   });
   const [isTabelaPrecosOpen, setIsTabelaPrecosOpen] = useState(false);
+  const [buscaTipoOs, setBuscaTipoOs] = useState("");
   const [valoresEditados, setValoresEditados] = useState<Record<string, string>>(
     {},
   );
   const [salvandoPrecos, setSalvandoPrecos] = useState(false);
+
+  const fecharTabelaPrecos = () => {
+    setIsTabelaPrecosOpen(false);
+    setBuscaTipoOs("");
+  };
 
   const abrirDetalheTecnico = (login: string, nome: string) => {
     setFiltroLocalAno(filtroPeriodo.ano);
@@ -393,7 +399,47 @@ export function KpiDesempenhoTecnicos({
       );
   }, [notasProcessadas, precosOs]);
 
+  const tiposOsFiltrados = useMemo(() => {
+    const termo = buscaTipoOs.trim().toLowerCase();
+    if (!termo) return tiposOsImportados;
+    return tiposOsImportados.filter(({ tipoOs }) =>
+      tipoOs.toLowerCase().includes(termo),
+    );
+  }, [buscaTipoOs, tiposOsImportados]);
+
+  useEffect(() => {
+    if (!isTabelaPrecosOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        fecharTabelaPrecos();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isTabelaPrecosOpen]);
+
+  useEffect(() => {
+    if (!isTabelaPrecosOpen) return;
+
+    setValoresEditados((atuais) => {
+      const proximos = { ...atuais };
+      let alterou = false;
+
+      for (const { chave, valor } of tiposOsImportados) {
+        if (proximos[chave] === undefined) {
+          proximos[chave] = valor.toFixed(2);
+          alterou = true;
+        }
+      }
+
+      return alterou ? proximos : atuais;
+    });
+  }, [isTabelaPrecosOpen, tiposOsImportados]);
+
   const abrirTabelaPrecos = () => {
+    setBuscaTipoOs("");
     setValoresEditados(
       Object.fromEntries(
         tiposOsImportados.map(({ chave, valor }) => [
@@ -1122,21 +1168,36 @@ export function KpiDesempenhoTecnicos({
       )}
 
       {isTabelaPrecosOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-11/12 max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={fecharTabelaPrecos}
+        >
+          <div
+            className="w-11/12 max-w-md rounded-lg bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-800">
                 Valores por Tipo de O.S.
               </h3>
               <button
                 type="button"
-                onClick={() => setIsTabelaPrecosOpen(false)}
+                onClick={fecharTabelaPrecos}
                 className="font-bold text-gray-500 hover:text-red-500"
                 aria-label="Fechar tabela de preços"
               >
                 X
               </button>
             </div>
+
+            <input
+              type="search"
+              value={buscaTipoOs}
+              onChange={(event) => setBuscaTipoOs(event.target.value)}
+              placeholder="Buscar Tipo de O.S..."
+              aria-label="Buscar Tipo de O.S."
+              className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
 
             <div className="max-h-96 overflow-y-auto">
               <table className="w-full text-left text-sm text-gray-500">
@@ -1156,8 +1217,17 @@ export function KpiDesempenhoTecnicos({
                         Nenhum Tipo de O.S. encontrado na importação TOA.
                       </td>
                     </tr>
+                  ) : tiposOsFiltrados.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        className="px-4 py-6 text-center text-muted-foreground"
+                      >
+                        Nenhum Tipo de O.S. encontrado para “{buscaTipoOs.trim()}”.
+                      </td>
+                    </tr>
                   ) : (
-                    tiposOsImportados.map(({ chave, tipoOs, valor }) => (
+                    tiposOsFiltrados.map(({ chave, tipoOs, valor }) => (
                       <tr key={chave} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium text-gray-900">
                           {tipoOs}
