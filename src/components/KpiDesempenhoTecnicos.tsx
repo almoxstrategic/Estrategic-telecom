@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowUp,
@@ -24,9 +25,11 @@ import {
 } from "recharts";
 import type { KpiTopTecnico } from "@/lib/logistica-types";
 import { formatQuantidade } from "@/lib/parse-locale-number";
+import type { PrecoOs, PrecosOsMap } from "@/lib/precos-os-service";
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import {
   filtrarNotasToa,
+  normalizeTipoOs,
   normalizeToaLogin,
   type ToaNotaProcessada,
   type ToaResumoTecnico,
@@ -50,6 +53,8 @@ type KpiDesempenhoTecnicosProps = {
   notasProcessadas: ToaNotaProcessada[];
   filtroPeriodo: KpiFiltroPeriodo;
   demitidosKeys: Set<string>;
+  precosOs: PrecosOsMap;
+  onSalvarPrecos: (precos: PrecoOs[]) => Promise<void>;
 };
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
@@ -171,6 +176,8 @@ export function KpiDesempenhoTecnicos({
   notasProcessadas,
   filtroPeriodo,
   demitidosKeys,
+  precosOs,
+  onSalvarPrecos,
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
@@ -189,6 +196,11 @@ export function KpiDesempenhoTecnicos({
     key: null,
     direction: "asc",
   });
+  const [isTabelaPrecosOpen, setIsTabelaPrecosOpen] = useState(false);
+  const [valoresEditados, setValoresEditados] = useState<Record<string, string>>(
+    {},
+  );
+  const [salvandoPrecos, setSalvandoPrecos] = useState(false);
 
   const abrirDetalheTecnico = (login: string, nome: string) => {
     setFiltroLocalAno(filtroPeriodo.ano);
@@ -356,6 +368,75 @@ export function KpiDesempenhoTecnicos({
       receitaLiquidaTotal: receitaBrutaTotal - receitaPerdaTotal,
     };
   }, [enriquecidos]);
+
+  const tiposOsImportados = useMemo(() => {
+    const unicos = new Map<string, string>();
+
+    for (const nota of notasProcessadas) {
+      const tipoOs = nota.tipoOs?.trim();
+      if (!tipoOs) continue;
+
+      const chave = normalizeTipoOs(tipoOs);
+      if (!unicos.has(chave)) {
+        unicos.set(chave, tipoOs);
+      }
+    }
+
+    return Array.from(unicos.entries())
+      .map(([chave, tipoOs]) => ({
+        chave,
+        tipoOs,
+        valor: precosOs[chave] ?? 0,
+      }))
+      .sort((a, b) =>
+        a.tipoOs.localeCompare(b.tipoOs, "pt-BR", { sensitivity: "base" }),
+      );
+  }, [notasProcessadas, precosOs]);
+
+  const abrirTabelaPrecos = () => {
+    setValoresEditados(
+      Object.fromEntries(
+        tiposOsImportados.map(({ chave, valor }) => [
+          chave,
+          valor.toFixed(2),
+        ]),
+      ),
+    );
+    setIsTabelaPrecosOpen(true);
+  };
+
+  const salvarValoresAlterados = async () => {
+    let temValorInvalido = false;
+    const alterados = tiposOsImportados.flatMap(({ chave, tipoOs, valor }) => {
+      const novoValor = Number(valoresEditados[chave] ?? valor);
+      if (!Number.isFinite(novoValor) || novoValor < 0) {
+        toast.error(`Informe um valor válido para ${tipoOs}.`);
+        temValorInvalido = true;
+        return [];
+      }
+      return Math.abs(novoValor - valor) >= 0.005
+        ? [{ tipoOS: tipoOs, valor: novoValor }]
+        : [];
+    });
+
+    if (temValorInvalido) return;
+
+    if (alterados.length === 0) {
+      toast.info("Nenhum valor foi alterado.");
+      return;
+    }
+
+    setSalvandoPrecos(true);
+    try {
+      await onSalvarPrecos(alterados);
+      toast.success("Tabela de preços atualizada.");
+    } catch (err) {
+      console.error("Erro ao salvar preços de OS:", err);
+      toast.error("Não foi possível salvar a tabela de preços.");
+    } finally {
+      setSalvandoPrecos(false);
+    }
+  };
 
   const chartData = useMemo(() => {
     const ordenados = [...enriquecidos].sort((a, b) => b.notasFeitas - a.notasFeitas);
@@ -636,10 +717,21 @@ export function KpiDesempenhoTecnicos({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
-          <Users className="h-4 w-4 text-primary" />
-          Detalhamento por Técnico
-        </h2>
+        <div className="mb-4 flex items-center gap-2">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+            <Users className="h-4 w-4 text-primary" />
+            Detalhamento por Técnico
+          </h2>
+          <button
+            type="button"
+            onClick={abrirTabelaPrecos}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
+            title="Ver Tabela de Preços"
+            aria-label="Ver tabela de preços"
+          >
+            ?
+          </button>
+        </div>
 
         <input
           type="search"
@@ -969,9 +1061,8 @@ export function KpiDesempenhoTecnicos({
                     </tr>
                   ) : (
                     notasDoTecnico.map((nota, index) => {
-                      const valorNota = nota.isProdutiva
-                        ? nota.valorReceita
-                        : nota.valorPerda;
+                      const valorNota =
+                        precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
                       const ganhoReal = nota.isProdutiva && valorNota > 0;
                       const perdaReal = !nota.isProdutiva && valorNota > 0;
 
@@ -1026,6 +1117,89 @@ export function KpiDesempenhoTecnicos({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isTabelaPrecosOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-11/12 max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-800">
+                Valores por Tipo de O.S.
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsTabelaPrecosOpen(false)}
+                className="font-bold text-gray-500 hover:text-red-500"
+                aria-label="Fechar tabela de preços"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full text-left text-sm text-gray-500">
+                <thead className="border-b bg-gray-50 text-xs text-gray-700">
+                  <tr>
+                    <th className="px-4 py-2">Tipo da OS</th>
+                    <th className="px-4 py-2 text-right">Valor (R$)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tiposOsImportados.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        className="px-4 py-6 text-center text-muted-foreground"
+                      >
+                        Nenhum Tipo de O.S. encontrado na importação TOA.
+                      </td>
+                    </tr>
+                  ) : (
+                    tiposOsImportados.map(({ chave, tipoOs, valor }) => (
+                      <tr key={chave} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-900">
+                          {tipoOs}
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={valoresEditados[chave] ?? valor.toFixed(2)}
+                            onChange={(event) =>
+                              setValoresEditados((atuais) => ({
+                                ...atuais,
+                                [chave]: event.target.value,
+                              }))
+                            }
+                            aria-label={`Valor de ${tipoOs}`}
+                            className={`w-28 rounded-md border px-2 py-1 text-right tabular-nums outline-none focus:ring-2 focus:ring-green-500 ${
+                              Number(valoresEditados[chave] ?? valor) > 0
+                                ? "border-gray-300 font-semibold text-green-600"
+                                : "border-orange-300 font-medium text-orange-500"
+                            }`}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-4 text-center text-xs text-gray-400">
+              * Valores de referência baseados no analítico. Tipos em laranja
+              ainda não possuem preço mapeado.
+            </p>
+            <button
+              type="button"
+              onClick={() => void salvarValoresAlterados()}
+              disabled={salvandoPrecos || tiposOsImportados.length === 0}
+              className="mt-4 w-full rounded-md bg-green-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {salvandoPrecos ? "Salvando..." : "Salvar Valores"}
+            </button>
           </div>
         </div>
       )}

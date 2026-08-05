@@ -71,6 +71,12 @@ import {
 } from "@/lib/material-code";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import {
+  fetchPrecosOs,
+  upsertPrecosOs,
+  type PrecoOs,
+  type PrecosOsMap,
+} from "@/lib/precos-os-service";
+import {
   buildTecnicosDemitidosKeys,
   fetchTecnicos,
   isTecnicoDemitido,
@@ -230,6 +236,28 @@ function KpisPage() {
   const filtro = useKpiFiltro();
   const toaSnapshot = useToaSnapshot();
   const ultimaImportacaoAt = useKpiUltimaImportacao();
+  const [precosOs, setPrecosOs] = useState<PrecosOsMap>({});
+
+  const carregarPrecosOs = useCallback(async () => {
+    const precos = await fetchPrecosOs();
+    setPrecosOs(precos);
+  }, []);
+
+  const salvarPrecosOs = useCallback(
+    async (precos: PrecoOs[]) => {
+      await upsertPrecosOs(precos);
+      await carregarPrecosOs();
+    },
+    [carregarPrecosOs],
+  );
+
+  useEffect(() => {
+    void carregarPrecosOs().catch((err) => {
+      console.error("Erro ao carregar preços de OS:", err);
+      toast.error("Não foi possível carregar a tabela de preços.");
+    });
+  }, [carregarPrecosOs]);
+
   const toaAgregado = useMemo(
     () =>
       agregarNotasToa(
@@ -238,12 +266,14 @@ function KpisPage() {
           mes: filtro.mes,
           dia: filtro.dia,
         }),
+        precosOs,
       ),
     [
       toaSnapshot.notasProcessadas,
       filtro.ano,
       filtro.mes,
       filtro.dia,
+      precosOs,
     ],
   );
   const [kpis, setKpis] = useState<KpisConsumo | null>(null);
@@ -960,6 +990,8 @@ function KpisPage() {
                 dia: filtro.dia,
               }}
               demitidosKeys={tecnicosDemitidosKeys}
+              precosOs={precosOs}
+              onSalvarPrecos={salvarPrecosOs}
             />
           )
         ) : (

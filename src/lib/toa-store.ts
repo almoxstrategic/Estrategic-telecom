@@ -9,14 +9,6 @@ export type ToaLinha = {
   tipoOs: string;
 };
 
-export const TABELA_PRECOS_TOA: Record<string, number> = {
-  "24 - MUDANCA DE PACOTE": 98.81,
-  "31 - REFAZER INSTALACAO": 218.48,
-  "15 - MUDANCA DE LOCAL DE PONTO": 167.07,
-  "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA": 174.78,
-  "1 - ADESAO - INSTALACAO DE ASSINATURA": 100,
-};
-
 export type ToaNotaProcessada = {
   data: string;
   login: string;
@@ -65,7 +57,7 @@ export function normalizeToaLogin(value: string): string {
   return value.trim().toUpperCase();
 }
 
-function normalizeTipoOs(value: string): string {
+export function normalizeTipoOs(value: string): string {
   return value
     .trim()
     .replace(/\s+/g, " ")
@@ -90,15 +82,16 @@ export function processarNotasTOA(linhas: ToaLinha[]): ToaNotaProcessada[] {
 
     const codBaixa = Number.parseInt(match[1]!, 10);
     const isProdutiva = codBaixa >= 409 && codBaixa <= 599;
-    const valorServico = TABELA_PRECOS_TOA[normalizeTipoOs(tipoOs)] ?? 0;
     notasProcessadas.push({
       login,
       codBaixa,
       codBaixaBruto,
       tipoOs,
       isProdutiva,
-      valorReceita: isProdutiva ? valorServico : 0,
-      valorPerda: isProdutiva ? 0 : valorServico,
+      // Mantidos por compatibilidade com snapshots antigos. O valor vigente
+      // é calculado em tempo real a partir da tabela precos_os.
+      valorReceita: 0,
+      valorPerda: 0,
       data,
       numeroWo: linha.numeroWo.trim(),
       contrato: linha.contrato.trim(),
@@ -159,12 +152,16 @@ export function filtrarNotasToa(
   });
 }
 
-export function agregarNotasToa(notas: ToaNotaProcessada[]): ToaAgregado {
+export function agregarNotasToa(
+  notas: ToaNotaProcessada[],
+  precosOs: Record<string, number> = {},
+): ToaAgregado {
   const resumoPorTecnico: Record<string, ToaResumoTecnico> = {};
   let totalProdutivas = 0;
   let totalPerdas = 0;
 
   for (const nota of notas) {
+    const valorServico = precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
     const resumo = resumoPorTecnico[nota.login] ?? {
       notasFeitas: 0,
       perdasNotas: 0,
@@ -174,11 +171,11 @@ export function agregarNotasToa(notas: ToaNotaProcessada[]): ToaAgregado {
 
     if (nota.isProdutiva) {
       resumo.notasFeitas += 1;
-      resumo.receitaBruta += nota.valorReceita;
+      resumo.receitaBruta += valorServico;
       totalProdutivas += 1;
     } else {
       resumo.perdasNotas += 1;
-      resumo.receitaPerda += nota.valorPerda;
+      resumo.receitaPerda += valorServico;
       totalPerdas += 1;
     }
     resumoPorTecnico[nota.login] = resumo;
