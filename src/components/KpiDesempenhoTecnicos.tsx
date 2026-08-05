@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   DollarSign,
   FilterX,
+  TrendingUp,
   Users,
   X,
   XCircle,
@@ -26,6 +27,11 @@ import {
 import type { KpiTopTecnico } from "@/lib/logistica-types";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import type { PrecoOs, PrecosOsMap } from "@/lib/precos-os-service";
+import {
+  getPercentualAumento,
+  setPercentualAumento,
+  usePercentualAumento,
+} from "@/lib/kpi-projecao-store";
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import {
   filtrarNotasToa,
@@ -75,6 +81,7 @@ type TecnicoDesempenho = {
   nome: string;
   primeiroNome: string;
   baixaMisc: number;
+  mediaMaterialPorNota: number;
   notasFeitas: number;
   perdasNotas: number;
   aproveitamento: number;
@@ -116,6 +123,17 @@ function formatReceita(valor: number): string {
     style: "currency",
     currency: "BRL",
   }).format(valor);
+}
+
+/** Colunas da tabela Detalhamento por Técnico: nome flexível + 11 métricas. */
+const GRID_TECNICOS =
+  "grid grid-cols-[minmax(96px,1.5fr)_repeat(11,minmax(0,1fr))] gap-2";
+
+function formatMediaMaterial(valor: number): string {
+  return valor.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatDataBr(isoDate: string): string {
@@ -181,6 +199,10 @@ export function KpiDesempenhoTecnicos({
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
+  const percentualAumento = usePercentualAumento();
+  const [percentualAumentoTexto, setPercentualAumentoTexto] = useState(() =>
+    String(getPercentualAumento()),
+  );
   const [tecnicoSelecionado, setTecnicoSelecionado] =
     useState<TecnicoSelecionado | null>(null);
   const [filtroLocalAno, setFiltroLocalAno] = useState<number | null>(
@@ -260,12 +282,16 @@ export function KpiDesempenhoTecnicos({
       const totalNotas = resumo.notasFeitas + resumo.perdasNotas;
       const aproveitamento =
         totalNotas > 0 ? (resumo.notasFeitas / totalNotas) * 100 : 0;
+      const baixaMisc = tecnicoKpi?.total ?? 0;
+      const mediaMaterialPorNota =
+        totalNotas > 0 ? baixaMisc / totalNotas : 0;
 
       return {
         id_tecnico: loginNormalizado,
         nome,
         primeiroNome: nome.trim().split(/\s+/)[0] ?? nome,
-        baixaMisc: tecnicoKpi?.total ?? 0,
+        baixaMisc,
+        mediaMaterialPorNota,
         notasFeitas: resumo.notasFeitas,
         perdasNotas: resumo.perdasNotas,
         aproveitamento,
@@ -310,19 +336,35 @@ export function KpiDesempenhoTecnicos({
     });
   }, [enriquecidos, buscaTecnico]);
 
+  const fatorProjecao = 1 + percentualAumento / 100;
+
+  const tecnicosComProjecao = useMemo(
+    () =>
+      tecnicosFiltrados.map((tecnico) => ({
+        ...tecnico,
+        receita: tecnico.receita * fatorProjecao,
+        receitaPerda: tecnico.receitaPerda * fatorProjecao,
+      })),
+    [tecnicosFiltrados, fatorProjecao],
+  );
+
   const tecnicosOrdenados = useMemo(() => {
-    if (!sortConfig.key) return tecnicosFiltrados;
+    if (!sortConfig.key) return tecnicosComProjecao;
     const key = sortConfig.key;
     const fator = sortConfig.direction === "asc" ? 1 : -1;
-    return [...tecnicosFiltrados].sort((a, b) => {
+    return [...tecnicosComProjecao].sort((a, b) => {
       const valorA = valorOrdenacao(a, key);
       const valorB = valorOrdenacao(b, key);
       if (valorA < valorB) return -1 * fator;
       if (valorA > valorB) return 1 * fator;
       return 0;
     });
-  }, [tecnicosFiltrados, sortConfig]);
+  }, [tecnicosComProjecao, sortConfig]);
 
+  const atualizarPercentualAumento = (valor: string) => {
+    setPercentualAumentoTexto(valor);
+    setPercentualAumento(valor.trim() === "" ? 0 : valor);
+  };
   const requestSort = (key: SortKey) => {
     setSortConfig((prev) => {
       if (prev.key === key && prev.direction === "asc") {
@@ -345,7 +387,7 @@ export function KpiDesempenhoTecnicos({
     <button
       type="button"
       onClick={() => requestSort(key)}
-      className="inline-flex w-full cursor-pointer select-none items-center justify-center gap-1 rounded-md px-1 py-0.5 hover:bg-gray-100"
+      className="inline-flex w-full cursor-pointer select-none items-center justify-center gap-1 rounded-md px-1 py-0.5 text-center leading-tight hover:bg-gray-100"
     >
       <span>{label}</span>
       {iconeOrdenacao(key)}
@@ -779,15 +821,32 @@ export function KpiDesempenhoTecnicos({
           </button>
         </div>
 
-        <input
-          type="search"
-          value={buscaTecnico}
-          onChange={(e) => setBuscaTecnico(e.target.value)}
-          placeholder="Buscar por nome ou matrícula (Z)..."
-          aria-label="Buscar técnico por nome ou matrícula"
-          className="mb-4 w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-72"
-        />
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <input
+            type="search"
+            value={buscaTecnico}
+            onChange={(e) => setBuscaTecnico(e.target.value)}
+            placeholder="Buscar por nome ou matrícula (Z)..."
+            aria-label="Buscar técnico por nome ou matrícula"
+            className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-72"
+          />
 
+          <label className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Simular               Aumento (%)
+            </span>
+            <input
+              type="number"
+              step="0.1"
+              value={percentualAumentoTexto}
+              onChange={(e) => atualizarPercentualAumento(e.target.value)}
+              placeholder="0"
+              aria-label="Aumento percentual"
+              className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </label>
+        </div>
         {enriquecidos.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
             Nenhum técnico com baixa no período selecionado.
@@ -797,12 +856,16 @@ export function KpiDesempenhoTecnicos({
             Nenhum técnico encontrado para “{buscaTecnico.trim()}”.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <div className="grid min-w-[1200px] grid-cols-10 gap-3 border-b border-border px-4 py-2 text-sm font-semibold text-muted-foreground">
+          <div className="w-full">
+            <div
+              className={`${GRID_TECNICOS} items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
+            >
               <span className="text-left">Nome</span>
               <span className="text-center">Total de Notas</span>
               <span className="text-center">Notas feitas</span>
               <span className="text-center">Perdas de Notas</span>
+              <span className="text-center">Qnt baixa de misc</span>
+              <span className="text-center">Média de material por nota</span>
               <span className="text-center">% Freq. Relativa</span>
               <span className="text-center">% Freq. Absoluta</span>
               <span className="text-center">
@@ -819,7 +882,7 @@ export function KpiDesempenhoTecnicos({
               </span>
             </div>
 
-            <ul className="min-w-[1200px]">
+            <ul>
               {tecnicosOrdenados.map((tecnico) => {
                 const isDemitido = isTecnicoDemitido(
                   demitidosKeys,
@@ -830,7 +893,7 @@ export function KpiDesempenhoTecnicos({
                 return (
                   <li
                     key={tecnico.id_tecnico}
-                    className="grid grid-cols-10 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
+                    className={`${GRID_TECNICOS} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
                   >
                     <button
                       type="button"
@@ -839,8 +902,8 @@ export function KpiDesempenhoTecnicos({
                       }
                       className={
                         isDemitido
-                          ? "truncate text-left font-medium text-gray-500 hover:underline"
-                          : "truncate text-left font-medium text-primary hover:underline"
+                          ? "max-w-[150px] truncate text-left font-medium text-gray-500 hover:underline"
+                          : "max-w-[150px] truncate text-left font-medium text-primary hover:underline"
                       }
                       title={tecnico.nome}
                     >
@@ -854,6 +917,12 @@ export function KpiDesempenhoTecnicos({
                     </span>
                     <span className="text-center font-normal tabular-nums text-gray-500">
                       {tecnico.perdasNotas}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-700">
+                      {formatQuantidade(tecnico.baixaMisc)}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-700">
+                      {formatMediaMaterial(tecnico.mediaMaterialPorNota)}
                     </span>
                     <span className="text-center font-normal tabular-nums text-gray-600">
                       {tecnico.freqRelativa}

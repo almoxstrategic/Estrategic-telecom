@@ -822,7 +822,7 @@ function KpisPage() {
       </aside>
 
       <div className="sticky top-16 z-40 w-full border-b border-border bg-background shadow-sm">
-        <div className="mx-auto flex w-full max-w-7xl flex-row flex-wrap items-center gap-4 px-4 py-3 sm:gap-6 lg:px-6">
+        <div className="mx-auto flex w-full max-w-[1920px] flex-row flex-wrap items-center gap-4 px-4 py-3 sm:gap-6 lg:px-8">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -956,7 +956,7 @@ function KpisPage() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 pb-10 pt-6 lg:px-6">
+      <main className="mx-auto w-full max-w-[1920px] px-4 pb-10 pt-6 lg:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
