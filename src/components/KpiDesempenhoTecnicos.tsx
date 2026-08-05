@@ -68,8 +68,7 @@ type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
 type SortKey =
   | "aproveitamento"
   | "receitaPerda"
-  | "receitaBruta"
-  | "receitaLiquida";
+  | "receita";
 
 type SortConfig = {
   key: SortKey | null;
@@ -127,9 +126,9 @@ function formatReceita(valor: number): string {
   }).format(valor);
 }
 
-/** Colunas da tabela Detalhamento por Técnico: nome flexível + 11 métricas. */
+/** Colunas da tabela Detalhamento por Técnico: nome flexível + 10 métricas. */
 const GRID_TECNICOS =
-  "grid grid-cols-[minmax(96px,1.5fr)_repeat(11,minmax(0,1fr))] gap-2";
+  "grid grid-cols-[minmax(96px,1.5fr)_repeat(10,minmax(0,1fr))] gap-2";
 
 function formatMediaMaterial(valor: number): string {
   return valor.toLocaleString("pt-BR", {
@@ -142,6 +141,31 @@ function formatDataBr(isoDate: string): string {
   const [ano, mes, dia] = isoDate.split("-");
   if (!ano || !mes || !dia) return isoDate;
   return `${dia}/${mes}/${ano}`;
+}
+
+const DIAS_SEMANA_PT = [
+  "Domingo",
+  "Segunda-Feira",
+  "Terça-Feira",
+  "Quarta-Feira",
+  "Quinta-Feira",
+  "Sexta-Feira",
+  "Sábado",
+] as const;
+
+/** Ex.: 03/08 (03/08/2026 - Quarta-Feira) */
+function formatTooltipDataComDiaSemana(isoDate: string): string {
+  const [anoStr, mesStr, diaStr] = isoDate.split("-");
+  const ano = Number(anoStr);
+  const mes = Number(mesStr);
+  const dia = Number(diaStr);
+  if (!ano || !mes || !dia) return formatDataBr(isoDate);
+
+  const data = new Date(ano, mes - 1, dia);
+  const dd = String(dia).padStart(2, "0");
+  const mm = String(mes).padStart(2, "0");
+  const diaSemana = DIAS_SEMANA_PT[data.getDay()] ?? "";
+  return `${dd}/${mm} (${dd}/${mm}/${ano} - ${diaSemana})`;
 }
 
 function descricaoPeriodoLocal(filtro: KpiFiltroPeriodo): string {
@@ -182,9 +206,7 @@ function valorOrdenacao(tecnico: TecnicoDesempenho, key: SortKey): number {
       return tecnico.aproveitamento;
     case "receitaPerda":
       return tecnico.receitaPerda;
-    case "receitaBruta":
-      return tecnico.receita;
-    case "receitaLiquida":
+    case "receita":
       return tecnico.receita;
   }
 }
@@ -216,6 +238,8 @@ export function KpiDesempenhoTecnicos({
   const [filtroLocalDia, setFiltroLocalDia] = useState<number | null>(
     filtroPeriodo.dia,
   );
+  const [buscaWoContrato, setBuscaWoContrato] = useState("");
+  const [filtroTipoOsModal, setFiltroTipoOsModal] = useState("todos");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: null,
     direction: "asc",
@@ -236,6 +260,8 @@ export function KpiDesempenhoTecnicos({
     setFiltroLocalAno(filtroPeriodo.ano);
     setFiltroLocalMes(filtroPeriodo.mes);
     setFiltroLocalDia(filtroPeriodo.dia);
+    setBuscaWoContrato("");
+    setFiltroTipoOsModal("todos");
     setTecnicoSelecionado({
       login: normalizeToaLogin(login),
       nome,
@@ -396,13 +422,8 @@ export function KpiDesempenhoTecnicos({
     </button>
   );
 
-  const { totalNotasProdutivas, totalPerdaNotas, receitaLiquidaTotal } = useMemo(() => {
-    const receitaBrutaTotal = enriquecidos.reduce(
-      (total, tecnico) => total + tecnico.receita,
-      0,
-    );
-
-    return {
+  const { totalNotasProdutivas, totalPerdaNotas, receitaTotal } = useMemo(
+    () => ({
       totalNotasProdutivas: enriquecidos.reduce(
         (total, tecnico) => total + tecnico.notasFeitas,
         0,
@@ -411,9 +432,14 @@ export function KpiDesempenhoTecnicos({
         (total, tecnico) => total + tecnico.perdasNotas,
         0,
       ),
-      receitaLiquidaTotal: receitaBrutaTotal,
-    };
-  }, [enriquecidos]);
+      // Soma a mesma Receita Líquida projetada exibida em cada linha da tabela.
+      receitaTotal: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.receita * fatorProjecao,
+        0,
+      ),
+    }),
+    [enriquecidos, fatorProjecao],
+  );
 
   const tiposOsImportados = useMemo(() => {
     const unicos = new Map<string, string>();
@@ -613,6 +639,44 @@ export function KpiDesempenhoTecnicos({
     );
   }, [tecnicoSelecionado, notasDoTecnicoBrutas, filtroLocalPeriodo]);
 
+  const receitaPeriodoModal = useMemo(() => {
+    return notasDoTecnico.reduce((total, nota) => {
+      if (!nota.isProdutiva) return total;
+      return total + (precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0);
+    }, 0);
+  }, [notasDoTecnico, precosOs]);
+
+  const tiposOsModal = useMemo(() => {
+    const unicos = new Map<string, string>();
+    for (const nota of notasDoTecnico) {
+      const tipoOs = nota.tipoOs?.trim();
+      if (!tipoOs) continue;
+      const chave = normalizeTipoOs(tipoOs);
+      if (!unicos.has(chave)) unicos.set(chave, tipoOs);
+    }
+    return [...unicos.values()].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [notasDoTecnico]);
+
+  const notasDoTecnicoTabela = useMemo(() => {
+    const termo = buscaWoContrato.trim().toLowerCase();
+    const tipoFiltro =
+      filtroTipoOsModal === "todos"
+        ? null
+        : normalizeTipoOs(filtroTipoOsModal);
+
+    return notasDoTecnico.filter((nota) => {
+      if (tipoFiltro && normalizeTipoOs(nota.tipoOs) !== tipoFiltro) {
+        return false;
+      }
+      if (!termo) return true;
+      const wo = (nota.numeroWo || "").toLowerCase();
+      const contrato = (nota.contrato || "").toLowerCase();
+      return wo.includes(termo) || contrato.includes(termo);
+    });
+  }, [notasDoTecnico, buscaWoContrato, filtroTipoOsModal]);
+
   const tendenciaPorData = useMemo(() => {
     const porData = new Map<
       string,
@@ -663,11 +727,11 @@ export function KpiDesempenhoTecnicos({
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
             <span className="text-sm font-medium text-muted-foreground">
-              Receita Líquida total
+              Receita Total
             </span>
           </div>
           <div className="mt-3 text-3xl font-bold text-green-600">
-            {formatReceita(receitaLiquidaTotal)}
+            {formatReceita(receitaTotal)}
           </div>
         </div>
       </div>
@@ -863,7 +927,7 @@ export function KpiDesempenhoTecnicos({
           <label className="flex w-full items-center gap-2 sm:w-auto">
             <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Simular               Aumento (%)
+              Aumento (%)
             </span>
             <input
               type="number"
@@ -904,10 +968,7 @@ export function KpiDesempenhoTecnicos({
                 {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
               </span>
               <span className="text-center">
-                {cabecalhoOrdenavel("Receita Bruta", "receitaBruta")}
-              </span>
-              <span className="text-center">
-                {cabecalhoOrdenavel("Receita Líquida", "receitaLiquida")}
+                {cabecalhoOrdenavel("Receita", "receita")}
               </span>
             </div>
 
@@ -918,7 +979,6 @@ export function KpiDesempenhoTecnicos({
                   tecnico.id_tecnico,
                   tecnico.nome,
                 );
-                const receitaLiquida = tecnico.receita;
                 return (
                   <li
                     key={tecnico.id_tecnico}
@@ -965,19 +1025,16 @@ export function KpiDesempenhoTecnicos({
                     <span className="text-center font-medium tabular-nums text-red-600">
                       {formatReceita(tecnico.receitaPerda)}
                     </span>
-                    <span className="text-center font-bold tabular-nums text-gray-900">
-                      {formatReceita(tecnico.receita)}
-                    </span>
                     <span
                       className={`text-center font-bold tabular-nums ${
-                        receitaLiquida > 0
+                        tecnico.receita > 0
                           ? "text-green-600"
-                          : receitaLiquida < 0
+                          : tecnico.receita < 0
                             ? "text-red-600"
                             : "text-gray-500"
                       }`}
                     >
-                      {formatReceita(receitaLiquida)}
+                      {formatReceita(tecnico.receita)}
                     </span>
                   </li>
                 );
@@ -1010,7 +1067,7 @@ export function KpiDesempenhoTecnicos({
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {formatQuantidade(notasDoTecnico.length)} notas no período
-                  selecionado
+                  selecionado · Receita: {formatReceita(receitaPeriodoModal)}
                 </p>
               </div>
               <button
@@ -1139,13 +1196,16 @@ export function KpiDesempenhoTecnicos({
                       content={({ active, payload }) => {
                         if (!active || !payload?.[0]) return null;
                         const item = payload[0].payload as {
+                          data: string;
                           dataLabel: string;
                           produtivas: number;
                           improdutivas: number;
                         };
                         return (
                           <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
-                            <p className="font-semibold">{item.dataLabel}</p>
+                            <p className="font-semibold">
+                              {formatTooltipDataComDiaSemana(item.data)}
+                            </p>
                             <p className="text-green-600">
                               Produtivas: {formatQuantidade(item.produtivas)}
                             </p>
@@ -1180,6 +1240,32 @@ export function KpiDesempenhoTecnicos({
               )}
             </div>
 
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={buscaWoContrato}
+                onChange={(e) => setBuscaWoContrato(e.target.value)}
+                placeholder="Pesquisar WO ou Contrato..."
+                aria-label="Pesquisar WO ou Contrato"
+                className="w-full rounded-md border border-gray-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 sm:max-w-xs"
+              />
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                Tipo de OS:
+                <select
+                  value={filtroTipoOsModal}
+                  onChange={(e) => setFiltroTipoOsModal(e.target.value)}
+                  className="min-w-[180px] rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
+                >
+                  <option value="todos">Todos</option>
+                  {tiposOsModal.map((tipoOs) => (
+                    <option key={tipoOs} value={tipoOs}>
+                      {tipoOs}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-left text-muted-foreground">
@@ -1194,7 +1280,7 @@ export function KpiDesempenhoTecnicos({
                   </tr>
                 </thead>
                 <tbody>
-                  {notasDoTecnico.length === 0 ? (
+                  {notasDoTecnicoTabela.length === 0 ? (
                     <tr>
                       <td
                         colSpan={7}
@@ -1204,7 +1290,7 @@ export function KpiDesempenhoTecnicos({
                       </td>
                     </tr>
                   ) : (
-                    notasDoTecnico.map((nota, index) => {
+                    notasDoTecnicoTabela.map((nota, index) => {
                       const valorNota =
                         precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
                       const ganhoReal = nota.isProdutiva && valorNota > 0;
