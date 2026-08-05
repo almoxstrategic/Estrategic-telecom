@@ -14,6 +14,8 @@ export type ToaNotaProcessada = {
   numeroWo: string;
   contrato: string;
   codBaixa: number;
+  /** Texto original da planilha (código + descrição, quando houver). */
+  codBaixaBruto: string;
   isProdutiva: boolean;
 };
 
@@ -66,6 +68,7 @@ export function processarNotasTOA(linhas: ToaLinha[]): ToaNotaProcessada[] {
     notasProcessadas.push({
       login,
       codBaixa,
+      codBaixaBruto,
       isProdutiva: codBaixa >= 409 && codBaixa <= 599,
       data,
       numeroWo: linha.numeroWo.trim(),
@@ -96,6 +99,10 @@ function normalizeNota(value: unknown): ToaNotaProcessada | null {
     numeroWo: nota.numeroWo.trim(),
     contrato: nota.contrato.trim(),
     codBaixa: nota.codBaixa,
+    codBaixaBruto:
+      typeof nota.codBaixaBruto === "string" && nota.codBaixaBruto.trim()
+        ? nota.codBaixaBruto.trim()
+        : String(nota.codBaixa),
     isProdutiva: nota.isProdutiva,
   };
 }

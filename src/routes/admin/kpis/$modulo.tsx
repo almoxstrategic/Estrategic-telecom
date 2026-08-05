@@ -176,6 +176,9 @@ function descricaoPeriodo(filtro: KpisFiltro): string {
     return "Histórico completo";
   }
   const mesLabel = MESES.find((m) => m.value === String(filtro.mes))?.label ?? "";
+  if (filtro.dia !== null) {
+    return `${String(filtro.dia).padStart(2, "0")}/${String(filtro.mes).padStart(2, "0")}/${filtro.ano}`;
+  }
   return `${mesLabel} de ${filtro.ano}`;
 }
 
@@ -922,6 +925,13 @@ function KpisPage() {
               tecnicos={kpis?.top_tecnicos ?? []}
               tecnicosEquipe={tecnicosEquipe}
               resumoToa={toaAgregado.resumoPorTecnico}
+              notasProcessadas={toaSnapshot.notasProcessadas}
+              filtroPeriodo={{
+                ano: filtro.ano,
+                mes: filtro.mes,
+                dia: filtro.dia,
+              }}
+              periodoLabel={descricaoPeriodo(filtro)}
               demitidosKeys={tecnicosDemitidosKeys}
             />
           )

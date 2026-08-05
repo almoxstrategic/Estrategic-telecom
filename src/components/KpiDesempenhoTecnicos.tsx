@@ -1,11 +1,20 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, BarChart3, ClipboardCheck, Users, XCircle } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  BarChart3,
+  ClipboardCheck,
+  Users,
+  X,
+  XCircle,
+} from "lucide-react";
 import {
   Bar,
   CartesianGrid,
   ComposedChart,
   Legend,
   Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,14 +24,30 @@ import type { KpiTopTecnico } from "@/lib/logistica-types";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import {
+  filtrarNotasToa,
   normalizeToaLogin,
+  type ToaNotaProcessada,
   type ToaResumoTecnico,
 } from "@/lib/toa-store";
+
+type KpiFiltroPeriodo = {
+  ano: number | null;
+  mes: number | null;
+  dia: number | null;
+};
+
+type TecnicoSelecionado = {
+  login: string;
+  nome: string;
+};
 
 type KpiDesempenhoTecnicosProps = {
   tecnicos: KpiTopTecnico[];
   tecnicosEquipe: TecnicoProfile[];
   resumoToa: Record<string, ToaResumoTecnico>;
+  notasProcessadas: ToaNotaProcessada[];
+  filtroPeriodo: KpiFiltroPeriodo;
+  periodoLabel: string;
   demitidosKeys: Set<string>;
 };
 
@@ -54,11 +79,28 @@ type TecnicoDesempenho = {
   freqAbsoluta: string;
 };
 
+type ChartBarPayload = {
+  login: string;
+  nome: string;
+  nomeCompleto: string;
+  notasFeitas: number;
+  perdasNotas: number;
+  receitaGanha: number;
+  receitaPerda: number;
+  pareto: number;
+};
+
 function formatReceita(valor: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
   }).format(valor);
+}
+
+function formatDataBr(isoDate: string): string {
+  const [ano, mes, dia] = isoDate.split("-");
+  if (!ano || !mes || !dia) return isoDate;
+  return `${dia}/${mes}/${ano}`;
 }
 
 function limiteDoFiltro(filtro: FiltroTop): number | null {
@@ -98,10 +140,15 @@ export function KpiDesempenhoTecnicos({
   tecnicos,
   tecnicosEquipe,
   resumoToa,
+  notasProcessadas,
+  filtroPeriodo,
+  periodoLabel,
   demitidosKeys,
 }: KpiDesempenhoTecnicosProps) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
+  const [tecnicoSelecionado, setTecnicoSelecionado] =
+    useState<TecnicoSelecionado | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: null,
     direction: "asc",
@@ -256,6 +303,7 @@ export function KpiDesempenhoTecnicos({
           : 0;
 
       return {
+        login: t.id_tecnico,
         nome: t.primeiroNome,
         nomeCompleto: t.nome,
         notasFeitas: t.notasFeitas,
@@ -263,9 +311,52 @@ export function KpiDesempenhoTecnicos({
         receitaGanha: t.receita,
         receitaPerda: t.receitaPerda,
         pareto,
-      };
+      } satisfies ChartBarPayload;
     });
   }, [enriquecidos, filtroTop]);
+
+  const selecionarTecnicoDoGrafico = (data: unknown) => {
+    const raw = data as ChartBarPayload & { payload?: ChartBarPayload };
+    const payload = raw?.payload ?? raw;
+    if (!payload?.login) return;
+    setTecnicoSelecionado({
+      login: normalizeToaLogin(payload.login),
+      nome: payload.nomeCompleto || payload.nome || payload.login,
+    });
+  };
+
+  const notasDoTecnico = useMemo(() => {
+    if (!tecnicoSelecionado) return [];
+    const login = normalizeToaLogin(tecnicoSelecionado.login);
+    return filtrarNotasToa(notasProcessadas, filtroPeriodo)
+      .filter((nota) => nota.login === login)
+      .sort((a, b) => {
+        const byDate = a.data.localeCompare(b.data);
+        if (byDate !== 0) return byDate;
+        return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+      });
+  }, [tecnicoSelecionado, notasProcessadas, filtroPeriodo]);
+
+  const tendenciaPorData = useMemo(() => {
+    const porData = new Map<
+      string,
+      { data: string; dataLabel: string; produtivas: number; improdutivas: number }
+    >();
+
+    for (const nota of notasDoTecnico) {
+      const atual = porData.get(nota.data) ?? {
+        data: nota.data,
+        dataLabel: formatDataBr(nota.data),
+        produtivas: 0,
+        improdutivas: 0,
+      };
+      if (nota.isProdutiva) atual.produtivas += 1;
+      else atual.improdutivas += 1;
+      porData.set(nota.data, atual);
+    }
+
+    return [...porData.values()].sort((a, b) => a.data.localeCompare(b.data));
+  }, [notasDoTecnico]);
 
   return (
     <div className="w-full space-y-6">
@@ -329,11 +420,17 @@ export function KpiDesempenhoTecnicos({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="nome"
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 11, cursor: "pointer" }}
                   interval={0}
                   angle={chartData.length > 8 ? -35 : 0}
                   textAnchor={chartData.length > 8 ? "end" : "middle"}
                   height={chartData.length > 8 ? 56 : 30}
+                  onClick={(state) => {
+                    const index =
+                      typeof state?.index === "number" ? state.index : -1;
+                    const item = index >= 0 ? chartData[index] : null;
+                    if (item) selecionarTecnicoDoGrafico(item);
+                  }}
                 />
                 <YAxis
                   yAxisId="left"
@@ -350,14 +447,7 @@ export function KpiDesempenhoTecnicos({
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.[0]) return null;
-                    const item = payload[0].payload as {
-                      nomeCompleto: string;
-                      notasFeitas: number;
-                      perdasNotas: number;
-                      receitaGanha: number;
-                      receitaPerda: number;
-                      pareto: number;
-                    };
+                    const item = payload[0].payload as ChartBarPayload;
                     return (
                       <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
                         <p className="font-semibold">{item.nomeCompleto}</p>
@@ -376,6 +466,9 @@ export function KpiDesempenhoTecnicos({
                             maximumFractionDigits: 1,
                           })}
                           %
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Clique na barra para ver o detalhamento
                         </p>
                       </div>
                     );
@@ -411,6 +504,8 @@ export function KpiDesempenhoTecnicos({
                   name="Notas Feitas"
                   fill="#16a34a"
                   radius={[4, 4, 0, 0]}
+                  cursor="pointer"
+                  onClick={(data) => selecionarTecnicoDoGrafico(data)}
                 />
                 <Bar
                   yAxisId="left"
@@ -418,6 +513,8 @@ export function KpiDesempenhoTecnicos({
                   name="Notas Perdidas"
                   fill="#dc2626"
                   radius={[4, 4, 0, 0]}
+                  cursor="pointer"
+                  onClick={(data) => selecionarTecnicoDoGrafico(data)}
                 />
                 <Line
                   yAxisId="right"
@@ -493,16 +590,23 @@ export function KpiDesempenhoTecnicos({
                     key={tecnico.id_tecnico}
                     className="grid grid-cols-10 items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
                   >
-                    <span
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTecnicoSelecionado({
+                          login: tecnico.id_tecnico,
+                          nome: tecnico.nome,
+                        })
+                      }
                       className={
                         isDemitido
-                          ? "truncate text-left font-medium text-gray-500"
-                          : "truncate text-left font-medium text-primary"
+                          ? "truncate text-left font-medium text-gray-500 hover:underline"
+                          : "truncate text-left font-medium text-primary hover:underline"
                       }
                       title={tecnico.nome}
                     >
                       {tecnico.nome}
-                    </span>
+                    </button>
                     <span className="text-center font-bold tabular-nums text-gray-900">
                       {formatQuantidade(tecnico.notasFeitas + tecnico.perdasNotas)}
                     </span>
@@ -537,6 +641,165 @@ export function KpiDesempenhoTecnicos({
           </div>
         )}
       </div>
+
+      {tecnicoSelecionado !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-detalhe-tecnico-titulo"
+          onClick={() => setTecnicoSelecionado(null)}
+        >
+          <div
+            className="max-h-[90vh] w-11/12 max-w-5xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3
+                  id="modal-detalhe-tecnico-titulo"
+                  className="text-lg font-bold text-gray-900"
+                >
+                  {tecnicoSelecionado.login} - {tecnicoSelecionado.nome} -{" "}
+                  {periodoLabel}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatQuantidade(notasDoTecnico.length)} notas no período
+                  selecionado
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTecnicoSelecionado(null)}
+                className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Fechar detalhamento"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-6 h-64 w-full rounded-lg border border-gray-200 p-3">
+              {tendenciaPorData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  Nenhuma nota encontrada para este técnico no período.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={tendenciaPorData}
+                    margin={{ top: 8, right: 12, left: 0, bottom: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="dataLabel"
+                      tick={{ fontSize: 11 }}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.[0]) return null;
+                        const item = payload[0].payload as {
+                          dataLabel: string;
+                          produtivas: number;
+                          improdutivas: number;
+                        };
+                        return (
+                          <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
+                            <p className="font-semibold">{item.dataLabel}</p>
+                            <p className="text-green-600">
+                              Produtivas: {formatQuantidade(item.produtivas)}
+                            </p>
+                            <p className="text-red-600">
+                              Quebra/Improdutivo:{" "}
+                              {formatQuantidade(item.improdutivas)}
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="produtivas"
+                      name="Notas Produtivas"
+                      stroke="#16a34a"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="improdutivas"
+                      name="Quebra/Improdutivo"
+                      stroke="#dc2626"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      dot={{ r: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Data</th>
+                    <th className="px-3 py-2 font-semibold">Número da WO</th>
+                    <th className="px-3 py-2 font-semibold">Contrato</th>
+                    <th className="px-3 py-2 font-semibold">Cód de Baixa</th>
+                    <th className="px-3 py-2 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notasDoTecnico.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-3 py-8 text-center text-muted-foreground"
+                      >
+                        Nenhuma nota para exibir.
+                      </td>
+                    </tr>
+                  ) : (
+                    notasDoTecnico.map((nota, index) => (
+                      <tr
+                        key={`${nota.data}-${nota.numeroWo}-${nota.codBaixa}-${index}`}
+                        className="border-t border-gray-100"
+                      >
+                        <td className="px-3 py-2 tabular-nums text-gray-800">
+                          {formatDataBr(nota.data)}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-gray-900">
+                          {nota.numeroWo || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {nota.contrato || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {nota.codBaixaBruto || String(nota.codBaixa)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {nota.isProdutiva ? (
+                            <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                              Produtivo
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                              Quebra/Improdutivo
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
