@@ -143,6 +143,15 @@ const MESES_LABEL = [
   { value: 12, label: "Dezembro" },
 ] as const;
 
+function formatStatusOsExibicao(os: {
+  status: string;
+  isExecutada: boolean;
+  isProdutiva: boolean;
+}): string {
+  if (!os.isExecutada) return os.status?.trim() || "Não executada";
+  return os.isProdutiva ? "Executada - Produtivo" : "Executada - Improdutivo";
+}
+
 function formatReceita(valor: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -267,6 +276,8 @@ export function KpiDesempenhoTecnicos({
   );
   const [buscaWoContrato, setBuscaWoContrato] = useState("");
   const [filtroTipoOsModal, setFiltroTipoOsModal] = useState("todos");
+  const [filtroCodBaixaModal, setFiltroCodBaixaModal] = useState("todos");
+  const [filtroStatusModal, setFiltroStatusModal] = useState("todos");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: null,
     direction: "asc",
@@ -294,6 +305,8 @@ export function KpiDesempenhoTecnicos({
     setFiltroLocalDia(filtroPeriodo.dia);
     setBuscaWoContrato("");
     setFiltroTipoOsModal("todos");
+    setFiltroCodBaixaModal("todos");
+    setFiltroStatusModal("todos");
     setTecnicoSelecionado({
       login: normalizeToaLogin(login),
       nome,
@@ -771,23 +784,65 @@ export function KpiDesempenhoTecnicos({
     );
   }, [osDoTecnico]);
 
+  const codigosBaixaModal = useMemo(() => {
+    const unicos = new Map<string, string>();
+    for (const os of osDoTecnico) {
+      const codigo = (os.codBaixaBruto || String(os.codBaixa) || "").trim();
+      if (!codigo) continue;
+      if (!unicos.has(codigo)) unicos.set(codigo, codigo);
+    }
+    return [...unicos.values()].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" }),
+    );
+  }, [osDoTecnico]);
+
+  const statusOsModal = useMemo(() => {
+    const unicos = new Set<string>();
+    for (const os of osDoTecnico) {
+      unicos.add(formatStatusOsExibicao(os));
+    }
+    return [...unicos].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [osDoTecnico]);
+
   const osDoTecnicoTabela = useMemo(() => {
     const termo = buscaWoContrato.trim().toLowerCase();
     const tipoFiltro =
       filtroTipoOsModal === "todos"
         ? null
         : normalizeTipoOs(filtroTipoOsModal);
+    const codBaixaFiltro =
+      filtroCodBaixaModal === "todos" ? null : filtroCodBaixaModal;
+    const statusFiltro =
+      filtroStatusModal === "todos" ? null : filtroStatusModal;
 
     return osDoTecnico.filter((os) => {
       if (tipoFiltro && normalizeTipoOs(os.tipoOs) !== tipoFiltro) {
         return false;
       }
+
+      const codigo = (os.codBaixaBruto || String(os.codBaixa) || "").trim();
+      if (codBaixaFiltro && codigo !== codBaixaFiltro) {
+        return false;
+      }
+
+      if (statusFiltro && formatStatusOsExibicao(os) !== statusFiltro) {
+        return false;
+      }
+
       if (!termo) return true;
       const wo = (os.numeroWo || "").toLowerCase();
       const contrato = (os.contrato || "").toLowerCase();
       return wo.includes(termo) || contrato.includes(termo);
     });
-  }, [osDoTecnico, buscaWoContrato, filtroTipoOsModal]);
+  }, [
+    osDoTecnico,
+    buscaWoContrato,
+    filtroTipoOsModal,
+    filtroCodBaixaModal,
+    filtroStatusModal,
+  ]);
 
   const tendenciaPorData = useMemo(() => {
     const porData = new Map<
@@ -1651,26 +1706,56 @@ export function KpiDesempenhoTecnicos({
               )}
             </div>
 
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <input
                 type="text"
                 value={buscaWoContrato}
                 onChange={(e) => setBuscaWoContrato(e.target.value)}
                 placeholder="Pesquisar WO ou Contrato..."
                 aria-label="Pesquisar WO ou Contrato"
-                className="w-full rounded-md border border-gray-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 sm:max-w-xs"
+                className="w-full rounded-md border border-gray-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                Tipo de OS:
+              <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                <span className="shrink-0">Tipo de OS:</span>
                 <select
                   value={filtroTipoOsModal}
                   onChange={(e) => setFiltroTipoOsModal(e.target.value)}
-                  className="min-w-[180px] rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
                 >
                   <option value="todos">Todos</option>
                   {tiposOsModal.map((tipoOs) => (
                     <option key={tipoOs} value={tipoOs}>
                       {tipoOs}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                <span className="shrink-0">Cód de Baixa:</span>
+                <select
+                  value={filtroCodBaixaModal}
+                  onChange={(e) => setFiltroCodBaixaModal(e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
+                >
+                  <option value="todos">Todos</option>
+                  {codigosBaixaModal.map((codigo) => (
+                    <option key={codigo} value={codigo}>
+                      {codigo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                <span className="shrink-0">Status:</span>
+                <select
+                  value={filtroStatusModal}
+                  onChange={(e) => setFiltroStatusModal(e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
+                >
+                  <option value="todos">Todos</option>
+                  {statusOsModal.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
                     </option>
                   ))}
                 </select>
@@ -1702,11 +1787,9 @@ export function KpiDesempenhoTecnicos({
                     </tr>
                   ) : (
                     osDoTecnicoTabela.map((os, index) => {
-                      const valorNota = os.isExecutada
-                        ? valorPrecoOs(precosOs, os.tipoOs)
-                        : 0;
-                      const ganhoReal = os.isExecutada && os.isProdutiva && valorNota > 0;
-                      const perdaReal = os.isExecutada && !os.isProdutiva && valorNota > 0;
+                      const valorNota = valorPrecoOs(precosOs, os.tipoOs);
+                      const ganhoReal = isOsProdutiva(os) && valorNota > 0;
+                      const perdaReal = isOsImprodutiva(os) && valorNota > 0;
 
                       return (
                         <tr
@@ -1731,15 +1814,15 @@ export function KpiDesempenhoTecnicos({
                           <td className="px-3 py-2">
                             {!os.isExecutada ? (
                               <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
-                                {os.status || "Não executada"}
+                                {formatStatusOsExibicao(os)}
                               </span>
                             ) : os.isProdutiva ? (
                               <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                                Executada · Produtivo
+                                {formatStatusOsExibicao(os)}
                               </span>
                             ) : (
                               <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                                Executada · Improdutivo
+                                {formatStatusOsExibicao(os)}
                               </span>
                             )}
                           </td>

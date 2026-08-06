@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from "react";
-import { CLASSIFICACAO_COD_BAIXA } from "./toa-cod-baixa-mapa";
 
 /** Linha bruta da planilha TOA (1 Nota = 1 WO/Contrato = 1 linha). */
 export type ToaOrdemLinha = {
@@ -113,15 +112,30 @@ export function isStatusExecutada(status: string): boolean {
 }
 
 /**
- * Classifica o Cód de Baixa via de/para oficial.
- * Códigos ausentes na planilha são tratados como IMPRODUTIVO.
+ * Extrai o número inicial do Cód de Baixa bruto do TOA
+ * (ex: "410 - Auto Instalação Concluída" → 410).
+ */
+export function extrairNumeroCodBaixa(codBaixaBruto: string): number | null {
+  const match = String(codBaixaBruto ?? "")
+    .trim()
+    .match(/^(\d+)/);
+  if (!match) return null;
+  const cod = Number.parseInt(match[1]!, 10);
+  return Number.isFinite(cod) ? cod : null;
+}
+
+/**
+ * Regra programática de produtividade do Cód de Baixa:
+ * - PRODUTIVO: 409 <= código <= 599, exceto 571
+ * - IMPRODUTIVO: 571 ou qualquer código fora de 409–599
  */
 export function isCodBaixaProdutivo(codBaixa: number): boolean {
-  return CLASSIFICACAO_COD_BAIXA[codBaixa] === "PRODUTIVO";
+  if (codBaixa === 571) return false;
+  return codBaixa >= 409 && codBaixa < 600;
 }
 
 export function isCodBaixaImprodutivo(codBaixa: number): boolean {
-  return CLASSIFICACAO_COD_BAIXA[codBaixa] !== "PRODUTIVO";
+  return !isCodBaixaProdutivo(codBaixa);
 }
 
 /** O.S. produtiva: Status === "Executada" E Cód de Baixa PRODUTIVO. */
@@ -138,19 +152,12 @@ export function isOsImprodutiva(
   return !ordem.isProdutiva;
 }
 
-function extrairCodBaixa(codBaixaBruto: string): number | null {
-  const match = codBaixaBruto.trim().match(/^(\d+)/);
-  if (!match) return null;
-  const cod = Number.parseInt(match[1]!, 10);
-  return Number.isFinite(cod) ? cod : null;
-}
-
 function processarOrdem(ordem: ToaOrdemLinha): ToaOrdemServico | null {
   const numeroOs = ordem.numeroOs.trim();
   const codBaixaBruto = ordem.codBaixaBruto.trim();
   if (!numeroOs && !codBaixaBruto) return null;
 
-  const codBaixa = extrairCodBaixa(codBaixaBruto);
+  const codBaixa = extrairNumeroCodBaixa(codBaixaBruto);
   if (codBaixa === null) return null;
 
   const status = ordem.status.trim();
@@ -513,5 +520,3 @@ function getSnapshot(): ToaSnapshot {
 export function useToaSnapshot(): ToaSnapshot {
   return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_SNAPSHOT);
 }
-
-export { CLASSIFICACAO_COD_BAIXA };
