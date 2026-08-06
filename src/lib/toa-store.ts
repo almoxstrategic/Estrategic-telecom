@@ -1,43 +1,81 @@
 import { useSyncExternalStore } from "react";
+import { CLASSIFICACAO_COD_BAIXA } from "./toa-cod-baixa-mapa";
+
+/** Linha bruta da planilha TOA (1 Nota = 1 WO/Contrato = 1 linha). */
+export type ToaOrdemLinha = {
+  indice: number;
+  numeroOs: string;
+  codBaixaBruto: string;
+  status: string;
+  tipoOs: string;
+};
 
 export type ToaLinha = {
   data: string;
   loginTecnico: string;
   numeroWo: string;
   contrato: string;
-  codBaixaBruto: string;
-  tipoOs: string;
+  ordensDeServico: ToaOrdemLinha[];
 };
 
-export type ToaNotaProcessada = {
+export type ToaOrdemServico = {
+  indice: number;
+  numeroOs: string;
+  codBaixa: number;
+  /** Texto original da planilha (código + descrição, quando houver). */
+  codBaixaBruto: string;
+  status: string;
+  tipoOs: string;
+  isExecutada: boolean;
+  /** Classificação do Cód de Baixa na tabela de apoio (PRODUTIVO). */
+  isProdutiva: boolean;
+};
+
+/** Nota/Chamado processado: 1 linha TOA com N O.S. (1–10). */
+export type ToaChamadoProcessado = {
   data: string;
   login: string;
   numeroWo: string;
   contrato: string;
-  codBaixa: number;
-  /** Texto original da planilha (código + descrição, quando houver). */
-  codBaixaBruto: string;
-  tipoOs: string;
-  isProdutiva: boolean;
-  valorReceita: number;
-  valorPerda: number;
+  ordensDeServico: ToaOrdemServico[];
+};
+
+/** Visão achatada de uma O.S. para tabelas/modais de detalhe. */
+export type ToaOsFlattened = ToaOrdemServico & {
+  data: string;
+  login: string;
+  numeroWo: string;
+  contrato: string;
 };
 
 export type ToaResumoTecnico = {
-  notasFeitas: number;
-  perdasNotas: number;
-  receitaBruta: number;
+  /** Total de Notas (linhas/WOs) do técnico. */
+  totalNotasFeitas: number;
+  /** Notas com ≥ 1 O.S. produtiva. */
+  notasProdutivas: number;
+  /** Notas sem nenhuma O.S. produtiva. */
+  notasImprodutivas: number;
+  /** Contagem bruta de O.S. produtivas (Executada + código PRODUTIVO). */
+  osProdutivas: number;
+  /** Contagem bruta de O.S. improdutivas (código IMPRODUTIVO). */
+  osImprodutivas: number;
+  receitaFaturada: number;
   receitaPerda: number;
 };
 
 export type ToaAgregado = {
   resumoPorTecnico: Record<string, ToaResumoTecnico>;
-  totalProdutivas: number;
-  totalPerdas: number;
+  totalNotasFeitas: number;
+  totalNotasProdutivas: number;
+  totalNotasImprodutivas: number;
+  totalOsProdutivas: number;
+  totalOsImprodutivas: number;
+  receitaFaturadaTotal: number;
+  receitaPerdaTotal: number;
 };
 
 export type ToaSnapshot = {
-  notasProcessadas: ToaNotaProcessada[];
+  chamadosProcessados: ToaChamadoProcessado[];
   updatedAt: string | null;
 };
 
@@ -45,7 +83,7 @@ const STORAGE_KEY = "estrategic.kpis.toa";
 const UPDATE_EVENT = "toa-kpis-updated";
 
 const EMPTY_SNAPSHOT: ToaSnapshot = {
-  notasProcessadas: [],
+  chamadosProcessados: [],
   updatedAt: null,
 };
 
@@ -66,84 +104,210 @@ export function normalizeTipoOs(value: string): string {
     .toUpperCase();
 }
 
-export function processarNotasTOA(linhas: ToaLinha[]): ToaNotaProcessada[] {
-  const notasProcessadas: ToaNotaProcessada[] = [];
+export function normalizeStatusOs(value: string): string {
+  return normalizeTipoOs(value);
+}
+
+export function isStatusExecutada(status: string): boolean {
+  return normalizeStatusOs(status) === "EXECUTADA";
+}
+
+/**
+ * Classifica o Cód de Baixa via de/para oficial.
+ * Códigos ausentes na planilha são tratados como IMPRODUTIVO.
+ */
+export function isCodBaixaProdutivo(codBaixa: number): boolean {
+  return CLASSIFICACAO_COD_BAIXA[codBaixa] === "PRODUTIVO";
+}
+
+export function isCodBaixaImprodutivo(codBaixa: number): boolean {
+  return CLASSIFICACAO_COD_BAIXA[codBaixa] !== "PRODUTIVO";
+}
+
+/** O.S. produtiva: Status === "Executada" E Cód de Baixa PRODUTIVO. */
+export function isOsProdutiva(
+  ordem: Pick<ToaOrdemServico, "isExecutada" | "isProdutiva">,
+): boolean {
+  return ordem.isExecutada && ordem.isProdutiva;
+}
+
+/** O.S. improdutiva: Cód de Baixa IMPRODUTIVO. */
+export function isOsImprodutiva(
+  ordem: Pick<ToaOrdemServico, "isProdutiva">,
+): boolean {
+  return !ordem.isProdutiva;
+}
+
+function extrairCodBaixa(codBaixaBruto: string): number | null {
+  const match = codBaixaBruto.trim().match(/^(\d+)/);
+  if (!match) return null;
+  const cod = Number.parseInt(match[1]!, 10);
+  return Number.isFinite(cod) ? cod : null;
+}
+
+function processarOrdem(ordem: ToaOrdemLinha): ToaOrdemServico | null {
+  const numeroOs = ordem.numeroOs.trim();
+  const codBaixaBruto = ordem.codBaixaBruto.trim();
+  if (!numeroOs && !codBaixaBruto) return null;
+
+  const codBaixa = extrairCodBaixa(codBaixaBruto);
+  if (codBaixa === null) return null;
+
+  const status = ordem.status.trim();
+  return {
+    indice: ordem.indice,
+    numeroOs: numeroOs || String(ordem.indice),
+    codBaixa,
+    codBaixaBruto: codBaixaBruto || String(codBaixa),
+    status,
+    tipoOs: ordem.tipoOs.trim(),
+    isExecutada: isStatusExecutada(status),
+    isProdutiva: isCodBaixaProdutivo(codBaixa),
+  };
+}
+
+export function processarChamadosTOA(
+  linhas: ToaLinha[],
+): ToaChamadoProcessado[] {
+  const chamados: ToaChamadoProcessado[] = [];
 
   for (const linha of linhas) {
     const login = normalizeToaLogin(linha.loginTecnico);
-    const codBaixaBruto = linha.codBaixaBruto.trim();
     const data = linha.data.trim();
-    const tipoOs = linha.tipoOs.trim();
+    if (!login || !data) continue;
 
-    if (!login || !codBaixaBruto || !data) continue;
+    const ordensDeServico = linha.ordensDeServico
+      .map(processarOrdem)
+      .filter((ordem): ordem is ToaOrdemServico => ordem !== null);
 
-    const match = codBaixaBruto.match(/^(\d+)/);
-    if (!match) continue;
+    if (ordensDeServico.length === 0) continue;
 
-    const codBaixa = Number.parseInt(match[1]!, 10);
-    const isProdutiva = codBaixa >= 409 && codBaixa <= 599;
-    notasProcessadas.push({
-      login,
-      codBaixa,
-      codBaixaBruto,
-      tipoOs,
-      isProdutiva,
-      // Mantidos por compatibilidade com snapshots antigos. O valor vigente
-      // é calculado em tempo real a partir da tabela precos_os.
-      valorReceita: 0,
-      valorPerda: 0,
+    chamados.push({
       data,
+      login,
       numeroWo: linha.numeroWo.trim(),
       contrato: linha.contrato.trim(),
+      ordensDeServico,
     });
   }
 
-  return notasProcessadas;
+  return chamados;
 }
 
-function normalizeNota(value: unknown): ToaNotaProcessada | null {
+/** @deprecated Use processarChamadosTOA. */
+export const processarNotasTOA = processarChamadosTOA;
+
+function normalizeOrdem(value: unknown): ToaOrdemServico | null {
   if (!value || typeof value !== "object") return null;
-  const nota = value as Record<string, unknown>;
+  const ordem = value as Record<string, unknown>;
   if (
-    typeof nota.data !== "string" ||
-    typeof nota.login !== "string" ||
-    typeof nota.numeroWo !== "string" ||
-    typeof nota.contrato !== "string" ||
-    typeof nota.codBaixa !== "number" ||
-    typeof nota.isProdutiva !== "boolean"
+    typeof ordem.numeroOs !== "string" ||
+    typeof ordem.codBaixa !== "number" ||
+    typeof ordem.isProdutiva !== "boolean"
   ) {
     return null;
   }
 
+  const status = typeof ordem.status === "string" ? ordem.status.trim() : "";
+  const isExecutada =
+    typeof ordem.isExecutada === "boolean"
+      ? ordem.isExecutada
+      : isStatusExecutada(status);
+
   return {
-    data: nota.data.trim(),
-    login: normalizeToaLogin(nota.login),
-    numeroWo: nota.numeroWo.trim(),
-    contrato: nota.contrato.trim(),
-    codBaixa: nota.codBaixa,
+    indice:
+      typeof ordem.indice === "number" && Number.isFinite(ordem.indice)
+        ? ordem.indice
+        : 1,
+    numeroOs: ordem.numeroOs.trim(),
+    codBaixa: ordem.codBaixa,
     codBaixaBruto:
-      typeof nota.codBaixaBruto === "string" && nota.codBaixaBruto.trim()
-        ? nota.codBaixaBruto.trim()
-        : String(nota.codBaixa),
-    tipoOs: typeof nota.tipoOs === "string" ? nota.tipoOs.trim() : "",
-    isProdutiva: nota.isProdutiva,
-    valorReceita:
-      typeof nota.valorReceita === "number" && Number.isFinite(nota.valorReceita)
-        ? nota.valorReceita
-        : 0,
-    valorPerda:
-      typeof nota.valorPerda === "number" && Number.isFinite(nota.valorPerda)
-        ? nota.valorPerda
-        : 0,
+      typeof ordem.codBaixaBruto === "string" && ordem.codBaixaBruto.trim()
+        ? ordem.codBaixaBruto.trim()
+        : String(ordem.codBaixa),
+    status,
+    tipoOs: typeof ordem.tipoOs === "string" ? ordem.tipoOs.trim() : "",
+    isExecutada,
+    isProdutiva: isCodBaixaProdutivo(ordem.codBaixa),
   };
 }
 
-export function filtrarNotasToa(
-  notas: ToaNotaProcessada[],
+function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+
+  if (Array.isArray(item.ordensDeServico)) {
+    if (
+      typeof item.data !== "string" ||
+      typeof item.login !== "string" ||
+      typeof item.numeroWo !== "string" ||
+      typeof item.contrato !== "string"
+    ) {
+      return null;
+    }
+
+    const ordensDeServico = item.ordensDeServico
+      .map(normalizeOrdem)
+      .filter((ordem): ordem is ToaOrdemServico => ordem !== null);
+
+    if (ordensDeServico.length === 0) return null;
+
+    return {
+      data: item.data.trim(),
+      login: normalizeToaLogin(item.login),
+      numeroWo: item.numeroWo.trim(),
+      contrato: item.contrato.trim(),
+      ordensDeServico,
+    };
+  }
+
+  if (
+    typeof item.data !== "string" ||
+    typeof item.login !== "string" ||
+    typeof item.numeroWo !== "string" ||
+    typeof item.contrato !== "string" ||
+    typeof item.codBaixa !== "number"
+  ) {
+    return null;
+  }
+
+  const status =
+    typeof item.status === "string" && item.status.trim()
+      ? item.status.trim()
+      : "Executada";
+
+  return {
+    data: item.data.trim(),
+    login: normalizeToaLogin(item.login),
+    numeroWo: item.numeroWo.trim(),
+    contrato: item.contrato.trim(),
+    ordensDeServico: [
+      {
+        indice: 1,
+        numeroOs:
+          typeof item.numeroOs === "string" && item.numeroOs.trim()
+            ? item.numeroOs.trim()
+            : item.numeroWo.trim() || "1",
+        codBaixa: item.codBaixa,
+        codBaixaBruto:
+          typeof item.codBaixaBruto === "string" && item.codBaixaBruto.trim()
+            ? item.codBaixaBruto.trim()
+            : String(item.codBaixa),
+        status,
+        tipoOs: typeof item.tipoOs === "string" ? item.tipoOs.trim() : "",
+        isExecutada: isStatusExecutada(status),
+        isProdutiva: isCodBaixaProdutivo(item.codBaixa),
+      },
+    ],
+  };
+}
+
+export function filtrarChamadosToa(
+  chamados: ToaChamadoProcessado[],
   filtro: { ano: number | null; mes: number | null; dia: number | null },
-): ToaNotaProcessada[] {
-  return notas.filter((nota) => {
-    const [ano, mes, dia] = nota.data.split("-").map(Number);
+): ToaChamadoProcessado[] {
+  return chamados.filter((chamado) => {
+    const [ano, mes, dia] = chamado.data.split("-").map(Number);
     if (!ano || !mes || !dia) return false;
     if (filtro.ano !== null && ano !== filtro.ano) return false;
     if (filtro.mes !== null && mes !== filtro.mes) return false;
@@ -152,37 +316,124 @@ export function filtrarNotasToa(
   });
 }
 
-export function agregarNotasToa(
-  notas: ToaNotaProcessada[],
-  precosOs: Record<string, number> = {},
+/** @deprecated Use filtrarChamadosToa. */
+export const filtrarNotasToa = filtrarChamadosToa;
+
+export function flattenChamadosToa(
+  chamados: ToaChamadoProcessado[],
+): ToaOsFlattened[] {
+  const flat: ToaOsFlattened[] = [];
+  for (const chamado of chamados) {
+    for (const ordem of chamado.ordensDeServico) {
+      flat.push({
+        ...ordem,
+        data: chamado.data,
+        login: chamado.login,
+        numeroWo: chamado.numeroWo,
+        contrato: chamado.contrato,
+      });
+    }
+  }
+  return flat;
+}
+
+export function valorPrecoOs(
+  precosOs: Record<string, number> | Record<string, { valor: number }>,
+  tipoOs: string,
+): number {
+  const chave = normalizeTipoOs(tipoOs);
+  const entry = precosOs[chave];
+  if (typeof entry === "number") return entry;
+  if (entry && typeof entry === "object" && typeof entry.valor === "number") {
+    return entry.valor;
+  }
+  return 0;
+}
+
+function emptyResumo(): ToaResumoTecnico {
+  return {
+    totalNotasFeitas: 0,
+    notasProdutivas: 0,
+    notasImprodutivas: 0,
+    osProdutivas: 0,
+    osImprodutivas: 0,
+    receitaFaturada: 0,
+    receitaPerda: 0,
+  };
+}
+
+export function agregarChamadosToa(
+  chamados: ToaChamadoProcessado[],
+  precosOs:
+    | Record<string, number>
+    | Record<string, { valor: number }> = {},
 ): ToaAgregado {
   const resumoPorTecnico: Record<string, ToaResumoTecnico> = {};
-  let totalProdutivas = 0;
-  let totalPerdas = 0;
+  let totalOsProdutivas = 0;
+  let totalOsImprodutivas = 0;
+  let totalNotasFeitas = 0;
+  let totalNotasProdutivas = 0;
+  let totalNotasImprodutivas = 0;
+  let receitaFaturadaTotal = 0;
+  let receitaPerdaTotal = 0;
 
-  for (const nota of notas) {
-    const valorServico = precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
-    const resumo = resumoPorTecnico[nota.login] ?? {
-      notasFeitas: 0,
-      perdasNotas: 0,
-      receitaBruta: 0,
-      receitaPerda: 0,
-    };
+  for (const chamado of chamados) {
+    const resumo = resumoPorTecnico[chamado.login] ?? emptyResumo();
 
-    if (nota.isProdutiva) {
-      resumo.notasFeitas += 1;
-      resumo.receitaBruta += valorServico;
-      totalProdutivas += 1;
-    } else {
-      resumo.perdasNotas += 1;
-      resumo.receitaPerda += valorServico;
-      totalPerdas += 1;
+    resumo.totalNotasFeitas += 1;
+    totalNotasFeitas += 1;
+
+    let osProdNaNota = 0;
+    let osImprodNaNota = 0;
+    let receitaFatNaNota = 0;
+    let receitaPerdaNaNota = 0;
+
+    for (const ordem of chamado.ordensDeServico) {
+      const valorServico = valorPrecoOs(precosOs, ordem.tipoOs);
+
+      if (isOsProdutiva(ordem)) {
+        osProdNaNota += 1;
+        receitaFatNaNota += valorServico;
+      } else if (isOsImprodutiva(ordem)) {
+        osImprodNaNota += 1;
+        receitaPerdaNaNota += valorServico;
+      }
     }
-    resumoPorTecnico[nota.login] = resumo;
+
+    resumo.osProdutivas += osProdNaNota;
+    resumo.osImprodutivas += osImprodNaNota;
+    resumo.receitaFaturada += receitaFatNaNota;
+    resumo.receitaPerda += receitaPerdaNaNota;
+    totalOsProdutivas += osProdNaNota;
+    totalOsImprodutivas += osImprodNaNota;
+    receitaFaturadaTotal += receitaFatNaNota;
+    receitaPerdaTotal += receitaPerdaNaNota;
+
+    if (osProdNaNota > 0) {
+      resumo.notasProdutivas += 1;
+      totalNotasProdutivas += 1;
+    } else {
+      resumo.notasImprodutivas += 1;
+      totalNotasImprodutivas += 1;
+    }
+
+    resumoPorTecnico[chamado.login] = resumo;
   }
 
-  return { resumoPorTecnico, totalProdutivas, totalPerdas };
+  return {
+    resumoPorTecnico,
+    totalNotasFeitas,
+    totalNotasProdutivas,
+    totalNotasImprodutivas,
+    totalOsProdutivas,
+    totalOsImprodutivas,
+    receitaFaturadaTotal,
+    receitaPerdaTotal,
+  };
 }
+
+/** @deprecated Use agregarChamadosToa. */
+export const agregarNotasToa = agregarChamadosToa;
 
 function loadSnapshot(): ToaSnapshot {
   if (!isClient()) return EMPTY_SNAPSHOT;
@@ -191,17 +442,23 @@ function loadSnapshot(): ToaSnapshot {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY_SNAPSHOT;
     const parsed = JSON.parse(raw) as {
+      chamadosProcessados?: unknown;
       notasProcessadas?: unknown;
       updatedAt?: unknown;
     };
-    const notasProcessadas = Array.isArray(parsed.notasProcessadas)
-      ? parsed.notasProcessadas
-          .map(normalizeNota)
-          .filter((nota): nota is ToaNotaProcessada => nota !== null)
-      : [];
+
+    const fonte = Array.isArray(parsed.chamadosProcessados)
+      ? parsed.chamadosProcessados
+      : Array.isArray(parsed.notasProcessadas)
+        ? parsed.notasProcessadas
+        : [];
+
+    const chamadosProcessados = fonte
+      .map(normalizeChamado)
+      .filter((c): c is ToaChamadoProcessado => c !== null);
 
     return {
-      notasProcessadas,
+      chamadosProcessados,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null,
     };
   } catch {
@@ -211,25 +468,27 @@ function loadSnapshot(): ToaSnapshot {
 
 let snapshot = loadSnapshot();
 
-export function saveToaNotas(notas: ToaNotaProcessada[]): ToaSnapshot {
-  const notasProcessadas = notas
-    .map(normalizeNota)
-    .filter((nota): nota is ToaNotaProcessada => nota !== null);
+export function saveToaChamados(
+  chamados: ToaChamadoProcessado[],
+): ToaSnapshot {
+  const chamadosProcessados = chamados
+    .map(normalizeChamado)
+    .filter((c): c is ToaChamadoProcessado => c !== null);
   snapshot = {
-    notasProcessadas,
+    chamadosProcessados,
     updatedAt: new Date().toISOString(),
   };
 
   if (isClient()) {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(snapshot),
-    );
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
     window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
   }
 
   return snapshot;
 }
+
+/** @deprecated Use saveToaChamados. */
+export const saveToaNotas = saveToaChamados;
 
 function subscribe(listener: () => void): () => void {
   if (!isClient()) return () => {};
@@ -254,3 +513,5 @@ function getSnapshot(): ToaSnapshot {
 export function useToaSnapshot(): ToaSnapshot {
   return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_SNAPSHOT);
 }
+
+export { CLASSIFICACAO_COD_BAIXA };

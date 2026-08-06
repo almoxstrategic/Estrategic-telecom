@@ -35,11 +35,16 @@ import {
   usePercentualAumento,
 } from "@/lib/kpi-projecao-store";
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
+import { ATIVIDADES_TOA_CATALOGO } from "@/lib/toa-atividades-catalogo";
 import {
-  filtrarNotasToa,
+  filtrarChamadosToa,
+  flattenChamadosToa,
+  isOsImprodutiva,
+  isOsProdutiva,
   normalizeTipoOs,
   normalizeToaLogin,
-  type ToaNotaProcessada,
+  valorPrecoOs,
+  type ToaChamadoProcessado,
   type ToaResumoTecnico,
 } from "@/lib/toa-store";
 
@@ -65,13 +70,14 @@ type NotaDetalheCard = {
   tipoOs: string;
   receita: number;
   isProdutiva: boolean;
+  status: string;
 };
 
 type KpiDesempenhoTecnicosProps = {
   tecnicos: KpiTopTecnico[];
   tecnicosEquipe: TecnicoProfile[];
   resumoToa: Record<string, ToaResumoTecnico>;
-  notasProcessadas: ToaNotaProcessada[];
+  chamadosProcessados: ToaChamadoProcessado[];
   filtroPeriodo: KpiFiltroPeriodo;
   demitidosKeys: Set<string>;
   precosOs: PrecosOsMap;
@@ -96,8 +102,11 @@ type TecnicoDesempenho = {
   primeiroNome: string;
   baixaMisc: number;
   mediaMaterialPorNota: number;
-  notasFeitas: number;
-  perdasNotas: number;
+  totalNotasFeitas: number;
+  notasProdutivas: number;
+  notasImprodutivas: number;
+  osProdutivas: number;
+  osImprodutivas: number;
   aproveitamento: number;
   mediaAproveitamento: string;
   receita: number;
@@ -110,8 +119,8 @@ type ChartBarPayload = {
   login: string;
   nome: string;
   nomeCompleto: string;
-  notasFeitas: number;
-  perdasNotas: number;
+  notasProdutivas: number;
+  notasImprodutivas: number;
   receitaGanha: number;
   receitaPerda: number;
   lucro: number;
@@ -141,9 +150,9 @@ function formatReceita(valor: number): string {
   }).format(valor);
 }
 
-/** Colunas da tabela Detalhamento por Técnico: nome flexível + 10 métricas. */
+/** Colunas da tabela Detalhamento por Técnico: nome flexível + 12 métricas. */
 const GRID_TECNICOS =
-  "grid grid-cols-[minmax(96px,1.5fr)_repeat(10,minmax(0,1fr))] gap-2";
+  "grid grid-cols-[minmax(96px,1.5fr)_repeat(12,minmax(0,1fr))] gap-2";
 
 function formatMediaMaterial(valor: number): string {
   return valor.toLocaleString("pt-BR", {
@@ -230,7 +239,7 @@ export function KpiDesempenhoTecnicos({
   tecnicos,
   tecnicosEquipe,
   resumoToa,
-  notasProcessadas,
+  chamadosProcessados,
   filtroPeriodo,
   demitidosKeys,
   precosOs,
@@ -267,11 +276,16 @@ export function KpiDesempenhoTecnicos({
   const [valoresEditados, setValoresEditados] = useState<Record<string, string>>(
     {},
   );
+  const [tiposResumoEditados, setTiposResumoEditados] = useState<
+    Record<string, string>
+  >({});
   const [salvandoPrecos, setSalvandoPrecos] = useState(false);
 
   const fecharTabelaPrecos = () => {
     setIsTabelaPrecosOpen(false);
     setBuscaTipoOs("");
+    setValoresEditados({});
+    setTiposResumoEditados({});
   };
 
   const abrirDetalheTecnico = (login: string, nome: string) => {
@@ -335,12 +349,13 @@ export function KpiDesempenhoTecnicos({
         tecnicoKpi?.nome_tecnico?.trim() ||
         nomesPorLogin.get(loginNormalizado) ||
         loginNormalizado;
-      const totalNotas = resumo.notasFeitas + resumo.perdasNotas;
+      const totalOs = resumo.osProdutivas + resumo.osImprodutivas;
       const aproveitamento =
-        totalNotas > 0 ? (resumo.notasFeitas / totalNotas) * 100 : 0;
+        totalOs > 0 ? (resumo.osProdutivas / totalOs) * 100 : 0;
       const baixaMisc = tecnicoKpi?.total ?? 0;
+      const totalNotasFeitas = resumo.totalNotasFeitas;
       const mediaMaterialPorNota =
-        totalNotas > 0 ? baixaMisc / totalNotas : 0;
+        totalNotasFeitas > 0 ? baixaMisc / totalNotasFeitas : 0;
 
       return {
         id_tecnico: loginNormalizado,
@@ -348,35 +363,40 @@ export function KpiDesempenhoTecnicos({
         primeiroNome: nome.trim().split(/\s+/)[0] ?? nome,
         baixaMisc,
         mediaMaterialPorNota,
-        notasFeitas: resumo.notasFeitas,
-        perdasNotas: resumo.perdasNotas,
+        totalNotasFeitas,
+        notasProdutivas: resumo.notasProdutivas,
+        notasImprodutivas: resumo.notasImprodutivas,
+        osProdutivas: resumo.osProdutivas,
+        osImprodutivas: resumo.osImprodutivas,
         aproveitamento,
         mediaAproveitamento: formatPct(aproveitamento),
-        receita: resumo.receitaBruta,
+        receita: resumo.receitaFaturada,
         receitaPerda: resumo.receitaPerda,
         freqRelativa: "",
         freqAbsoluta: "",
       };
     });
 
-    const totalProdutivas = base.reduce(
-      (total, tecnico) => total + tecnico.notasFeitas,
+    const totalVolume = base.reduce(
+      (total, tecnico) => total + tecnico.totalNotasFeitas,
       0,
     );
-    const ordenados = [...base].sort((a, b) => b.notasFeitas - a.notasFeitas);
+    const ordenados = [...base].sort(
+      (a, b) => b.notasProdutivas - a.notasProdutivas,
+    );
     let acumulado = 0;
 
     return ordenados.map((tecnico) => {
-      acumulado += tecnico.notasFeitas;
+      acumulado += tecnico.totalNotasFeitas;
       return {
         ...tecnico,
         freqRelativa: formatPct(
-          totalProdutivas > 0
-            ? (tecnico.notasFeitas / totalProdutivas) * 100
+          totalVolume > 0
+            ? (tecnico.totalNotasFeitas / totalVolume) * 100
             : 0,
         ),
         freqAbsoluta: formatPct(
-          totalProdutivas > 0 ? (acumulado / totalProdutivas) * 100 : 0,
+          totalVolume > 0 ? (acumulado / totalVolume) * 100 : 0,
         ),
       };
     });
@@ -453,14 +473,13 @@ export function KpiDesempenhoTecnicos({
   const { totalNotasProdutivas, totalPerdaNotas, receitaTotal } = useMemo(
     () => ({
       totalNotasProdutivas: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.notasFeitas,
+        (total, tecnico) => total + tecnico.notasProdutivas,
         0,
       ),
       totalPerdaNotas: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.perdasNotas,
+        (total, tecnico) => total + tecnico.notasImprodutivas,
         0,
       ),
-      // Soma a mesma Receita Líquida projetada exibida em cada linha da tabela.
       receitaTotal: enriquecidos.reduce(
         (total, tecnico) => total + tecnico.receita * fatorProjecao,
         0,
@@ -470,34 +489,58 @@ export function KpiDesempenhoTecnicos({
   );
 
   const tiposOsImportados = useMemo(() => {
-    const unicos = new Map<string, string>();
+    const map = new Map<
+      string,
+      { chave: string; tipo: string; tipoAtividade: string; valor: number }
+    >();
 
-    for (const nota of notasProcessadas) {
-      const tipoOs = nota.tipoOs?.trim();
-      if (!tipoOs) continue;
+    for (const entrada of ATIVIDADES_TOA_CATALOGO) {
+      const chave = normalizeTipoOs(entrada.tipoAtividade);
+      const preco = precosOs[chave];
+      map.set(chave, {
+        chave,
+        tipo: preco?.tipo ?? entrada.tipo,
+        tipoAtividade: entrada.tipoAtividade,
+        valor: preco?.valor ?? 0,
+      });
+    }
 
-      const chave = normalizeTipoOs(tipoOs);
-      if (!unicos.has(chave)) {
-        unicos.set(chave, tipoOs);
+    for (const chamado of chamadosProcessados) {
+      for (const ordem of chamado.ordensDeServico) {
+        const tipoOs = ordem.tipoOs?.trim();
+        if (!tipoOs) continue;
+
+        const chave = normalizeTipoOs(tipoOs);
+        if (map.has(chave)) continue;
+
+        const preco = precosOs[chave];
+        map.set(chave, {
+          chave,
+          tipo: preco?.tipo ?? "",
+          tipoAtividade: tipoOs,
+          valor: preco?.valor ?? 0,
+        });
       }
     }
 
-    return Array.from(unicos.entries())
-      .map(([chave, tipoOs]) => ({
-        chave,
-        tipoOs,
-        valor: precosOs[chave] ?? 0,
-      }))
-      .sort((a, b) =>
-        a.tipoOs.localeCompare(b.tipoOs, "pt-BR", { sensitivity: "base" }),
-      );
-  }, [notasProcessadas, precosOs]);
+    return Array.from(map.values()).sort((a, b) => {
+      const byTipo = a.tipo.localeCompare(b.tipo, "pt-BR", {
+        sensitivity: "base",
+      });
+      if (byTipo !== 0) return byTipo;
+      return a.tipoAtividade.localeCompare(b.tipoAtividade, "pt-BR", {
+        sensitivity: "base",
+      });
+    });
+  }, [chamadosProcessados, precosOs]);
 
   const tiposOsFiltrados = useMemo(() => {
     const termo = buscaTipoOs.trim().toLowerCase();
     if (!termo) return tiposOsImportados;
-    return tiposOsImportados.filter(({ tipoOs }) =>
-      tipoOs.toLowerCase().includes(termo),
+    return tiposOsImportados.filter(
+      ({ tipo, tipoAtividade }) =>
+        tipo.toLowerCase().includes(termo) ||
+        tipoAtividade.toLowerCase().includes(termo),
     );
   }, [buscaTipoOs, tiposOsImportados]);
 
@@ -543,6 +586,20 @@ export function KpiDesempenhoTecnicos({
 
       return alterou ? proximos : atuais;
     });
+
+    setTiposResumoEditados((atuais) => {
+      const proximos = { ...atuais };
+      let alterou = false;
+
+      for (const { chave, tipo } of tiposOsImportados) {
+        if (proximos[chave] === undefined) {
+          proximos[chave] = tipo;
+          alterou = true;
+        }
+      }
+
+      return alterou ? proximos : atuais;
+    });
   }, [isTabelaPrecosOpen, tiposOsImportados]);
 
   const abrirTabelaPrecos = () => {
@@ -555,22 +612,32 @@ export function KpiDesempenhoTecnicos({
         ]),
       ),
     );
+    setTiposResumoEditados(
+      Object.fromEntries(
+        tiposOsImportados.map(({ chave, tipo }) => [chave, tipo]),
+      ),
+    );
     setIsTabelaPrecosOpen(true);
   };
 
   const salvarValoresAlterados = async () => {
     let temValorInvalido = false;
-    const alterados = tiposOsImportados.flatMap(({ chave, tipoOs, valor }) => {
-      const novoValor = Number(valoresEditados[chave] ?? valor);
-      if (!Number.isFinite(novoValor) || novoValor < 0) {
-        toast.error(`Informe um valor válido para ${tipoOs}.`);
-        temValorInvalido = true;
-        return [];
-      }
-      return Math.abs(novoValor - valor) >= 0.005
-        ? [{ tipoOS: tipoOs, valor: novoValor }]
-        : [];
-    });
+    const alterados = tiposOsImportados.flatMap(
+      ({ chave, tipo, tipoAtividade, valor }) => {
+        const novoValor = Number(valoresEditados[chave] ?? valor);
+        const novoTipo = (tiposResumoEditados[chave] ?? tipo).trim();
+        if (!Number.isFinite(novoValor) || novoValor < 0) {
+          toast.error(`Informe um valor válido para ${tipoAtividade}.`);
+          temValorInvalido = true;
+          return [];
+        }
+        const valorAlterado = Math.abs(novoValor - valor) >= 0.005;
+        const tipoAlterado = novoTipo !== tipo.trim();
+        return valorAlterado || tipoAlterado
+          ? [{ tipo: novoTipo, tipoAtividade, valor: novoValor }]
+          : [];
+      },
+    );
 
     if (temValorInvalido) return;
 
@@ -599,21 +666,23 @@ export function KpiDesempenhoTecnicos({
         ...tecnico,
         receitaGanha,
         receitaPerda,
-        // Lucro/Receita Líquida = apenas notas produtivas (sem descontar perdas).
         lucro: receitaGanha,
       };
     });
 
     const ordenados = [...comProjecao].sort(
-      (a, b) => b.notasFeitas - a.notasFeitas,
+      (a, b) => b.notasProdutivas - a.notasProdutivas,
     );
     const limite = limiteDoFiltro(filtroTop);
     const fatia = limite === null ? ordenados : ordenados.slice(0, limite);
-    const totalNotasFatia = fatia.reduce((acc, t) => acc + t.notasFeitas, 0);
+    const totalNotasFatia = fatia.reduce(
+      (acc, t) => acc + t.notasProdutivas,
+      0,
+    );
 
     let notasAcumuladas = 0;
     return fatia.map((t) => {
-      notasAcumuladas += t.notasFeitas;
+      notasAcumuladas += t.notasProdutivas;
       const pareto =
         totalNotasFatia > 0
           ? Math.round((notasAcumuladas / totalNotasFatia) * 1000) / 10
@@ -623,8 +692,8 @@ export function KpiDesempenhoTecnicos({
         login: t.id_tecnico,
         nome: t.primeiroNome,
         nomeCompleto: t.nome,
-        notasFeitas: t.notasFeitas,
-        perdasNotas: t.perdasNotas,
+        notasProdutivas: t.notasProdutivas,
+        notasImprodutivas: t.notasImprodutivas,
         receitaGanha: t.receitaGanha,
         receitaPerda: t.receitaPerda,
         lucro: t.lucro,
@@ -644,53 +713,55 @@ export function KpiDesempenhoTecnicos({
     );
   };
 
-  const notasDoTecnicoBrutas = useMemo(() => {
+  const chamadosDoTecnicoBrutos = useMemo(() => {
     if (!tecnicoSelecionado) return [];
     const login = normalizeToaLogin(tecnicoSelecionado.login);
-    return notasProcessadas.filter((nota) => nota.login === login);
-  }, [tecnicoSelecionado, notasProcessadas]);
+    return chamadosProcessados.filter((chamado) => chamado.login === login);
+  }, [tecnicoSelecionado, chamadosProcessados]);
 
   const anosDisponiveisModal = useMemo(() => {
     const anos = new Set<number>();
-    for (const nota of notasDoTecnicoBrutas) {
-      const ano = Number(nota.data.split("-")[0]);
+    for (const chamado of chamadosDoTecnicoBrutos) {
+      const ano = Number(chamado.data.split("-")[0]);
       if (ano) anos.add(ano);
     }
     return [...anos].sort((a, b) => b - a);
-  }, [notasDoTecnicoBrutas]);
+  }, [chamadosDoTecnicoBrutos]);
 
   const mesesDisponiveisModal = useMemo(() => {
     if (filtroLocalAno === null) return [];
     const meses = new Set<number>();
-    for (const nota of notasDoTecnicoBrutas) {
-      const [ano, mes] = nota.data.split("-").map(Number);
+    for (const chamado of chamadosDoTecnicoBrutos) {
+      const [ano, mes] = chamado.data.split("-").map(Number);
       if (ano === filtroLocalAno && mes) meses.add(mes);
     }
     return [...meses].sort((a, b) => a - b);
-  }, [notasDoTecnicoBrutas, filtroLocalAno]);
+  }, [chamadosDoTecnicoBrutos, filtroLocalAno]);
 
-  const notasDoTecnico = useMemo(() => {
+  const osDoTecnico = useMemo(() => {
     if (!tecnicoSelecionado) return [];
-    return filtrarNotasToa(notasDoTecnicoBrutas, filtroLocalPeriodo).sort(
-      (a, b) => {
-        const byDate = a.data.localeCompare(b.data);
-        if (byDate !== 0) return byDate;
-        return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
-      },
+    const chamadosFiltradosPeriodo = filtrarChamadosToa(
+      chamadosDoTecnicoBrutos,
+      filtroLocalPeriodo,
     );
-  }, [tecnicoSelecionado, notasDoTecnicoBrutas, filtroLocalPeriodo]);
+    return flattenChamadosToa(chamadosFiltradosPeriodo).sort((a, b) => {
+      const byDate = a.data.localeCompare(b.data);
+      if (byDate !== 0) return byDate;
+      return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+    });
+  }, [tecnicoSelecionado, chamadosDoTecnicoBrutos, filtroLocalPeriodo]);
 
   const receitaPeriodoModal = useMemo(() => {
-    return notasDoTecnico.reduce((total, nota) => {
-      if (!nota.isProdutiva) return total;
-      return total + (precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0);
+    return osDoTecnico.reduce((total, os) => {
+      if (!isOsProdutiva(os)) return total;
+      return total + valorPrecoOs(precosOs, os.tipoOs);
     }, 0);
-  }, [notasDoTecnico, precosOs]);
+  }, [osDoTecnico, precosOs]);
 
   const tiposOsModal = useMemo(() => {
     const unicos = new Map<string, string>();
-    for (const nota of notasDoTecnico) {
-      const tipoOs = nota.tipoOs?.trim();
+    for (const os of osDoTecnico) {
+      const tipoOs = os.tipoOs?.trim();
       if (!tipoOs) continue;
       const chave = normalizeTipoOs(tipoOs);
       if (!unicos.has(chave)) unicos.set(chave, tipoOs);
@@ -698,25 +769,25 @@ export function KpiDesempenhoTecnicos({
     return [...unicos.values()].sort((a, b) =>
       a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
     );
-  }, [notasDoTecnico]);
+  }, [osDoTecnico]);
 
-  const notasDoTecnicoTabela = useMemo(() => {
+  const osDoTecnicoTabela = useMemo(() => {
     const termo = buscaWoContrato.trim().toLowerCase();
     const tipoFiltro =
       filtroTipoOsModal === "todos"
         ? null
         : normalizeTipoOs(filtroTipoOsModal);
 
-    return notasDoTecnico.filter((nota) => {
-      if (tipoFiltro && normalizeTipoOs(nota.tipoOs) !== tipoFiltro) {
+    return osDoTecnico.filter((os) => {
+      if (tipoFiltro && normalizeTipoOs(os.tipoOs) !== tipoFiltro) {
         return false;
       }
       if (!termo) return true;
-      const wo = (nota.numeroWo || "").toLowerCase();
-      const contrato = (nota.contrato || "").toLowerCase();
+      const wo = (os.numeroWo || "").toLowerCase();
+      const contrato = (os.contrato || "").toLowerCase();
       return wo.includes(termo) || contrato.includes(termo);
     });
-  }, [notasDoTecnico, buscaWoContrato, filtroTipoOsModal]);
+  }, [osDoTecnico, buscaWoContrato, filtroTipoOsModal]);
 
   const tendenciaPorData = useMemo(() => {
     const porData = new Map<
@@ -724,20 +795,20 @@ export function KpiDesempenhoTecnicos({
       { data: string; dataLabel: string; produtivas: number; improdutivas: number }
     >();
 
-    for (const nota of notasDoTecnico) {
-      const atual = porData.get(nota.data) ?? {
-        data: nota.data,
-        dataLabel: formatDataBr(nota.data),
+    for (const os of osDoTecnico) {
+      const atual = porData.get(os.data) ?? {
+        data: os.data,
+        dataLabel: formatDataBr(os.data),
         produtivas: 0,
         improdutivas: 0,
       };
-      if (nota.isProdutiva) atual.produtivas += 1;
-      else atual.improdutivas += 1;
-      porData.set(nota.data, atual);
+      if (isOsProdutiva(os)) atual.produtivas += 1;
+      else if (isOsImprodutiva(os)) atual.improdutivas += 1;
+      porData.set(os.data, atual);
     }
 
     return [...porData.values()].sort((a, b) => a.data.localeCompare(b.data));
-  }, [notasDoTecnico]);
+  }, [osDoTecnico]);
 
   const nomesColaboradorPorLogin = useMemo(() => {
     const nomes = new Map<string, string>();
@@ -775,25 +846,28 @@ export function KpiDesempenhoTecnicos({
     if (!detalheNotasTipo) return [];
 
     const desejaProdutiva = detalheNotasTipo === "produtivas";
-    const filtradas = filtrarNotasToa(notasProcessadas, filtroPeriodo).filter(
-      (nota) => nota.isProdutiva === desejaProdutiva,
+    const osFlat = flattenChamadosToa(
+      filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
+    ).filter((os) =>
+      desejaProdutiva ? isOsProdutiva(os) : isOsImprodutiva(os),
     );
 
-    return filtradas
-      .map((nota) => {
-        const login = normalizeToaLogin(nota.login);
-        const valorBase = precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
+    return osFlat
+      .map((os) => {
+        const login = normalizeToaLogin(os.login);
+        const valorBase = valorPrecoOs(precosOs, os.tipoOs);
         const receita = valorBase * fatorProjecao;
 
         return {
-          data: nota.data,
+          data: os.data,
           login,
           colaborador: nomesColaboradorPorLogin.get(login) || login,
-          contrato: nota.contrato,
-          numeroWo: nota.numeroWo,
-          tipoOs: nota.tipoOs,
+          contrato: os.contrato,
+          numeroWo: os.numeroWo,
+          tipoOs: os.tipoOs,
           receita,
-          isProdutiva: nota.isProdutiva,
+          isProdutiva: os.isProdutiva,
+          status: os.status,
         };
       })
       .sort((a, b) => {
@@ -805,7 +879,7 @@ export function KpiDesempenhoTecnicos({
       });
   }, [
     detalheNotasTipo,
-    notasProcessadas,
+    chamadosProcessados,
     filtroPeriodo,
     precosOs,
     fatorProjecao,
@@ -991,11 +1065,11 @@ export function KpiDesempenhoTecnicos({
                       <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
                         <p className="font-semibold">{item.nomeCompleto}</p>
                         <p className="text-green-600">
-                          Notas Feitas: {formatQuantidade(item.notasFeitas)} -{" "}
+                          Notas Produtivas: {formatQuantidade(item.notasProdutivas)} -{" "}
                           {formatReceita(item.receitaGanha)}
                         </p>
                         <p className="text-red-600">
-                          Notas Perdidas: {formatQuantidade(item.perdasNotas)} -{" "}
+                          Notas Improdutivas: {formatQuantidade(item.notasImprodutivas)} -{" "}
                           {formatReceita(item.receitaPerda)}
                         </p>
                         <p
@@ -1054,8 +1128,8 @@ export function KpiDesempenhoTecnicos({
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="notasFeitas"
-                  name="Notas Feitas"
+                  dataKey="notasProdutivas"
+                  name="Notas Produtivas"
                   fill="#16a34a"
                   radius={[4, 4, 0, 0]}
                   cursor="pointer"
@@ -1063,8 +1137,8 @@ export function KpiDesempenhoTecnicos({
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="perdasNotas"
-                  name="Notas Perdidas"
+                  dataKey="notasImprodutivas"
+                  name="Notas Improdutivas"
                   fill="#dc2626"
                   radius={[4, 4, 0, 0]}
                   cursor="pointer"
@@ -1142,10 +1216,12 @@ export function KpiDesempenhoTecnicos({
               className={`${GRID_TECNICOS} items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
             >
               <span className="text-left">Nome</span>
-              <span className="text-center">Total de Notas</span>
-              <span className="text-center">Notas feitas</span>
-              <span className="text-center">Perdas de Notas</span>
-              <span className="text-center">Qnt baixa de misc</span>
+              <span className="text-center">Total de Notas feitas</span>
+              <span className="text-center">Total de Notas produtivas</span>
+              <span className="text-center">Total de Notas improdutivas</span>
+              <span className="text-center">O.S produtivas</span>
+              <span className="text-center">O.S Improdutivas</span>
+              <span className="text-center">Baixa misc</span>
               <span className="text-center">Média de material por nota</span>
               <span className="text-center">% Freq. Relativa</span>
               <span className="text-center">% Freq. Absoluta</span>
@@ -1156,7 +1232,7 @@ export function KpiDesempenhoTecnicos({
                 {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
               </span>
               <span className="text-center">
-                {cabecalhoOrdenavel("Receita", "receita")}
+                {cabecalhoOrdenavel("Receita faturada", "receita")}
               </span>
             </div>
 
@@ -1187,13 +1263,19 @@ export function KpiDesempenhoTecnicos({
                       {tecnico.nome}
                     </button>
                     <span className="text-center font-bold tabular-nums text-gray-900">
-                      {formatQuantidade(tecnico.notasFeitas + tecnico.perdasNotas)}
+                      {formatQuantidade(tecnico.totalNotasFeitas)}
                     </span>
                     <span className="text-center font-normal tabular-nums text-gray-500">
-                      {tecnico.notasFeitas}
+                      {formatQuantidade(tecnico.notasProdutivas)}
                     </span>
                     <span className="text-center font-normal tabular-nums text-gray-500">
-                      {tecnico.perdasNotas}
+                      {formatQuantidade(tecnico.notasImprodutivas)}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-500">
+                      {tecnico.osProdutivas}
+                    </span>
+                    <span className="text-center font-normal tabular-nums text-gray-500">
+                      {tecnico.osImprodutivas}
                     </span>
                     <span className="text-center font-normal tabular-nums text-gray-700">
                       {formatQuantidade(tecnico.baixaMisc)}
@@ -1395,7 +1477,7 @@ export function KpiDesempenhoTecnicos({
                   {periodoLabelLocal}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {formatQuantidade(notasDoTecnico.length)} notas no período
+                  {formatQuantidade(osDoTecnico.length)} O.S. no período
                   selecionado · Receita: {formatReceita(receitaPeriodoModal)}
                 </p>
               </div>
@@ -1609,50 +1691,55 @@ export function KpiDesempenhoTecnicos({
                   </tr>
                 </thead>
                 <tbody>
-                  {notasDoTecnicoTabela.length === 0 ? (
+                  {osDoTecnicoTabela.length === 0 ? (
                     <tr>
                       <td
                         colSpan={7}
                         className="px-3 py-8 text-center text-muted-foreground"
                       >
-                        Nenhuma nota para exibir.
+                        Nenhuma O.S. para exibir.
                       </td>
                     </tr>
                   ) : (
-                    notasDoTecnicoTabela.map((nota, index) => {
-                      const valorNota =
-                        precosOs[normalizeTipoOs(nota.tipoOs)] ?? 0;
-                      const ganhoReal = nota.isProdutiva && valorNota > 0;
-                      const perdaReal = !nota.isProdutiva && valorNota > 0;
+                    osDoTecnicoTabela.map((os, index) => {
+                      const valorNota = os.isExecutada
+                        ? valorPrecoOs(precosOs, os.tipoOs)
+                        : 0;
+                      const ganhoReal = os.isExecutada && os.isProdutiva && valorNota > 0;
+                      const perdaReal = os.isExecutada && !os.isProdutiva && valorNota > 0;
 
                       return (
                         <tr
-                          key={`${nota.data}-${nota.numeroWo}-${nota.codBaixa}-${index}`}
+                          key={`${os.data}-${os.numeroWo}-${os.numeroOs}-${os.codBaixa}-${index}`}
                           className="border-t border-gray-100"
                         >
                           <td className="px-3 py-2 tabular-nums text-gray-800">
-                            {formatDataBr(nota.data)}
+                            {formatDataBr(os.data)}
                           </td>
                           <td className="px-3 py-2 font-medium text-gray-900">
-                            {nota.numeroWo || "—"}
+                            {os.numeroWo || "—"}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
-                            {nota.contrato || "—"}
+                            {os.contrato || "—"}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
-                            {nota.tipoOs || "—"}
+                            {os.tipoOs || "—"}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
-                            {nota.codBaixaBruto || String(nota.codBaixa)}
+                            {os.codBaixaBruto || String(os.codBaixa)}
                           </td>
                           <td className="px-3 py-2">
-                            {nota.isProdutiva ? (
+                            {!os.isExecutada ? (
+                              <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
+                                {os.status || "Não executada"}
+                              </span>
+                            ) : os.isProdutiva ? (
                               <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                                Produtivo
+                                Executada · Produtivo
                               </span>
                             ) : (
                               <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                                Quebra/Improdutivo
+                                Executada · Improdutivo
                               </span>
                             )}
                           </td>
@@ -1686,7 +1773,7 @@ export function KpiDesempenhoTecnicos({
           onClick={fecharTabelaPrecos}
         >
           <div
-            className="w-11/12 max-w-md rounded-lg bg-white p-6 shadow-xl"
+            className="w-11/12 max-w-2xl rounded-lg bg-white p-6 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -1716,7 +1803,8 @@ export function KpiDesempenhoTecnicos({
               <table className="w-full text-left text-sm text-gray-500">
                 <thead className="border-b bg-gray-50 text-xs text-gray-700">
                   <tr>
-                    <th className="px-4 py-2">Tipo da OS</th>
+                    <th className="px-4 py-2">Tipo</th>
+                    <th className="px-4 py-2">Tipo de Atividade</th>
                     <th className="px-4 py-2 text-right">Valor (R$)</th>
                   </tr>
                 </thead>
@@ -1724,7 +1812,7 @@ export function KpiDesempenhoTecnicos({
                   {tiposOsImportados.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={2}
+                        colSpan={3}
                         className="px-4 py-6 text-center text-muted-foreground"
                       >
                         Nenhum Tipo de O.S. encontrado na importação TOA.
@@ -1733,17 +1821,31 @@ export function KpiDesempenhoTecnicos({
                   ) : tiposOsFiltrados.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={2}
+                        colSpan={3}
                         className="px-4 py-6 text-center text-muted-foreground"
                       >
                         Nenhum Tipo de O.S. encontrado para “{buscaTipoOs.trim()}”.
                       </td>
                     </tr>
                   ) : (
-                    tiposOsFiltrados.map(({ chave, tipoOs, valor }) => (
+                    tiposOsFiltrados.map(({ chave, tipo, tipoAtividade, valor }) => (
                       <tr key={chave} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-2">
+                          <input
+                            type="text"
+                            value={tiposResumoEditados[chave] ?? tipo}
+                            onChange={(event) =>
+                              setTiposResumoEditados((atuais) => ({
+                                ...atuais,
+                                [chave]: event.target.value,
+                              }))
+                            }
+                            aria-label={`Tipo resumo de ${tipoAtividade}`}
+                            className="w-full min-w-[80px] rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </td>
                         <td className="px-4 py-2 font-medium text-gray-900">
-                          {tipoOs}
+                          {tipoAtividade}
                         </td>
                         <td className="px-4 py-2">
                           <input
@@ -1757,7 +1859,7 @@ export function KpiDesempenhoTecnicos({
                                 [chave]: event.target.value,
                               }))
                             }
-                            aria-label={`Valor de ${tipoOs}`}
+                            aria-label={`Valor de ${tipoAtividade}`}
                             className={`w-28 rounded-md border px-2 py-1 text-right tabular-nums outline-none focus:ring-2 focus:ring-green-500 ${
                               Number(valoresEditados[chave] ?? valor) > 0
                                 ? "border-gray-300 font-semibold text-green-600"

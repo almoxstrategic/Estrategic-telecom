@@ -19,7 +19,7 @@ import { saveEstoqueBase } from "@/lib/estoque-base-store";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
 import { markKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
-import { agregarNotasToa, processarNotasTOA, saveToaNotas } from "@/lib/toa-store";
+import { agregarChamadosToa, processarChamadosTOA, saveToaChamados } from "@/lib/toa-store";
 import { cn } from "@/lib/utils";
 
 function formatImportError(scope: string, err: unknown): string {
@@ -370,21 +370,20 @@ function ImportacaoPage() {
     setBusyToa(true);
     try {
       const linhas = await parseToaFile(file);
-      const notasProcessadas = processarNotasTOA(linhas);
-      const resultado = agregarNotasToa(notasProcessadas);
-      const totalClassificadas = resultado.totalProdutivas + resultado.totalPerdas;
+      const chamados = processarChamadosTOA(linhas);
+      const resultado = agregarChamadosToa(chamados);
 
-      if (totalClassificadas === 0) {
+      if (resultado.totalNotasFeitas === 0) {
         toast.error(
-          "Nenhuma linha válida encontrada na aba Page 1. Verifique Data, Login do Técnico e Cód de Baixa 1.",
+          "Nenhum chamado válido encontrado na aba Page 1. Verifique Data, Login do Técnico e Número da O.S 1–10.",
         );
         return;
       }
 
-      saveToaNotas(notasProcessadas);
+      saveToaChamados(chamados);
       markKpiUltimaImportacao();
       toast.success(
-        `TOA importado: ${resultado.totalProdutivas} notas produtivas e ${resultado.totalPerdas} perdas.`,
+        `TOA importado: ${resultado.totalNotasFeitas} notas (${resultado.totalNotasProdutivas} produtivas / ${resultado.totalNotasImprodutivas} improdutivas), ${resultado.totalOsProdutivas} O.S. produtivas e ${resultado.totalOsImprodutivas} O.S. improdutivas.`,
       );
     } catch (err) {
       toast.error(formatImportError("toa", err));
@@ -516,7 +515,7 @@ function ImportacaoPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Importação TOA"
-              description='Lê exclusivamente a aba "Page 1": Data, Login do Técnico, Número da WO, Contrato, Cód de Baixa 1 e Tipo O.S 1.'
+              description='Lê a aba "Page 1": cada linha é um chamado (Data, Login, WO, Contrato) com até 10 O.S. (Número da O.S, Cód de Baixa, Status da O.S e Tipo O.S).'
               file={arquivoToa}
               onFileChange={setArquivoToa}
               busy={busyToa}

@@ -232,6 +232,9 @@ function parseToaData(value: string): string {
 /**
  * Exportação TOA: por regra, somente a aba exatamente chamada `Page 1`
  * pode alimentar os KPIs.
+ *
+ * Cada linha é um chamado (WO/Contrato). Dentro dela, as O.S. ocupam
+ * slots 1–10: Número da O.S X, Cód de Baixa X, Status da O.S X, Tipo O.S X.
  */
 export async function parseToaFile(file: File): Promise<ToaLinha[]> {
   const name = file.name.toLowerCase();
@@ -255,14 +258,60 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
     dateNF: "dd/mm/yyyy",
   }) as string[][];
 
-  return rowsFromMatrix(matrix).map((row) => ({
-    data: parseToaData(pick(row, "Data")),
-    loginTecnico: normalizeMatricula(pick(row, "Login do Técnico")),
-    numeroWo: pick(row, "Número da WO"),
-    contrato: pick(row, "Contrato"),
-    codBaixaBruto: pick(row, "Cód de Baixa 1"),
-    tipoOs: pick(row, "Tipo O.S 1"),
-  }));
+  return rowsFromMatrix(matrix)
+    .map((row) => {
+      const ordensDeServico: ToaLinha["ordensDeServico"] = [];
+
+      for (let indice = 1; indice <= 10; indice += 1) {
+        const numeroOs = pick(
+          row,
+          `Número da O.S ${indice}`,
+          `Numero da O.S ${indice}`,
+          `Número da OS ${indice}`,
+          `Numero da OS ${indice}`,
+        );
+        const codBaixaBruto = pick(
+          row,
+          `Cód de Baixa ${indice}`,
+          `Cod de Baixa ${indice}`,
+          `Código de Baixa ${indice}`,
+          `Codigo de Baixa ${indice}`,
+        );
+        // Slot válido se Número da O.S. ou Cód de Baixa estiver preenchido.
+        if (!numeroOs && !codBaixaBruto) continue;
+
+        ordensDeServico.push({
+          indice,
+          numeroOs,
+          codBaixaBruto,
+          status: pick(
+            row,
+            `Status da O.S ${indice}`,
+            `Status da OS ${indice}`,
+            `Status O.S ${indice}`,
+            `Status OS ${indice}`,
+          ),
+          tipoOs: pick(
+            row,
+            `Tipo O.S ${indice}`,
+            `Tipo OS ${indice}`,
+            `Tipo O.S. ${indice}`,
+          ),
+        });
+      }
+
+      return {
+        data: parseToaData(pick(row, "Data")),
+        loginTecnico: normalizeMatricula(pick(row, "Login do Técnico")),
+        numeroWo: pick(row, "Número da WO", "Numero da WO", "Número WO"),
+        contrato: pick(row, "Contrato"),
+        ordensDeServico,
+      };
+    })
+    .filter(
+      (linha) =>
+        Boolean(linha.data && linha.loginTecnico && linha.ordensDeServico.length > 0),
+    );
 }
 
 export async function parseWoCabecalhoFile(file: File): Promise<WoCabecalhoRow[]> {

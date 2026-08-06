@@ -84,8 +84,8 @@ import {
 } from "@/lib/team-service";
 import { formatTecnicoLabel, formatTecnicoModalTitle } from "@/lib/tecnico-label";
 import {
-  agregarNotasToa,
-  filtrarNotasToa,
+  agregarChamadosToa,
+  filtrarChamadosToa,
   normalizeToaLogin,
   useToaSnapshot,
 } from "@/lib/toa-store";
@@ -260,8 +260,8 @@ function KpisPage() {
 
   const toaAgregado = useMemo(
     () =>
-      agregarNotasToa(
-        filtrarNotasToa(toaSnapshot.notasProcessadas, {
+      agregarChamadosToa(
+        filtrarChamadosToa(toaSnapshot.chamadosProcessados, {
           ano: filtro.ano,
           mes: filtro.mes,
           dia: filtro.dia,
@@ -269,7 +269,7 @@ function KpisPage() {
         precosOs,
       ),
     [
-      toaSnapshot.notasProcessadas,
+      toaSnapshot.chamadosProcessados,
       filtro.ano,
       filtro.mes,
       filtro.dia,
@@ -384,15 +384,15 @@ function KpisPage() {
     for (const periodo of periodos) {
       porChave.set(`${periodo.ano}-${periodo.mes}`, periodo);
     }
-    for (const nota of toaSnapshot.notasProcessadas) {
-      const [ano, mes] = nota.data.split("-").map(Number);
+    for (const chamado of toaSnapshot.chamadosProcessados) {
+      const [ano, mes] = chamado.data.split("-").map(Number);
       if (!ano || !mes) continue;
       porChave.set(`${ano}-${mes}`, { ano, mes });
     }
     return [...porChave.values()].sort(
       (a, b) => b.ano - a.ano || b.mes - a.mes,
     );
-  }, [periodos, toaSnapshot.notasProcessadas]);
+  }, [periodos, toaSnapshot.chamadosProcessados]);
 
   useEffect(() => {
     if (periodosComDados.length === 0) return;
@@ -983,7 +983,7 @@ function KpisPage() {
               tecnicos={kpis?.top_tecnicos ?? []}
               tecnicosEquipe={tecnicosEquipe}
               resumoToa={toaAgregado.resumoPorTecnico}
-              notasProcessadas={toaSnapshot.notasProcessadas}
+              chamadosProcessados={toaSnapshot.chamadosProcessados}
               filtroPeriodo={{
                 ano: filtro.ano,
                 mes: filtro.mes,
@@ -1047,7 +1047,7 @@ function KpisPage() {
                       </span>
                     </div>
                     <div className="mt-3 text-3xl font-black text-foreground">
-                      {formatQuantidade(toaAgregado.totalProdutivas)}
+                      {formatQuantidade(toaAgregado.totalNotasProdutivas)}
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border bg-card p-5 text-left shadow-sm">
@@ -1058,7 +1058,7 @@ function KpisPage() {
                       </span>
                     </div>
                     <div className="mt-3 text-3xl font-black text-foreground">
-                      {formatQuantidade(toaAgregado.totalPerdas)}
+                      {formatQuantidade(toaAgregado.totalNotasImprodutivas)}
                     </div>
                   </div>
                 </section>
@@ -1223,8 +1223,8 @@ function KpisPage() {
                                 toaAgregado.resumoPorTecnico[
                                   normalizeToaLogin(t.id_tecnico)
                                 ];
-                              const notasFeitas = resumoToa?.notasFeitas ?? 0;
-                              const receitaLiquida = resumoToa?.receitaBruta ?? 0;
+                              const notasFeitas = resumoToa?.totalNotasFeitas ?? 0;
+                              const receitaLiquida = resumoToa?.receitaFaturada ?? 0;
                               return (
                               <li
                                 key={t.id_tecnico}
