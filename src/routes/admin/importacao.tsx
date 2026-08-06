@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
 import {
+  parseAnaliticoFaturamentoFile,
   parseEstoqueAtlasFile,
   parseEstoqueBaseFile,
   parseEstoqueBtpFile,
@@ -19,7 +20,15 @@ import { saveEstoqueBase } from "@/lib/estoque-base-store";
 import { saveEstoqueAtlas } from "@/lib/serializados-atlas-store";
 import { saveEstoqueCampo } from "@/lib/serializados-campo-store";
 import { markKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
-import { agregarChamadosToa, processarChamadosTOA, saveToaChamados } from "@/lib/toa-store";
+import {
+  replaceAnaliticoHistoricoLote,
+  replaceToaImportacoes,
+} from "@/lib/faturamento-service";
+import {
+  agregarChamadosToa,
+  clearToaLocalStorage,
+  processarChamadosTOA,
+} from "@/lib/toa-store";
 import { cn } from "@/lib/utils";
 
 function formatImportError(scope: string, err: unknown): string {
@@ -224,12 +233,14 @@ function ImportacaoPage() {
   const [busyEstoqueBtp, setBusyEstoqueBtp] = useState(false);
   const [busyEstoqueBase, setBusyEstoqueBase] = useState(false);
   const [busyToa, setBusyToa] = useState(false);
+  const [busyAnalitico, setBusyAnalitico] = useState(false);
   const [fileAtlas, setFileAtlas] = useState<File | null>(null);
   const [fileCampo, setFileCampo] = useState<File | null>(null);
   const [fileFisico, setFileFisico] = useState<File | null>(null);
   const [fileConsolidado, setFileConsolidado] = useState<File | null>(null);
   const [arquivoEstoqueTecnico, setArquivoEstoqueTecnico] = useState<File | null>(null);
   const [arquivoToa, setArquivoToa] = useState<File | null>(null);
+  const [arquivoAnalitico, setArquivoAnalitico] = useState<File | null>(null);
   const [busyAtlas, setBusyAtlas] = useState(false);
   const [busyCampo, setBusyCampo] = useState(false);
 
@@ -380,15 +391,39 @@ function ImportacaoPage() {
         return;
       }
 
-      saveToaChamados(chamados);
+      const persistido = await replaceToaImportacoes(chamados);
+      clearToaLocalStorage();
       markKpiUltimaImportacao();
       toast.success(
-        `TOA importado: ${resultado.totalNotasFeitas} notas (${resultado.totalNotasProdutivas} produtivas / ${resultado.totalNotasImprodutivas} improdutivas), ${resultado.totalOsProdutivas} O.S. produtivas e ${resultado.totalOsImprodutivas} O.S. improdutivas.`,
+        `TOA salvo no Supabase: ${persistido.totalNotas} notas (competências ${persistido.competencias.join(", ") || "—"}). ` +
+          `${resultado.totalNotasProdutivas} produtivas / ${resultado.totalNotasImprodutivas} improdutivas.`,
       );
     } catch (err) {
       toast.error(formatImportError("toa", err));
     } finally {
       setBusyToa(false);
+    }
+  };
+
+  const handleAnalitico = async (file: File) => {
+    setBusyAnalitico(true);
+    try {
+      const rows = await parseAnaliticoFaturamentoFile(file);
+      if (rows.length === 0) {
+        toast.error("Nenhuma linha válida encontrada no Analítico.");
+        return;
+      }
+      const persistido = await replaceAnaliticoHistoricoLote(rows);
+      markKpiUltimaImportacao();
+      const receita = rows.reduce((s, r) => s + r.valor_servico, 0);
+      toast.success(
+        `Analítico salvo: ${persistido.total} notas em ${persistido.meses.length} mês(es) ` +
+          `(${persistido.meses.join(", ")}). Receita: R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}.`,
+      );
+    } catch (err) {
+      toast.error(formatImportError("analitico", err));
+    } finally {
+      setBusyAnalitico(false);
     }
   };
 
@@ -403,7 +438,8 @@ function ImportacaoPage() {
               Importação de Dados
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Leitura no navegador (CSV/XLSX) antes de enviar ao Supabase.
+              TOA e Analítico são gravados no Supabase (overwrite por mês). Demais
+              importações seguem o fluxo atual.
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -515,11 +551,19 @@ function ImportacaoPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Importação TOA"
-              description='Lê a aba "Page 1": cada linha é um chamado (Data, Login, WO, Contrato) com até 10 O.S. (Número da O.S, Cód de Baixa, Status da O.S e Tipo O.S).'
+              description='Lê a aba "Page 1" e grava no Supabase (toa_importacoes). Overwrite automático por mês/competência presente no arquivo (ex.: Agosto substitui só Agosto).'
               file={arquivoToa}
               onFileChange={setArquivoToa}
               busy={busyToa}
               onImport={handleToa}
+            />
+            <ImportFileCard
+              title="Analítico Claro (histórico)"
+              description='Lê abas "Notas e valores de …" ou ANALITICO e grava em analitico_historico. Overwrite por DATA_BASE (mês). Usado no painel para períodos ≤ jun/2026.'
+              file={arquivoAnalitico}
+              onFileChange={setArquivoAnalitico}
+              busy={busyAnalitico}
+              onImport={handleAnalitico}
             />
           </div>
         )}

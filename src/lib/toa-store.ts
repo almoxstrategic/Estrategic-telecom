@@ -45,6 +45,11 @@ export type ToaOsFlattened = ToaOrdemServico & {
   login: string;
   numeroWo: string;
   contrato: string;
+  /**
+   * false quando a O.S. é produtiva operacionalmente, mas a Claro não fatura
+   * (ex.: tipo 43 na mesma Nota que já tem adesão tipo 1).
+   */
+  contaReceitaFaturada: boolean;
 };
 
 export type ToaResumoTecnico = {
@@ -150,6 +155,40 @@ export function isOsImprodutiva(
   ordem: Pick<ToaOrdemServico, "isProdutiva">,
 ): boolean {
   return !ordem.isProdutiva;
+}
+
+/** Código numérico do Tipo O.S. (ex: "43 - ADESAO..." → 43). */
+export function extrairCodigoTipoOs(tipoOs: string): number | null {
+  const match = String(tipoOs ?? "")
+    .trim()
+    .match(/^(\d+)/);
+  if (!match) return null;
+  const cod = Number.parseInt(match[1]!, 10);
+  return Number.isFinite(cod) ? cod : null;
+}
+
+/**
+ * Receita projetada na Nota (simula Analítico Claro):
+ * - Status Executada + Cód Baixa PRODUTIVO (409–599 ≠ 571)
+ * - Exceto tipo 43 quando a mesma Nota já tem tipo 1 produtiva
+ *   (Claro não paga os dois no mesmo contrato/mês)
+ */
+export function isOsReceitaFaturavelNaNota(
+  ordem: ToaOrdemServico,
+  ordensDaNota: ToaOrdemServico[],
+): boolean {
+  if (!isOsProdutiva(ordem)) return false;
+
+  const codigoTipo = extrairCodigoTipoOs(ordem.tipoOs);
+  if (codigoTipo === 43) {
+    const temAdesaoPrincipal = ordensDaNota.some(
+      (outra) =>
+        isOsProdutiva(outra) && extrairCodigoTipoOs(outra.tipoOs) === 1,
+    );
+    if (temAdesaoPrincipal) return false;
+  }
+
+  return true;
 }
 
 function processarOrdem(ordem: ToaOrdemLinha): ToaOrdemServico | null {
@@ -338,12 +377,21 @@ export function flattenChamadosToa(
         login: chamado.login,
         numeroWo: chamado.numeroWo,
         contrato: chamado.contrato,
+        contaReceitaFaturada: isOsReceitaFaturavelNaNota(
+          ordem,
+          chamado.ordensDeServico,
+        ),
       });
     }
   }
   return flat;
 }
 
+/**
+ * Preço unitário calibrado pelo histórico Analítico.
+ * Match exato do Tipo O.S.; fallback pelo código numérico (ex.: "1 - ...").
+ * QTDE no Analítico é sempre 1 — não multiplicar.
+ */
 export function valorPrecoOs(
   precosOs: Record<string, number> | Record<string, { valor: number }>,
   tipoOs: string,
@@ -354,7 +402,35 @@ export function valorPrecoOs(
   if (entry && typeof entry === "object" && typeof entry.valor === "number") {
     return entry.valor;
   }
+
+  const codigo = extrairCodigoTipoOs(tipoOs);
+  if (codigo == null) return 0;
+
+  for (const [mapKey, mapEntry] of Object.entries(precosOs)) {
+    if (extrairCodigoTipoOs(mapKey) !== codigo) continue;
+    if (typeof mapEntry === "number") return mapEntry;
+    if (
+      mapEntry &&
+      typeof mapEntry === "object" &&
+      typeof mapEntry.valor === "number"
+    ) {
+      return mapEntry.valor;
+    }
+  }
+
   return 0;
+}
+
+/**
+ * Receita projetada da O.S. (simula faturamento Claro).
+ * 0 se bundlada (ex.: tipo 43 com tipo 1 na mesma Nota) ou não faturável.
+ */
+export function valorReceitaFaturadaOs(
+  ordem: Pick<ToaOsFlattened, "tipoOs" | "contaReceitaFaturada">,
+  precosOs: Record<string, number> | Record<string, { valor: number }>,
+): number {
+  if (!ordem.contaReceitaFaturada) return 0;
+  return valorPrecoOs(precosOs, ordem.tipoOs);
 }
 
 function emptyResumo(): ToaResumoTecnico {
@@ -400,7 +476,9 @@ export function agregarChamadosToa(
 
       if (isOsProdutiva(ordem)) {
         osProdNaNota += 1;
-        receitaFatNaNota += valorServico;
+        if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
+          receitaFatNaNota += valorServico;
+        }
       } else if (isOsImprodutiva(ordem)) {
         osImprodNaNota += 1;
         receitaPerdaNaNota += valorServico;
@@ -475,6 +553,10 @@ function loadSnapshot(): ToaSnapshot {
 
 let snapshot = loadSnapshot();
 
+/**
+ * @deprecated Persistência grande migrada para Supabase (`toa_importacoes`).
+ * Mantido só para compatibilidade; preferir `replaceToaImportacoes`.
+ */
 export function saveToaChamados(
   chamados: ToaChamadoProcessado[],
 ): ToaSnapshot {
@@ -492,6 +574,14 @@ export function saveToaChamados(
   }
 
   return snapshot;
+}
+
+/** Remove o snapshot TOA do localStorage (fonte oficial = Supabase). */
+export function clearToaLocalStorage(): void {
+  if (!isClient()) return;
+  window.localStorage.removeItem(STORAGE_KEY);
+  snapshot = EMPTY_SNAPSHOT;
+  window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
 }
 
 /** @deprecated Use saveToaChamados. */

@@ -1,0 +1,499 @@
+{
+  "ghost43": 203,
+  "ghost43SameNotaHasAnaOs": 198,
+  "ghost43SameContratoHasAna": 0,
+  "ghost43Alone": 5,
+  "siblingTipos": [
+    [
+      "1 - ADESAO - INSTALACAO DE ASSINATURA",
+      198
+    ],
+    [
+      "208 - ENVIO DE CHIP VIA TECNICO",
+      8
+    ],
+    [
+      "101 - ADESAO - INSTALAR PONTO PORTABILIDADE",
+      6
+    ],
+    [
+      "95 - ADESAO - INSTALAR PONTO VOIP",
+      6
+    ],
+    [
+      "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      6
+    ],
+    [
+      "516 - ADESAO ENTREGA STREAMING",
+      4
+    ],
+    [
+      "156 - INSTALACAO WIFI MESH",
+      2
+    ],
+    [
+      "172 - INST PONTO EXTENSAO REDE VIRTUA",
+      1
+    ],
+    [
+      "51 - ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+      1
+    ]
+  ],
+  "ana43": 26,
+  "dateAlign": {
+    "sameDay": 0,
+    "diffDay": 0,
+    "dayDelta": {}
+  },
+  "examples": [
+    {
+      "contrato": "170553549",
+      "ghostOs": "2638626540",
+      "siblingsToa": [
+        {
+          "os": "2638626539",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638626540",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638626539,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 244.18
+        }
+      ]
+    },
+    {
+      "contrato": "170556742",
+      "ghostOs": "2639014137",
+      "siblingsToa": [
+        {
+          "os": "2639014126",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2639014137",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2639014126,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170555665",
+      "ghostOs": "2638818071",
+      "siblingsToa": [
+        {
+          "os": "2638818060",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638818071",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638818082",
+          "tipo": "101 - ADESAO - INSTALAR PONTO PORTABILIDADE",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638818060,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 225.9
+        }
+      ]
+    },
+    {
+      "contrato": "170556947",
+      "ghostOs": "2639061432",
+      "siblingsToa": [
+        {
+          "os": "2639061421",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2639061432",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2639061421,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170556629",
+      "ghostOs": "2638974265",
+      "siblingsToa": [
+        {
+          "os": "2638974254",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638974265",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638974254,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 225.9
+        }
+      ]
+    },
+    {
+      "contrato": "170555975",
+      "ghostOs": "2638878684",
+      "siblingsToa": [
+        {
+          "os": "2638878673",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638878684",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638878673,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 225.9
+        }
+      ]
+    },
+    {
+      "contrato": "170550337",
+      "ghostOs": "2638123609",
+      "siblingsToa": [
+        {
+          "os": "2638123597",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638123609",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638123610",
+          "tipo": "95 - ADESAO - INSTALAR PONTO VOIP",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638123597,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170555924",
+      "ghostOs": "2638873948",
+      "siblingsToa": [
+        {
+          "os": "2638873937",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638873948",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638873959",
+          "tipo": "208 - ENVIO DE CHIP VIA TECNICO",
+          "inAna": false,
+          "status": "Não Executada",
+          "cod": 104
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638873937,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170556556",
+      "ghostOs": "2638953307",
+      "siblingsToa": [
+        {
+          "os": "2638953295",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638953307",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638953295,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170554936",
+      "ghostOs": "2638688784",
+      "siblingsToa": [
+        {
+          "os": "2638688773",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638688784",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638688773,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170557404",
+      "ghostOs": "2639146481",
+      "siblingsToa": [
+        {
+          "os": "2639146470",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2639146481",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2639146470,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    },
+    {
+      "contrato": "170557714",
+      "ghostOs": "2639200516",
+      "siblingsToa": [
+        {
+          "os": "2639200493",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2639200516",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2639200527",
+          "tipo": "95 - ADESAO - INSTALAR PONTO VOIP",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 410
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2639200493,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 244.18
+        }
+      ]
+    },
+    {
+      "contrato": "170549630",
+      "ghostOs": "2638013270",
+      "siblingsToa": [
+        {
+          "os": "2638013269",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638013270",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638013269,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 235.19
+        }
+      ]
+    },
+    {
+      "contrato": "170555703",
+      "ghostOs": "2638819858",
+      "siblingsToa": [
+        {
+          "os": "2638819847",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638819858",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638819847,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 244.18
+        }
+      ]
+    },
+    {
+      "contrato": "170556378",
+      "ghostOs": "2638925193",
+      "siblingsToa": [
+        {
+          "os": "2638925182",
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "inAna": true,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638925193",
+          "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+          "inAna": false,
+          "status": "Executada",
+          "cod": 409
+        },
+        {
+          "os": "2638925205",
+          "tipo": "156 - INSTALACAO WIFI MESH",
+          "inAna": false,
+          "status": "Não Executada",
+          "cod": 301
+        },
+        {
+          "os": "2638925216",
+          "tipo": "156 - INSTALACAO WIFI MESH",
+          "inAna": false,
+          "status": "Não Executada",
+          "cod": 301
+        }
+      ],
+      "anaSiblings": [
+        {
+          "cdOs": 2638925182,
+          "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+          "valor": 199.33
+        }
+      ]
+    }
+  ]
+}

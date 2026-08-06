@@ -190,13 +190,71 @@ async function parseCsv(file: File): Promise<RawRow[]> {
   });
 }
 
-export async function parseSpreadsheet(file: File): Promise<RawRow[]> {
+/**
+ * Analítico Claro: lê abas "Notas e valores de …" ou a aba ANALITICO.
+ * Retorna linhas normalizadas para analitico_historico.
+ */
+export async function parseAnaliticoFaturamentoFile(
+  file: File,
+): Promise<
+  Array<{
+    data_base: number;
+    nr_contrato: string;
+    cd_os: string;
+    id_tipo_os: number | null;
+    ds_tipo_os: string;
+    cd_baixa: number | null;
+    qtde: number;
+    valor_servico: number;
+    dh_baixa: string | null;
+    tipo_os_consolid: string;
+    nm_cidade: string;
+  }>
+> {
   const name = file.name.toLowerCase();
-  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
-    return parseXlsx(file);
+  if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+    throw new Error("A importação do Analítico aceita somente Excel (.xlsx/.xls).");
   }
-  return parseCsv(file);
+
+  const XLSX = await import("xlsx");
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+
+  const monthSheets = workbook.SheetNames.filter((n) =>
+    /^Notas e valores de /i.test(n),
+  );
+  const sheets =
+    monthSheets.length > 0
+      ? monthSheets
+      : workbook.Sheets.ANALITICO
+        ? ["ANALITICO"]
+        : [];
+
+  if (sheets.length === 0) {
+    throw new Error(
+      'Planilha sem abas "Notas e valores de …" ou "ANALITICO".',
+    );
+  }
+
+  const { mapAnaliticoSheetRow } = await import("./faturamento-service");
+  const out: ReturnType<typeof mapAnaliticoSheetRow>[] = [];
+
+  for (const sheetName of sheets) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: "",
+      raw: true,
+    });
+    for (const row of rows) {
+      const mapped = mapAnaliticoSheetRow(row);
+      if (mapped) out.push(mapped);
+    }
+  }
+
+  return out.filter((r): r is NonNullable<typeof r> => r !== null);
 }
+
 
 function parseToaData(value: string): string {
   const raw = trimCell(value);

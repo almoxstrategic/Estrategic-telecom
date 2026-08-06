@@ -37,6 +37,7 @@ import {
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import { ATIVIDADES_TOA_CATALOGO } from "@/lib/toa-atividades-catalogo";
 import {
+  agregarChamadosToa,
   filtrarChamadosToa,
   flattenChamadosToa,
   isOsImprodutiva,
@@ -44,9 +45,14 @@ import {
   normalizeTipoOs,
   normalizeToaLogin,
   valorPrecoOs,
+  valorReceitaFaturadaOs,
   type ToaChamadoProcessado,
   type ToaResumoTecnico,
 } from "@/lib/toa-store";
+import {
+  resumirAnaliticoHistorico,
+  type AnaliticoHistoricoRow,
+} from "@/lib/faturamento-service";
 
 type KpiFiltroPeriodo = {
   ano: number | null;
@@ -70,18 +76,28 @@ type NotaDetalheCard = {
   tipoOs: string;
   receita: number;
   isProdutiva: boolean;
+  /** true se entra na receita projetada (não bundlada). */
+  contaReceitaFaturada: boolean;
   status: string;
 };
+
+export type ModoFaturamentoKpi = "historico" | "projecao" | "indefinido";
 
 type KpiDesempenhoTecnicosProps = {
   tecnicos: KpiTopTecnico[];
   tecnicosEquipe: TecnicoProfile[];
-  resumoToa: Record<string, ToaResumoTecnico>;
+  /** @deprecated Preferir recálculo interno via chamados + precosOs. Mantido por compat. */
+  resumoToa?: Record<string, ToaResumoTecnico>;
   chamadosProcessados: ToaChamadoProcessado[];
   filtroPeriodo: KpiFiltroPeriodo;
   demitidosKeys: Set<string>;
   precosOs: PrecosOsMap;
   onSalvarPrecos: (precos: PrecoOs[]) => Promise<void>;
+  /** Força regravação do catálogo calibrado no Supabase e invalida cache local. */
+  onRecalcularBase?: () => Promise<void>;
+  /** Fonte de dados: histórico Analítico vs projeção TOA. */
+  modoFaturamento?: ModoFaturamentoKpi;
+  analiticoRows?: AnaliticoHistoricoRow[];
 };
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
@@ -244,22 +260,219 @@ function valorOrdenacao(tecnico: TecnicoDesempenho, key: SortKey): number {
   }
 }
 
+const GRID_HISTORICO =
+  "grid grid-cols-[minmax(100px,1.2fr)_minmax(80px,0.8fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)] gap-2";
+
+/** Painel Analítico real (≤ jun/2026): cards + detalhamento global ESTRATEGIC. */
+function KpiDesempenhoHistoricoAnalitico({
+  rows,
+  filtroPeriodo,
+}: {
+  rows: AnaliticoHistoricoRow[];
+  filtroPeriodo: KpiFiltroPeriodo;
+}) {
+  const [busca, setBusca] = useState("");
+  const resumo = useMemo(() => resumirAnaliticoHistorico(rows), [rows]);
+  const periodoLabel = useMemo(
+    () => descricaoPeriodoLocal(filtroPeriodo),
+    [filtroPeriodo],
+  );
+
+  const linhas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    const base = [...rows].sort((a, b) => {
+      if (a.data_base !== b.data_base) return a.data_base - b.data_base;
+      return a.cd_os.localeCompare(b.cd_os, "pt-BR");
+    });
+    if (!termo) return base;
+    return base.filter((r) => {
+      return (
+        r.nr_contrato.toLowerCase().includes(termo) ||
+        r.cd_os.toLowerCase().includes(termo) ||
+        r.ds_tipo_os.toLowerCase().includes(termo) ||
+        r.nm_cidade.toLowerCase().includes(termo)
+      );
+    });
+  }, [rows, busca]);
+
+  return (
+    <div className="w-full space-y-6">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
+        Modo histórico (Analítico Claro) — {periodoLabel}. Valores reais
+        validados/pagos; TOA ignorado neste período.
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
+            <span className="text-sm font-medium text-muted-foreground">
+              Total de notas
+            </span>
+          </div>
+          <div className="mt-3 text-3xl font-bold text-gray-900">
+            {formatQuantidade(resumo.totalNotas)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
+            <span className="text-sm font-medium text-muted-foreground">
+              Receita (Analítico)
+            </span>
+          </div>
+          <div className="mt-3 text-3xl font-bold text-green-600">
+            {formatReceita(resumo.receitaTotal)}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+            <Users className="h-4 w-4 text-primary" />
+            Detalhamento por Técnico
+          </h2>
+          <input
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar contrato, CD_OS, tipo ou cidade..."
+            aria-label="Buscar no Analítico"
+            className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
+          />
+        </div>
+
+        {rows.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Nenhuma nota do Analítico para o período. Importe o arquivo em
+            Administração → Importação.
+          </p>
+        ) : linhas.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Nenhum resultado para “{busca.trim()}”.
+          </p>
+        ) : (
+          <div className="w-full overflow-x-auto">
+            <div
+              className={`${GRID_HISTORICO} min-w-[720px] items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
+            >
+              <span className="text-left">Nome</span>
+              <span className="text-center">Total de notas</span>
+              <span className="text-center">NR_CONTRATO</span>
+              <span className="text-center">CD_OS</span>
+              <span className="text-right">VALOR_SERVICO</span>
+              <span className="text-right">Receita</span>
+            </div>
+            <div className="max-h-[28rem] overflow-y-auto">
+              {linhas.map((row, idx) => (
+                <div
+                  key={row.id ?? `${row.data_base}-${row.cd_os}-${idx}`}
+                  className={`${GRID_HISTORICO} min-w-[720px] items-center border-b border-border/60 px-2 py-2.5 text-sm`}
+                >
+                  <span className="font-medium text-foreground">ESTRATEGIC</span>
+                  <span className="text-center tabular-nums text-muted-foreground">
+                    {formatQuantidade(resumo.totalNotas)}
+                  </span>
+                  <span className="text-center tabular-nums">
+                    {row.nr_contrato || "—"}
+                  </span>
+                  <span className="text-center tabular-nums">{row.cd_os}</span>
+                  <span className="text-right tabular-nums">
+                    {formatReceita(row.valor_servico)}
+                  </span>
+                  <span className="text-right font-medium tabular-nums text-green-700">
+                    {formatReceita(row.valor_servico)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div
+              className={`${GRID_HISTORICO} min-w-[720px] items-center border-t border-border bg-muted/40 px-2 py-3 text-sm font-semibold`}
+            >
+              <span>Total</span>
+              <span className="text-center tabular-nums">
+                {formatQuantidade(resumo.totalNotas)}
+              </span>
+              <span />
+              <span />
+              <span />
+              <span className="text-right tabular-nums text-green-700">
+                {formatReceita(resumo.receitaTotal)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function KpiDesempenhoTecnicos({
   tecnicos,
   tecnicosEquipe,
-  resumoToa,
+  resumoToa: _resumoToaProp,
   chamadosProcessados,
   filtroPeriodo,
   demitidosKeys,
   precosOs,
   onSalvarPrecos,
+  onRecalcularBase,
+  modoFaturamento = "projecao",
+  analiticoRows = [],
 }: KpiDesempenhoTecnicosProps) {
+  if (modoFaturamento === "indefinido") {
+    return (
+      <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+        Selecione <strong>mês</strong> e <strong>ano</strong> no filtro para
+        carregar o faturamento. Até junho/2026 usa o Analítico real; a partir de
+        julho/2026 usa a projeção TOA.
+      </p>
+    );
+  }
+
+  if (modoFaturamento === "historico") {
+    return (
+      <KpiDesempenhoHistoricoAnalitico
+        rows={analiticoRows}
+        filtroPeriodo={filtroPeriodo}
+      />
+    );
+  }
+
+  return (
+    <KpiDesempenhoProjecaoToa
+      tecnicos={tecnicos}
+      tecnicosEquipe={tecnicosEquipe}
+      resumoToa={_resumoToaProp}
+      chamadosProcessados={chamadosProcessados}
+      filtroPeriodo={filtroPeriodo}
+      demitidosKeys={demitidosKeys}
+      precosOs={precosOs}
+      onSalvarPrecos={onSalvarPrecos}
+      onRecalcularBase={onRecalcularBase}
+    />
+  );
+}
+
+function KpiDesempenhoProjecaoToa({
+  tecnicos,
+  tecnicosEquipe,
+  resumoToa: _resumoToaProp,
+  chamadosProcessados,
+  filtroPeriodo,
+  demitidosKeys,
+  precosOs,
+  onSalvarPrecos,
+  onRecalcularBase,
+}: Omit<KpiDesempenhoTecnicosProps, "modoFaturamento" | "analiticoRows">) {
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
   const percentualAumento = usePercentualAumento();
   const [percentualAumentoTexto, setPercentualAumentoTexto] = useState(() =>
     String(getPercentualAumento()),
   );
+  const [recalculandoBase, setRecalculandoBase] = useState(false);
   const [tecnicoSelecionado, setTecnicoSelecionado] =
     useState<TecnicoSelecionado | null>(null);
   const [detalheNotasTipo, setDetalheNotasTipo] =
@@ -336,6 +549,18 @@ export function KpiDesempenhoTecnicos({
     () => descricaoPeriodoLocal(filtroLocalPeriodo),
     [filtroLocalPeriodo],
   );
+
+  /**
+   * Fonte única de verdade: mesmas regras preditivas do card, tabela e drill-down.
+   * (Não reutiliza resumo pré-agregado do parent para evitar dessincronia com precosOs.)
+   */
+  const resumoToa = useMemo(() => {
+    const agregado = agregarChamadosToa(
+      filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
+      precosOs,
+    );
+    return agregado.resumoPorTecnico;
+  }, [chamadosProcessados, filtroPeriodo, precosOs]);
 
   const enriquecidos = useMemo<TecnicoDesempenho[]>(() => {
     const kpisPorLogin = new Map(
@@ -512,9 +737,9 @@ export function KpiDesempenhoTecnicos({
       const preco = precosOs[chave];
       map.set(chave, {
         chave,
-        tipo: preco?.tipo ?? entrada.tipo,
+        tipo: preco?.tipo?.trim() || entrada.tipo,
         tipoAtividade: entrada.tipoAtividade,
-        valor: preco?.valor ?? 0,
+        valor: Number(preco?.valor ?? entrada.valor) || 0,
       });
     }
 
@@ -531,7 +756,7 @@ export function KpiDesempenhoTecnicos({
           chave,
           tipo: preco?.tipo ?? "",
           tipoAtividade: tipoOs,
-          valor: preco?.valor ?? 0,
+          valor: Number(preco?.valor) || 0,
         });
       }
     }
@@ -586,33 +811,20 @@ export function KpiDesempenhoTecnicos({
   useEffect(() => {
     if (!isTabelaPrecosOpen) return;
 
-    setValoresEditados((atuais) => {
-      const proximos = { ...atuais };
-      let alterou = false;
-
-      for (const { chave, valor } of tiposOsImportados) {
-        if (proximos[chave] === undefined) {
-          proximos[chave] = valor.toFixed(2);
-          alterou = true;
-        }
-      }
-
-      return alterou ? proximos : atuais;
-    });
-
-    setTiposResumoEditados((atuais) => {
-      const proximos = { ...atuais };
-      let alterou = false;
-
-      for (const { chave, tipo } of tiposOsImportados) {
-        if (proximos[chave] === undefined) {
-          proximos[chave] = tipo;
-          alterou = true;
-        }
-      }
-
-      return alterou ? proximos : atuais;
-    });
+    // Sempre realinha drafts ao catálogo/preços atuais (evita modal com valores antigos).
+    setValoresEditados(
+      Object.fromEntries(
+        tiposOsImportados.map(({ chave, valor }) => [
+          chave,
+          valor.toFixed(2),
+        ]),
+      ),
+    );
+    setTiposResumoEditados(
+      Object.fromEntries(
+        tiposOsImportados.map(({ chave, tipo }) => [chave, tipo]),
+      ),
+    );
   }, [isTabelaPrecosOpen, tiposOsImportados]);
 
   const abrirTabelaPrecos = () => {
@@ -631,6 +843,22 @@ export function KpiDesempenhoTecnicos({
       ),
     );
     setIsTabelaPrecosOpen(true);
+  };
+
+  const recalcularBase = async () => {
+    if (!onRecalcularBase || recalculandoBase) return;
+    setRecalculandoBase(true);
+    try {
+      await onRecalcularBase();
+      toast.success(
+        "Base de preços recalculada. Receita projetada atualizada em todos os cards.",
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível recalcular a base de preços.");
+    } finally {
+      setRecalculandoBase(false);
+    }
   };
 
   const salvarValoresAlterados = async () => {
@@ -766,8 +994,7 @@ export function KpiDesempenhoTecnicos({
 
   const receitaPeriodoModal = useMemo(() => {
     return osDoTecnico.reduce((total, os) => {
-      if (!isOsProdutiva(os)) return total;
-      return total + valorPrecoOs(precosOs, os.tipoOs);
+      return total + valorReceitaFaturadaOs(os, precosOs);
     }, 0);
   }, [osDoTecnico, precosOs]);
 
@@ -910,7 +1137,7 @@ export function KpiDesempenhoTecnicos({
     return osFlat
       .map((os) => {
         const login = normalizeToaLogin(os.login);
-        const valorBase = valorPrecoOs(precosOs, os.tipoOs);
+        const valorBase = valorReceitaFaturadaOs(os, precosOs);
         const receita = valorBase * fatorProjecao;
 
         return {
@@ -922,6 +1149,7 @@ export function KpiDesempenhoTecnicos({
           tipoOs: os.tipoOs,
           receita,
           isProdutiva: os.isProdutiva,
+          contaReceitaFaturada: os.contaReceitaFaturada,
           status: os.status,
         };
       })
@@ -964,11 +1192,13 @@ export function KpiDesempenhoTecnicos({
     }
 
     const dadosExcel = notasDetalheCardFiltradas.map((nota) => {
-      const receitaExibida = nota.isProdutiva
+      const receitaExibida = nota.contaReceitaFaturada
         ? nota.receita
-        : nota.receita > 0
-          ? -Math.abs(nota.receita)
-          : 0;
+        : nota.isProdutiva
+          ? 0
+          : nota.receita > 0
+            ? -Math.abs(nota.receita)
+            : 0;
 
       return {
         Data: formatDataBr(nota.data),
@@ -977,7 +1207,11 @@ export function KpiDesempenhoTecnicos({
         WO: nota.numeroWo || "—",
         "Tipo OS": nota.tipoOs || "—",
         Receita: Number(receitaExibida.toFixed(2)),
-        Status: nota.isProdutiva ? "Produtivo" : "Quebra/Improdutivo",
+        Status: nota.contaReceitaFaturada
+          ? "Produtivo / Faturável"
+          : nota.isProdutiva
+            ? "Produtivo / Bundlado"
+            : "Quebra/Improdutivo",
       };
     });
 
@@ -1044,7 +1278,7 @@ export function KpiDesempenhoTecnicos({
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
             <span className="text-sm font-medium text-muted-foreground">
-              Receita Total
+              Receita projetada
             </span>
           </div>
           <div className="mt-3 text-3xl font-bold text-green-600">
@@ -1229,6 +1463,17 @@ export function KpiDesempenhoTecnicos({
           >
             ?
           </button>
+          {onRecalcularBase ? (
+            <button
+              type="button"
+              onClick={() => void recalcularBase()}
+              disabled={recalculandoBase}
+              className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+              title="Regrava o catálogo calibrado no Supabase e invalida cache local de preços"
+            >
+              {recalculandoBase ? "Recalculando…" : "Recalcular Base"}
+            </button>
+          ) : null}
         </div>
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1287,7 +1532,7 @@ export function KpiDesempenhoTecnicos({
                 {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
               </span>
               <span className="text-center">
-                {cabecalhoOrdenavel("Receita faturada", "receita")}
+                {cabecalhoOrdenavel("Receita projetada", "receita")}
               </span>
             </div>
 
@@ -1451,8 +1696,10 @@ export function KpiDesempenhoTecnicos({
                     </tr>
                   ) : (
                     notasDetalheCardFiltradas.map((nota, index) => {
-                      const ganhoReal = nota.isProdutiva && nota.receita > 0;
-                      const perdaReal = !nota.isProdutiva && nota.receita > 0;
+                      const ganhoReal =
+                        nota.contaReceitaFaturada && nota.receita > 0;
+                      const perdaReal =
+                        !nota.isProdutiva && nota.receita > 0;
                       const receitaExibida = perdaReal
                         ? -Math.abs(nota.receita)
                         : nota.receita;
@@ -1489,9 +1736,13 @@ export function KpiDesempenhoTecnicos({
                             {formatReceita(receitaExibida)}
                           </td>
                           <td className="px-3 py-2">
-                            {nota.isProdutiva ? (
+                            {nota.contaReceitaFaturada ? (
                               <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
                                 Produtivo
+                              </span>
+                            ) : nota.isProdutiva ? (
+                              <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                                Bundlado
                               </span>
                             ) : (
                               <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
@@ -1787,9 +2038,10 @@ export function KpiDesempenhoTecnicos({
                     </tr>
                   ) : (
                     osDoTecnicoTabela.map((os, index) => {
-                      const valorNota = valorPrecoOs(precosOs, os.tipoOs);
-                      const ganhoReal = isOsProdutiva(os) && valorNota > 0;
-                      const perdaReal = isOsImprodutiva(os) && valorNota > 0;
+                      const valorCatalogo = valorPrecoOs(precosOs, os.tipoOs);
+                      const valorNota = valorReceitaFaturadaOs(os, precosOs);
+                      const ganhoReal = os.contaReceitaFaturada && valorNota > 0;
+                      const perdaReal = isOsImprodutiva(os) && valorCatalogo > 0;
 
                       return (
                         <tr
@@ -1836,7 +2088,9 @@ export function KpiDesempenhoTecnicos({
                             }`}
                           >
                             {formatReceita(
-                              perdaReal ? -Math.abs(valorNota) : valorNota,
+                              perdaReal
+                                ? -Math.abs(valorCatalogo)
+                                : valorNota,
                             )}
                           </td>
                         </tr>

@@ -1,0 +1,1138 @@
+{
+  "generatedAt": "2026-08-06T16:51:55.728Z",
+  "files": {
+    "PATH_ANALITICO": "C:\\Users\\Estrategic PE0454DQ\\OneDrive\\Desktop\\ANALITICO FATURAMENTO ESTRATEGIC - 202606.xlsx",
+    "PATH_ATIV": "C:\\Users\\Estrategic PE0454DQ\\OneDrive\\Desktop\\CÓDIGOS_BAIXA_e_Atividades_TOA.xlsx"
+  },
+  "checksumOk": true,
+  "totalLinhas": 2162,
+  "totalValor": 369767.06,
+  "totalChecksum": 369767.06,
+  "deltaTotal": 0,
+  "checksumReport": [
+    {
+      "mes": "Dezembro",
+      "ym": 202512,
+      "linhas": 14,
+      "checksumNotas": 14,
+      "matchNotas": true,
+      "somaValorServico": 1961.94,
+      "checksumValor": 1961.94,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 1961.94,
+      "contratosUnicos": 10,
+      "cdOsUnicos": 14
+    },
+    {
+      "mes": "Janeiro",
+      "ym": 202601,
+      "linhas": 289,
+      "checksumNotas": 289,
+      "matchNotas": true,
+      "somaValorServico": 45591.6,
+      "checksumValor": 45591.6,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 45591.6,
+      "contratosUnicos": 200,
+      "cdOsUnicos": 289
+    },
+    {
+      "mes": "Fevereiro",
+      "ym": 202602,
+      "linhas": 184,
+      "checksumNotas": 184,
+      "matchNotas": true,
+      "somaValorServico": 29540.22,
+      "checksumValor": 29540.22,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 29540.22,
+      "contratosUnicos": 127,
+      "cdOsUnicos": 184
+    },
+    {
+      "mes": "Março",
+      "ym": 202603,
+      "linhas": 386,
+      "checksumNotas": 386,
+      "matchNotas": true,
+      "somaValorServico": 65150.56,
+      "checksumValor": 65150.56,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 65150.56,
+      "contratosUnicos": 296,
+      "cdOsUnicos": 386
+    },
+    {
+      "mes": "Abril",
+      "ym": 202604,
+      "linhas": 482,
+      "checksumNotas": 482,
+      "matchNotas": true,
+      "somaValorServico": 79742.31,
+      "checksumValor": 79742.31,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 79742.31,
+      "contratosUnicos": 393,
+      "cdOsUnicos": 482
+    },
+    {
+      "mes": "Maio",
+      "ym": 202605,
+      "linhas": 413,
+      "checksumNotas": 413,
+      "matchNotas": true,
+      "somaValorServico": 77097.27,
+      "checksumValor": 77097.27,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 77097.27,
+      "contratosUnicos": 359,
+      "cdOsUnicos": 412
+    },
+    {
+      "mes": "Junho",
+      "ym": 202606,
+      "linhas": 394,
+      "checksumNotas": 394,
+      "matchNotas": true,
+      "somaValorServico": 70683.16,
+      "checksumValor": 70683.16,
+      "deltaValor": 0,
+      "matchValor": true,
+      "somaSeMultQtde": 70683.16,
+      "contratosUnicos": 328,
+      "cdOsUnicos": 392
+    }
+  ],
+  "regrasDescobertas": {
+    "qtde": {
+      "dist": {
+        "1": 2162
+      },
+      "qtdeGt1": 0,
+      "conclusao": "QTDE sempre 1 — VALOR_SERVICO já é o valor final da linha; não multiplicar."
+    },
+    "cdBaixa": {
+      "dist": {
+        "203": {
+          "n": 1,
+          "valor": 128.51
+        },
+        "409": {
+          "n": 2109,
+          "valor": 365234.48
+        },
+        "425": {
+          "n": 35,
+          "valor": 3126.63
+        },
+        "430": {
+          "n": 2,
+          "valor": 51.42
+        },
+        "477": {
+          "n": 4,
+          "valor": 262.18
+        },
+        "478": {
+          "n": 5,
+          "valor": 385.55
+        },
+        "517": {
+          "n": 1,
+          "valor": 128.51
+        },
+        "527": {
+          "n": 4,
+          "valor": 321.27
+        },
+        "562": {
+          "n": 1,
+          "valor": 128.51
+        }
+      },
+      "improdutivosAppComReceita": 1,
+      "amostraImprodutivos": [
+        {
+          "mes": "Junho",
+          "cdOs": "2641050208",
+          "cdBaixa": 203,
+          "mapaStatus": "IMPRODUTIVO",
+          "idTipoOs": 188,
+          "dsTipoOs": "MANUTENCAO PREVENTIVA INDOOR I",
+          "valor": 128.51
+        }
+      ],
+      "conclusao": "Há códigos fora da regra atual com receita — revisar regra de produtividade."
+    },
+    "tipo43vs1": {
+      "contratosMesCom43e1": 0,
+      "contratosMesCom43Sozinho": 147,
+      "conclusao": "No Analítico, tipo 43 nunca coexiste com tipo 1 no mesmo contrato+mês (Claro não paga os dois)."
+    },
+    "multiOs": {
+      "contratosComMaisDeUmaOs": 376,
+      "exemplos": [
+        {
+          "chave": "202512|170396079",
+          "n": 3,
+          "tipos": [
+            "517:38.56",
+            "516:38.56",
+            "43:199.33"
+          ],
+          "total": 276.45
+        },
+        {
+          "chave": "202512|170395552",
+          "n": 2,
+          "tipos": [
+            "516:38.56",
+            "43:199.33"
+          ],
+          "total": 237.89
+        },
+        {
+          "chave": "202512|167064057",
+          "n": 2,
+          "tipos": [
+            "156:105.38",
+            "156:20.56"
+          ],
+          "total": 125.94
+        },
+        {
+          "chave": "202601|170392618",
+          "n": 3,
+          "tipos": [
+            "43:199.33",
+            "516:38.56",
+            "517:38.56"
+          ],
+          "total": 276.45
+        },
+        {
+          "chave": "202601|168951383",
+          "n": 2,
+          "tipos": [
+            "24:98.81",
+            "191:214.21"
+          ],
+          "total": 313.02
+        },
+        {
+          "chave": "202601|169087321",
+          "n": 2,
+          "tipos": [
+            "24:98.81",
+            "191:214.21"
+          ],
+          "total": 313.02
+        },
+        {
+          "chave": "202601|95771438",
+          "n": 2,
+          "tipos": [
+            "24:98.81",
+            "191:214.21"
+          ],
+          "total": 313.02
+        },
+        {
+          "chave": "202601|169335520",
+          "n": 2,
+          "tipos": [
+            "24:98.81",
+            "191:135.94"
+          ],
+          "total": 234.75
+        }
+      ]
+    },
+    "valoresNegativos": {
+      "n": 1,
+      "soma": -64.26,
+      "amostra": [
+        {
+          "mes": "Junho",
+          "ym": 202606,
+          "nrContrato": "170558834",
+          "cdOs": "2639915788",
+          "idTipoOs": 188,
+          "dsTipoOs": "MANUTENCAO PREVENTIVA INDOOR I",
+          "cdBaixa": 527,
+          "qtde": 1,
+          "valorServico": -64.26,
+          "valorXQtde": -64.26,
+          "tipoOsConsolid": "DESCONTO –RETORNO DE CREDENCIADA PARA MANUTENCAO",
+          "dhBaixa": "46182",
+          "dataBase": "202606"
+        }
+      ]
+    },
+    "valoresZero": {
+      "n": 7
+    }
+  },
+  "topTiposPorVolume": [
+    {
+      "id": 1,
+      "ds": "ADESAO - INSTALACAO DE ASSINATURA",
+      "n": 915,
+      "media": 213.13,
+      "moda": 199.33,
+      "min": 199.33,
+      "max": 279.06,
+      "spread": 79.73,
+      "estrategia": "media_historica",
+      "preco": 213.13,
+      "noMapaToa": true
+    },
+    {
+      "id": 24,
+      "ds": "MUDANCA DE PACOTE",
+      "n": 226,
+      "media": 93.64,
+      "moda": 98.81,
+      "min": 0,
+      "max": 98.81,
+      "spread": 98.81,
+      "estrategia": "media_historica",
+      "preco": 93.64,
+      "noMapaToa": true
+    },
+    {
+      "id": 191,
+      "ds": "INSTALACAO DE CABO GPON",
+      "n": 223,
+      "media": 194.2,
+      "moda": 214.21,
+      "min": 135.94,
+      "max": 214.21,
+      "spread": 78.27,
+      "estrategia": "media_historica",
+      "preco": 194.2,
+      "noMapaToa": true
+    },
+    {
+      "id": 43,
+      "ds": "ADESAO - INSTALAR PONTO VIRTUA",
+      "n": 147,
+      "media": 211.68,
+      "moda": 199.33,
+      "min": 199.33,
+      "max": 414.61,
+      "spread": 215.28,
+      "estrategia": "media_historica",
+      "preco": 211.68,
+      "noMapaToa": true
+    },
+    {
+      "id": 516,
+      "ds": "ADESAO ENTREGA STREAMING",
+      "n": 141,
+      "media": 38.56,
+      "moda": 38.56,
+      "min": 38.56,
+      "max": 38.56,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 38.56,
+      "noMapaToa": true
+    },
+    {
+      "id": 12,
+      "ds": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+      "n": 106,
+      "media": 184.16,
+      "moda": 174.78,
+      "min": 174.78,
+      "max": 269.89,
+      "spread": 95.11,
+      "estrategia": "media_historica",
+      "preco": 184.16,
+      "noMapaToa": true
+    },
+    {
+      "id": 156,
+      "ds": "INSTALACAO WIFI MESH",
+      "n": 81,
+      "media": 62.76,
+      "moda": 105.38,
+      "min": 20.56,
+      "max": 105.38,
+      "spread": 84.82,
+      "estrategia": "media_historica",
+      "preco": 62.76,
+      "noMapaToa": true
+    },
+    {
+      "id": 176,
+      "ds": "REFAZER MANUTENCAO PON",
+      "n": 47,
+      "media": 218.48,
+      "moda": 218.48,
+      "min": 218.48,
+      "max": 218.48,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 218.48,
+      "noMapaToa": true
+    },
+    {
+      "id": 209,
+      "ds": "REFAZER MANUTENCAO",
+      "n": 41,
+      "media": 218.48,
+      "moda": 218.48,
+      "min": 218.48,
+      "max": 218.48,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 218.48,
+      "noMapaToa": true
+    },
+    {
+      "id": 148,
+      "ds": "TROCA DECODER PARA ATUALIZACAO DIGITAL",
+      "n": 33,
+      "media": 92.8,
+      "moda": 98.81,
+      "min": 59.14,
+      "max": 98.81,
+      "spread": 39.67,
+      "estrategia": "media_historica",
+      "preco": 92.8,
+      "noMapaToa": true
+    },
+    {
+      "id": 517,
+      "ds": "ADESAO ENTREGA ADC STREAMING",
+      "n": 28,
+      "media": 38.56,
+      "moda": 38.56,
+      "min": 38.56,
+      "max": 38.56,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 38.56,
+      "noMapaToa": true
+    },
+    {
+      "id": 44,
+      "ds": "INSTALAR PONTO VIRTUA",
+      "n": 19,
+      "media": 175.56,
+      "moda": 172.76,
+      "min": 172.76,
+      "max": 199.33,
+      "spread": 26.57,
+      "estrategia": "media_historica",
+      "preco": 175.56,
+      "noMapaToa": true
+    },
+    {
+      "id": 83,
+      "ds": "INSTALAR PONTO VOIP",
+      "n": 19,
+      "media": 123.1,
+      "moda": 119.6,
+      "min": 106.3,
+      "max": 199.33,
+      "spread": 93.03,
+      "estrategia": "media_historica",
+      "preco": 123.1,
+      "noMapaToa": true
+    },
+    {
+      "id": 514,
+      "ds": "MUDANCA DE ENDERECO - ENTREGA STREAMING",
+      "n": 14,
+      "media": 180.29,
+      "moda": 174.78,
+      "min": 174.78,
+      "max": 190.2,
+      "spread": 15.42,
+      "estrategia": "media_historica",
+      "preco": 180.29,
+      "noMapaToa": true
+    },
+    {
+      "id": 15,
+      "ds": "MUDANCA DE LOCAL DE PONTO",
+      "n": 13,
+      "media": 167.07,
+      "moda": 167.07,
+      "min": 167.07,
+      "max": 167.07,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 167.07,
+      "noMapaToa": true
+    },
+    {
+      "id": 54,
+      "ds": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA DIGITAL",
+      "n": 13,
+      "media": 205.77,
+      "moda": 207.55,
+      "min": 195.98,
+      "max": 207.55,
+      "spread": 11.57,
+      "estrategia": "media_historica",
+      "preco": 205.77,
+      "noMapaToa": true
+    },
+    {
+      "id": 31,
+      "ds": "REFAZER INSTALACAO",
+      "n": 12,
+      "media": 218.48,
+      "moda": 218.48,
+      "min": 218.48,
+      "max": 218.48,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 218.48,
+      "noMapaToa": true
+    },
+    {
+      "id": 33,
+      "ds": "REINSTALACAO - ASSINATURA",
+      "n": 11,
+      "media": 115.67,
+      "moda": 115.67,
+      "min": 115.67,
+      "max": 115.67,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 115.67,
+      "noMapaToa": true
+    },
+    {
+      "id": 172,
+      "ds": "INST PONTO EXTENSAO REDE VIRTUA",
+      "n": 9,
+      "media": 167.93,
+      "moda": 185.06,
+      "min": 146.51,
+      "max": 185.06,
+      "spread": 38.55,
+      "estrategia": "media_historica",
+      "preco": 167.93,
+      "noMapaToa": true
+    },
+    {
+      "id": 55,
+      "ds": "MUDANCA ENDERECO - INSTALAR SERVICO CONEXAO ADIC DIG",
+      "n": 8,
+      "media": 64.26,
+      "moda": 64.26,
+      "min": 64.26,
+      "max": 64.26,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 64.26,
+      "noMapaToa": false
+    },
+    {
+      "id": 188,
+      "ds": "MANUTENCAO PREVENTIVA INDOOR I",
+      "n": 7,
+      "media": 100.97,
+      "moda": 128.51,
+      "min": -64.26,
+      "max": 128.51,
+      "spread": 192.77,
+      "estrategia": "media_historica",
+      "preco": 100.97,
+      "noMapaToa": true
+    },
+    {
+      "id": 59,
+      "ds": "REINSTALACAO - ASSINATURA DIGITAL",
+      "n": 6,
+      "media": 115.67,
+      "moda": 115.67,
+      "min": 115.67,
+      "max": 115.67,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 115.67,
+      "noMapaToa": true
+    },
+    {
+      "id": 51,
+      "ds": "ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+      "n": 5,
+      "media": 257.8,
+      "moda": 279.06,
+      "min": 199.33,
+      "max": 279.06,
+      "spread": 79.73,
+      "estrategia": "media_historica",
+      "preco": 257.8,
+      "noMapaToa": true
+    },
+    {
+      "id": 175,
+      "ds": "CONFIGURACAO STREAMING",
+      "n": 5,
+      "media": 77.11,
+      "moda": 77.11,
+      "min": 77.11,
+      "max": 77.11,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 77.11,
+      "noMapaToa": true
+    },
+    {
+      "id": 53,
+      "ds": "INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+      "n": 4,
+      "media": 146.17,
+      "moda": 146.17,
+      "min": 146.17,
+      "max": 146.17,
+      "spread": 0,
+      "estrategia": "fixo",
+      "preco": 146.17,
+      "noMapaToa": true
+    }
+  ],
+  "tiposVariaveis": [
+    {
+      "id": 1,
+      "ds": "ADESAO - INSTALACAO DE ASSINATURA",
+      "n": 915,
+      "min": 199.33,
+      "max": 279.06,
+      "media": 213.13,
+      "moda": 199.33,
+      "amostra": [
+        199.33,
+        225.9,
+        235.19,
+        244.18,
+        279.06
+      ]
+    },
+    {
+      "id": 24,
+      "ds": "MUDANCA DE PACOTE",
+      "n": 226,
+      "min": 0,
+      "max": 98.81,
+      "media": 93.64,
+      "moda": 98.81,
+      "amostra": [
+        0,
+        59.14,
+        98.81
+      ]
+    },
+    {
+      "id": 191,
+      "ds": "INSTALACAO DE CABO GPON",
+      "n": 223,
+      "min": 135.94,
+      "max": 214.21,
+      "media": 194.2,
+      "moda": 214.21,
+      "amostra": [
+        135.94,
+        214.21
+      ]
+    },
+    {
+      "id": 43,
+      "ds": "ADESAO - INSTALAR PONTO VIRTUA",
+      "n": 147,
+      "min": 199.33,
+      "max": 414.61,
+      "media": 211.68,
+      "moda": 199.33,
+      "amostra": [
+        199.33,
+        225.9,
+        235.19,
+        244.18,
+        414.61
+      ]
+    },
+    {
+      "id": 12,
+      "ds": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+      "n": 106,
+      "min": 174.78,
+      "max": 269.89,
+      "media": 184.16,
+      "moda": 174.78,
+      "amostra": [
+        174.78,
+        190.2,
+        194.06,
+        204.34,
+        206.92,
+        269.89
+      ]
+    },
+    {
+      "id": 156,
+      "ds": "INSTALACAO WIFI MESH",
+      "n": 81,
+      "min": 20.56,
+      "max": 105.38,
+      "media": 62.76,
+      "moda": 105.38,
+      "amostra": [
+        20.56,
+        25.71,
+        30.84,
+        105.38
+      ]
+    },
+    {
+      "id": 148,
+      "ds": "TROCA DECODER PARA ATUALIZACAO DIGITAL",
+      "n": 33,
+      "min": 59.14,
+      "max": 98.81,
+      "media": 92.8,
+      "moda": 98.81,
+      "amostra": [
+        59.14,
+        98.81
+      ]
+    },
+    {
+      "id": 44,
+      "ds": "INSTALAR PONTO VIRTUA",
+      "n": 19,
+      "min": 172.76,
+      "max": 199.33,
+      "media": 175.56,
+      "moda": 172.76,
+      "amostra": [
+        172.76,
+        199.33
+      ]
+    },
+    {
+      "id": 83,
+      "ds": "INSTALAR PONTO VOIP",
+      "n": 19,
+      "min": 106.3,
+      "max": 199.33,
+      "media": 123.1,
+      "moda": 119.6,
+      "amostra": [
+        106.3,
+        119.6,
+        199.33
+      ]
+    },
+    {
+      "id": 514,
+      "ds": "MUDANCA DE ENDERECO - ENTREGA STREAMING",
+      "n": 14,
+      "min": 174.78,
+      "max": 190.2,
+      "media": 180.29,
+      "moda": 174.78,
+      "amostra": [
+        174.78,
+        190.2
+      ]
+    },
+    {
+      "id": 54,
+      "ds": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA DIGITAL",
+      "n": 13,
+      "min": 195.98,
+      "max": 207.55,
+      "media": 205.77,
+      "moda": 207.55,
+      "amostra": [
+        195.98,
+        207.55
+      ]
+    },
+    {
+      "id": 172,
+      "ds": "INST PONTO EXTENSAO REDE VIRTUA",
+      "n": 9,
+      "min": 146.51,
+      "max": 185.06,
+      "media": 167.93,
+      "moda": 185.06,
+      "amostra": [
+        146.51,
+        185.06
+      ]
+    },
+    {
+      "id": 188,
+      "ds": "MANUTENCAO PREVENTIVA INDOOR I",
+      "n": 7,
+      "min": -64.26,
+      "max": 128.51,
+      "media": 100.97,
+      "moda": 128.51,
+      "amostra": [
+        -64.26,
+        128.51
+      ]
+    },
+    {
+      "id": 51,
+      "ds": "ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+      "n": 5,
+      "min": 199.33,
+      "max": 279.06,
+      "media": 257.8,
+      "moda": 279.06,
+      "amostra": [
+        199.33,
+        252.49,
+        279.06
+      ]
+    },
+    {
+      "id": 102,
+      "ds": "INSTALAR PONTO PORTABILIDADE",
+      "n": 4,
+      "min": 119.6,
+      "max": 199.33,
+      "media": 139.53,
+      "moda": 119.6,
+      "amostra": [
+        119.6,
+        199.33
+      ]
+    },
+    {
+      "id": 190,
+      "ds": "INSTALACAO DE CABO HFC",
+      "n": 3,
+      "min": 135.94,
+      "max": 214.21,
+      "media": 162.03,
+      "moda": 135.94,
+      "amostra": [
+        135.94,
+        214.21
+      ]
+    },
+    {
+      "id": 213,
+      "ds": "TROCA DE EQUIPAMENTO HD",
+      "n": 3,
+      "min": 12.85,
+      "max": 51.4,
+      "media": 38.55,
+      "moda": 51.4,
+      "amostra": [
+        12.85,
+        51.4
+      ]
+    },
+    {
+      "id": 240,
+      "ds": "INSTALAR TV BASE",
+      "n": 3,
+      "min": 106.3,
+      "max": 146.17,
+      "media": 132.88,
+      "moda": 146.17,
+      "amostra": [
+        106.3,
+        146.17
+      ]
+    }
+  ],
+  "mapaSemPagamento": [
+    {
+      "idTipoOs": 48,
+      "tipoAtividade": "48 - VISITA TECNICA - VIRTUA",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 161,
+      "tipoAtividade": "161 - VISITA TECNICA STREAMING",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 261,
+      "tipoAtividade": "261 - VISTORIA DE CASOS ESPECIAIS EPO",
+      "resumo": "SERVIÇOS",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 69,
+      "tipoAtividade": "69 - RETORNO DE CREDENCIADA",
+      "resumo": "RETORNO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 158,
+      "tipoAtividade": "158 - VISITA TECNICA WIFI MESH",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 50,
+      "tipoAtividade": "50 - VISITA TECNICA - VOIP",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 211,
+      "tipoAtividade": "211 - MANUTENCAO RETORNO COP",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 512,
+      "tipoAtividade": "512 - REINSTALACAO ENTREGA STREAMING",
+      "resumo": "STREAMING",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 129,
+      "tipoAtividade": "129 - MANUTENCAO REPARO NO DROP",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 32,
+      "tipoAtividade": "32 - DESCONEXAO I C/ RETIRADA DE EQUIPAMENTO",
+      "resumo": "DESCONEXÃO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 510,
+      "tipoAtividade": "510 - BASE ENTREGA STREAMING",
+      "resumo": "STREAMING",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 87,
+      "tipoAtividade": "87 - RETIRAR EMTA",
+      "resumo": "RETIRADA DE EQUIPAMENTO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 79,
+      "tipoAtividade": "79 - DESCONEXAO OPCAO C/ RETIRADA DE EQUIPAMENTO",
+      "resumo": "DESCONEXÃO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 5,
+      "tipoAtividade": "5 - RETIRAR EQUIPAMENTO",
+      "resumo": "RETIRADA DE EQUIPAMENTO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 173,
+      "tipoAtividade": "173 - RETIRADA WIFI MESH",
+      "resumo": "RETIRADA DE EQUIPAMENTO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 305,
+      "tipoAtividade": "305 - SUBS CONTROLE REMOTO STREAMING",
+      "resumo": "STREAMING",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 304,
+      "tipoAtividade": "304 - TROCA DE EQUIPAMENTO STREAMING",
+      "resumo": "STREAMING",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 225,
+      "tipoAtividade": "225 - VISTORIA DE CASOS ESPECIAIS IAT",
+      "resumo": "SERVIÇOS",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 99,
+      "tipoAtividade": "99 - TROCA DE EQUIPAMENTO WIFI",
+      "resumo": "SERVIÇOS",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 518,
+      "tipoAtividade": "518 - BASE ENTREGA ADC STREAMING",
+      "resumo": "STREAMING",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 62,
+      "tipoAtividade": "62 - VISITA TECNICA DIGITAL",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 154,
+      "tipoAtividade": "154 - DESOBSTRUCAO - INSTALACAO DE ASSINATURA",
+      "resumo": "SERVIÇOS",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 307,
+      "tipoAtividade": "307 - LIMPEZA DE RUIDO INDOOR",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 96,
+      "tipoAtividade": "96 - INSTALACAO EXTENSAO VOIP",
+      "resumo": "SERVIÇOS",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 180,
+      "tipoAtividade": "180 - MANUTENCAO INDOOR GPON",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 178,
+      "tipoAtividade": "178 - TROCA DECODER PARA ATUALIZACAO DIGITAL 4K",
+      "resumo": "SERVIÇOS",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 511,
+      "tipoAtividade": "511 - MUD PACOTE ENTREGA STREAMING",
+      "resumo": "MUDANÇA DE PACOTE",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 144,
+      "tipoAtividade": "144 - MANUTENCAO CORRETIVA - DEGRADACAO MDU",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 208,
+      "tipoAtividade": "208 - ENVIO DE CHIP VIA TECNICO",
+      "resumo": "ENVIO DE CHIP",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 45,
+      "tipoAtividade": "45 - MUDANCA DE ENDERECO - INSTALAR PONTO ADICIONAL VIRTUA",
+      "resumo": "MUDANÇA DE ENDEREÇO",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 174,
+      "tipoAtividade": "174 - MANUTENCAO CORRETIVA - MDU GPON",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    },
+    {
+      "idTipoOs": 131,
+      "tipoAtividade": "131 - VISITA TECNICA CUMPRIMENTO ESPECIAL",
+      "resumo": "VISITA TÉCNICA",
+      "precoRecomendado": 0,
+      "observacao": "Presente no DE/PARA TOA, nunca pago no Analítico dez–jun"
+    }
+  ],
+  "simPrecisaoCatalogo": [
+    {
+      "mes": "Dezembro",
+      "real": 1961.94,
+      "projetadoComMediaModa": 2069.56,
+      "delta": 107.62,
+      "erroPct": 5.49
+    },
+    {
+      "mes": "Janeiro",
+      "real": 45591.6,
+      "projetadoComMediaModa": 45752.45,
+      "delta": 160.85,
+      "erroPct": 0.35
+    },
+    {
+      "mes": "Fevereiro",
+      "real": 29540.22,
+      "projetadoComMediaModa": 30096.3,
+      "delta": 556.08,
+      "erroPct": 1.88
+    },
+    {
+      "mes": "Março",
+      "real": 65150.56,
+      "projetadoComMediaModa": 65799.13,
+      "delta": 648.57,
+      "erroPct": 1
+    },
+    {
+      "mes": "Abril",
+      "real": 79742.31,
+      "projetadoComMediaModa": 80921.92,
+      "delta": 1179.61,
+      "erroPct": 1.48
+    },
+    {
+      "mes": "Maio",
+      "real": 77097.27,
+      "projetadoComMediaModa": 75302.62,
+      "delta": -1794.65,
+      "erroPct": 2.33
+    },
+    {
+      "mes": "Junho",
+      "real": 70683.16,
+      "projetadoComMediaModa": 69824.28,
+      "delta": -858.88,
+      "erroPct": 1.22
+    }
+  ],
+  "erroMedioAbsPct": 1.96
+}

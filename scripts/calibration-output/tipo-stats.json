@@ -1,0 +1,1150 @@
+[
+  {
+    "idTipoOs": 1,
+    "dsTipoOs": "ADESAO - INSTALACAO DE ASSINATURA",
+    "tipoAtividadeToa": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+    "resumoToa": "ADESÃO",
+    "noMapaAtividadeToa": true,
+    "n": 915,
+    "media": 213.13,
+    "mediana": 199.33,
+    "moda": 199.33,
+    "min": 199.33,
+    "max": 279.06,
+    "spread": 79.73,
+    "stable": false,
+    "valoresDistintos": 5,
+    "amostraValores": [
+      199.33,
+      225.9,
+      235.19,
+      244.18,
+      279.06
+    ],
+    "meses": {
+      "Dezembro": 4,
+      "Janeiro": 91,
+      "Fevereiro": 61,
+      "Março": 131,
+      "Abril": 193,
+      "Maio": 241,
+      "Junho": 194
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 213.13,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 24,
+    "dsTipoOs": "MUDANCA DE PACOTE",
+    "tipoAtividadeToa": "24 - MUDANCA DE PACOTE",
+    "resumoToa": "MUDANÇA DE PACOTE",
+    "noMapaAtividadeToa": true,
+    "n": 226,
+    "media": 93.64,
+    "mediana": 98.81,
+    "moda": 98.81,
+    "min": 0,
+    "max": 98.81,
+    "spread": 98.81,
+    "stable": false,
+    "valoresDistintos": 3,
+    "amostraValores": [
+      0,
+      59.14,
+      98.81
+    ],
+    "meses": {
+      "Janeiro": 44,
+      "Fevereiro": 27,
+      "Março": 59,
+      "Abril": 43,
+      "Maio": 17,
+      "Junho": 36
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 93.64,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 191,
+    "dsTipoOs": "INSTALACAO DE CABO GPON",
+    "tipoAtividadeToa": "191 - INSTALACAO DE CABO GPON",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 223,
+    "media": 194.2,
+    "mediana": 214.21,
+    "moda": 214.21,
+    "min": 135.94,
+    "max": 214.21,
+    "spread": 78.27,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      135.94,
+      214.21
+    ],
+    "meses": {
+      "Janeiro": 53,
+      "Fevereiro": 32,
+      "Março": 74,
+      "Abril": 30,
+      "Maio": 5,
+      "Junho": 29
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 194.2,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 43,
+    "dsTipoOs": "ADESAO - INSTALAR PONTO VIRTUA",
+    "tipoAtividadeToa": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+    "resumoToa": "ADESÃO",
+    "noMapaAtividadeToa": true,
+    "n": 147,
+    "media": 211.68,
+    "mediana": 199.33,
+    "moda": 199.33,
+    "min": 199.33,
+    "max": 414.61,
+    "spread": 215.28,
+    "stable": false,
+    "valoresDistintos": 5,
+    "amostraValores": [
+      199.33,
+      225.9,
+      235.19,
+      244.18,
+      414.61
+    ],
+    "meses": {
+      "Dezembro": 2,
+      "Janeiro": 18,
+      "Fevereiro": 14,
+      "Março": 21,
+      "Abril": 35,
+      "Maio": 31,
+      "Junho": 26
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 211.68,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 516,
+    "dsTipoOs": "ADESAO ENTREGA STREAMING",
+    "tipoAtividadeToa": "516 - ADESAO ENTREGA STREAMING",
+    "resumoToa": "ADESÃO",
+    "noMapaAtividadeToa": true,
+    "n": 141,
+    "media": 38.56,
+    "mediana": 38.56,
+    "moda": 38.56,
+    "min": 38.56,
+    "max": 38.56,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      38.56
+    ],
+    "meses": {
+      "Dezembro": 2,
+      "Janeiro": 19,
+      "Fevereiro": 14,
+      "Março": 21,
+      "Abril": 32,
+      "Maio": 28,
+      "Junho": 25
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 38.56,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 12,
+    "dsTipoOs": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+    "tipoAtividadeToa": "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+    "resumoToa": "MUDANÇA DE ENDEREÇO",
+    "noMapaAtividadeToa": true,
+    "n": 106,
+    "media": 184.16,
+    "mediana": 174.78,
+    "moda": 174.78,
+    "min": 174.78,
+    "max": 269.89,
+    "spread": 95.11,
+    "stable": false,
+    "valoresDistintos": 6,
+    "amostraValores": [
+      174.78,
+      190.2,
+      194.06,
+      204.34,
+      206.92,
+      269.89
+    ],
+    "meses": {
+      "Dezembro": 3,
+      "Janeiro": 6,
+      "Fevereiro": 3,
+      "Março": 26,
+      "Abril": 36,
+      "Maio": 20,
+      "Junho": 12
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 184.16,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 156,
+    "dsTipoOs": "INSTALACAO WIFI MESH",
+    "tipoAtividadeToa": "156 - INSTALACAO WIFI MESH",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 81,
+    "media": 62.76,
+    "mediana": 30.84,
+    "moda": 105.38,
+    "min": 20.56,
+    "max": 105.38,
+    "spread": 84.82,
+    "stable": false,
+    "valoresDistintos": 4,
+    "amostraValores": [
+      20.56,
+      25.71,
+      30.84,
+      105.38
+    ],
+    "meses": {
+      "Dezembro": 2,
+      "Janeiro": 25,
+      "Fevereiro": 6,
+      "Março": 10,
+      "Abril": 14,
+      "Maio": 15,
+      "Junho": 9
+    },
+    "cdBaixas": [
+      409,
+      477
+    ],
+    "precoRecomendado": 62.76,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 176,
+    "dsTipoOs": "REFAZER MANUTENCAO PON",
+    "tipoAtividadeToa": "176 - REFAZER MANUTENCAO PON",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 47,
+    "media": 218.48,
+    "mediana": 218.48,
+    "moda": 218.48,
+    "min": 218.48,
+    "max": 218.48,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      218.48
+    ],
+    "meses": {
+      "Janeiro": 1,
+      "Fevereiro": 1,
+      "Março": 14,
+      "Abril": 11,
+      "Maio": 10,
+      "Junho": 10
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 218.48,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 209,
+    "dsTipoOs": "REFAZER MANUTENCAO",
+    "tipoAtividadeToa": "209 - REFAZER MANUTENCAO",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 41,
+    "media": 218.48,
+    "mediana": 218.48,
+    "moda": 218.48,
+    "min": 218.48,
+    "max": 218.48,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      218.48
+    ],
+    "meses": {
+      "Janeiro": 3,
+      "Fevereiro": 3,
+      "Março": 4,
+      "Abril": 8,
+      "Maio": 9,
+      "Junho": 14
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 218.48,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 148,
+    "dsTipoOs": "TROCA DECODER PARA ATUALIZACAO DIGITAL",
+    "tipoAtividadeToa": "148 - TROCA DECODER PARA ATUALIZACAO DIGITAL",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 33,
+    "media": 92.8,
+    "mediana": 98.81,
+    "moda": 98.81,
+    "min": 59.14,
+    "max": 98.81,
+    "spread": 39.67,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      59.14,
+      98.81
+    ],
+    "meses": {
+      "Fevereiro": 1,
+      "Março": 2,
+      "Abril": 24,
+      "Maio": 2,
+      "Junho": 4
+    },
+    "cdBaixas": [
+      425
+    ],
+    "precoRecomendado": 92.8,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 517,
+    "dsTipoOs": "ADESAO ENTREGA ADC STREAMING",
+    "tipoAtividadeToa": "517 - ADESAO ENTREGA ADC STREAMING",
+    "resumoToa": "ADESÃO",
+    "noMapaAtividadeToa": true,
+    "n": 28,
+    "media": 38.56,
+    "mediana": 38.56,
+    "moda": 38.56,
+    "min": 38.56,
+    "max": 38.56,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      38.56
+    ],
+    "meses": {
+      "Dezembro": 1,
+      "Janeiro": 5,
+      "Fevereiro": 5,
+      "Março": 5,
+      "Abril": 7,
+      "Maio": 3,
+      "Junho": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 38.56,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 44,
+    "dsTipoOs": "INSTALAR PONTO VIRTUA",
+    "tipoAtividadeToa": "44 - INSTALAR PONTO VIRTUA",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 19,
+    "media": 175.56,
+    "mediana": 172.76,
+    "moda": 172.76,
+    "min": 172.76,
+    "max": 199.33,
+    "spread": 26.57,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      172.76,
+      199.33
+    ],
+    "meses": {
+      "Janeiro": 4,
+      "Fevereiro": 3,
+      "Março": 4,
+      "Abril": 4,
+      "Maio": 2,
+      "Junho": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 175.56,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 83,
+    "dsTipoOs": "INSTALAR PONTO VOIP",
+    "tipoAtividadeToa": "83 - INSTALAR PONTO VOIP",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 19,
+    "media": 123.1,
+    "mediana": 119.6,
+    "moda": 119.6,
+    "min": 106.3,
+    "max": 199.33,
+    "spread": 93.03,
+    "stable": false,
+    "valoresDistintos": 3,
+    "amostraValores": [
+      106.3,
+      119.6,
+      199.33
+    ],
+    "meses": {
+      "Janeiro": 5,
+      "Março": 1,
+      "Abril": 5,
+      "Maio": 4,
+      "Junho": 4
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 123.1,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 514,
+    "dsTipoOs": "MUDANCA DE ENDERECO - ENTREGA STREAMING",
+    "tipoAtividadeToa": "514 - MUDANCA DE ENDERECO - ENTREGA STREAMING",
+    "resumoToa": "MUDANÇA DE ENDEREÇO",
+    "noMapaAtividadeToa": true,
+    "n": 14,
+    "media": 180.29,
+    "mediana": 174.78,
+    "moda": 174.78,
+    "min": 174.78,
+    "max": 190.2,
+    "spread": 15.42,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      174.78,
+      190.2
+    ],
+    "meses": {
+      "Janeiro": 2,
+      "Fevereiro": 2,
+      "Março": 2,
+      "Abril": 3,
+      "Maio": 3,
+      "Junho": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 180.29,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 15,
+    "dsTipoOs": "MUDANCA DE LOCAL DE PONTO",
+    "tipoAtividadeToa": "15 - MUDANCA DE LOCAL DE PONTO",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 13,
+    "media": 167.07,
+    "mediana": 167.07,
+    "moda": 167.07,
+    "min": 167.07,
+    "max": 167.07,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      167.07
+    ],
+    "meses": {
+      "Janeiro": 2,
+      "Fevereiro": 1,
+      "Março": 1,
+      "Abril": 3,
+      "Maio": 2,
+      "Junho": 4
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 167.07,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 54,
+    "dsTipoOs": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA DIGITAL",
+    "tipoAtividadeToa": "54 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA DIGITAL",
+    "resumoToa": "MUDANÇA DE ENDEREÇO",
+    "noMapaAtividadeToa": true,
+    "n": 13,
+    "media": 205.77,
+    "mediana": 207.55,
+    "moda": 207.55,
+    "min": 195.98,
+    "max": 207.55,
+    "spread": 11.57,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      195.98,
+      207.55
+    ],
+    "meses": {
+      "Janeiro": 2,
+      "Fevereiro": 3,
+      "Março": 2,
+      "Abril": 5,
+      "Maio": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 205.77,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 31,
+    "dsTipoOs": "REFAZER INSTALACAO",
+    "tipoAtividadeToa": "31 - REFAZER INSTALACAO",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 12,
+    "media": 218.48,
+    "mediana": 218.48,
+    "moda": 218.48,
+    "min": 218.48,
+    "max": 218.48,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      218.48
+    ],
+    "meses": {
+      "Fevereiro": 1,
+      "Março": 1,
+      "Abril": 6,
+      "Maio": 4
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 218.48,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 33,
+    "dsTipoOs": "REINSTALACAO - ASSINATURA",
+    "tipoAtividadeToa": "33 - REINSTALACAO - ASSINATURA",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 11,
+    "media": 115.67,
+    "mediana": 115.67,
+    "moda": 115.67,
+    "min": 115.67,
+    "max": 115.67,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      115.67
+    ],
+    "meses": {
+      "Março": 2,
+      "Abril": 1,
+      "Maio": 2,
+      "Junho": 6
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 115.67,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 172,
+    "dsTipoOs": "INST PONTO EXTENSAO REDE VIRTUA",
+    "tipoAtividadeToa": "172 - INST PONTO EXTENSAO REDE VIRTUA",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 9,
+    "media": 167.93,
+    "mediana": 185.06,
+    "moda": 185.06,
+    "min": 146.51,
+    "max": 185.06,
+    "spread": 38.55,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      146.51,
+      185.06
+    ],
+    "meses": {
+      "Fevereiro": 3,
+      "Março": 1,
+      "Abril": 3,
+      "Junho": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 167.93,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 55,
+    "dsTipoOs": "MUDANCA ENDERECO - INSTALAR SERVICO CONEXAO ADIC DIG",
+    "tipoAtividadeToa": "55 - MUDANCA ENDERECO - INSTALAR SERVICO CONEXAO ADIC DIG",
+    "resumoToa": null,
+    "noMapaAtividadeToa": false,
+    "n": 8,
+    "media": 64.26,
+    "mediana": 64.26,
+    "moda": 64.26,
+    "min": 64.26,
+    "max": 64.26,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      64.26
+    ],
+    "meses": {
+      "Janeiro": 2,
+      "Fevereiro": 2,
+      "Abril": 3,
+      "Maio": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 64.26,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 188,
+    "dsTipoOs": "MANUTENCAO PREVENTIVA INDOOR I",
+    "tipoAtividadeToa": "188 - MANUTENCAO PREVENTIVA INDOOR I",
+    "resumoToa": "VISITA TÉCNICA",
+    "noMapaAtividadeToa": true,
+    "n": 7,
+    "media": 100.97,
+    "mediana": 128.51,
+    "moda": 128.51,
+    "min": -64.26,
+    "max": 128.51,
+    "spread": 192.77,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      -64.26,
+      128.51
+    ],
+    "meses": {
+      "Maio": 1,
+      "Junho": 6
+    },
+    "cdBaixas": [
+      203,
+      517,
+      527,
+      562
+    ],
+    "precoRecomendado": 100.97,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 59,
+    "dsTipoOs": "REINSTALACAO - ASSINATURA DIGITAL",
+    "tipoAtividadeToa": "59 - REINSTALACAO - ASSINATURA DIGITAL",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 6,
+    "media": 115.67,
+    "mediana": 115.67,
+    "moda": 115.67,
+    "min": 115.67,
+    "max": 115.67,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      115.67
+    ],
+    "meses": {
+      "Janeiro": 1,
+      "Março": 3,
+      "Maio": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 115.67,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 51,
+    "dsTipoOs": "ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+    "tipoAtividadeToa": "51 - ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+    "resumoToa": "ADESÃO",
+    "noMapaAtividadeToa": true,
+    "n": 5,
+    "media": 257.8,
+    "mediana": 279.06,
+    "moda": 279.06,
+    "min": 199.33,
+    "max": 279.06,
+    "spread": 79.73,
+    "stable": false,
+    "valoresDistintos": 3,
+    "amostraValores": [
+      199.33,
+      252.49,
+      279.06
+    ],
+    "meses": {
+      "Janeiro": 1,
+      "Abril": 2,
+      "Junho": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 257.8,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 175,
+    "dsTipoOs": "CONFIGURACAO STREAMING",
+    "tipoAtividadeToa": "175 - CONFIGURACAO STREAMING",
+    "resumoToa": "STREAMING",
+    "noMapaAtividadeToa": true,
+    "n": 5,
+    "media": 77.11,
+    "mediana": 77.11,
+    "moda": 77.11,
+    "min": 77.11,
+    "max": 77.11,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      77.11
+    ],
+    "meses": {
+      "Abril": 2,
+      "Maio": 2,
+      "Junho": 1
+    },
+    "cdBaixas": [
+      478
+    ],
+    "precoRecomendado": 77.11,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 53,
+    "dsTipoOs": "INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+    "tipoAtividadeToa": "53 - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 4,
+    "media": 146.17,
+    "mediana": 146.17,
+    "moda": 146.17,
+    "min": 146.17,
+    "max": 146.17,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      146.17
+    ],
+    "meses": {
+      "Abril": 2,
+      "Maio": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 146.17,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 56,
+    "dsTipoOs": "MUDANCA DE LOCAL DE PONTO DIGITAL",
+    "tipoAtividadeToa": "56 - MUDANCA DE LOCAL DE PONTO DIGITAL",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 4,
+    "media": 167.07,
+    "mediana": 167.07,
+    "moda": 167.07,
+    "min": 167.07,
+    "max": 167.07,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      167.07
+    ],
+    "meses": {
+      "Janeiro": 2,
+      "Abril": 1,
+      "Junho": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 167.07,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 102,
+    "dsTipoOs": "INSTALAR PONTO PORTABILIDADE",
+    "tipoAtividadeToa": "102 - INSTALAR PONTO PORTABILIDADE",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 4,
+    "media": 139.53,
+    "mediana": 119.6,
+    "moda": 119.6,
+    "min": 119.6,
+    "max": 199.33,
+    "spread": 79.73,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      119.6,
+      199.33
+    ],
+    "meses": {
+      "Fevereiro": 1,
+      "Março": 1,
+      "Maio": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 139.53,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 46,
+    "dsTipoOs": "REINSTALACAO - PONTO ADICIONAL VIRTUA",
+    "tipoAtividadeToa": "46 - REINSTALACAO - PONTO ADICIONAL VIRTUA",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 3,
+    "media": 77.11,
+    "mediana": 77.11,
+    "moda": 77.11,
+    "min": 77.11,
+    "max": 77.11,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      77.11
+    ],
+    "meses": {
+      "Janeiro": 1,
+      "Abril": 1,
+      "Maio": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 77.11,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 190,
+    "dsTipoOs": "INSTALACAO DE CABO HFC",
+    "tipoAtividadeToa": "190 - INSTALACAO DE CABO HFC",
+    "resumoToa": null,
+    "noMapaAtividadeToa": false,
+    "n": 3,
+    "media": 162.03,
+    "mediana": 135.94,
+    "moda": 135.94,
+    "min": 135.94,
+    "max": 214.21,
+    "spread": 78.27,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      135.94,
+      214.21
+    ],
+    "meses": {
+      "Janeiro": 2,
+      "Maio": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 162.03,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 213,
+    "dsTipoOs": "TROCA DE EQUIPAMENTO HD",
+    "tipoAtividadeToa": "213 - TROCA DE EQUIPAMENTO HD",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 3,
+    "media": 38.55,
+    "mediana": 51.4,
+    "moda": 51.4,
+    "min": 12.85,
+    "max": 51.4,
+    "spread": 38.55,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      12.85,
+      51.4
+    ],
+    "meses": {
+      "Abril": 3
+    },
+    "cdBaixas": [
+      409,
+      425
+    ],
+    "precoRecomendado": 38.55,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 240,
+    "dsTipoOs": "INSTALAR TV BASE",
+    "tipoAtividadeToa": "240 - INSTALAR TV BASE",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 3,
+    "media": 132.88,
+    "mediana": 146.17,
+    "moda": 146.17,
+    "min": 106.3,
+    "max": 146.17,
+    "spread": 39.87,
+    "stable": false,
+    "valoresDistintos": 2,
+    "amostraValores": [
+      106.3,
+      146.17
+    ],
+    "meses": {
+      "Março": 1,
+      "Maio": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 132.88,
+    "precoEstrategia": "media_historica"
+  },
+  {
+    "idTipoOs": 4,
+    "dsTipoOs": "RETIRAR PONTO",
+    "tipoAtividadeToa": "4 - RETIRAR PONTO",
+    "resumoToa": "RETIRADA DE PONTO",
+    "noMapaAtividadeToa": true,
+    "n": 2,
+    "media": 25.71,
+    "mediana": 25.71,
+    "moda": 25.71,
+    "min": 25.71,
+    "max": 25.71,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      25.71
+    ],
+    "meses": {
+      "Abril": 2
+    },
+    "cdBaixas": [
+      430
+    ],
+    "precoRecomendado": 25.71,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 94,
+    "dsTipoOs": "REINSTALACAO - ASSINATURA VOIP",
+    "tipoAtividadeToa": "94 - REINSTALACAO - ASSINATURA VOIP",
+    "resumoToa": "SERVIÇOS",
+    "noMapaAtividadeToa": true,
+    "n": 2,
+    "media": 102.82,
+    "mediana": 102.82,
+    "moda": 102.82,
+    "min": 102.82,
+    "max": 102.82,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      102.82
+    ],
+    "meses": {
+      "Junho": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 102.82,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 149,
+    "dsTipoOs": "INSTALAR CABEAMENTO MESH",
+    "tipoAtividadeToa": "149 - INSTALAR CABEAMENTO MESH",
+    "resumoToa": null,
+    "noMapaAtividadeToa": false,
+    "n": 2,
+    "media": 25.71,
+    "mediana": 25.71,
+    "moda": 25.71,
+    "min": 25.71,
+    "max": 25.71,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      25.71
+    ],
+    "meses": {
+      "Abril": 2
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 25.71,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 52,
+    "dsTipoOs": "ADESAO - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+    "tipoAtividadeToa": "52 - ADESAO - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+    "resumoToa": null,
+    "noMapaAtividadeToa": false,
+    "n": 1,
+    "media": 66.44,
+    "mediana": 66.44,
+    "moda": 66.44,
+    "min": 66.44,
+    "max": 66.44,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      66.44
+    ],
+    "meses": {
+      "Junho": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 66.44,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 57,
+    "dsTipoOs": "MUDANCA DE PACOTE DIGITAL",
+    "tipoAtividadeToa": "57 - MUDANCA DE PACOTE DIGITAL",
+    "resumoToa": "MUDANÇA DE PACOTE",
+    "noMapaAtividadeToa": true,
+    "n": 1,
+    "media": 98.81,
+    "mediana": 98.81,
+    "moda": 98.81,
+    "min": 98.81,
+    "max": 98.81,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      98.81
+    ],
+    "meses": {
+      "Fevereiro": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 98.81,
+    "precoEstrategia": "fixo"
+  },
+  {
+    "idTipoOs": 95,
+    "dsTipoOs": "ADESAO - INSTALAR PONTO VOIP",
+    "tipoAtividadeToa": "95 - ADESAO - INSTALAR PONTO VOIP",
+    "resumoToa": null,
+    "noMapaAtividadeToa": false,
+    "n": 1,
+    "media": 199.33,
+    "mediana": 199.33,
+    "moda": 199.33,
+    "min": 199.33,
+    "max": 199.33,
+    "spread": 0,
+    "stable": true,
+    "valoresDistintos": 1,
+    "amostraValores": [
+      199.33
+    ],
+    "meses": {
+      "Abril": 1
+    },
+    "cdBaixas": [
+      409
+    ],
+    "precoRecomendado": 199.33,
+    "precoEstrategia": "fixo"
+  }
+]

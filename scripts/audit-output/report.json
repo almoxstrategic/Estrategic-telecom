@@ -1,0 +1,1685 @@
+{
+  "generatedAt": "2026-08-06T15:59:16.116Z",
+  "files": {
+    "PATH_TOA": "C:\\Users\\Estrategic PE0454DQ\\OneDrive\\Desktop\\TOA.xlsx",
+    "PATH_ANALITICO": "C:\\Users\\Estrategic PE0454DQ\\OneDrive\\Desktop\\ANALITICO FATURAMENTO ESTRATEGIC - 202606.xlsx",
+    "PATH_ATIV": "C:\\Users\\Estrategic PE0454DQ\\OneDrive\\Desktop\\CÓDIGOS_BAIXA_e_Atividades_TOA.xlsx"
+  },
+  "counts": {
+    "toaNotas": 2495,
+    "toaOs": 2702,
+    "anaLinhas": 2162,
+    "anaDataBases": [
+      202512,
+      202601,
+      202602,
+      202603,
+      202604,
+      202605,
+      202606
+    ]
+  },
+  "join": {
+    "byContrato": 0,
+    "byCdOs": 392,
+    "byBoth": 0,
+    "anaOnlyContrato": 0,
+    "anaOnlyOs": 0,
+    "byContratoOnly": 12,
+    "noMatch": 1758,
+    "matchRateOs": "18.1%",
+    "toaOsInAna": 410,
+    "toaOsNotInAna": 2292,
+    "toaOsInAnaPct": "15.2%"
+  },
+  "reported": {
+    "anaJun": 378127.49,
+    "appJun": 180165.76,
+    "anaJul": 98000,
+    "appJul": 250529.23
+  },
+  "analitico": {
+    "byDataBase": {
+      "202512": 1961.94,
+      "202601": 45591.6,
+      "202602": 29540.22,
+      "202603": 65150.56,
+      "202604": 79742.31,
+      "202605": 77097.27,
+      "202606": 70683.16
+    },
+    "byDhBaixaMonth": {
+      "202512": 1961.94,
+      "202601": 45591.6,
+      "202602": 29540.22,
+      "202603": 65150.56,
+      "202604": 79742.31,
+      "202605": 77097.27,
+      "202606": 70683.16
+    },
+    "byDhBaixaCiclo21": {
+      "202601": 31396.93,
+      "202602": 41335.67,
+      "202603": 43649.56,
+      "202604": 82185.1,
+      "202605": 74141.81,
+      "202606": 76805.62,
+      "202607": 20252.37
+    },
+    "jun": {
+      "n": 394,
+      "v": 70683.16000000018,
+      "vQtde": 70683.16000000018
+    },
+    "jul": {
+      "n": 0,
+      "v": 0,
+      "vQtde": 0
+    },
+    "all": {
+      "n": 2162,
+      "v": 369767.06
+    },
+    "dateAlignment": {
+      "sameMonth": 2162,
+      "prevMonth": 0,
+      "nextMonth": 0,
+      "other": 0,
+      "noDh": 0
+    },
+    "ciclo21vsDataBase": {
+      "cicloMatch": 1496,
+      "cicloMismatch": 666,
+      "matchPct": "69.2%"
+    },
+    "dayOfBaixaHist": {
+      "1": 42,
+      "2": 82,
+      "3": 34,
+      "4": 45,
+      "5": 81,
+      "6": 93,
+      "7": 75,
+      "8": 81,
+      "9": 97,
+      "10": 86,
+      "11": 86,
+      "12": 77,
+      "13": 105,
+      "14": 65,
+      "15": 74,
+      "16": 73,
+      "17": 68,
+      "18": 66,
+      "19": 71,
+      "20": 95,
+      "21": 51,
+      "22": 65,
+      "23": 61,
+      "24": 48,
+      "25": 58,
+      "26": 52,
+      "27": 78,
+      "28": 68,
+      "29": 59,
+      "30": 86,
+      "31": 40
+    }
+  },
+  "toaApp": {
+    "junCalendario": {
+      "n": 1126,
+      "fat": 170041.82999999885,
+      "perda": 97313.20999999983,
+      "semPreco": 93
+    },
+    "julCalendario": {
+      "n": 1415,
+      "fat": 249366.69999999733,
+      "perda": 123132.71999999986,
+      "semPreco": 68
+    },
+    "junCiclo21": {
+      "n": 833,
+      "fat": 118290.81999999975,
+      "perda": 71034.04999999989,
+      "semPreco": 75
+    },
+    "julCiclo21": {
+      "n": 1108,
+      "fat": 189779.19999999861,
+      "perda": 97721.21999999988,
+      "semPreco": 63
+    }
+  },
+  "qtde": {
+    "dist": {
+      "1": 2162
+    },
+    "qtdeGt1": 0,
+    "extraFromQtde": 0
+  },
+  "priceAudit": {
+    "priceMatch": 84,
+    "priceDiff": 243,
+    "priceMissing": 67,
+    "sampleDiffs": [
+      {
+        "cdOs": "2624998097",
+        "tipo": "156 - INSTALACAO WIFI MESH",
+        "catalogo": 105.38,
+        "valorServico": 30.84,
+        "qtde": 1,
+        "delta": 74.54,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2624998086",
+        "tipo": "156 - INSTALACAO WIFI MESH",
+        "catalogo": 105.38,
+        "valorServico": 25.71,
+        "qtde": 1,
+        "delta": 79.67,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625600267",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2624852984",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2624113489",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2624464084",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2623901348",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625433845",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625510122",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625416857",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625499173",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625573738",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625296279",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625547964",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625301748",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625379451",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625324271",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2624524272",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625315800",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 199.33,
+        "qtde": 1,
+        "delta": 79.73,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2625574403",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 244.18,
+        "qtde": 1,
+        "delta": 34.88,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2624488293",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 235.19,
+        "qtde": 1,
+        "delta": 43.87,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2641445273",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2643239580",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2642882527",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2643348109",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2640097624",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2643342440",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2642709985",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2641667796",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2641181652",
+        "tipo": "156 - INSTALACAO WIFI MESH",
+        "catalogo": 105.38,
+        "valorServico": 30.84,
+        "qtde": 1,
+        "delta": 74.54,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2639647274",
+        "tipo": "156 - INSTALACAO WIFI MESH",
+        "catalogo": 105.38,
+        "valorServico": 30.84,
+        "qtde": 1,
+        "delta": 74.54,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2639398794",
+        "tipo": "156 - INSTALACAO WIFI MESH",
+        "catalogo": 105.38,
+        "valorServico": 30.84,
+        "qtde": 1,
+        "delta": 74.54,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2639275383",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2640051387",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2640331052",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2641948596",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2642680411",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2640100225",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2638574889",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      },
+      {
+        "cdOs": "2639499134",
+        "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "catalogo": 279.06,
+        "valorServico": 225.9,
+        "qtde": 1,
+        "delta": 53.16,
+        "dataBase": 202606
+      }
+    ],
+    "topTiposJun": [
+      {
+        "id": "1",
+        "ds": "ADESAO - INSTALACAO DE ASSINATURA",
+        "n": 194,
+        "media": 217.3,
+        "distintos": [
+          199.33,
+          225.9,
+          235.19,
+          244.18
+        ],
+        "catalogo": 279.06
+      },
+      {
+        "id": "24",
+        "ds": "MUDANCA DE PACOTE",
+        "n": 36,
+        "media": 98.81,
+        "distintos": [
+          98.81
+        ],
+        "catalogo": 98.81
+      },
+      {
+        "id": "191",
+        "ds": "INSTALACAO DE CABO GPON",
+        "n": 29,
+        "media": 184.52,
+        "distintos": [
+          135.94,
+          214.21
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "43",
+        "ds": "ADESAO - INSTALAR PONTO VIRTUA",
+        "n": 26,
+        "media": 217.16,
+        "distintos": [
+          199.33,
+          225.9,
+          235.19,
+          414.61
+        ],
+        "catalogo": 414.61
+      },
+      {
+        "id": "516",
+        "ds": "ADESAO ENTREGA STREAMING",
+        "n": 25,
+        "media": 38.56,
+        "distintos": [
+          38.56
+        ],
+        "catalogo": 38.56
+      },
+      {
+        "id": "209",
+        "ds": "REFAZER MANUTENCAO",
+        "n": 14,
+        "media": 218.48,
+        "distintos": [
+          218.48
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "12",
+        "ds": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+        "n": 12,
+        "media": 186.45,
+        "distintos": [
+          174.78,
+          190.2,
+          206.92
+        ],
+        "catalogo": 269.89
+      },
+      {
+        "id": "176",
+        "ds": "REFAZER MANUTENCAO PON",
+        "n": 10,
+        "media": 218.48,
+        "distintos": [
+          218.48
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "156",
+        "ds": "INSTALACAO WIFI MESH",
+        "n": 9,
+        "media": 63.4,
+        "distintos": [
+          25.71,
+          30.84,
+          105.38
+        ],
+        "catalogo": 105.38
+      },
+      {
+        "id": "33",
+        "ds": "REINSTALACAO - ASSINATURA",
+        "n": 6,
+        "media": 115.67,
+        "distintos": [
+          115.67
+        ],
+        "catalogo": 115.67
+      },
+      {
+        "id": "188",
+        "ds": "MANUTENCAO PREVENTIVA INDOOR I",
+        "n": 6,
+        "media": 96.38,
+        "distintos": [
+          -64.26,
+          128.51
+        ],
+        "catalogo": 128.51
+      },
+      {
+        "id": "15",
+        "ds": "MUDANCA DE LOCAL DE PONTO",
+        "n": 4,
+        "media": 167.07,
+        "distintos": [
+          167.07
+        ],
+        "catalogo": 167.07
+      },
+      {
+        "id": "83",
+        "ds": "INSTALAR PONTO VOIP",
+        "n": 4,
+        "media": 116.27,
+        "distintos": [
+          106.3,
+          119.6
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "148",
+        "ds": "TROCA DECODER PARA ATUALIZACAO DIGITAL",
+        "n": 4,
+        "media": 98.81,
+        "distintos": [
+          98.81
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "44",
+        "ds": "INSTALAR PONTO VIRTUA",
+        "n": 2,
+        "media": 172.76,
+        "distintos": [
+          172.76
+        ],
+        "catalogo": 199.33
+      },
+      {
+        "id": "51",
+        "ds": "ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+        "n": 2,
+        "media": 279.06,
+        "distintos": [
+          279.06
+        ],
+        "catalogo": 279.06
+      },
+      {
+        "id": "94",
+        "ds": "REINSTALACAO - ASSINATURA VOIP",
+        "n": 2,
+        "media": 102.82,
+        "distintos": [
+          102.82
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "172",
+        "ds": "INST PONTO EXTENSAO REDE VIRTUA",
+        "n": 2,
+        "media": 146.51,
+        "distintos": [
+          146.51
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "514",
+        "ds": "MUDANCA DE ENDERECO - ENTREGA STREAMING",
+        "n": 2,
+        "media": 182.49,
+        "distintos": [
+          174.78,
+          190.2
+        ],
+        "catalogo": 0
+      },
+      {
+        "id": "517",
+        "ds": "ADESAO ENTREGA ADC STREAMING",
+        "n": 2,
+        "media": 38.56,
+        "distintos": [
+          38.56
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "52",
+        "ds": "ADESAO - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+        "n": 1,
+        "media": 66.44,
+        "distintos": [
+          66.44
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "56",
+        "ds": "MUDANCA DE LOCAL DE PONTO DIGITAL",
+        "n": 1,
+        "media": 167.07,
+        "distintos": [
+          167.07
+        ],
+        "catalogo": null
+      },
+      {
+        "id": "175",
+        "ds": "CONFIGURACAO STREAMING",
+        "n": 1,
+        "media": 77.11,
+        "distintos": [
+          77.11
+        ],
+        "catalogo": null
+      }
+    ]
+  },
+  "matchedJun": {
+    "count": 392,
+    "ana": 70340.17,
+    "app": 73764.73,
+    "gap": -3424.56
+  },
+  "falsosNegativosJunho": {
+    "count": 86,
+    "valorTotal": 15040.5,
+    "porMotivoCount": {
+      "SEM_PRECO_CATALOGO": 69,
+      "STATUS_Não Executada": 13,
+      "PRECO_ZERO": 2,
+      "NAO_NO_TOA": 1,
+      "COD_IMPROD_125": 1
+    },
+    "porMotivoValor": {
+      "SEM_PRECO_CATALOGO": 12267.45,
+      "STATUS_Não Executada": 1937.99,
+      "PRECO_ZERO": 364.98,
+      "NAO_NO_TOA": 244.18,
+      "COD_IMPROD_125": 225.9
+    },
+    "amostra": [
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "1040994",
+        "cdOs": "2625331549",
+        "dsTipoOs": "REFAZER MANUTENCAO PON",
+        "cdBaixa": 409,
+        "valor": 218.48,
+        "qtde": 1,
+        "dhBaixa": "2026-06-26",
+        "dataBase": 202606,
+        "toaData": "2026-06-26",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "176 - REFAZER MANUTENCAO PON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "1500251",
+        "cdOs": "2625476279",
+        "dsTipoOs": "REFAZER MANUTENCAO PON",
+        "cdBaixa": 409,
+        "valor": 218.48,
+        "qtde": 1,
+        "dhBaixa": "2026-06-27",
+        "dataBase": 202606,
+        "toaData": "2026-06-27",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "176 - REFAZER MANUTENCAO PON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "1016775",
+        "cdOs": "2625333653",
+        "dsTipoOs": "REFAZER MANUTENCAO PON",
+        "cdBaixa": 409,
+        "valor": 218.48,
+        "qtde": 1,
+        "dhBaixa": "2026-06-26",
+        "dataBase": 202606,
+        "toaData": "2026-06-26",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "176 - REFAZER MANUTENCAO PON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170576360",
+        "cdOs": "2642114008",
+        "dsTipoOs": "ADESAO ENTREGA STREAMING",
+        "cdBaixa": 409,
+        "valor": 38.56,
+        "qtde": 1,
+        "dhBaixa": "2026-06-30",
+        "dataBase": 202606,
+        "toaData": "2026-06-23",
+        "toaStatus": "Não Executada",
+        "toaCod": 106,
+        "toaTipo": "516 - ADESAO ENTREGA STREAMING",
+        "toaPreco": 38.56,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170568902",
+        "cdOs": "2641181630",
+        "dsTipoOs": "INSTALACAO WIFI MESH",
+        "cdBaixa": 409,
+        "valor": 105.38,
+        "qtde": 1,
+        "dhBaixa": "2026-06-18",
+        "dataBase": 202606,
+        "toaData": "2026-06-13",
+        "toaStatus": "Não Executada",
+        "toaCod": 107,
+        "toaTipo": "156 - INSTALACAO WIFI MESH",
+        "toaPreco": 105.38,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170568902",
+        "cdOs": "2641181652",
+        "dsTipoOs": "INSTALACAO WIFI MESH",
+        "cdBaixa": 409,
+        "valor": 30.84,
+        "qtde": 1,
+        "dhBaixa": "2026-06-18",
+        "dataBase": 202606,
+        "toaData": "2026-06-13",
+        "toaStatus": "Não Executada",
+        "toaCod": 107,
+        "toaTipo": "156 - INSTALACAO WIFI MESH",
+        "toaPreco": 105.38,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170573329",
+        "cdOs": "2641636613",
+        "dsTipoOs": "ADESAO - INSTALACAO DE ASSINATURA",
+        "cdBaixa": 409,
+        "valor": 225.9,
+        "qtde": 1,
+        "dhBaixa": "2026-06-18",
+        "dataBase": 202606,
+        "toaData": "2026-06-17",
+        "toaStatus": "Não Executada",
+        "toaCod": 301,
+        "toaTipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "toaPreco": 279.06,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "169024699",
+        "cdOs": "2640863838",
+        "dsTipoOs": "REINSTALACAO - ASSINATURA VOIP",
+        "cdBaixa": 409,
+        "valor": 102.82,
+        "qtde": 1,
+        "dhBaixa": "2026-06-16",
+        "dataBase": 202606,
+        "toaData": "2026-06-16",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "94 - REINSTALACAO - ASSINATURA VOIP",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "170193356",
+        "cdOs": "2640410690",
+        "dsTipoOs": "REINSTALACAO - ASSINATURA VOIP",
+        "cdBaixa": 409,
+        "valor": 102.82,
+        "qtde": 1,
+        "dhBaixa": "2026-06-11",
+        "dataBase": 202606,
+        "toaData": "2026-06-11",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "94 - REINSTALACAO - ASSINATURA VOIP",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170568686",
+        "cdOs": "2640863265",
+        "dsTipoOs": "ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+        "cdBaixa": 409,
+        "valor": 279.06,
+        "qtde": 1,
+        "dhBaixa": "2026-06-17",
+        "dataBase": 202606,
+        "toaData": "2026-06-16",
+        "toaStatus": "Não Executada",
+        "toaCod": 104,
+        "toaTipo": "51 - ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+        "toaPreco": 279.06,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "165682551",
+        "cdOs": "2639826497",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-15",
+        "dataBase": 202606,
+        "toaData": "2026-06-15",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "168640906",
+        "cdOs": "2641763984",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-22",
+        "dataBase": 202606,
+        "toaData": "2026-06-22",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "166966332",
+        "cdOs": "2641781872",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-22",
+        "dataBase": 202606,
+        "toaData": "2026-06-22",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "170053279",
+        "cdOs": "2640109774",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-15",
+        "dataBase": 202606,
+        "toaData": "2026-06-15",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "170083640",
+        "cdOs": "2641696675",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-22",
+        "dataBase": 202606,
+        "toaData": "2026-06-22",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "168690687",
+        "cdOs": "2641925625",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-19",
+        "dataBase": 202606,
+        "toaData": "2026-06-19",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "95930404",
+        "cdOs": "2640205894",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-15",
+        "dataBase": 202606,
+        "toaData": "2026-06-15",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "95410800",
+        "cdOs": "2640932026",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-17",
+        "dataBase": 202606,
+        "toaData": "2026-06-17",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "169717848",
+        "cdOs": "2641103870",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-18",
+        "dataBase": 202606,
+        "toaData": "2026-06-18",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "167131463",
+        "cdOs": "2640921428",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 135.94,
+        "qtde": 1,
+        "dhBaixa": "2026-06-20",
+        "dataBase": 202606,
+        "toaData": "2026-06-20",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "169878159",
+        "cdOs": "2640361459",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 214.21,
+        "qtde": 1,
+        "dhBaixa": "2026-06-17",
+        "dataBase": 202606,
+        "toaData": "2026-06-17",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "168254682",
+        "cdOs": "2640173045",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 214.21,
+        "qtde": 1,
+        "dhBaixa": "2026-06-15",
+        "dataBase": 202606,
+        "toaData": "2026-06-15",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "168756653",
+        "cdOs": "2641081651",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 214.21,
+        "qtde": 1,
+        "dhBaixa": "2026-06-17",
+        "dataBase": 202606,
+        "toaData": "2026-06-17",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "141094110",
+        "cdOs": "2641484760",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 214.21,
+        "qtde": 1,
+        "dhBaixa": "2026-06-19",
+        "dataBase": 202606,
+        "toaData": "2026-06-19",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "95299283",
+        "cdOs": "2640388504",
+        "dsTipoOs": "INSTALACAO DE CABO GPON",
+        "cdBaixa": 409,
+        "valor": 214.21,
+        "qtde": 1,
+        "dhBaixa": "2026-06-16",
+        "dataBase": 202606,
+        "toaData": "2026-06-16",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "191 - INSTALACAO DE CABO GPON",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170568686",
+        "cdOs": "2640863287",
+        "dsTipoOs": "ADESAO - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+        "cdBaixa": 409,
+        "valor": 66.44,
+        "qtde": 1,
+        "dhBaixa": "2026-06-17",
+        "dataBase": 202606,
+        "toaData": "2026-06-16",
+        "toaStatus": "Não Executada",
+        "toaCod": 104,
+        "toaTipo": "52 - ADESAO - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "168067602",
+        "cdOs": "2640937515",
+        "dsTipoOs": "INST PONTO EXTENSAO REDE VIRTUA",
+        "cdBaixa": 409,
+        "valor": 146.51,
+        "qtde": 1,
+        "dhBaixa": "2026-06-17",
+        "dataBase": 202606,
+        "toaData": "2026-06-17",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "172 - INST PONTO EXTENSAO REDE VIRTUA",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "SEM_PRECO_CATALOGO",
+        "nrContrato": "170559016",
+        "cdOs": "2639394206",
+        "dsTipoOs": "INST PONTO EXTENSAO REDE VIRTUA",
+        "cdBaixa": 409,
+        "valor": 146.51,
+        "qtde": 1,
+        "dhBaixa": "2026-06-05",
+        "dataBase": 202606,
+        "toaData": "2026-06-05",
+        "toaStatus": "Executada",
+        "toaCod": 409,
+        "toaTipo": "172 - INST PONTO EXTENSAO REDE VIRTUA",
+        "toaPreco": null,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170576360",
+        "cdOs": "2642114019",
+        "dsTipoOs": "ADESAO - INSTALAR PONTO VIRTUA",
+        "cdBaixa": 409,
+        "valor": 225.9,
+        "qtde": 1,
+        "dhBaixa": "2026-06-30",
+        "dataBase": 202606,
+        "toaData": "2026-06-23",
+        "toaStatus": "Não Executada",
+        "toaCod": 106,
+        "toaTipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "toaPreco": 414.61,
+        "toaYm": 202606
+      },
+      {
+        "motivo": "STATUS_Não Executada",
+        "nrContrato": "170045683",
+        "cdOs": "2639165314",
+        "dsTipoOs": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+        "cdBaixa": 409,
+        "valor": 190.2,
+        "qtde": 1,
+        "dhBaixa": "2026-06-06",
+        "dataBase": 202606,
+        "toaData": "2026-06-02",
+        "toaStatus": "Não Executada",
+        "toaCod": 106,
+        "toaTipo": "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+        "toaPreco": 269.89,
+        "toaYm": 202606
+      }
+    ]
+  },
+  "falsosPositivosJulho": {
+    "count": 821,
+    "valorApp": 249366.7,
+    "porMotivoCount": {
+      "AUSENTE_ANALITICO": 815,
+      "VALOR_ZERO_OU_OUTRO": 6
+    },
+    "porMotivoValor": {
+      "AUSENTE_ANALITICO": 248611.04,
+      "VALOR_ZERO_OU_OUTRO": 755.66
+    },
+    "amostra": [
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584100",
+        "numeroOs": "2643664380",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584100",
+        "numeroOs": "2643664391",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584282",
+        "numeroOs": "2643679892",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584282",
+        "numeroOs": "2643679904",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584150",
+        "numeroOs": "2643665482",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584150",
+        "numeroOs": "2643665493",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170564788",
+        "numeroOs": "2640370077",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170564788",
+        "numeroOs": "2640370088",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "95192438",
+        "numeroOs": "2641681871",
+        "tipoOs": "24 - MUDANCA DE PACOTE",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 98.81,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "167790530",
+        "numeroOs": "2643116618",
+        "tipoOs": "45 - MUDANCA DE ENDERECO - INSTALAR PONTO ADICIONAL VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 199.33,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170583561",
+        "numeroOs": "2643547672",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170583561",
+        "numeroOs": "2643547683",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170585750",
+        "numeroOs": "2643959646",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170585750",
+        "numeroOs": "2643959657",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170585602",
+        "numeroOs": "2643945551",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170585602",
+        "numeroOs": "2643945562",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170583430",
+        "numeroOs": "2643530001",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170583430",
+        "numeroOs": "2643530023",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170297763",
+        "numeroOs": "2642567639",
+        "tipoOs": "24 - MUDANCA DE PACOTE",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 98.81,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170583960",
+        "numeroOs": "2643628021",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170583960",
+        "numeroOs": "2643628032",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170586099",
+        "numeroOs": "2643996108",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170586099",
+        "numeroOs": "2643996119",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "6021742",
+        "numeroOs": "2625683178",
+        "tipoOs": "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 269.89,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "6021742",
+        "numeroOs": "2625683189",
+        "tipoOs": "45 - MUDANCA DE ENDERECO - INSTALAR PONTO ADICIONAL VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 199.33,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "1556222",
+        "numeroOs": "2625901621",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "1556222",
+        "numeroOs": "2625901632",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "1556028",
+        "numeroOs": "2625587340",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "1556028",
+        "numeroOs": "2625587351",
+        "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 414.61,
+        "toaData": "2026-07-01",
+        "basesAna": "",
+        "valorAna": 0
+      },
+      {
+        "motivo": "AUSENTE_ANALITICO",
+        "contrato": "170584932",
+        "numeroOs": "2643858284",
+        "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+        "cod": 409,
+        "status": "Executada",
+        "receitaApp": 279.06,
+        "toaData": "2026-07-03",
+        "basesAna": "",
+        "valorAna": 0
+      }
+    ]
+  }
+}

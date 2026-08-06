@@ -62,6 +62,15 @@ import type {
   TopConsumidorMaterial,
 } from "@/lib/logistica-types";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
+import {
+  fetchAnaliticoHistorico,
+  fetchCompetenciasAnalitico,
+  fetchCompetenciasToa,
+  fetchToaImportacoes,
+  isPeriodoHistoricoAnalitico,
+  isPeriodoProjecaoToa,
+  type AnaliticoHistoricoRow,
+} from "@/lib/faturamento-service";
 import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
 import { useKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
 import {
@@ -72,6 +81,7 @@ import {
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import {
   fetchPrecosOs,
+  forceResyncCatalogoPrecos,
   upsertPrecosOs,
   type PrecoOs,
   type PrecosOsMap,
@@ -87,7 +97,7 @@ import {
   agregarChamadosToa,
   filtrarChamadosToa,
   normalizeToaLogin,
-  useToaSnapshot,
+  type ToaChamadoProcessado,
 } from "@/lib/toa-store";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
@@ -232,14 +242,31 @@ async function copyTabela(headers: string[], rows: string[][]): Promise<void> {
 
 function KpisPage() {
   const [periodos, setPeriodos] = useState<PeriodoConsumo[]>([]);
+  const [periodosFaturamento, setPeriodosFaturamento] = useState<PeriodoConsumo[]>(
+    [],
+  );
   const [filtroReady, setFiltroReady] = useState(false);
   const filtro = useKpiFiltro();
-  const toaSnapshot = useToaSnapshot();
   const ultimaImportacaoAt = useKpiUltimaImportacao();
   const [precosOs, setPrecosOs] = useState<PrecosOsMap>({});
+  const [chamadosToa, setChamadosToa] = useState<ToaChamadoProcessado[]>([]);
+  const [analiticoRows, setAnaliticoRows] = useState<AnaliticoHistoricoRow[]>([]);
+  const [faturamentoLoading, setFaturamentoLoading] = useState(false);
+  const [faturamentoError, setFaturamentoError] = useState<string | null>(null);
+
+  const modoFaturamento = useMemo(() => {
+    if (isPeriodoHistoricoAnalitico(filtro.ano, filtro.mes)) return "historico" as const;
+    if (isPeriodoProjecaoToa(filtro.ano, filtro.mes)) return "projecao" as const;
+    return "indefinido" as const;
+  }, [filtro.ano, filtro.mes]);
 
   const carregarPrecosOs = useCallback(async () => {
     const precos = await fetchPrecosOs();
+    setPrecosOs(precos);
+  }, []);
+
+  const recalcularBasePrecos = useCallback(async () => {
+    const precos = await forceResyncCatalogoPrecos();
     setPrecosOs(precos);
   }, []);
 
@@ -258,23 +285,89 @@ function KpisPage() {
     });
   }, [carregarPrecosOs]);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [compsToa, compsAnalitico] = await Promise.all([
+          fetchCompetenciasToa().catch(() => [] as number[]),
+          fetchCompetenciasAnalitico().catch(() => [] as number[]),
+        ]);
+        const porChave = new Map<string, PeriodoConsumo>();
+        for (const ym of [...compsToa, ...compsAnalitico]) {
+          const ano = Math.floor(ym / 100);
+          const mes = ym % 100;
+          if (ano >= 2000 && mes >= 1 && mes <= 12) {
+            porChave.set(`${ano}-${mes}`, { ano, mes });
+          }
+        }
+        setPeriodosFaturamento([...porChave.values()]);
+      } catch {
+        setPeriodosFaturamento([]);
+      }
+    })();
+  }, [ultimaImportacaoAt]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (filtro.ano === null || filtro.mes === null) {
+        setChamadosToa([]);
+        setAnaliticoRows([]);
+        setFaturamentoError(null);
+        setFaturamentoLoading(false);
+        return;
+      }
+      setFaturamentoLoading(true);
+      setFaturamentoError(null);
+      try {
+        if (isPeriodoHistoricoAnalitico(filtro.ano, filtro.mes)) {
+          const rows = await fetchAnaliticoHistorico({
+            ano: filtro.ano,
+            mes: filtro.mes,
+          });
+          if (cancelled) return;
+          setAnaliticoRows(rows);
+          setChamadosToa([]);
+        } else {
+          const chamados = await fetchToaImportacoes({
+            ano: filtro.ano,
+            mes: filtro.mes,
+            dia: filtro.dia,
+          });
+          if (cancelled) return;
+          setChamadosToa(chamados);
+          setAnaliticoRows([]);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Erro ao carregar faturamento:", err);
+        setFaturamentoError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar os dados de faturamento.",
+        );
+        setChamadosToa([]);
+        setAnaliticoRows([]);
+      } finally {
+        if (!cancelled) setFaturamentoLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filtro.ano, filtro.mes, filtro.dia, ultimaImportacaoAt]);
+
   const toaAgregado = useMemo(
     () =>
       agregarChamadosToa(
-        filtrarChamadosToa(toaSnapshot.chamadosProcessados, {
+        filtrarChamadosToa(chamadosToa, {
           ano: filtro.ano,
           mes: filtro.mes,
           dia: filtro.dia,
         }),
         precosOs,
       ),
-    [
-      toaSnapshot.chamadosProcessados,
-      filtro.ano,
-      filtro.mes,
-      filtro.dia,
-      precosOs,
-    ],
+    [chamadosToa, filtro.ano, filtro.mes, filtro.dia, precosOs],
   );
   const [kpis, setKpis] = useState<KpisConsumo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -384,15 +477,13 @@ function KpisPage() {
     for (const periodo of periodos) {
       porChave.set(`${periodo.ano}-${periodo.mes}`, periodo);
     }
-    for (const chamado of toaSnapshot.chamadosProcessados) {
-      const [ano, mes] = chamado.data.split("-").map(Number);
-      if (!ano || !mes) continue;
-      porChave.set(`${ano}-${mes}`, { ano, mes });
+    for (const periodo of periodosFaturamento) {
+      porChave.set(`${periodo.ano}-${periodo.mes}`, periodo);
     }
     return [...porChave.values()].sort(
       (a, b) => b.ano - a.ano || b.mes - a.mes,
     );
-  }, [periodos, toaSnapshot.chamadosProcessados]);
+  }, [periodos, periodosFaturamento]);
 
   useEffect(() => {
     if (periodosComDados.length === 0) return;
@@ -964,10 +1055,12 @@ function KpisPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isDesempenho
-                ? "Visão detalhada de desempenho por técnico no período selecionado."
-                : formatDataUltimaImportacao(
-                    ultimaImportacaoAt ?? toaSnapshot.updatedAt,
-                  )}
+                ? modoFaturamento === "historico"
+                  ? "Modo histórico: Analítico Claro (valores reais pagos)."
+                  : modoFaturamento === "projecao"
+                    ? "Modo projeção: TOA × catálogo de preços."
+                    : "Selecione mês e ano para carregar o faturamento."
+                : formatDataUltimaImportacao(ultimaImportacaoAt)}
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -976,14 +1069,19 @@ function KpisPage() {
         </div>
 
         {isDesempenho ? (
-          !filtroReady || loading ? (
+          !filtroReady || loading || faturamentoLoading ? (
             <p className="text-sm text-muted-foreground">Carregando métricas...</p>
+          ) : faturamentoError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {faturamentoError}
+            </p>
           ) : (
             <KpiDesempenhoTecnicos
               tecnicos={kpis?.top_tecnicos ?? []}
               tecnicosEquipe={tecnicosEquipe}
-              resumoToa={toaAgregado.resumoPorTecnico}
-              chamadosProcessados={toaSnapshot.chamadosProcessados}
+              chamadosProcessados={chamadosToa}
+              analiticoRows={analiticoRows}
+              modoFaturamento={modoFaturamento}
               filtroPeriodo={{
                 ano: filtro.ano,
                 mes: filtro.mes,
@@ -992,6 +1090,7 @@ function KpisPage() {
               demitidosKeys={tecnicosDemitidosKeys}
               precosOs={precosOs}
               onSalvarPrecos={salvarPrecosOs}
+              onRecalcularBase={recalcularBasePrecos}
             />
           )
         ) : (
@@ -1210,7 +1309,7 @@ function KpisPage() {
                             <span className="text-left">Nome</span>
                             <span className="text-center">Baixa Misc</span>
                             <span className="text-center">Notas feitas</span>
-                            <span className="text-center">Receita líquida</span>
+                            <span className="text-center">Receita projetada</span>
                           </div>
                           <ul>
                             {(kpis?.top_tecnicos ?? []).map((t) => {

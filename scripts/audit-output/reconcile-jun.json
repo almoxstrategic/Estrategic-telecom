@@ -1,0 +1,455 @@
+{
+  "catalogoSize": 64,
+  "buckets": {
+    "inAnaJun": {
+      "n": 392,
+      "app": 90361.93,
+      "ana": 70544.7,
+      "gap": 19817.23
+    },
+    "inAnaOtherMonth": {
+      "n": 0,
+      "app": 0,
+      "ana": 0,
+      "bases": {}
+    },
+    "notInAna": {
+      "n": 288,
+      "app": 89803.83
+    },
+    "notFaturavel": 426,
+    "semPreco": 20,
+    "precoZero": 43
+  },
+  "totalAppJunFat": 180165.75999999975,
+  "topTiposNotInAna": [
+    {
+      "tipo": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "n": 203,
+      "app": 84165.83
+    },
+    {
+      "tipo": "24 - MUDANCA DE PACOTE",
+      "n": 19,
+      "app": 1877.39
+    },
+    {
+      "tipo": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+      "n": 6,
+      "app": 1674.36
+    },
+    {
+      "tipo": "188 - MANUTENCAO PREVENTIVA INDOOR I",
+      "n": 7,
+      "app": 899.57
+    },
+    {
+      "tipo": "46 - REINSTALACAO - PONTO ADICIONAL VIRTUA",
+      "n": 6,
+      "app": 462.66
+    },
+    {
+      "tipo": "191 - INSTALACAO DE CABO GPON",
+      "n": 2,
+      "app": 428.42
+    },
+    {
+      "tipo": "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+      "n": 1,
+      "app": 269.89
+    },
+    {
+      "tipo": "4 - RETIRAR PONTO",
+      "n": 1,
+      "app": 25.71
+    },
+    {
+      "tipo": "69 - RETORNO DE CREDENCIADA",
+      "n": 22,
+      "app": 0
+    },
+    {
+      "tipo": "45 - MUDANCA DE ENDERECO - INSTALAR PONTO ADICIONAL VIRTUA",
+      "n": 18,
+      "app": 0
+    },
+    {
+      "tipo": "518 - BASE ENTREGA ADC STREAMING",
+      "n": 1,
+      "app": 0
+    },
+    {
+      "tipo": "511 - MUD PACOTE ENTREGA STREAMING",
+      "n": 1,
+      "app": 0
+    },
+    {
+      "tipo": "99 - TROCA DE EQUIPAMENTO WIFI",
+      "n": 1,
+      "app": 0
+    }
+  ],
+  "notInAnaByCod": {
+    "409": 257,
+    "425": 1,
+    "430": 1,
+    "505": 1,
+    "510": 1,
+    "516": 1,
+    "517": 11,
+    "533": 1,
+    "536": 1,
+    "555": 10,
+    "559": 1,
+    "575": 1,
+    "584": 1
+  },
+  "priceGapMatched": {
+    "n": 392,
+    "sumApp": 90361.93,
+    "sumAna": 70544.7,
+    "gap": 19817.23
+  },
+  "valorServicoVariavel": [
+    {
+      "id": "1",
+      "ds": "ADESAO - INSTALACAO DE ASSINATURA",
+      "n": 194,
+      "min": 199.33,
+      "max": 244.18,
+      "avg": 217.3,
+      "catalogo": 279.06,
+      "spread": 44.85
+    },
+    {
+      "id": "191",
+      "ds": "INSTALACAO DE CABO GPON",
+      "n": 29,
+      "min": 135.94,
+      "max": 214.21,
+      "avg": 184.52,
+      "catalogo": 214.21,
+      "spread": 78.27
+    },
+    {
+      "id": "43",
+      "ds": "ADESAO - INSTALAR PONTO VIRTUA",
+      "n": 26,
+      "min": 199.33,
+      "max": 414.61,
+      "avg": 217.16,
+      "catalogo": 414.61,
+      "spread": 215.28
+    },
+    {
+      "id": "12",
+      "ds": "MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+      "n": 12,
+      "min": 174.78,
+      "max": 206.92,
+      "avg": 186.45,
+      "catalogo": 269.89,
+      "spread": 32.14
+    },
+    {
+      "id": "156",
+      "ds": "INSTALACAO WIFI MESH",
+      "n": 9,
+      "min": 25.71,
+      "max": 105.38,
+      "avg": 63.4,
+      "catalogo": 105.38,
+      "spread": 79.67
+    },
+    {
+      "id": "188",
+      "ds": "MANUTENCAO PREVENTIVA INDOOR I",
+      "n": 6,
+      "min": -64.26,
+      "max": 128.51,
+      "avg": 96.38,
+      "catalogo": 128.51,
+      "spread": 192.77
+    },
+    {
+      "id": "83",
+      "ds": "INSTALAR PONTO VOIP",
+      "n": 4,
+      "min": 106.3,
+      "max": 119.6,
+      "avg": 116.27,
+      "catalogo": 199.33,
+      "spread": 13.3
+    },
+    {
+      "id": "514",
+      "ds": "MUDANCA DE ENDERECO - ENTREGA STREAMING",
+      "n": 2,
+      "min": 174.78,
+      "max": 190.2,
+      "avg": 182.49,
+      "catalogo": 190.2,
+      "spread": 15.42
+    }
+  ],
+  "sampleNotInAna": [
+    {
+      "os": "2638626540",
+      "contrato": "170553549",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "BRUNO HENRIQUE VIEIRA VITORIO"
+    },
+    {
+      "os": "2639014137",
+      "contrato": "170556742",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "BRUNO HENRIQUE VIEIRA VITORIO"
+    },
+    {
+      "os": "2638818071",
+      "contrato": "170555665",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "CICERO MARQUES DE SANTANA NETO"
+    },
+    {
+      "os": "2639061432",
+      "contrato": "170556947",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "FELIPE SANTANA DE ALMEIDA BAPTISTA"
+    },
+    {
+      "os": "2638974265",
+      "contrato": "170556629",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "FELIPE SANTANA DE ALMEIDA BAPTISTA"
+    },
+    {
+      "os": "2638878684",
+      "contrato": "170555975",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2638123609",
+      "contrato": "170550337",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2638873948",
+      "contrato": "170555924",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2638953307",
+      "contrato": "170556556",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "1/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2638688784",
+      "contrato": "170554936",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "ANDRE COSTA DE JESUS"
+    },
+    {
+      "os": "2639146481",
+      "contrato": "170557404",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "ANDRE COSTA DE JESUS"
+    },
+    {
+      "os": "2639200516",
+      "contrato": "170557714",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "ANDRE COSTA DE JESUS"
+    },
+    {
+      "os": "2638013270",
+      "contrato": "170549630",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "ANDRE COSTA DE JESUS"
+    },
+    {
+      "os": "2636501999",
+      "contrato": "170540293",
+      "tipoOs": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 279.06,
+      "data": "2/6/2026",
+      "tecnico": "BRUNO HENRIQUE VIEIRA VITORIO"
+    },
+    {
+      "os": "2638819858",
+      "contrato": "170555703",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "CICERO MARQUES DE SANTANA NETO"
+    },
+    {
+      "os": "2638925193",
+      "contrato": "170556378",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "CICERO MARQUES DE SANTANA NETO"
+    },
+    {
+      "os": "2639230485",
+      "contrato": "170557943",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "CICERO MARQUES DE SANTANA NETO"
+    },
+    {
+      "os": "2639139911",
+      "contrato": "170557374",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "FELIPE SANTANA DE ALMEIDA BAPTISTA"
+    },
+    {
+      "os": "2638938131",
+      "contrato": "170556475",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "FELIPE SANTANA DE ALMEIDA BAPTISTA"
+    },
+    {
+      "os": "2639209717",
+      "contrato": "170557803",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "FELIPE SANTANA DE ALMEIDA BAPTISTA"
+    },
+    {
+      "os": "2639101257",
+      "contrato": "170557072",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2639153513",
+      "contrato": "170557447",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2639208413",
+      "contrato": "170557790",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "FRANC FELIX DOS SANTOS"
+    },
+    {
+      "os": "2638894592",
+      "contrato": "170556106",
+      "tipoOs": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "cod": 409,
+      "status": "Executada",
+      "preco": 414.61,
+      "data": "2/6/2026",
+      "tecnico": "RENATO SOUZA CUNHA"
+    },
+    {
+      "os": "2638149506",
+      "contrato": "168969827",
+      "tipoOs": "4 - RETIRAR PONTO",
+      "cod": 430,
+      "status": "Executada",
+      "preco": 25.71,
+      "data": "2/6/2026",
+      "tecnico": "RICARDO SILVA DE SOUZA ALVES"
+    }
+  ],
+  "hypothesis378k": {
+    "mediaJunTimesAllRows": 387860.38,
+    "mediaTotalTimesAllRows": 369767.05,
+    "sumAllMonths": 369767.06,
+    "sumAllPlusApprox": 378127.06,
+    "mediaJunTimes2108": 378172.84,
+    "adesaoAllMonthsFromDin": 195012.16
+  }
+}
