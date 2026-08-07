@@ -63,13 +63,13 @@ import type {
 } from "@/lib/logistica-types";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import {
+  detectarModoFaturamento,
   fetchAnaliticoHistorico,
   fetchCompetenciasAnalitico,
   fetchCompetenciasToa,
   fetchToaImportacoes,
-  isPeriodoHistoricoAnalitico,
-  isPeriodoProjecaoToa,
   type AnaliticoHistoricoRow,
+  type ModoFaturamentoDisponibilidade,
 } from "@/lib/faturamento-service";
 import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
 import { useKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
@@ -254,11 +254,13 @@ function KpisPage() {
   const [faturamentoLoading, setFaturamentoLoading] = useState(false);
   const [faturamentoError, setFaturamentoError] = useState<string | null>(null);
 
-  const modoFaturamento = useMemo(() => {
-    if (isPeriodoHistoricoAnalitico(filtro.ano, filtro.mes)) return "historico" as const;
-    if (isPeriodoProjecaoToa(filtro.ano, filtro.mes)) return "projecao" as const;
-    return "indefinido" as const;
-  }, [filtro.ano, filtro.mes]);
+  const modoFaturamento = useMemo((): ModoFaturamentoDisponibilidade | "indefinido" => {
+    if (filtro.ano === null || filtro.mes === null) return "indefinido";
+    return detectarModoFaturamento({
+      temAnalitico: analiticoRows.length > 0,
+      temToa: chamadosToa.length > 0,
+    });
+  }, [filtro.ano, filtro.mes, analiticoRows.length, chamadosToa.length]);
 
   const carregarPrecosOs = useCallback(async () => {
     const precos = await fetchPrecosOs();
@@ -320,24 +322,20 @@ function KpisPage() {
       setFaturamentoLoading(true);
       setFaturamentoError(null);
       try {
-        if (isPeriodoHistoricoAnalitico(filtro.ano, filtro.mes)) {
-          const rows = await fetchAnaliticoHistorico({
+        const [rows, chamados] = await Promise.all([
+          fetchAnaliticoHistorico({
             ano: filtro.ano,
             mes: filtro.mes,
-          });
-          if (cancelled) return;
-          setAnaliticoRows(rows);
-          setChamadosToa([]);
-        } else {
-          const chamados = await fetchToaImportacoes({
+          }),
+          fetchToaImportacoes({
             ano: filtro.ano,
             mes: filtro.mes,
             dia: filtro.dia,
-          });
-          if (cancelled) return;
-          setChamadosToa(chamados);
-          setAnaliticoRows([]);
-        }
+          }),
+        ]);
+        if (cancelled) return;
+        setAnaliticoRows(rows);
+        setChamadosToa(chamados);
       } catch (err) {
         if (cancelled) return;
         console.error("Erro ao carregar faturamento:", err);
@@ -1055,11 +1053,15 @@ function KpisPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isDesempenho
-                ? modoFaturamento === "historico"
-                  ? "Modo histórico: Analítico Claro (valores reais pagos)."
-                  : modoFaturamento === "projecao"
-                    ? "Modo projeção: TOA × catálogo de preços."
-                    : "Selecione mês e ano para carregar o faturamento."
+                ? modoFaturamento === "COMPARISON_MODE"
+                  ? "Modo comparação: Analítico Claro e TOA disponíveis no período."
+                  : modoFaturamento === "ONLY_ANALITICO"
+                    ? "Modo Analítico Claro (valores reais pagos)."
+                    : modoFaturamento === "ONLY_TOA"
+                      ? "Modo projeção TOA × catálogo de preços."
+                      : modoFaturamento === "vazio"
+                        ? "Sem dados de Analítico ou TOA para o período selecionado."
+                        : "Selecione mês e ano para carregar o faturamento."
                 : formatDataUltimaImportacao(ultimaImportacaoAt)}
             </p>
           </div>

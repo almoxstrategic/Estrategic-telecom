@@ -387,6 +387,62 @@ export function flattenChamadosToa(
   return flat;
 }
 
+/** Status agregado da Nota: ≥1 O.S. produtiva (Executada + Cód 409–599 ≠ 571). */
+export function statusNotaToa(
+  ordens: ToaOrdemServico[],
+): "Produtiva" | "Improdutiva" {
+  return ordens.some(isOsProdutiva) ? "Produtiva" : "Improdutiva";
+}
+
+export type ToaNotaExportRow = Record<string, string | number>;
+
+/**
+ * Achata cada Nota/chamado em uma linha Excel com slots O.S. 1–10
+ * (Cód de Baixa, Nº O.S, Tipo O.S, Status da O.S) + Status da Nota.
+ */
+export function flattenChamadosToaParaExportacaoNotas(
+  chamados: ToaChamadoProcessado[],
+  options?: {
+    nomePorLogin?: (login: string) => string;
+    formatData?: (isoDate: string) => string;
+  },
+): ToaNotaExportRow[] {
+  const resolveNome =
+    options?.nomePorLogin ?? ((login: string) => normalizeToaLogin(login));
+  const formatData = options?.formatData ?? ((iso: string) => iso);
+
+  return chamados.map((chamado) => {
+    const porIndice = new Map<number, ToaOrdemServico>();
+    for (const ordem of chamado.ordensDeServico) {
+      porIndice.set(ordem.indice, ordem);
+    }
+
+    const ordered: ToaNotaExportRow = {
+      Nome: resolveNome(normalizeToaLogin(chamado.login)),
+      Contrato: chamado.contrato || "",
+      Data: formatData(chamado.data),
+    };
+
+    for (let i = 1; i <= 10; i += 1) {
+      const ordem = porIndice.get(i);
+      ordered[`Cód de Baixa ${i}`] =
+        ordem?.codBaixaBruto || (ordem ? String(ordem.codBaixa) : "");
+    }
+    for (let i = 1; i <= 10; i += 1) {
+      ordered[`Nº O.S ${i}`] = porIndice.get(i)?.numeroOs || "";
+    }
+    for (let i = 1; i <= 10; i += 1) {
+      ordered[`Tipo O.S ${i}`] = porIndice.get(i)?.tipoOs || "";
+    }
+    for (let i = 1; i <= 10; i += 1) {
+      ordered[`Status da O.S ${i}`] = porIndice.get(i)?.status || "";
+    }
+
+    ordered["Status da Nota"] = statusNotaToa(chamado.ordensDeServico);
+    return ordered;
+  });
+}
+
 /**
  * Preço unitário calibrado pelo histórico Analítico.
  * Match exato do Tipo O.S.; fallback pelo código numérico (ex.: "1 - ...").

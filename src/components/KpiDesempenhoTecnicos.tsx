@@ -40,6 +40,7 @@ import {
   agregarChamadosToa,
   filtrarChamadosToa,
   flattenChamadosToa,
+  flattenChamadosToaParaExportacaoNotas,
   isOsImprodutiva,
   isOsProdutiva,
   normalizeTipoOs,
@@ -50,9 +51,12 @@ import {
   type ToaResumoTecnico,
 } from "@/lib/toa-store";
 import {
+  filtrarAnaliticoPorDhBaixa,
+  formatDhBaixaDisplay,
   resumirAnaliticoHistorico,
   type AnaliticoHistoricoRow,
 } from "@/lib/faturamento-service";
+import { conciliarAnaliticoVsToa } from "@/lib/faturamento-conciliacao";
 
 type KpiFiltroPeriodo = {
   ano: number | null;
@@ -81,7 +85,12 @@ type NotaDetalheCard = {
   status: string;
 };
 
-export type ModoFaturamentoKpi = "historico" | "projecao" | "indefinido";
+export type ModoFaturamentoKpi =
+  | "ONLY_ANALITICO"
+  | "ONLY_TOA"
+  | "COMPARISON_MODE"
+  | "vazio"
+  | "indefinido";
 
 type KpiDesempenhoTecnicosProps = {
   tecnicos: KpiTopTecnico[];
@@ -95,10 +104,12 @@ type KpiDesempenhoTecnicosProps = {
   onSalvarPrecos: (precos: PrecoOs[]) => Promise<void>;
   /** Força regravação do catálogo calibrado no Supabase e invalida cache local. */
   onRecalcularBase?: () => Promise<void>;
-  /** Fonte de dados: histórico Analítico vs projeção TOA. */
+  /** Fonte de dados: disponibilidade Analítico / TOA no mês. */
   modoFaturamento?: ModoFaturamentoKpi;
   analiticoRows?: AnaliticoHistoricoRow[];
 };
+
+type AbaDetalhamento = "analitico" | "toa";
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
 
@@ -261,9 +272,152 @@ function valorOrdenacao(tecnico: TecnicoDesempenho, key: SortKey): number {
 }
 
 const GRID_HISTORICO =
-  "grid grid-cols-[minmax(100px,1.2fr)_minmax(80px,0.8fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)] gap-2";
+  "grid grid-cols-[minmax(90px,1fr)_minmax(80px,0.9fr)_minmax(70px,0.7fr)_minmax(140px,1.4fr)_minmax(70px,0.7fr)_minmax(110px,1.1fr)_minmax(90px,1fr)_minmax(80px,0.8fr)_minmax(90px,0.9fr)_minmax(100px,1fr)_minmax(60px,0.6fr)_minmax(100px,1fr)] gap-2";
 
-/** Painel Analítico real (≤ jun/2026): cards + detalhamento global ESTRATEGIC. */
+function TabelaDetalhamentoAnalitico({
+  rows,
+}: {
+  rows: AnaliticoHistoricoRow[];
+}) {
+  const [busca, setBusca] = useState("");
+  const resumo = useMemo(() => resumirAnaliticoHistorico(rows), [rows]);
+
+  const linhas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    const base = [...rows].sort((a, b) => {
+      const da = a.dh_baixa || "";
+      const db = b.dh_baixa || "";
+      if (da !== db) return da.localeCompare(db);
+      return (a.cd_os || "").localeCompare(b.cd_os || "", "pt-BR");
+    });
+    if (!termo) return base;
+    return base.filter((r) => {
+      return (
+        (r.nr_contrato || "").toLowerCase().includes(termo) ||
+        (r.cd_os || "").toLowerCase().includes(termo) ||
+        (r.ds_tipo_os || "").toLowerCase().includes(termo) ||
+        (r.tipo_os_consolid || "").toLowerCase().includes(termo) ||
+        (r.terminal || "").toLowerCase().includes(termo) ||
+        String(r.id_tipo_os ?? "").includes(termo) ||
+        String(r.cd_baixa ?? "").includes(termo)
+      );
+    });
+  }, [rows, busca]);
+
+  return (
+    <>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <input
+          type="search"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar contrato, CD_OS, tipo, terminal..."
+          aria-label="Buscar no Analítico"
+          className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+          Nenhuma nota do Analítico com DH_BAIXA no período. Importe o
+          consolidado em Administração → Importação.
+        </p>
+      ) : linhas.length === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+          Nenhum resultado para “{busca.trim()}”.
+        </p>
+      ) : (
+        <div className="w-full overflow-x-auto">
+          <div
+            className={`${GRID_HISTORICO} min-w-[1280px] items-end border-b border-border px-2 py-2 text-[11px] font-semibold leading-tight text-muted-foreground`}
+          >
+            <span className="text-left">NR_CONTRATO</span>
+            <span className="text-center">CD_OS</span>
+            <span className="text-center">ID_TIPO_OS</span>
+            <span className="text-left">DS_TIPO_OS</span>
+            <span className="text-center">CD_BAIXA</span>
+            <span className="text-left">TIPO_OS_CONSOLID</span>
+            <span className="text-center">TERMINAL</span>
+            <span className="text-center">TIPO_TERM</span>
+            <span className="text-center">DH_BAIXA</span>
+            <span className="text-left">TIPO_EDIFICACAO</span>
+            <span className="text-center">QTDE</span>
+            <span className="text-right">VALOR_SERVICO</span>
+          </div>
+          <div className="max-h-[28rem] overflow-y-auto">
+            {linhas.map((row, idx) => (
+              <div
+                key={row.id ?? `${row.cd_os}-${row.dh_baixa}-${idx}`}
+                className={`${GRID_HISTORICO} min-w-[1280px] items-center border-b border-border/60 px-2 py-2 text-xs`}
+              >
+                <span className="tabular-nums">{row.nr_contrato || "—"}</span>
+                <span className="text-center tabular-nums">
+                  {row.cd_os || "—"}
+                </span>
+                <span className="text-center tabular-nums">
+                  {row.id_tipo_os ?? "—"}
+                </span>
+                <span className="truncate" title={row.ds_tipo_os || undefined}>
+                  {row.ds_tipo_os || "—"}
+                </span>
+                <span className="text-center tabular-nums">
+                  {row.cd_baixa ?? "—"}
+                </span>
+                <span
+                  className="truncate"
+                  title={row.tipo_os_consolid || undefined}
+                >
+                  {row.tipo_os_consolid || "—"}
+                </span>
+                <span className="text-center tabular-nums">
+                  {row.terminal || "—"}
+                </span>
+                <span className="text-center">{row.tipo_term || "—"}</span>
+                <span className="text-center tabular-nums">
+                  {formatDhBaixaDisplay(row.dh_baixa)}
+                </span>
+                <span
+                  className="truncate"
+                  title={row.tipo_edificacao || undefined}
+                >
+                  {row.tipo_edificacao || "—"}
+                </span>
+                <span className="text-center tabular-nums">
+                  {row.qtde == null
+                    ? "—"
+                    : formatQuantidade(Number(row.qtde))}
+                </span>
+                <span className="text-right font-medium tabular-nums text-green-700">
+                  {formatReceita(Number(row.valor_servico) || 0)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div
+            className={`${GRID_HISTORICO} min-w-[1280px] items-center border-t border-border bg-muted/40 px-2 py-3 text-xs font-semibold`}
+          >
+            <span>Total ({formatQuantidade(resumo.totalNotas)})</span>
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span className="text-right tabular-nums text-green-700">
+              {formatReceita(resumo.receitaTotal)}
+            </span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Painel somente Analítico: cards + detalhamento filtrado por DH_BAIXA. */
 function KpiDesempenhoHistoricoAnalitico({
   rows,
   filtroPeriodo,
@@ -271,35 +425,24 @@ function KpiDesempenhoHistoricoAnalitico({
   rows: AnaliticoHistoricoRow[];
   filtroPeriodo: KpiFiltroPeriodo;
 }) {
-  const [busca, setBusca] = useState("");
-  const resumo = useMemo(() => resumirAnaliticoHistorico(rows), [rows]);
+  const rowsFiltradas = useMemo(
+    () => filtrarAnaliticoPorDhBaixa(rows, filtroPeriodo),
+    [rows, filtroPeriodo],
+  );
+  const resumo = useMemo(
+    () => resumirAnaliticoHistorico(rowsFiltradas),
+    [rowsFiltradas],
+  );
   const periodoLabel = useMemo(
     () => descricaoPeriodoLocal(filtroPeriodo),
     [filtroPeriodo],
   );
 
-  const linhas = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    const base = [...rows].sort((a, b) => {
-      if (a.data_base !== b.data_base) return a.data_base - b.data_base;
-      return a.cd_os.localeCompare(b.cd_os, "pt-BR");
-    });
-    if (!termo) return base;
-    return base.filter((r) => {
-      return (
-        r.nr_contrato.toLowerCase().includes(termo) ||
-        r.cd_os.toLowerCase().includes(termo) ||
-        r.ds_tipo_os.toLowerCase().includes(termo) ||
-        r.nm_cidade.toLowerCase().includes(termo)
-      );
-    });
-  }, [rows, busca]);
-
   return (
     <div className="w-full space-y-6">
       <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
-        Modo histórico (Analítico Claro) — {periodoLabel}. Valores reais
-        validados/pagos; TOA ignorado neste período.
+        Modo Analítico Claro — {periodoLabel}. Valores reais validados/pagos
+        (filtro por DH_BAIXA).
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -328,81 +471,13 @@ function KpiDesempenhoHistoricoAnalitico({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Users className="h-4 w-4 text-primary" />
             Detalhamento por Técnico
           </h2>
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar contrato, CD_OS, tipo ou cidade..."
-            aria-label="Buscar no Analítico"
-            className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
-          />
         </div>
-
-        {rows.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhuma nota do Analítico para o período. Importe o arquivo em
-            Administração → Importação.
-          </p>
-        ) : linhas.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhum resultado para “{busca.trim()}”.
-          </p>
-        ) : (
-          <div className="w-full overflow-x-auto">
-            <div
-              className={`${GRID_HISTORICO} min-w-[720px] items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
-            >
-              <span className="text-left">Nome</span>
-              <span className="text-center">Total de notas</span>
-              <span className="text-center">NR_CONTRATO</span>
-              <span className="text-center">CD_OS</span>
-              <span className="text-right">VALOR_SERVICO</span>
-              <span className="text-right">Receita</span>
-            </div>
-            <div className="max-h-[28rem] overflow-y-auto">
-              {linhas.map((row, idx) => (
-                <div
-                  key={row.id ?? `${row.data_base}-${row.cd_os}-${idx}`}
-                  className={`${GRID_HISTORICO} min-w-[720px] items-center border-b border-border/60 px-2 py-2.5 text-sm`}
-                >
-                  <span className="font-medium text-foreground">ESTRATEGIC</span>
-                  <span className="text-center tabular-nums text-muted-foreground">
-                    {formatQuantidade(resumo.totalNotas)}
-                  </span>
-                  <span className="text-center tabular-nums">
-                    {row.nr_contrato || "—"}
-                  </span>
-                  <span className="text-center tabular-nums">{row.cd_os}</span>
-                  <span className="text-right tabular-nums">
-                    {formatReceita(row.valor_servico)}
-                  </span>
-                  <span className="text-right font-medium tabular-nums text-green-700">
-                    {formatReceita(row.valor_servico)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div
-              className={`${GRID_HISTORICO} min-w-[720px] items-center border-t border-border bg-muted/40 px-2 py-3 text-sm font-semibold`}
-            >
-              <span>Total</span>
-              <span className="text-center tabular-nums">
-                {formatQuantidade(resumo.totalNotas)}
-              </span>
-              <span />
-              <span />
-              <span />
-              <span className="text-right tabular-nums text-green-700">
-                {formatReceita(resumo.receitaTotal)}
-              </span>
-            </div>
-          </div>
-        )}
+        <TabelaDetalhamentoAnalitico rows={rowsFiltradas} />
       </div>
     </div>
   );
@@ -418,20 +493,29 @@ export function KpiDesempenhoTecnicos({
   precosOs,
   onSalvarPrecos,
   onRecalcularBase,
-  modoFaturamento = "projecao",
+  modoFaturamento = "indefinido",
   analiticoRows = [],
 }: KpiDesempenhoTecnicosProps) {
   if (modoFaturamento === "indefinido") {
     return (
       <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
         Selecione <strong>mês</strong> e <strong>ano</strong> no filtro para
-        carregar o faturamento. Até junho/2026 usa o Analítico real; a partir de
-        julho/2026 usa a projeção TOA.
+        carregar o faturamento. O modo (Analítico, TOA ou comparação) depende
+        dos dados importados no período.
       </p>
     );
   }
 
-  if (modoFaturamento === "historico") {
+  if (modoFaturamento === "vazio") {
+    return (
+      <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+        Nenhum dado de <strong>Analítico</strong> nem de <strong>TOA</strong>{" "}
+        para o período. Importe em Administração → Importação.
+      </p>
+    );
+  }
+
+  if (modoFaturamento === "ONLY_ANALITICO") {
     return (
       <KpiDesempenhoHistoricoAnalitico
         rows={analiticoRows}
@@ -451,6 +535,10 @@ export function KpiDesempenhoTecnicos({
       precosOs={precosOs}
       onSalvarPrecos={onSalvarPrecos}
       onRecalcularBase={onRecalcularBase}
+      modoFaturamento={
+        modoFaturamento === "COMPARISON_MODE" ? "COMPARISON_MODE" : "ONLY_TOA"
+      }
+      analiticoRows={analiticoRows}
     />
   );
 }
@@ -465,7 +553,29 @@ function KpiDesempenhoProjecaoToa({
   precosOs,
   onSalvarPrecos,
   onRecalcularBase,
-}: Omit<KpiDesempenhoTecnicosProps, "modoFaturamento" | "analiticoRows">) {
+  modoFaturamento = "ONLY_TOA",
+  analiticoRows = [],
+}: Omit<KpiDesempenhoTecnicosProps, "modoFaturamento"> & {
+  modoFaturamento: "ONLY_TOA" | "COMPARISON_MODE";
+}) {
+  const isComparacao = modoFaturamento === "COMPARISON_MODE";
+  const [activeTab, setActiveTab] = useState<AbaDetalhamento>(
+    isComparacao ? "analitico" : "toa",
+  );
+
+  useEffect(() => {
+    if (modoFaturamento === "ONLY_TOA") setActiveTab("toa");
+    else setActiveTab("analitico");
+  }, [modoFaturamento, filtroPeriodo.ano, filtroPeriodo.mes]);
+
+  const analiticoFiltrado = useMemo(
+    () => filtrarAnaliticoPorDhBaixa(analiticoRows, filtroPeriodo),
+    [analiticoRows, filtroPeriodo],
+  );
+  const resumoAnalitico = useMemo(
+    () => resumirAnaliticoHistorico(analiticoFiltrado),
+    [analiticoFiltrado],
+  );
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
   const [buscaTecnico, setBuscaTecnico] = useState("");
   const percentualAumento = usePercentualAumento();
@@ -708,23 +818,28 @@ function KpiDesempenhoProjecaoToa({
     </button>
   );
 
-  const { totalNotasProdutivas, totalPerdaNotas, receitaTotal } = useMemo(
-    () => ({
-      totalNotasProdutivas: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.notasProdutivas,
-        0,
-      ),
-      totalPerdaNotas: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.notasImprodutivas,
-        0,
-      ),
-      receitaTotal: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.receita * fatorProjecao,
-        0,
-      ),
-    }),
-    [enriquecidos, fatorProjecao],
-  );
+  const { totalNotasProdutivas, totalPerdaNotas, receitaTotal, totalNotasToa } =
+    useMemo(
+      () => ({
+        totalNotasProdutivas: enriquecidos.reduce(
+          (total, tecnico) => total + tecnico.notasProdutivas,
+          0,
+        ),
+        totalPerdaNotas: enriquecidos.reduce(
+          (total, tecnico) => total + tecnico.notasImprodutivas,
+          0,
+        ),
+        receitaTotal: enriquecidos.reduce(
+          (total, tecnico) => total + tecnico.receita * fatorProjecao,
+          0,
+        ),
+        totalNotasToa: enriquecidos.reduce(
+          (total, tecnico) => total + tecnico.totalNotasFeitas,
+          0,
+        ),
+      }),
+      [enriquecidos, fatorProjecao],
+    );
 
   const tiposOsImportados = useMemo(() => {
     const map = new Map<
@@ -1232,6 +1347,137 @@ function KpiDesempenhoProjecaoToa({
     );
   };
 
+  const nomesPorLoginExport = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tecnico of tecnicosEquipe) {
+      for (const identificador of [
+        tecnico.identificacao,
+        tecnico.login,
+        tecnico.id,
+      ]) {
+        if (identificador?.trim()) {
+          map.set(normalizeToaLogin(identificador), tecnico.nome);
+        }
+      }
+    }
+    for (const tecnico of tecnicos) {
+      const login = normalizeToaLogin(tecnico.id_tecnico);
+      if (tecnico.nome_tecnico?.trim() && !map.has(login)) {
+        map.set(login, tecnico.nome_tecnico.trim());
+      }
+    }
+    for (const tecnico of enriquecidos) {
+      map.set(tecnico.id_tecnico, tecnico.nome);
+    }
+    return map;
+  }, [tecnicosEquipe, tecnicos, enriquecidos]);
+
+  const exportarNotasDetalhamentoExcel = () => {
+    const chamadosPeriodo = filtrarChamadosToa(
+      chamadosProcessados,
+      filtroPeriodo,
+    );
+
+    const loginsVisiveis = new Set(
+      tecnicosFiltrados.map((t) => normalizeToaLogin(t.id_tecnico)),
+    );
+    const chamadosVisiveis =
+      buscaTecnico.trim().length > 0
+        ? chamadosPeriodo.filter((c) =>
+            loginsVisiveis.has(normalizeToaLogin(c.login)),
+          )
+        : chamadosPeriodo;
+
+    if (chamadosVisiveis.length === 0) {
+      toast.error("Nenhuma nota no período para exportar.");
+      return;
+    }
+
+    const dadosExcel = flattenChamadosToaParaExportacaoNotas(chamadosVisiveis, {
+      nomePorLogin: (login) =>
+        nomesPorLoginExport.get(normalizeToaLogin(login)) || login,
+      formatData: formatDataBr,
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Notas");
+
+    const mesAno =
+      filtroPeriodo.mes !== null && filtroPeriodo.ano !== null
+        ? `${String(filtroPeriodo.mes).padStart(2, "0")}${filtroPeriodo.ano}`
+        : "Completo";
+    XLSX.writeFile(workbook, `Exportacao_Notas_${mesAno}.xlsx`);
+    toast.success(
+      `Excel exportado: ${formatQuantidade(dadosExcel.length)} notas.`,
+    );
+  };
+
+  const exportarComparacaoConciliacao = () => {
+    const chamadosPeriodo = filtrarChamadosToa(
+      chamadosProcessados,
+      filtroPeriodo,
+    );
+
+    if (analiticoFiltrado.length === 0 || chamadosPeriodo.length === 0) {
+      toast.error(
+        "É necessário ter Analítico e TOA no período para gerar a conciliação.",
+      );
+      return;
+    }
+
+    const { faltandoNoToa, faltandoNoAnalitico } = conciliarAnaliticoVsToa(
+      analiticoFiltrado,
+      chamadosPeriodo,
+      {
+        nomePorLogin: (login) =>
+          nomesPorLoginExport.get(normalizeToaLogin(login)) || login,
+        precosOs,
+      },
+    );
+
+    if (faltandoNoToa.length === 0 && faltandoNoAnalitico.length === 0) {
+      toast.success(
+        "Conciliação sem gaps: todos os contratos produtivos cruzaram entre Analítico e TOA.",
+      );
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const sheetAnalitico =
+      faltandoNoToa.length > 0
+        ? XLSX.utils.json_to_sheet(faltandoNoToa)
+        : XLSX.utils.aoa_to_sheet([
+            ["NR_CONTRATO", "CD_OS", "VALOR_SERVICO", "DS_TIPO_OS"],
+          ]);
+    const sheetToa =
+      faltandoNoAnalitico.length > 0
+        ? XLSX.utils.json_to_sheet(faltandoNoAnalitico)
+        : XLSX.utils.aoa_to_sheet([
+            [
+              "Contrato",
+              "Número da WO",
+              "Nome do Técnico",
+              "Total de O.S. Produtivas",
+              "Receita Projetada",
+            ],
+          ]);
+
+    XLSX.utils.book_append_sheet(workbook, sheetAnalitico, "Somente no Analítico");
+    XLSX.utils.book_append_sheet(workbook, sheetToa, "Somente no TOA");
+
+    const mesAno =
+      filtroPeriodo.mes !== null && filtroPeriodo.ano !== null
+        ? `${String(filtroPeriodo.mes).padStart(2, "0")}${filtroPeriodo.ano}`
+        : "Completo";
+    XLSX.writeFile(
+      workbook,
+      `Conciliacao_Analitico_vs_TOA_${mesAno}.xlsx`,
+    );
+    toast.success(
+      `Conciliação exportada: ${formatQuantidade(faltandoNoToa.length)} só no Analítico, ${formatQuantidade(faltandoNoAnalitico.length)} só no TOA.`,
+    );
+  };
+
   const tituloDetalheNotas =
     detalheNotasTipo === "produtivas"
       ? "Detalhamento de Notas Produtivas"
@@ -1241,51 +1487,106 @@ function KpiDesempenhoProjecaoToa({
 
   return (
     <div className="w-full space-y-6">
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <button
-          type="button"
-          onClick={() => abrirDetalheNotas("produtivas")}
-          className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-green-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500"
-          aria-label="Abrir detalhamento de notas produtivas"
-        >
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Total de notas produtivas (TOA)
-            </span>
+      {isComparacao ? (
+        <>
+          <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm text-sky-900">
+            Modo comparação — Analítico Claro e TOA disponíveis no período.
+            Use as abas abaixo para alternar o detalhamento.
           </div>
-          <div className="mt-3 text-3xl font-bold text-gray-900">
-            {formatQuantidade(totalNotasProdutivas)}
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 shrink-0 text-emerald-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de notas (Analítico Claro)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(resumoAnalitico.totalNotas)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 shrink-0 text-emerald-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Receita (Analítico Claro)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-emerald-600">
+                {formatReceita(resumoAnalitico.receitaTotal)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de notas (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(totalNotasToa)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Receita (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-green-600">
+                {formatReceita(receitaTotal)}
+              </div>
+            </div>
           </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => abrirDetalheNotas("perdas")}
-          className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-red-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
-          aria-label="Abrir detalhamento de perdas de notas"
-        >
-          <div className="flex items-center gap-2">
-            <XCircle className="h-5 w-5 shrink-0 text-red-600" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Total de perda de notas (TOA)
-            </span>
-          </div>
-          <div className="mt-3 text-3xl font-bold text-gray-900">
-            {formatQuantidade(totalPerdaNotas)}
-          </div>
-        </button>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Receita projetada
-            </span>
-          </div>
-          <div className="mt-3 text-3xl font-bold text-green-600">
-            {formatReceita(receitaTotal)}
+        </>
+      ) : (
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => abrirDetalheNotas("produtivas")}
+            className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-green-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            aria-label="Abrir detalhamento de notas produtivas"
+          >
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total de notas produtivas (TOA)
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-gray-900">
+              {formatQuantidade(totalNotasProdutivas)}
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => abrirDetalheNotas("perdas")}
+            className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-red-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
+            aria-label="Abrir detalhamento de perdas de notas"
+          >
+            <div className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 shrink-0 text-red-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total de perda de notas (TOA)
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-gray-900">
+              {formatQuantidade(totalPerdaNotas)}
+            </div>
+          </button>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Receita projetada
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-green-600">
+              {formatReceita(receitaTotal)}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex justify-between items-center gap-3">
@@ -1449,21 +1750,23 @@ function KpiDesempenhoProjecaoToa({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Users className="h-4 w-4 text-primary" />
             Detalhamento por Técnico
           </h2>
-          <button
-            type="button"
-            onClick={abrirTabelaPrecos}
-            className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
-            title="Ver Tabela de Preços"
-            aria-label="Ver tabela de preços"
-          >
-            ?
-          </button>
-          {onRecalcularBase ? (
+          {activeTab === "toa" ? (
+            <button
+              type="button"
+              onClick={abrirTabelaPrecos}
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
+              title="Ver Tabela de Preços"
+              aria-label="Ver tabela de preços"
+            >
+              ?
+            </button>
+          ) : null}
+          {activeTab === "toa" && onRecalcularBase ? (
             <button
               type="button"
               onClick={() => void recalcularBase()}
@@ -1476,141 +1779,221 @@ function KpiDesempenhoProjecaoToa({
           ) : null}
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <input
-            type="search"
-            value={buscaTecnico}
-            onChange={(e) => setBuscaTecnico(e.target.value)}
-            placeholder="Buscar por nome ou matrícula (Z)..."
-            aria-label="Buscar técnico por nome ou matrícula"
-            className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-72"
-          />
-
-          <label className="flex w-full items-center gap-2 sm:w-auto">
-            <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Aumento (%)
-            </span>
-            <input
-              type="number"
-              step="0.1"
-              value={percentualAumentoTexto}
-              onChange={(e) => atualizarPercentualAumento(e.target.value)}
-              placeholder="0"
-              aria-label="Aumento percentual"
-              className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </label>
-        </div>
-        {enriquecidos.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhum técnico com baixa no período selecionado.
-          </p>
-        ) : tecnicosFiltrados.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhum técnico encontrado para “{buscaTecnico.trim()}”.
-          </p>
-        ) : (
-          <div className="w-full">
+        {isComparacao ? (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div
-              className={`${GRID_TECNICOS} items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
+              className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+              role="tablist"
+              aria-label="Fonte do detalhamento"
             >
-              <span className="text-left">Nome</span>
-              <span className="text-center">Total de Notas feitas</span>
-              <span className="text-center">Total de Notas produtivas</span>
-              <span className="text-center">Total de Notas improdutivas</span>
-              <span className="text-center">O.S produtivas</span>
-              <span className="text-center">O.S Improdutivas</span>
-              <span className="text-center">Baixa misc</span>
-              <span className="text-center">Média de material por nota</span>
-              <span className="text-center">% Freq. Relativa</span>
-              <span className="text-center">% Freq. Absoluta</span>
-              <span className="text-center">
-                {cabecalhoOrdenavel("Aproveitamento", "aproveitamento")}
-              </span>
-              <span className="text-center">
-                {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
-              </span>
-              <span className="text-center">
-                {cabecalhoOrdenavel("Receita projetada", "receita")}
-              </span>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "analitico"}
+                onClick={() => setActiveTab("analitico")}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                  activeTab === "analitico"
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Analítico Claro
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "toa"}
+                onClick={() => setActiveTab("toa")}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                  activeTab === "toa"
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Detalhamento TOA
+              </button>
             </div>
 
-            <ul>
-              {tecnicosOrdenados.map((tecnico) => {
-                const isDemitido = isTecnicoDemitido(
-                  demitidosKeys,
-                  tecnico.id_tecnico,
-                  tecnico.nome,
-                );
-                return (
-                  <li
-                    key={tecnico.id_tecnico}
-                    className={`${GRID_TECNICOS} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        abrirDetalheTecnico(tecnico.id_tecnico, tecnico.nome)
-                      }
-                      className={
-                        isDemitido
-                          ? "max-w-[150px] truncate text-left font-medium text-gray-500 hover:underline"
-                          : "max-w-[150px] truncate text-left font-medium text-primary hover:underline"
-                      }
-                      title={tecnico.nome}
-                    >
-                      {tecnico.nome}
-                    </button>
-                    <span className="text-center font-bold tabular-nums text-gray-900">
-                      {formatQuantidade(tecnico.totalNotasFeitas)}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-500">
-                      {formatQuantidade(tecnico.notasProdutivas)}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-500">
-                      {formatQuantidade(tecnico.notasImprodutivas)}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-500">
-                      {tecnico.osProdutivas}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-500">
-                      {tecnico.osImprodutivas}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-700">
-                      {formatQuantidade(tecnico.baixaMisc)}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-700">
-                      {formatMediaMaterial(tecnico.mediaMaterialPorNota)}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-600">
-                      {tecnico.freqRelativa}
-                    </span>
-                    <span className="text-center font-normal tabular-nums text-gray-600">
-                      {tecnico.freqAbsoluta}
-                    </span>
-                    <span className="text-center font-semibold tabular-nums text-gray-800">
-                      {tecnico.mediaAproveitamento}
-                    </span>
-                    <span className="text-center font-medium tabular-nums text-red-600">
-                      {formatReceita(tecnico.receitaPerda)}
-                    </span>
-                    <span
-                      className={`text-center font-bold tabular-nums ${
-                        tecnico.receita > 0
-                          ? "text-green-600"
-                          : tecnico.receita < 0
-                            ? "text-red-600"
-                            : "text-gray-500"
-                      }`}
-                    >
-                      {formatReceita(tecnico.receita)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <button
+              type="button"
+              onClick={exportarComparacaoConciliacao}
+              className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+              title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
+              aria-label="Exportar comparação Analítico vs TOA"
+            >
+              <Download className="h-4 w-4" />
+              Exportar Comparação
+            </button>
           </div>
+        ) : null}
+
+        {activeTab === "analitico" ? (
+          <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
+        ) : (
+          <>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <input
+                type="search"
+                value={buscaTecnico}
+                onChange={(e) => setBuscaTecnico(e.target.value)}
+                placeholder="Buscar por nome ou matrícula (Z)..."
+                aria-label="Buscar técnico por nome ou matrícula"
+                className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-72"
+              />
+
+              <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
+                <button
+                  type="button"
+                  onClick={exportarNotasDetalhamentoExcel}
+                  className="inline-flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 transition hover:bg-green-100"
+                  title="Exportar notas do período com O.S. 1–10 e Status da Nota"
+                  aria-label="Exportar Excel com notas do período"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar Excel (Notas)
+                </button>
+
+                {isComparacao ? (
+                  <button
+                    type="button"
+                    onClick={exportarComparacaoConciliacao}
+                    className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                    title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
+                    aria-label="Exportar comparação Analítico vs TOA"
+                  >
+                    <Download className="h-4 w-4" />
+                    Exportar Comparação
+                  </button>
+                ) : null}
+
+                <label className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Aumento (%)
+                  </span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={percentualAumentoTexto}
+                    onChange={(e) => atualizarPercentualAumento(e.target.value)}
+                    placeholder="0"
+                    aria-label="Aumento percentual"
+                    className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </label>
+              </div>
+            </div>
+            {enriquecidos.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                Nenhum técnico com baixa no período selecionado.
+              </p>
+            ) : tecnicosFiltrados.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                Nenhum técnico encontrado para “{buscaTecnico.trim()}”.
+              </p>
+            ) : (
+              <div className="w-full">
+                <div
+                  className={`${GRID_TECNICOS} items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
+                >
+                  <span className="text-left">Nome</span>
+                  <span className="text-center">Total de Notas feitas</span>
+                  <span className="text-center">Total de Notas produtivas</span>
+                  <span className="text-center">Total de Notas improdutivas</span>
+                  <span className="text-center">O.S produtivas</span>
+                  <span className="text-center">O.S Improdutivas</span>
+                  <span className="text-center">Baixa misc</span>
+                  <span className="text-center">Média de material por nota</span>
+                  <span className="text-center">% Freq. Relativa</span>
+                  <span className="text-center">% Freq. Absoluta</span>
+                  <span className="text-center">
+                    {cabecalhoOrdenavel("Aproveitamento", "aproveitamento")}
+                  </span>
+                  <span className="text-center">
+                    {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
+                  </span>
+                  <span className="text-center">
+                    {cabecalhoOrdenavel("Receita projetada", "receita")}
+                  </span>
+                </div>
+
+                <ul>
+                  {tecnicosOrdenados.map((tecnico) => {
+                    const isDemitido = isTecnicoDemitido(
+                      demitidosKeys,
+                      tecnico.id_tecnico,
+                      tecnico.nome,
+                    );
+                    return (
+                      <li
+                        key={tecnico.id_tecnico}
+                        className={`${GRID_TECNICOS} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            abrirDetalheTecnico(tecnico.id_tecnico, tecnico.nome)
+                          }
+                          className={
+                            isDemitido
+                              ? "max-w-[150px] truncate text-left font-medium text-gray-500 hover:underline"
+                              : "max-w-[150px] truncate text-left font-medium text-primary hover:underline"
+                          }
+                          title={tecnico.nome}
+                        >
+                          {tecnico.nome}
+                        </button>
+                        <span className="text-center font-bold tabular-nums text-gray-900">
+                          {formatQuantidade(tecnico.totalNotasFeitas)}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-500">
+                          {formatQuantidade(tecnico.notasProdutivas)}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-500">
+                          {formatQuantidade(tecnico.notasImprodutivas)}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-500">
+                          {tecnico.osProdutivas}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-500">
+                          {tecnico.osImprodutivas}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-700">
+                          {formatQuantidade(tecnico.baixaMisc)}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-700">
+                          {formatMediaMaterial(tecnico.mediaMaterialPorNota)}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-600">
+                          {tecnico.freqRelativa}
+                        </span>
+                        <span className="text-center font-normal tabular-nums text-gray-600">
+                          {tecnico.freqAbsoluta}
+                        </span>
+                        <span className="text-center font-semibold tabular-nums text-gray-800">
+                          {tecnico.mediaAproveitamento}
+                        </span>
+                        <span className="text-center font-medium tabular-nums text-red-600">
+                          {formatReceita(tecnico.receitaPerda)}
+                        </span>
+                        <span
+                          className={`text-center font-bold tabular-nums ${
+                            tecnico.receita > 0
+                              ? "text-green-600"
+                              : tecnico.receita < 0
+                                ? "text-red-600"
+                                : "text-gray-500"
+                          }`}
+                        >
+                          {formatReceita(tecnico.receita)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
 

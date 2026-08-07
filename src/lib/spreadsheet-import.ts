@@ -191,26 +191,12 @@ async function parseCsv(file: File): Promise<RawRow[]> {
 }
 
 /**
- * Analítico Claro: lê abas "Notas e valores de …" ou a aba ANALITICO.
- * Retorna linhas normalizadas para analitico_historico.
+ * Consolidado IAT: lê a aba "Consolidado" (ou fallback legado / 1ª aba).
+ * Retorna linhas normalizadas para analitico_historico (62 campos).
  */
 export async function parseAnaliticoFaturamentoFile(
   file: File,
-): Promise<
-  Array<{
-    data_base: number;
-    nr_contrato: string;
-    cd_os: string;
-    id_tipo_os: number | null;
-    ds_tipo_os: string;
-    cd_baixa: number | null;
-    qtde: number;
-    valor_servico: number;
-    dh_baixa: string | null;
-    tipo_os_consolid: string;
-    nm_cidade: string;
-  }>
-> {
+): Promise<import("./faturamento-service").AnaliticoHistoricoRow[]> {
   const name = file.name.toLowerCase();
   if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
     throw new Error("A importação do Analítico aceita somente Excel (.xlsx/.xls).");
@@ -218,41 +204,69 @@ export async function parseAnaliticoFaturamentoFile(
 
   const XLSX = await import("xlsx");
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
 
+  const consolidadoName = workbook.SheetNames.find(
+    (n) => n.trim().toLowerCase() === "consolidado",
+  );
   const monthSheets = workbook.SheetNames.filter((n) =>
     /^Notas e valores de /i.test(n),
   );
-  const sheets =
-    monthSheets.length > 0
-      ? monthSheets
-      : workbook.Sheets.ANALITICO
-        ? ["ANALITICO"]
-        : [];
+
+  let sheets: string[] = [];
+  if (consolidadoName) {
+    sheets = [consolidadoName];
+  } else if (monthSheets.length > 0) {
+    sheets = monthSheets;
+  } else if (workbook.Sheets.ANALITICO) {
+    sheets = ["ANALITICO"];
+  } else if (workbook.SheetNames.length > 0) {
+    sheets = [workbook.SheetNames[0]!];
+  }
 
   if (sheets.length === 0) {
     throw new Error(
-      'Planilha sem abas "Notas e valores de …" ou "ANALITICO".',
+      'Planilha sem aba "Consolidado", "Notas e valores de …" ou "ANALITICO".',
     );
   }
 
   const { mapAnaliticoSheetRow } = await import("./faturamento-service");
-  const out: ReturnType<typeof mapAnaliticoSheetRow>[] = [];
+  const out: NonNullable<ReturnType<typeof mapAnaliticoSheetRow>>[] = [];
 
   for (const sheetName of sheets) {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-      defval: "",
+      defval: null,
       raw: true,
+      blankrows: false,
     });
     for (const row of rows) {
-      const mapped = mapAnaliticoSheetRow(row);
+      const normalized: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(row)) {
+        const key = k.trim();
+        if (
+          v == null ||
+          v === undefined ||
+          (typeof v === "number" && Number.isNaN(v))
+        ) {
+          normalized[key] = null;
+        } else {
+          normalized[key] = v;
+        }
+      }
+      const mapped = mapAnaliticoSheetRow(normalized);
       if (mapped) out.push(mapped);
     }
   }
 
-  return out.filter((r): r is NonNullable<typeof r> => r !== null);
+  if (out.length === 0) {
+    throw new Error(
+      "Nenhuma linha válida encontrada (DATA_BASE e CD_OS são obrigatórios).",
+    );
+  }
+
+  return out;
 }
 
 

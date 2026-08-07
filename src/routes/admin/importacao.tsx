@@ -559,7 +559,7 @@ function ImportacaoPage() {
             />
             <ImportFileCard
               title="Analítico Claro (histórico)"
-              description='Lê abas "Notas e valores de …" ou ANALITICO e grava em analitico_historico. Overwrite por DATA_BASE (mês). Usado no painel para períodos ≤ jun/2026.'
+              description='Lê a aba "Consolidado" do arquivo mestre IAT (62 colunas) e grava em analitico_historico. Overwrite automático por DATA_BASE. Fallback: abas mensais / ANALITICO / primeira aba.'
               file={arquivoAnalitico}
               onFileChange={setArquivoAnalitico}
               busy={busyAnalitico}
