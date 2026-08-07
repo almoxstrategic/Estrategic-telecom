@@ -129,6 +129,11 @@ type KpiDesempenhoTecnicosProps = {
   onSalvarPrecos: (precos: PrecoOs[]) => Promise<void>;
   /** Força regravação do catálogo calibrado no Supabase e invalida cache local. */
   onRecalcularBase?: () => Promise<void>;
+  /** Descobre moda no Analítico, estima zeros por semelhança e atualiza precos_os. */
+  onAtualizarCatalogoViaHistorico?: () => Promise<{
+    atualizados: number;
+    estimados: number;
+  }>;
   /** Fonte de dados: disponibilidade Analítico / TOA no mês. */
   modoFaturamento?: ModoFaturamentoKpi;
   analiticoRows?: AnaliticoHistoricoRow[];
@@ -508,6 +513,7 @@ export function KpiDesempenhoTecnicos({
   precosOs,
   onSalvarPrecos,
   onRecalcularBase,
+  onAtualizarCatalogoViaHistorico,
   modoFaturamento = "indefinido",
   analiticoRows = [],
 }: KpiDesempenhoTecnicosProps) {
@@ -551,6 +557,7 @@ export function KpiDesempenhoTecnicos({
       precosOs={precosOs}
       onSalvarPrecos={onSalvarPrecos}
       onRecalcularBase={onRecalcularBase}
+      onAtualizarCatalogoViaHistorico={onAtualizarCatalogoViaHistorico}
       modoFaturamento={
         modoFaturamento === "COMPARISON_MODE" ? "COMPARISON_MODE" : "ONLY_TOA"
       }
@@ -570,6 +577,7 @@ function KpiDesempenhoProjecaoToa({
   precosOs,
   onSalvarPrecos,
   onRecalcularBase,
+  onAtualizarCatalogoViaHistorico,
   modoFaturamento = "ONLY_TOA",
   analiticoRows = [],
 }: Omit<KpiDesempenhoTecnicosProps, "modoFaturamento"> & {
@@ -600,6 +608,8 @@ function KpiDesempenhoProjecaoToa({
     String(getPercentualAumento()),
   );
   const [recalculandoBase, setRecalculandoBase] = useState(false);
+  const [atualizandoCatalogoHistorico, setAtualizandoCatalogoHistorico] =
+    useState(false);
   const [tecnicoSelecionado, setTecnicoSelecionado] =
     useState<TecnicoSelecionado | null>(null);
   const [detalheNotasTipo, setDetalheNotasTipo] =
@@ -896,7 +906,13 @@ function KpiDesempenhoProjecaoToa({
   const tiposOsImportados = useMemo(() => {
     const map = new Map<
       string,
-      { chave: string; tipo: string; tipoAtividade: string; valor: number }
+      {
+        chave: string;
+        tipo: string;
+        tipoAtividade: string;
+        valor: number;
+        isEstimado: boolean;
+      }
     >();
 
     for (const entrada of ATIVIDADES_TOA_CATALOGO) {
@@ -907,6 +923,7 @@ function KpiDesempenhoProjecaoToa({
         tipo: preco?.tipo?.trim() || entrada.tipo,
         tipoAtividade: entrada.tipoAtividade,
         valor: Number(preco?.valor ?? entrada.valor) || 0,
+        isEstimado: Boolean(preco?.isEstimado),
       });
     }
 
@@ -924,6 +941,7 @@ function KpiDesempenhoProjecaoToa({
           tipo: preco?.tipo ?? "",
           tipoAtividade: tipoOs,
           valor: Number(preco?.valor) || 0,
+          isEstimado: Boolean(preco?.isEstimado),
         });
       }
     }
@@ -1028,6 +1046,31 @@ function KpiDesempenhoProjecaoToa({
     }
   };
 
+  const atualizarCatalogoViaHistorico = async () => {
+    if (!onAtualizarCatalogoViaHistorico || atualizandoCatalogoHistorico) return;
+    setAtualizandoCatalogoHistorico(true);
+    try {
+      const { atualizados, estimados } = await onAtualizarCatalogoViaHistorico();
+      if (atualizados === 0 && estimados === 0) {
+        toast.success(
+          "Nenhum preço novo no Analítico e nada a estimar por semelhança.",
+        );
+      } else {
+        toast.success(
+          `Catálogo: ${formatQuantidade(atualizados)} do histórico` +
+            (estimados > 0
+              ? ` + ${formatQuantidade(estimados)} estimado(s) por semelhança.`
+              : "."),
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível atualizar o catálogo via histórico.");
+    } finally {
+      setAtualizandoCatalogoHistorico(false);
+    }
+  };
+
   const salvarValoresAlterados = async () => {
     let temValorInvalido = false;
     const alterados = tiposOsImportados.flatMap(
@@ -1042,7 +1085,14 @@ function KpiDesempenhoProjecaoToa({
         const valorAlterado = Math.abs(novoValor - valor) >= 0.005;
         const tipoAlterado = novoTipo !== tipo.trim();
         return valorAlterado || tipoAlterado
-          ? [{ tipo: novoTipo, tipoAtividade, valor: novoValor }]
+          ? [
+              {
+                tipo: novoTipo,
+                tipoAtividade,
+                valor: novoValor,
+                isEstimado: false,
+              },
+            ]
           : [];
       },
     );
@@ -2075,11 +2125,26 @@ function KpiDesempenhoProjecaoToa({
             <button
               type="button"
               onClick={() => void recalcularBase()}
-              disabled={recalculandoBase}
+              disabled={recalculandoBase || atualizandoCatalogoHistorico}
               className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
               title="Regrava o catálogo calibrado no Supabase e invalida cache local de preços"
             >
               {recalculandoBase ? "Recalculando…" : "Recalcular Base"}
+            </button>
+          ) : null}
+          {activeTab === "toa" && onAtualizarCatalogoViaHistorico ? (
+            <button
+              type="button"
+              onClick={() => void atualizarCatalogoViaHistorico()}
+              disabled={atualizandoCatalogoHistorico || recalculandoBase}
+              className={`rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                onRecalcularBase ? "" : "ml-auto"
+              }`}
+              title="Calcula a moda de valor_servico no Analítico e faz upsert em precos_os"
+            >
+              {atualizandoCatalogoHistorico
+                ? "Atualizando catálogo…"
+                : "Atualizar Catálogo via Histórico"}
             </button>
           ) : null}
         </div>
@@ -2827,13 +2892,14 @@ function KpiDesempenhoProjecaoToa({
                     <th className="px-4 py-2">Tipo</th>
                     <th className="px-4 py-2">Tipo de Atividade</th>
                     <th className="px-4 py-2 text-right">Valor (R$)</th>
+                    <th className="px-4 py-2 text-center">Origem</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tiposOsImportados.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-4 py-6 text-center text-muted-foreground"
                       >
                         Nenhum Tipo de O.S. encontrado na importação TOA.
@@ -2842,14 +2908,15 @@ function KpiDesempenhoProjecaoToa({
                   ) : tiposOsFiltrados.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-4 py-6 text-center text-muted-foreground"
                       >
                         Nenhum Tipo de O.S. encontrado para “{buscaTipoOs.trim()}”.
                       </td>
                     </tr>
                   ) : (
-                    tiposOsFiltrados.map(({ chave, tipo, tipoAtividade, valor }) => (
+                    tiposOsFiltrados.map(
+                      ({ chave, tipo, tipoAtividade, valor, isEstimado }) => (
                       <tr key={chave} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2">
                           <input
@@ -2882,11 +2949,32 @@ function KpiDesempenhoProjecaoToa({
                             }
                             aria-label={`Valor de ${tipoAtividade}`}
                             className={`w-28 rounded-md border px-2 py-1 text-right tabular-nums outline-none focus:ring-2 focus:ring-green-500 ${
-                              Number(valoresEditados[chave] ?? valor) > 0
-                                ? "border-gray-300 font-semibold text-green-600"
-                                : "border-orange-300 font-medium text-orange-500"
+                              Number(valoresEditados[chave] ?? valor) <= 0
+                                ? "border-orange-300 font-medium text-orange-500"
+                                : isEstimado
+                                  ? "border-amber-300 bg-amber-50 font-semibold text-amber-800"
+                                  : "border-gray-300 font-semibold text-green-600"
                             }`}
                           />
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          {Number(valoresEditados[chave] ?? valor) <= 0 ? (
+                            <span className="text-xs text-orange-500">—</span>
+                          ) : isEstimado ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900"
+                              title="Valor estimado por semelhança de categoria/descrição"
+                            >
+                              ✓ Estimado
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                              title="Valor calibrado pelo histórico Analítico ou edição manual"
+                            >
+                              Histórico
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -2895,8 +2983,8 @@ function KpiDesempenhoProjecaoToa({
               </table>
             </div>
             <p className="mt-4 text-center text-xs text-gray-400">
-              * Valores de referência baseados no analítico. Tipos em laranja
-              ainda não possuem preço mapeado.
+              * Verde = histórico/manual · Amarelo = estimado por semelhança ·
+              Laranja = ainda sem preço.
             </p>
             <button
               type="button"

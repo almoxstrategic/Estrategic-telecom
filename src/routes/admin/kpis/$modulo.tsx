@@ -83,6 +83,7 @@ import { formatQuantidade } from "@/lib/parse-locale-number";
 import {
   fetchPrecosOs,
   forceResyncCatalogoPrecos,
+  atualizarCatalogoPrecosViaHistorico,
   upsertPrecosOs,
   type PrecoOs,
   type PrecosOsMap,
@@ -276,6 +277,13 @@ function KpisPage() {
   const recalcularBasePrecos = useCallback(async () => {
     const precos = await forceResyncCatalogoPrecos();
     setPrecosOs(precos);
+  }, []);
+
+  const atualizarCatalogoViaHistorico = useCallback(async () => {
+    const { atualizados, estimados, precos } =
+      await atualizarCatalogoPrecosViaHistorico();
+    setPrecosOs(precos);
+    return { atualizados, estimados };
   }, []);
 
   const salvarPrecosOs = useCallback(
@@ -1100,6 +1108,7 @@ function KpisPage() {
               precosOs={precosOs}
               onSalvarPrecos={salvarPrecosOs}
               onRecalcularBase={recalcularBasePrecos}
+              onAtualizarCatalogoViaHistorico={atualizarCatalogoViaHistorico}
             />
           )
         ) : (

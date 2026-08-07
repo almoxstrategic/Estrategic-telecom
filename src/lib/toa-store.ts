@@ -225,6 +225,13 @@ export function isStatusExecutada(status: string): boolean {
   return normalizeStatusOs(status) === "EXECUTADA";
 }
 
+/** Status da Atividade = concluído (case/acento-insensitive). */
+export function isStatusAtividadeConcluido(
+  status: string | null | undefined,
+): boolean {
+  return normalizeTipoOs(String(status ?? "")) === "CONCLUIDO";
+}
+
 /**
  * Extrai o número inicial do Cód de Baixa bruto do TOA
  * (ex: "410 - Auto Instalação Concluída" → 410).
@@ -1107,6 +1114,10 @@ export function agregarChamadosToa(
   for (const chamado of notasUnicas) {
     const resumo = resumoPorTecnico[chamado.login] ?? emptyResumo();
     const metrica = avaliarNotaToa(chamado);
+    // Receita (TOA): só visitas concluídas (cancelado/suspenso fora).
+    const visitaConcluida =
+      !chamado.statusAtividade?.trim() ||
+      isStatusAtividadeConcluido(chamado.statusAtividade);
 
     resumo.totalNotasFeitas += 1;
     totalNotasFeitas += 1;
@@ -1114,15 +1125,17 @@ export function agregarChamadosToa(
     let receitaFatNaNota = 0;
     let receitaPerdaNaNota = 0;
 
-    for (const ordem of chamado.ordensDeServico) {
-      const valorServico = valorPrecoOs(precosOs, ordem.tipoOs);
+    if (visitaConcluida) {
+      for (const ordem of chamado.ordensDeServico) {
+        const valorServico = valorPrecoOs(precosOs, ordem.tipoOs);
 
-      if (isOsProdutiva(ordem)) {
-        if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
-          receitaFatNaNota += valorServico;
+        if (isOsProdutiva(ordem)) {
+          if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
+            receitaFatNaNota += valorServico;
+          }
+        } else if (isOsImprodutiva(ordem)) {
+          receitaPerdaNaNota += valorServico;
         }
-      } else if (isOsImprodutiva(ordem)) {
-        receitaPerdaNaNota += valorServico;
       }
     }
 

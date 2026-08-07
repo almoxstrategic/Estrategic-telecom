@@ -4,10 +4,12 @@ import type {
 } from "./faturamento-service";
 import {
   isCodBaixaProdutivo,
+  isStatusAtividadeConcluido,
   isStatusExecutada,
-  normalizeTipoOs,
   normalizeToaLogin,
 } from "./toa-store";
+
+export { isStatusAtividadeConcluido } from "./toa-store";
 
 /** Normaliza contrato para cruzamento (só dígitos quando houver). */
 export function normalizeContratoKey(value: string): string {
@@ -111,13 +113,6 @@ function isToaOsProdutivaFlat(
     cod > 0 &&
     isCodBaixaProdutivo(cod)
   );
-}
-
-/** Visitas concluídas (ignora cancelado/suspenso; case/acento-insensitive). */
-export function isStatusAtividadeConcluido(
-  status: string | null | undefined,
-): boolean {
-  return normalizeTipoOs(String(status ?? "")) === "CONCLUIDO";
 }
 
 /**
