@@ -368,6 +368,7 @@ export function processarChamadosTOA(
 /**
  * Unpivot: 1 linha persistida por O.S. (pai WO + slot).
  * status_nota é o da WO (visita) e se repete em cada O.S. filha.
+ * status_atividade é o Status da Atividade da WO-mãe, repetido em cada O.S.
  * nome_tecnico vem da coluna "técnicos" da planilha (não do login Z...).
  */
 export function flattenChamadosParaImportacaoFlat(
@@ -384,6 +385,7 @@ export function flattenChamadosParaImportacaoFlat(
   cod_baixa: number | null;
   status_os: string;
   status_nota: "Produtiva" | "Improdutiva";
+  status_atividade: string;
 }> {
   const rows: Array<{
     competencia: number;
@@ -397,6 +399,7 @@ export function flattenChamadosParaImportacaoFlat(
     cod_baixa: number | null;
     status_os: string;
     status_nota: "Produtiva" | "Improdutiva";
+    status_atividade: string;
   }> = [];
 
   for (const chamado of dedupeChamadosPorNumeroWo(chamados)) {
@@ -408,6 +411,7 @@ export function flattenChamadosParaImportacaoFlat(
     const login = normalizeToaLogin(chamado.login);
     // Nome real da planilha (coluna "técnicos") — nunca repetir o login Z...
     const nomeTecnico = (chamado.nomeTecnico || "").trim();
+    const statusAtividade = (chamado.statusAtividade || "").trim();
 
     for (const ordem of chamado.ordensDeServico) {
       const numeroOs = (ordem.numeroOs || "").trim();
@@ -426,6 +430,7 @@ export function flattenChamadosParaImportacaoFlat(
         cod_baixa: ordem.codBaixa > 0 ? ordem.codBaixa : null,
         status_os: ordem.status || "",
         status_nota: statusNota,
+        status_atividade: statusAtividade,
       });
     }
   }
@@ -448,6 +453,7 @@ export function regroupFlatRowsToChamados(
     cod_baixa: number | null;
     status_os: string;
     status_nota?: string;
+    status_atividade?: string;
   }>,
 ): ToaChamadoProcessado[] {
   const byWo = new Map<
@@ -458,6 +464,7 @@ export function regroupFlatRowsToChamados(
       nomeTecnico: string;
       numeroWo: string;
       contrato: string;
+      statusAtividade: string;
       ordens: ToaOrdemServico[];
     }
   >();
@@ -469,6 +476,7 @@ export function regroupFlatRowsToChamados(
     const data = String(row.data_toa ?? "").slice(0, 10);
     if (!login || !data) continue;
     const nomeTecnico = String(row.nome_tecnico ?? "").trim();
+    const statusAtividade = String(row.status_atividade ?? "").trim();
 
     let group = byWo.get(numeroWo);
     if (!group) {
@@ -478,11 +486,15 @@ export function regroupFlatRowsToChamados(
         nomeTecnico: nomeTecnico || login,
         numeroWo,
         contrato: String(row.contrato ?? "").trim(),
+        statusAtividade,
         ordens: [],
       };
       byWo.set(numeroWo, group);
-    } else if (nomeTecnico && !group.nomeTecnico) {
-      group.nomeTecnico = nomeTecnico;
+    } else {
+      if (nomeTecnico && !group.nomeTecnico) group.nomeTecnico = nomeTecnico;
+      if (statusAtividade && !group.statusAtividade) {
+        group.statusAtividade = statusAtividade;
+      }
     }
 
     const codBaixa =
@@ -512,7 +524,7 @@ export function regroupFlatRowsToChamados(
       nomeTecnico: g.nomeTecnico,
       numeroWo: g.numeroWo,
       contrato: g.contrato,
-      statusAtividade: "",
+      statusAtividade: g.statusAtividade,
       ordensDeServico: g.ordens,
     })),
   );

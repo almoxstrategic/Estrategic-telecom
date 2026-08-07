@@ -5,6 +5,7 @@ import type {
 import {
   isCodBaixaProdutivo,
   isStatusExecutada,
+  normalizeTipoOs,
   normalizeToaLogin,
 } from "./toa-store";
 
@@ -66,6 +67,7 @@ export function chaveConciliacaoOs(
 export type GapFaltaNoAnalitico = {
   "Nome Técnico": string;
   Login: string;
+  "Status de atividade": string;
   Contrato: string;
   "Número WO": string;
   "Número OS": string;
@@ -89,6 +91,14 @@ export type ConciliacaoAnaliticoToa = {
   faltandoNoToa: GapFaltaNoToa[];
 };
 
+/** YYYY-MM-DD → DD/MM/YYYY para planilha de auditoria. */
+function formatDateBr(value: string | null | undefined): string {
+  const iso = normalizeDateKey(value);
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(value ?? "").trim();
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 function isToaOsProdutivaFlat(
   row: Pick<ToaImportacaoRow, "status_os" | "cod_baixa">,
 ): boolean {
@@ -103,12 +113,20 @@ function isToaOsProdutivaFlat(
   );
 }
 
+/** Visitas concluídas (ignora cancelado/suspenso; case/acento-insensitive). */
+export function isStatusAtividadeConcluido(
+  status: string | null | undefined,
+): boolean {
+  return normalizeTipoOs(String(status ?? "")) === "CONCLUIDO";
+}
+
 /**
  * Conciliação O.S. a O.S. (flat):
  * chave = contrato/nr_contrato + numero_os/cd_os.
  *
+ * - Só TOA com status_atividade = concluído entra no cruzamento.
  * - Falta no Analítico: O.S. produtivas do TOA sem par no Analítico.
- * - Falta no TOA: linhas do Analítico sem par no TOA.
+ * - Falta no TOA: linhas do Analítico sem par no TOA (apenas vs visitas concluídas).
  */
 export function conciliarAnaliticoVsToa(
   analitico: AnaliticoHistoricoRow[],
@@ -120,6 +138,11 @@ export function conciliarAnaliticoVsToa(
 ): ConciliacaoAnaliticoToa {
   const somenteProdutivas = options?.somenteProdutivasToa !== false;
 
+  // Cancelado/suspenso não participam da auditoria de pagamento.
+  const toaConcluidos = toaOs.filter((row) =>
+    isStatusAtividadeConcluido(row.status_atividade),
+  );
+
   const chavesAnalitico = new Set<string>();
   for (const row of analitico) {
     const key = chaveConciliacaoOs(row.nr_contrato, row.cd_os);
@@ -127,14 +150,14 @@ export function conciliarAnaliticoVsToa(
   }
 
   const chavesToa = new Set<string>();
-  for (const row of toaOs) {
+  for (const row of toaConcluidos) {
     const key = chaveConciliacaoOs(row.contrato, row.numero_os);
     if (key) chavesToa.add(key);
   }
 
   const faltandoNoAnalitico: GapFaltaNoAnalitico[] = [];
   const vistosToa = new Set<string>();
-  for (const row of toaOs) {
+  for (const row of toaConcluidos) {
     if (somenteProdutivas && !isToaOsProdutivaFlat(row)) continue;
     const key = chaveConciliacaoOs(row.contrato, row.numero_os);
     if (!key || chavesAnalitico.has(key) || vistosToa.has(key)) continue;
@@ -143,12 +166,13 @@ export function conciliarAnaliticoVsToa(
     faltandoNoAnalitico.push({
       "Nome Técnico": (row.nome_tecnico || "").trim() || row.login_tecnico,
       Login: normalizeToaLogin(row.login_tecnico),
+      "Status de atividade": (row.status_atividade || "").trim(),
       Contrato: row.contrato,
       "Número WO": row.numero_wo,
       "Número OS": row.numero_os,
       "Tipo OS": row.tipo_os || "",
       "Cód Baixa": row.cod_baixa ?? "",
-      "Data TOA": normalizeDateKey(row.data_toa) || row.data_toa,
+      "Data TOA": formatDateBr(row.data_toa),
     });
   }
 

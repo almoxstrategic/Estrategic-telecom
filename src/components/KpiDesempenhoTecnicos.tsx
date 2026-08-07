@@ -1641,6 +1641,7 @@ function KpiDesempenhoProjecaoToa({
             [
               "Nome Técnico",
               "Login",
+              "Status de atividade",
               "Contrato",
               "Número WO",
               "Número OS",

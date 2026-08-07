@@ -92,6 +92,8 @@ export type ToaImportacaoRow = {
   cod_baixa: number | null;
   status_os: string;
   status_nota: "Produtiva" | "Improdutiva";
+  /** Status da Atividade da WO-mãe (concluído, cancelado, suspenso, …). */
+  status_atividade?: string;
   imported_at?: string;
 };
 
@@ -751,7 +753,7 @@ export async function fetchToaImportacoes(filtro: {
   let query = supabase
     .from("toa_importacoes")
     .select(
-      "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, imported_at",
+      "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, imported_at",
     )
     .order("data_toa", { ascending: true });
 
@@ -790,6 +792,7 @@ export async function fetchToaImportacoes(filtro: {
       String(row.status_nota ?? "").trim() === "Produtiva"
         ? "Produtiva"
         : "Improdutiva",
+    status_atividade: String(row.status_atividade ?? "").trim(),
     imported_at: row.imported_at ? String(row.imported_at) : undefined,
   }));
 }
