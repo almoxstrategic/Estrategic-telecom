@@ -394,53 +394,82 @@ export function statusNotaToa(
   return ordens.some(isOsProdutiva) ? "Produtiva" : "Improdutiva";
 }
 
-export type ToaNotaExportRow = Record<string, string | number>;
+export type ToaNotaExportRow = {
+  Nome: string;
+  "Login do técnico": string;
+  Contrato: string;
+  Data: string;
+  "Cód Baixa": string | number;
+  "Nº O.S": string;
+  "Tipo O.S": string;
+  "Status da O.S": string;
+  "Status da Nota": "Produtiva" | "Improdutiva";
+};
 
 /**
- * Achata cada Nota/chamado em uma linha Excel com slots O.S. 1–10
- * (Cód de Baixa, Nº O.S, Tipo O.S, Status da O.S) + Status da Nota.
+ * Unpivot: 1 linha Excel por O.S. (slots 1–10 preenchidos).
+ * Colunas: Nome, Login do técnico, Contrato, Data, Cód Baixa,
+ * Nº O.S, Tipo O.S, Status da O.S, Status da Nota.
  */
 export function flattenChamadosToaParaExportacaoNotas(
   chamados: ToaChamadoProcessado[],
   options?: {
     nomePorLogin?: (login: string) => string;
+    /**
+     * Código Z... do técnico (IdTOA / Login do Técnico no TOA).
+     * Default: login bruto do chamado.
+     */
+    loginTecnicoPorLogin?: (login: string) => string;
     formatData?: (isoDate: string) => string;
   },
 ): ToaNotaExportRow[] {
   const resolveNome =
     options?.nomePorLogin ?? ((login: string) => normalizeToaLogin(login));
+  const resolveLoginTecnico =
+    options?.loginTecnicoPorLogin ??
+    ((login: string) => normalizeToaLogin(login));
   const formatData = options?.formatData ?? ((iso: string) => iso);
 
-  return chamados.map((chamado) => {
+  const excelData: ToaNotaExportRow[] = [];
+
+  for (const chamado of chamados) {
+    const loginKey = normalizeToaLogin(chamado.login);
+    const nome = resolveNome(loginKey);
+    const loginTecnico = resolveLoginTecnico(loginKey) || loginKey;
+    const contrato = chamado.contrato || "";
+    const data = formatData(chamado.data);
+    const statusNota = statusNotaToa(chamado.ordensDeServico);
+
     const porIndice = new Map<number, ToaOrdemServico>();
     for (const ordem of chamado.ordensDeServico) {
       porIndice.set(ordem.indice, ordem);
     }
 
-    const ordered: ToaNotaExportRow = {
-      Nome: resolveNome(normalizeToaLogin(chamado.login)),
-      Contrato: chamado.contrato || "",
-      Data: formatData(chamado.data),
-    };
-
     for (let i = 1; i <= 10; i += 1) {
       const ordem = porIndice.get(i);
-      ordered[`Cód de Baixa ${i}`] =
-        ordem?.codBaixaBruto || (ordem ? String(ordem.codBaixa) : "");
-    }
-    for (let i = 1; i <= 10; i += 1) {
-      ordered[`Nº O.S ${i}`] = porIndice.get(i)?.numeroOs || "";
-    }
-    for (let i = 1; i <= 10; i += 1) {
-      ordered[`Tipo O.S ${i}`] = porIndice.get(i)?.tipoOs || "";
-    }
-    for (let i = 1; i <= 10; i += 1) {
-      ordered[`Status da O.S ${i}`] = porIndice.get(i)?.status || "";
-    }
+      if (!ordem) continue;
 
-    ordered["Status da Nota"] = statusNotaToa(chamado.ordensDeServico);
-    return ordered;
-  });
+      const numeroOs = (ordem.numeroOs || "").trim();
+      const codBaixa =
+        (ordem.codBaixaBruto || "").trim() ||
+        (ordem.codBaixa != null ? String(ordem.codBaixa) : "");
+      if (!numeroOs && !codBaixa) continue;
+
+      excelData.push({
+        Nome: nome,
+        "Login do técnico": loginTecnico,
+        Contrato: contrato,
+        Data: data,
+        "Cód Baixa": codBaixa || ordem.codBaixa,
+        "Nº O.S": numeroOs,
+        "Tipo O.S": ordem.tipoOs || "",
+        "Status da O.S": ordem.status || "",
+        "Status da Nota": statusNota,
+      });
+    }
+  }
+
+  return excelData;
 }
 
 /**

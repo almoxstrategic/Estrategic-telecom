@@ -1372,6 +1372,29 @@ function KpiDesempenhoProjecaoToa({
     return map;
   }, [tecnicosEquipe, tecnicos, enriquecidos]);
 
+  /** Código Z... (IdTOA / identificação) a partir do cadastro da equipe. */
+  const loginTecnicoPorLoginExport = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tecnico of tecnicosEquipe) {
+      const codigoZ = (
+        tecnico.identificacao ||
+        tecnico.login ||
+        ""
+      ).trim();
+      if (!codigoZ) continue;
+      for (const identificador of [
+        tecnico.identificacao,
+        tecnico.login,
+        tecnico.id,
+      ]) {
+        if (identificador?.trim()) {
+          map.set(normalizeToaLogin(identificador), codigoZ);
+        }
+      }
+    }
+    return map;
+  }, [tecnicosEquipe]);
+
   const exportarNotasDetalhamentoExcel = () => {
     const chamadosPeriodo = filtrarChamadosToa(
       chamadosProcessados,
@@ -1396,10 +1419,32 @@ function KpiDesempenhoProjecaoToa({
     const dadosExcel = flattenChamadosToaParaExportacaoNotas(chamadosVisiveis, {
       nomePorLogin: (login) =>
         nomesPorLoginExport.get(normalizeToaLogin(login)) || login,
+      loginTecnicoPorLogin: (login) => {
+        const key = normalizeToaLogin(login);
+        // Preferência: código Z do cadastro; senão o login bruto do TOA (Z...).
+        return loginTecnicoPorLoginExport.get(key) || key;
+      },
       formatData: formatDataBr,
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    if (dadosExcel.length === 0) {
+      toast.error("Nenhuma O.S. preenchida nas notas do período.");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel, {
+      header: [
+        "Nome",
+        "Login do técnico",
+        "Contrato",
+        "Data",
+        "Cód Baixa",
+        "Nº O.S",
+        "Tipo O.S",
+        "Status da O.S",
+        "Status da Nota",
+      ],
+    });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Notas");
 
@@ -1409,7 +1454,7 @@ function KpiDesempenhoProjecaoToa({
         : "Completo";
     XLSX.writeFile(workbook, `Exportacao_Notas_${mesAno}.xlsx`);
     toast.success(
-      `Excel exportado: ${formatQuantidade(dadosExcel.length)} notas.`,
+      `Excel exportado: ${formatQuantidade(dadosExcel.length)} O.S. (${formatQuantidade(chamadosVisiveis.length)} notas).`,
     );
   };
 
