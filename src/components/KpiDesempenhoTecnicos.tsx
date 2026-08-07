@@ -9,6 +9,7 @@ import {
   DollarSign,
   Download,
   FilterX,
+  Layers,
   TrendingUp,
   Users,
   X,
@@ -38,6 +39,7 @@ import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import { ATIVIDADES_TOA_CATALOGO } from "@/lib/toa-atividades-catalogo";
 import {
   agregarChamadosToa,
+  contarOsChamadosToa,
   filtrarChamadosToa,
   flattenChamadosToa,
   flattenChamadosToaParaExportacaoNotas,
@@ -818,28 +820,42 @@ function KpiDesempenhoProjecaoToa({
     </button>
   );
 
-  const { totalNotasProdutivas, totalPerdaNotas, receitaTotal, totalNotasToa } =
-    useMemo(
-      () => ({
-        totalNotasProdutivas: enriquecidos.reduce(
-          (total, tecnico) => total + tecnico.notasProdutivas,
-          0,
-        ),
-        totalPerdaNotas: enriquecidos.reduce(
-          (total, tecnico) => total + tecnico.notasImprodutivas,
-          0,
-        ),
-        receitaTotal: enriquecidos.reduce(
-          (total, tecnico) => total + tecnico.receita * fatorProjecao,
-          0,
-        ),
-        totalNotasToa: enriquecidos.reduce(
-          (total, tecnico) => total + tecnico.totalNotasFeitas,
-          0,
-        ),
-      }),
-      [enriquecidos, fatorProjecao],
+  const {
+    totalNotasProdutivas,
+    totalPerdaNotas,
+    receitaTotal,
+    totalNotasToa,
+    totalOsToa,
+    totalOsProdutivasToa,
+    totalOsImprodutivasToa,
+  } = useMemo(() => {
+    const chamadosPeriodo = filtrarChamadosToa(
+      chamadosProcessados,
+      filtroPeriodo,
     );
+    const os = contarOsChamadosToa(chamadosPeriodo);
+    return {
+      totalNotasProdutivas: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.notasProdutivas,
+        0,
+      ),
+      totalPerdaNotas: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.notasImprodutivas,
+        0,
+      ),
+      receitaTotal: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.receita * fatorProjecao,
+        0,
+      ),
+      totalNotasToa: enriquecidos.reduce(
+        (total, tecnico) => total + tecnico.totalNotasFeitas,
+        0,
+      ),
+      totalOsToa: os.totalOs,
+      totalOsProdutivasToa: os.osProdutivas,
+      totalOsImprodutivasToa: os.osImprodutivas,
+    };
+  }, [enriquecidos, fatorProjecao, chamadosProcessados, filtroPeriodo]);
 
   const tiposOsImportados = useMemo(() => {
     const map = new Map<
@@ -1538,7 +1554,7 @@ function KpiDesempenhoProjecaoToa({
             Modo comparação — Analítico Claro e TOA disponíveis no período.
             Use as abas abaixo para alternar o detalhamento.
           </div>
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-emerald-600" />
@@ -1572,6 +1588,71 @@ function KpiDesempenhoProjecaoToa({
                 {formatQuantidade(totalNotasToa)}
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => abrirDetalheNotas("produtivas")}
+              className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-green-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              aria-label="Abrir detalhamento de notas produtivas TOA"
+            >
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de notas produtivas (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(totalNotasProdutivas)}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => abrirDetalheNotas("perdas")}
+              className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 text-left transition hover:border-red-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
+              aria-label="Abrir detalhamento de notas improdutivas TOA"
+            >
+              <div className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de notas improdutivas (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(totalPerdaNotas)}
+              </div>
+            </button>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 shrink-0 text-blue-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de O.S (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(totalOsToa)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 shrink-0 text-green-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de O.S Produtivas (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(totalOsProdutivasToa)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total de O.S improdutivas (TOA)
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-gray-900">
+                {formatQuantidade(totalOsImprodutivasToa)}
+              </div>
+            </div>
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
@@ -1586,7 +1667,18 @@ function KpiDesempenhoProjecaoToa({
           </div>
         </>
       ) : (
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total de notas (TOA)
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-gray-900">
+              {formatQuantidade(totalNotasToa)}
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => abrirDetalheNotas("produtivas")}
@@ -1612,7 +1704,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <XCircle className="h-5 w-5 shrink-0 text-red-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Total de perda de notas (TOA)
+                Total de notas improdutivas (TOA)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1621,9 +1713,42 @@ function KpiDesempenhoProjecaoToa({
           </button>
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 shrink-0 text-blue-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total de O.S (TOA)
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-gray-900">
+              {formatQuantidade(totalOsToa)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 shrink-0 text-green-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total de O.S Produtivas (TOA)
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-gray-900">
+              {formatQuantidade(totalOsProdutivasToa)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 shrink-0 text-red-600" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total de O.S improdutivas (TOA)
+              </span>
+            </div>
+            <div className="mt-3 text-3xl font-bold text-gray-900">
+              {formatQuantidade(totalOsImprodutivasToa)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Receita projetada
+                Receita (TOA)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-green-600">

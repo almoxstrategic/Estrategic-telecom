@@ -472,6 +472,36 @@ export function flattenChamadosToaParaExportacaoNotas(
   return excelData;
 }
 
+/** Contagem de O.S. válidas (slots com dados) e classificação prod/improd. */
+export function contarOsChamadosToa(chamados: ToaChamadoProcessado[]): {
+  totalOs: number;
+  osProdutivas: number;
+  osImprodutivas: number;
+} {
+  let totalOs = 0;
+  let osProdutivas = 0;
+  let osImprodutivas = 0;
+
+  for (const chamado of chamados) {
+    for (const ordem of chamado.ordensDeServico) {
+      const numeroOs = (ordem.numeroOs || "").trim();
+      const codBaixa =
+        (ordem.codBaixaBruto || "").trim() ||
+        (ordem.codBaixa != null ? String(ordem.codBaixa) : "");
+      if (!numeroOs && !codBaixa) continue;
+
+      totalOs += 1;
+      if (isOsProdutiva(ordem)) {
+        osProdutivas += 1;
+      } else if (isOsImprodutiva(ordem)) {
+        osImprodutivas += 1;
+      }
+    }
+  }
+
+  return { totalOs, osProdutivas, osImprodutivas };
+}
+
 /**
  * Preço unitário calibrado pelo histórico Analítico.
  * Match exato do Tipo O.S.; fallback pelo código numérico (ex.: "1 - ...").
