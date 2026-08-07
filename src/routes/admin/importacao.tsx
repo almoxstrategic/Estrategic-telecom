@@ -395,7 +395,8 @@ function ImportacaoPage() {
       clearToaLocalStorage();
       markKpiUltimaImportacao();
       toast.success(
-        `TOA salvo no Supabase: ${persistido.totalNotas} notas (competências ${persistido.competencias.join(", ") || "—"}). ` +
+        `TOA salvo (achatado): ${persistido.totalOs} O.S. / ${persistido.totalNotas} notas-WO ` +
+          `(competências ${persistido.competencias.join(", ") || "—"}). ` +
           `${resultado.totalNotasProdutivas} produtivas / ${resultado.totalNotasImprodutivas} improdutivas.`,
       );
     } catch (err) {
@@ -551,7 +552,7 @@ function ImportacaoPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Importação TOA"
-              description='Lê a aba "Page 1" e grava no Supabase (toa_importacoes). Overwrite automático por mês/competência presente no arquivo (ex.: Agosto substitui só Agosto).'
+              description='Lê a aba "Page 1", faz unpivot (1 O.S. = 1 linha) e grava no Supabase. Overwrite por mês/competência. Notas no KPI = WOs distintas.'
               file={arquivoToa}
               onFileChange={setArquivoToa}
               busy={busyToa}

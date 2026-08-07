@@ -3,6 +3,7 @@ import { normalizeMatricula } from "./auth-identificacao";
 import { normalizeMaterialCode } from "./material-code";
 import { parseLocaleNumber } from "./parse-locale-number";
 import type { ToaLinha } from "./toa-store";
+import { normalizeNumeroWo } from "./toa-store";
 
 type RawRow = Record<string, string>;
 
@@ -305,8 +306,9 @@ function parseToaData(value: string): string {
  * Exportação TOA: por regra, somente a aba exatamente chamada `Page 1`
  * pode alimentar os KPIs.
  *
- * Cada linha é um chamado (WO/Contrato). Dentro dela, as O.S. ocupam
- * slots 1–10: Número da O.S X, Cód de Baixa X, Status da O.S X, Tipo O.S X.
+ * Hierarquia na planilha: 1 linha Excel = 1 WO (pai) com slots O.S. 1–10.
+ * Na persistência (Supabase) fazemos unpivot: 1 linha = 1 O.S.
+ * Cancelado/suspenso não entram no KPI (filtro em processarChamadosTOA).
  */
 export async function parseToaFile(file: File): Promise<ToaLinha[]> {
   const name = file.name.toLowerCase();
@@ -374,15 +376,34 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
 
       return {
         data: parseToaData(pick(row, "Data")),
-        loginTecnico: normalizeMatricula(pick(row, "Login do Técnico")),
+        loginTecnico: normalizeMatricula(
+          pick(row, "Login do Técnico", "ID do Recurso", "Id do Recurso"),
+        ),
+        nomeTecnico: pick(
+          row,
+          "técnicos",
+          "tecnicos",
+          "Técnicos",
+          "Tecnicos",
+          "Técnico",
+          "tecnico",
+          "Nome do Técnico",
+          "Nome Técnico",
+        ),
         numeroWo: pick(row, "Número da WO", "Numero da WO", "Número WO"),
         contrato: pick(row, "Contrato"),
+        statusAtividade: pick(row, "Status da Atividade"),
         ordensDeServico,
       };
     })
     .filter(
       (linha) =>
-        Boolean(linha.data && linha.loginTecnico && linha.ordensDeServico.length > 0),
+        Boolean(
+          linha.data &&
+            linha.loginTecnico &&
+            normalizeNumeroWo(linha.numeroWo) &&
+            linha.ordensDeServico.length > 0,
+        ),
     );
 }
 

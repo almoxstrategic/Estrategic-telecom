@@ -1,6 +1,10 @@
 import { getSupabaseClient } from "./supabase";
-import type { ToaChamadoProcessado, ToaOrdemServico } from "./toa-store";
-import { normalizeToaLogin } from "./toa-store";
+import type { ToaChamadoProcessado } from "./toa-store";
+import {
+  flattenChamadosParaImportacaoFlat,
+  normalizeToaLogin,
+  regroupFlatRowsToChamados,
+} from "./toa-store";
 
 /** Último mês inclusivo do gabarito Analítico (jun/2026). */
 export const FATURAMENTO_HISTORICO_ATE = 202606;
@@ -74,14 +78,20 @@ export type AnaliticoHistoricoRow = {
   unidade_negocio: string | null;
 };
 
+/** 1 linha = 1 O.S. (granularidade alinhada ao Analítico). */
 export type ToaImportacaoRow = {
   id?: string;
   competencia: number;
-  data: string;
-  login: string;
+  data_toa: string;
+  nome_tecnico: string;
+  login_tecnico: string;
   numero_wo: string;
   contrato: string;
-  ordens: ToaOrdemServico[];
+  numero_os: string;
+  tipo_os: string;
+  cod_baixa: number | null;
+  status_os: string;
+  status_nota: "Produtiva" | "Improdutiva";
   imported_at?: string;
 };
 
@@ -667,14 +677,17 @@ export function groupChamadosByCompetencia(
   return map;
 }
 
-/** Overwrite idempotente: apaga competências presentes e reinsere. */
+/** Overwrite idempotente: apaga competências e reinsere O.S. achatadas (1 linha = 1 OS). */
 export async function replaceToaImportacoes(
   chamados: ToaChamadoProcessado[],
-): Promise<{ competencias: number[]; totalNotas: number }> {
-  const byComp = groupChamadosByCompetencia(chamados);
-  const competencias = [...byComp.keys()].sort((a, b) => a - b);
-  if (competencias.length === 0) {
-    return { competencias: [], totalNotas: 0 };
+): Promise<{ competencias: number[]; totalOs: number; totalNotas: number }> {
+  const flat = flattenChamadosParaImportacaoFlat(chamados);
+  const competencias = [
+    ...new Set(flat.map((r) => r.competencia).filter((c) => c > 0)),
+  ].sort((a, b) => a - b);
+
+  if (competencias.length === 0 || flat.length === 0) {
+    return { competencias: [], totalOs: 0, totalNotas: 0 };
   }
 
   const supabase = getSupabaseClient();
@@ -684,36 +697,15 @@ export async function replaceToaImportacoes(
     .in("competencia", competencias);
   if (delError) throw delError;
 
-  const payload: Array<{
-    competencia: number;
-    data: string;
-    login: string;
-    numero_wo: string;
-    contrato: string;
-    ordens: ToaOrdemServico[];
-  }> = [];
-
-  for (const [competencia, lista] of byComp) {
-    for (const c of lista) {
-      payload.push({
-        competencia,
-        data: c.data,
-        login: normalizeToaLogin(c.login),
-        numero_wo: c.numeroWo,
-        contrato: c.contrato,
-        ordens: c.ordensDeServico,
-      });
-    }
-  }
-
   const chunkSize = 200;
-  for (let i = 0; i < payload.length; i += chunkSize) {
-    const chunk = payload.slice(i, i + chunkSize);
+  for (let i = 0; i < flat.length; i += chunkSize) {
+    const chunk = flat.slice(i, i + chunkSize);
     const { error } = await supabase.from("toa_importacoes").insert(chunk);
     if (error) throw error;
   }
 
-  return { competencias, totalNotas: payload.length };
+  const totalNotas = new Set(flat.map((r) => r.numero_wo)).size;
+  return { competencias, totalOs: flat.length, totalNotas };
 }
 
 /** Competências YYYYMM distintas presentes em toa_importacoes. */
@@ -746,16 +738,22 @@ export async function fetchCompetenciasAnalitico(): Promise<number[]> {
   return [...set].sort((a, b) => a - b);
 }
 
+/**
+ * Busca O.S. flat do TOA (1 linha = 1 O.S.).
+ * Use `regroupFlatRowsToChamados` quando precisar da visão por WO.
+ */
 export async function fetchToaImportacoes(filtro: {
   ano: number | null;
   mes: number | null;
   dia: number | null;
-}): Promise<ToaChamadoProcessado[]> {
+}): Promise<ToaImportacaoRow[]> {
   const supabase = getSupabaseClient();
   let query = supabase
     .from("toa_importacoes")
-    .select("competencia, data, login, numero_wo, contrato, ordens")
-    .order("data", { ascending: true });
+    .select(
+      "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, imported_at",
+    )
+    .order("data_toa", { ascending: true });
 
   if (filtro.ano !== null && filtro.mes !== null) {
     query = query.eq("competencia", competenciaYm(filtro.ano, filtro.mes));
@@ -767,19 +765,40 @@ export async function fetchToaImportacoes(filtro: {
 
   if (filtro.dia !== null && filtro.ano !== null && filtro.mes !== null) {
     const iso = `${filtro.ano}-${String(filtro.mes).padStart(2, "0")}-${String(filtro.dia).padStart(2, "0")}`;
-    query = query.eq("data", iso);
+    query = query.eq("data_toa", iso);
   }
 
   const { data, error } = await query;
   if (error) throw error;
 
   return (data ?? []).map((row) => ({
-    data: String(row.data).slice(0, 10),
-    login: normalizeToaLogin(String(row.login ?? "")),
-    numeroWo: String(row.numero_wo ?? ""),
+    id: row.id ? String(row.id) : undefined,
+    competencia: Number(row.competencia) || 0,
+    data_toa: String(row.data_toa ?? "").slice(0, 10),
+    nome_tecnico: String(row.nome_tecnico ?? "").trim(),
+    login_tecnico: normalizeToaLogin(String(row.login_tecnico ?? "")),
+    numero_wo: String(row.numero_wo ?? ""),
     contrato: String(row.contrato ?? ""),
-    ordensDeServico: Array.isArray(row.ordens)
-      ? (row.ordens as ToaOrdemServico[])
-      : [],
+    numero_os: String(row.numero_os ?? ""),
+    tipo_os: String(row.tipo_os ?? ""),
+    cod_baixa:
+      row.cod_baixa == null || row.cod_baixa === ""
+        ? null
+        : Number(row.cod_baixa),
+    status_os: String(row.status_os ?? ""),
+    status_nota:
+      String(row.status_nota ?? "").trim() === "Produtiva"
+        ? "Produtiva"
+        : "Improdutiva",
+    imported_at: row.imported_at ? String(row.imported_at) : undefined,
   }));
+}
+
+/** @deprecated Preferir fetchToaImportacoes (flat) + regroupFlatRowsToChamados. */
+export async function fetchToaImportacoesComoChamados(filtro: {
+  ano: number | null;
+  mes: number | null;
+  dia: number | null;
+}): Promise<ToaChamadoProcessado[]> {
+  return regroupFlatRowsToChamados(await fetchToaImportacoes(filtro));
 }

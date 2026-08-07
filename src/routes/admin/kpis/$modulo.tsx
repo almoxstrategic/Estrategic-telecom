@@ -70,6 +70,7 @@ import {
   fetchToaImportacoes,
   type AnaliticoHistoricoRow,
   type ModoFaturamentoDisponibilidade,
+  type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
 import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
 import { useKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
@@ -97,7 +98,7 @@ import {
   agregarChamadosToa,
   filtrarChamadosToa,
   normalizeToaLogin,
-  type ToaChamadoProcessado,
+  regroupFlatRowsToChamados,
 } from "@/lib/toa-store";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
@@ -249,18 +250,23 @@ function KpisPage() {
   const filtro = useKpiFiltro();
   const ultimaImportacaoAt = useKpiUltimaImportacao();
   const [precosOs, setPrecosOs] = useState<PrecosOsMap>({});
-  const [chamadosToa, setChamadosToa] = useState<ToaChamadoProcessado[]>([]);
+  const [toaOsRows, setToaOsRows] = useState<ToaImportacaoRow[]>([]);
   const [analiticoRows, setAnaliticoRows] = useState<AnaliticoHistoricoRow[]>([]);
   const [faturamentoLoading, setFaturamentoLoading] = useState(false);
   const [faturamentoError, setFaturamentoError] = useState<string | null>(null);
+
+  const chamadosToa = useMemo(
+    () => regroupFlatRowsToChamados(toaOsRows),
+    [toaOsRows],
+  );
 
   const modoFaturamento = useMemo((): ModoFaturamentoDisponibilidade | "indefinido" => {
     if (filtro.ano === null || filtro.mes === null) return "indefinido";
     return detectarModoFaturamento({
       temAnalitico: analiticoRows.length > 0,
-      temToa: chamadosToa.length > 0,
+      temToa: toaOsRows.length > 0,
     });
-  }, [filtro.ano, filtro.mes, analiticoRows.length, chamadosToa.length]);
+  }, [filtro.ano, filtro.mes, analiticoRows.length, toaOsRows.length]);
 
   const carregarPrecosOs = useCallback(async () => {
     const precos = await fetchPrecosOs();
@@ -313,7 +319,7 @@ function KpisPage() {
     let cancelled = false;
     void (async () => {
       if (filtro.ano === null || filtro.mes === null) {
-        setChamadosToa([]);
+        setToaOsRows([]);
         setAnaliticoRows([]);
         setFaturamentoError(null);
         setFaturamentoLoading(false);
@@ -322,7 +328,7 @@ function KpisPage() {
       setFaturamentoLoading(true);
       setFaturamentoError(null);
       try {
-        const [rows, chamados] = await Promise.all([
+        const [rows, toaFlat] = await Promise.all([
           fetchAnaliticoHistorico({
             ano: filtro.ano,
             mes: filtro.mes,
@@ -335,7 +341,7 @@ function KpisPage() {
         ]);
         if (cancelled) return;
         setAnaliticoRows(rows);
-        setChamadosToa(chamados);
+        setToaOsRows(toaFlat);
       } catch (err) {
         if (cancelled) return;
         console.error("Erro ao carregar faturamento:", err);
@@ -344,7 +350,7 @@ function KpisPage() {
             ? err.message
             : "Não foi possível carregar os dados de faturamento.",
         );
-        setChamadosToa([]);
+        setToaOsRows([]);
         setAnaliticoRows([]);
       } finally {
         if (!cancelled) setFaturamentoLoading(false);
@@ -1081,6 +1087,7 @@ function KpisPage() {
             <KpiDesempenhoTecnicos
               tecnicos={kpis?.top_tecnicos ?? []}
               tecnicosEquipe={tecnicosEquipe}
+              toaOsRows={toaOsRows}
               chamadosProcessados={chamadosToa}
               analiticoRows={analiticoRows}
               modoFaturamento={modoFaturamento}

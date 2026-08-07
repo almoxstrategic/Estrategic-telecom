@@ -38,27 +38,33 @@ import {
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import { ATIVIDADES_TOA_CATALOGO } from "@/lib/toa-atividades-catalogo";
 import {
+  filtrarAnaliticoPorDhBaixa,
+  formatDhBaixaDisplay,
+  resumirAnaliticoHistorico,
+  type AnaliticoHistoricoRow,
+  type ToaImportacaoRow,
+} from "@/lib/faturamento-service";
+import { conciliarAnaliticoVsToa } from "@/lib/faturamento-conciliacao";
+import {
   agregarChamadosToa,
-  contarOsChamadosToa,
+  agregarKpisToaFlat,
+  dedupeChamadosPorNumeroWo,
   filtrarChamadosToa,
+  filtrarToaOsRows,
   flattenChamadosToa,
   flattenChamadosToaParaExportacaoNotas,
   isOsImprodutiva,
   isOsProdutiva,
+  isOsReceitaFaturavelNaNota,
+  avaliarNotaToa,
   normalizeTipoOs,
   normalizeToaLogin,
+  statusNotaToa,
   valorPrecoOs,
   valorReceitaFaturadaOs,
   type ToaChamadoProcessado,
   type ToaResumoTecnico,
 } from "@/lib/toa-store";
-import {
-  filtrarAnaliticoPorDhBaixa,
-  formatDhBaixaDisplay,
-  resumirAnaliticoHistorico,
-  type AnaliticoHistoricoRow,
-} from "@/lib/faturamento-service";
-import { conciliarAnaliticoVsToa } from "@/lib/faturamento-conciliacao";
 
 type KpiFiltroPeriodo = {
   ano: number | null;
@@ -79,12 +85,27 @@ type NotaDetalheCard = {
   colaborador: string;
   contrato: string;
   numeroWo: string;
-  tipoOs: string;
+  /** Resumo das O.S. da WO (ex.: quantidade ou tipos). */
+  resumoOs: string;
   receita: number;
   isProdutiva: boolean;
   /** true se entra na receita projetada (não bundlada). */
   contaReceitaFaturada: boolean;
-  status: string;
+  statusNota: "Produtiva" | "Improdutiva";
+};
+
+type NotaWoLinha = {
+  numeroWo: string;
+  contrato: string;
+  data: string;
+  login: string;
+  nome: string;
+  statusNota: "Produtiva" | "Improdutiva";
+  totalOs: number;
+  osProdutivas: number;
+  osImprodutivas: number;
+  receita: number;
+  receitaPerda: number;
 };
 
 export type ModoFaturamentoKpi =
@@ -99,6 +120,8 @@ type KpiDesempenhoTecnicosProps = {
   tecnicosEquipe: TecnicoProfile[];
   /** @deprecated Preferir recálculo interno via chamados + precosOs. Mantido por compat. */
   resumoToa?: Record<string, ToaResumoTecnico>;
+  /** Linhas flat do banco (1 = 1 O.S.) — fonte dos cards de volume TOA. */
+  toaOsRows?: ToaImportacaoRow[];
   chamadosProcessados: ToaChamadoProcessado[];
   filtroPeriodo: KpiFiltroPeriodo;
   demitidosKeys: Set<string>;
@@ -188,9 +211,9 @@ function formatReceita(valor: number): string {
   }).format(valor);
 }
 
-/** Colunas da tabela Detalhamento por Técnico: nome flexível + 12 métricas. */
-const GRID_TECNICOS =
-  "grid grid-cols-[minmax(96px,1.5fr)_repeat(12,minmax(0,1fr))] gap-2";
+/** Colunas da tabela Detalhamento TOA: 1 linha = 1 WO (Nota). */
+const GRID_NOTAS_WO =
+  "grid grid-cols-[minmax(96px,1.3fr)_minmax(90px,1fr)_minmax(80px,0.95fr)_minmax(64px,0.7fr)_minmax(72px,0.75fr)_minmax(48px,0.55fr)_minmax(48px,0.55fr)_minmax(48px,0.55fr)_minmax(72px,0.85fr)_minmax(72px,0.85fr)] gap-2";
 
 function formatMediaMaterial(valor: number): string {
   return valor.toLocaleString("pt-BR", {
@@ -260,17 +283,6 @@ function formatPct(valor: number): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })}%`;
-}
-
-function valorOrdenacao(tecnico: TecnicoDesempenho, key: SortKey): number {
-  switch (key) {
-    case "aproveitamento":
-      return tecnico.aproveitamento;
-    case "receitaPerda":
-      return tecnico.receitaPerda;
-    case "receita":
-      return tecnico.receita;
-  }
 }
 
 const GRID_HISTORICO =
@@ -476,7 +488,7 @@ function KpiDesempenhoHistoricoAnalitico({
         <div className="mb-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Users className="h-4 w-4 text-primary" />
-            Detalhamento por Técnico
+            Detalhamento Analítico
           </h2>
         </div>
         <TabelaDetalhamentoAnalitico rows={rowsFiltradas} />
@@ -489,6 +501,7 @@ export function KpiDesempenhoTecnicos({
   tecnicos,
   tecnicosEquipe,
   resumoToa: _resumoToaProp,
+  toaOsRows = [],
   chamadosProcessados,
   filtroPeriodo,
   demitidosKeys,
@@ -531,6 +544,7 @@ export function KpiDesempenhoTecnicos({
       tecnicos={tecnicos}
       tecnicosEquipe={tecnicosEquipe}
       resumoToa={_resumoToaProp}
+      toaOsRows={toaOsRows}
       chamadosProcessados={chamadosProcessados}
       filtroPeriodo={filtroPeriodo}
       demitidosKeys={demitidosKeys}
@@ -549,6 +563,7 @@ function KpiDesempenhoProjecaoToa({
   tecnicos,
   tecnicosEquipe,
   resumoToa: _resumoToaProp,
+  toaOsRows = [],
   chamadosProcessados,
   filtroPeriodo,
   demitidosKeys,
@@ -664,21 +679,75 @@ function KpiDesempenhoProjecaoToa({
 
   /**
    * Fonte única de verdade: mesmas regras preditivas do card, tabela e drill-down.
-   * (Não reutiliza resumo pré-agregado do parent para evitar dessincronia com precosOs.)
+   * Contagem de Nota = WO única (não Contrato).
    */
+  const chamadosToaPeriodo = useMemo(
+    () =>
+      dedupeChamadosPorNumeroWo(
+        filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
+      ),
+    [chamadosProcessados, filtroPeriodo],
+  );
+
+  /** Linhas flat (1 O.S.) no período — cards de volume usam status_* do banco. */
+  const toaOsPeriodo = useMemo(
+    () => filtrarToaOsRows(toaOsRows, filtroPeriodo),
+    [toaOsRows, filtroPeriodo],
+  );
+
+  const kpisToaFlat = useMemo(
+    () => agregarKpisToaFlat(toaOsPeriodo),
+    [toaOsPeriodo],
+  );
+
   const resumoToa = useMemo(() => {
-    const agregado = agregarChamadosToa(
-      filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
-      precosOs,
-    );
-    return agregado.resumoPorTecnico;
-  }, [chamadosProcessados, filtroPeriodo, precosOs]);
+    const agregado = agregarChamadosToa(chamadosToaPeriodo, precosOs);
+    const flatResumo = kpisToaFlat.resumoPorTecnico;
+    const merged: Record<string, ToaResumoTecnico> = {};
+    const logins = new Set([
+      ...Object.keys(agregado.resumoPorTecnico),
+      ...Object.keys(flatResumo),
+    ]);
+    for (const login of logins) {
+      const receita = agregado.resumoPorTecnico[login];
+      const volume = flatResumo[login];
+      merged[login] = {
+        totalNotasFeitas:
+          volume?.totalNotasFeitas ?? receita?.totalNotasFeitas ?? 0,
+        notasProdutivas:
+          volume?.notasProdutivas ?? receita?.notasProdutivas ?? 0,
+        notasImprodutivas:
+          volume?.notasImprodutivas ?? receita?.notasImprodutivas ?? 0,
+        osProdutivas: volume?.osProdutivas ?? receita?.osProdutivas ?? 0,
+        osImprodutivas: volume?.osImprodutivas ?? receita?.osImprodutivas ?? 0,
+        receitaFaturada: receita?.receitaFaturada ?? 0,
+        receitaPerda: receita?.receitaPerda ?? 0,
+      };
+    }
+    return merged;
+  }, [chamadosToaPeriodo, precosOs, kpisToaFlat]);
 
   const enriquecidos = useMemo<TecnicoDesempenho[]>(() => {
     const kpisPorLogin = new Map(
       tecnicos.map((tecnico) => [normalizeToaLogin(tecnico.id_tecnico), tecnico]),
     );
     const nomesPorLogin = new Map<string, string>();
+
+    for (const row of toaOsPeriodo) {
+      const login = normalizeToaLogin(row.login_tecnico);
+      const nome = row.nome_tecnico?.trim();
+      if (login && nome && !nomesPorLogin.has(login)) {
+        nomesPorLogin.set(login, nome);
+      }
+    }
+
+    for (const chamado of chamadosToaPeriodo) {
+      const login = normalizeToaLogin(chamado.login);
+      const nome = chamado.nomeTecnico?.trim();
+      if (login && nome && !nomesPorLogin.has(login)) {
+        nomesPorLogin.set(login, nome);
+      }
+    }
 
     for (const tecnico of tecnicosEquipe) {
       for (const identificador of [
@@ -687,7 +756,10 @@ function KpiDesempenhoProjecaoToa({
         tecnico.id,
       ]) {
         if (identificador?.trim()) {
-          nomesPorLogin.set(normalizeToaLogin(identificador), tecnico.nome);
+          const key = normalizeToaLogin(identificador);
+          if (!nomesPorLogin.has(key)) {
+            nomesPorLogin.set(key, tecnico.nome);
+          }
         }
       }
     }
@@ -696,8 +768,8 @@ function KpiDesempenhoProjecaoToa({
       const loginNormalizado = normalizeToaLogin(login);
       const tecnicoKpi = kpisPorLogin.get(loginNormalizado);
       const nome =
-        tecnicoKpi?.nome_tecnico?.trim() ||
         nomesPorLogin.get(loginNormalizado) ||
+        tecnicoKpi?.nome_tecnico?.trim() ||
         loginNormalizado;
       const totalOs = resumo.osProdutivas + resumo.osImprodutivas;
       const aproveitamento =
@@ -750,42 +822,9 @@ function KpiDesempenhoProjecaoToa({
         ),
       };
     });
-  }, [resumoToa, tecnicos, tecnicosEquipe]);
-
-  const tecnicosFiltrados = useMemo(() => {
-    const termo = buscaTecnico.trim().toLowerCase();
-    if (!termo) return enriquecidos;
-    return enriquecidos.filter((tecnico) => {
-      const nome = (tecnico.nome || "").toLowerCase();
-      const matricula = (tecnico.id_tecnico || "").toLowerCase();
-      return nome.includes(termo) || matricula.includes(termo);
-    });
-  }, [enriquecidos, buscaTecnico]);
+  }, [resumoToa, tecnicos, tecnicosEquipe, toaOsPeriodo, chamadosToaPeriodo]);
 
   const fatorProjecao = 1 + percentualAumento / 100;
-
-  const tecnicosComProjecao = useMemo(
-    () =>
-      tecnicosFiltrados.map((tecnico) => ({
-        ...tecnico,
-        receita: tecnico.receita * fatorProjecao,
-        receitaPerda: tecnico.receitaPerda * fatorProjecao,
-      })),
-    [tecnicosFiltrados, fatorProjecao],
-  );
-
-  const tecnicosOrdenados = useMemo(() => {
-    if (!sortConfig.key) return tecnicosComProjecao;
-    const key = sortConfig.key;
-    const fator = sortConfig.direction === "asc" ? 1 : -1;
-    return [...tecnicosComProjecao].sort((a, b) => {
-      const valorA = valorOrdenacao(a, key);
-      const valorB = valorOrdenacao(b, key);
-      if (valorA < valorB) return -1 * fator;
-      if (valorA > valorB) return 1 * fator;
-      return 0;
-    });
-  }, [tecnicosComProjecao, sortConfig]);
 
   const atualizarPercentualAumento = (valor: string) => {
     setPercentualAumentoTexto(valor);
@@ -829,33 +868,30 @@ function KpiDesempenhoProjecaoToa({
     totalOsProdutivasToa,
     totalOsImprodutivasToa,
   } = useMemo(() => {
-    const chamadosPeriodo = filtrarChamadosToa(
-      chamadosProcessados,
-      filtroPeriodo,
-    );
-    const os = contarOsChamadosToa(chamadosPeriodo);
+    const agregado = agregarChamadosToa(chamadosToaPeriodo, precosOs);
+    const usarFlat = toaOsPeriodo.length > 0;
     return {
-      totalNotasProdutivas: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.notasProdutivas,
-        0,
-      ),
-      totalPerdaNotas: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.notasImprodutivas,
-        0,
-      ),
-      receitaTotal: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.receita * fatorProjecao,
-        0,
-      ),
-      totalNotasToa: enriquecidos.reduce(
-        (total, tecnico) => total + tecnico.totalNotasFeitas,
-        0,
-      ),
-      totalOsToa: os.totalOs,
-      totalOsProdutivasToa: os.osProdutivas,
-      totalOsImprodutivasToa: os.osImprodutivas,
+      totalNotasProdutivas: usarFlat
+        ? kpisToaFlat.notasProdutivas
+        : agregado.totalNotasProdutivas,
+      totalPerdaNotas: usarFlat
+        ? kpisToaFlat.notasImprodutivas
+        : agregado.totalNotasImprodutivas,
+      receitaTotal: agregado.receitaFaturadaTotal * fatorProjecao,
+      totalNotasToa: usarFlat
+        ? kpisToaFlat.totalNotas
+        : agregado.totalNotasFeitas,
+      totalOsToa: usarFlat
+        ? kpisToaFlat.totalOs
+        : agregado.totalOsProdutivas + agregado.totalOsImprodutivas,
+      totalOsProdutivasToa: usarFlat
+        ? kpisToaFlat.osProdutivas
+        : agregado.totalOsProdutivas,
+      totalOsImprodutivasToa: usarFlat
+        ? kpisToaFlat.osImprodutivas
+        : agregado.totalOsImprodutivas,
     };
-  }, [enriquecidos, fatorProjecao, chamadosProcessados, filtroPeriodo]);
+  }, [chamadosToaPeriodo, precosOs, fatorProjecao, kpisToaFlat, toaOsPeriodo.length]);
 
   const tiposOsImportados = useMemo(() => {
     const map = new Map<
@@ -1255,33 +1291,144 @@ function KpiDesempenhoProjecaoToa({
     return nomes;
   }, [tecnicosEquipe, tecnicos, enriquecidos]);
 
+  /** Detalhamento TOA: 1 linha = 1 WO (Nota). Contrato é atributo, não identidade. */
+  const notasWoDetalhe = useMemo<NotaWoLinha[]>(() => {
+    return chamadosToaPeriodo.map((chamado) => {
+      const login = normalizeToaLogin(chamado.login);
+      const metrica = avaliarNotaToa(chamado);
+      let receita = 0;
+      let receitaPerda = 0;
+
+      for (const ordem of chamado.ordensDeServico) {
+        const valor = valorPrecoOs(precosOs, ordem.tipoOs);
+        if (isOsProdutiva(ordem)) {
+          if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
+            receita += valor;
+          }
+        } else if (isOsImprodutiva(ordem)) {
+          receitaPerda += valor;
+        }
+      }
+
+      return {
+        numeroWo: chamado.numeroWo,
+        contrato: chamado.contrato,
+        data: chamado.data,
+        login,
+        nome:
+          chamado.nomeTecnico?.trim() ||
+          nomesColaboradorPorLogin.get(login) ||
+          login,
+        statusNota: metrica.statusNota,
+        totalOs: metrica.totalOs,
+        osProdutivas: metrica.osProdutivas,
+        osImprodutivas: metrica.osImprodutivas,
+        receita: receita * fatorProjecao,
+        receitaPerda: receitaPerda * fatorProjecao,
+      };
+    });
+  }, [
+    chamadosToaPeriodo,
+    precosOs,
+    fatorProjecao,
+    nomesColaboradorPorLogin,
+  ]);
+
+  const notasWoFiltradas = useMemo(() => {
+    const termo = buscaTecnico.trim().toLowerCase();
+    if (!termo) return notasWoDetalhe;
+    return notasWoDetalhe.filter((nota) => {
+      const nome = (nota.nome || "").toLowerCase();
+      const login = (nota.login || "").toLowerCase();
+      const wo = (nota.numeroWo || "").toLowerCase();
+      const contrato = (nota.contrato || "").toLowerCase();
+      return (
+        nome.includes(termo) ||
+        login.includes(termo) ||
+        wo.includes(termo) ||
+        contrato.includes(termo)
+      );
+    });
+  }, [notasWoDetalhe, buscaTecnico]);
+
+  const notasWoOrdenadas = useMemo(() => {
+    if (!sortConfig.key) {
+      return [...notasWoFiltradas].sort((a, b) => {
+        const byDate = b.data.localeCompare(a.data);
+        if (byDate !== 0) return byDate;
+        return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+      });
+    }
+    const key = sortConfig.key;
+    const fator = sortConfig.direction === "asc" ? 1 : -1;
+    return [...notasWoFiltradas].sort((a, b) => {
+      const valorA =
+        key === "receitaPerda"
+          ? a.receitaPerda
+          : key === "receita"
+            ? a.receita
+            : a.statusNota === "Produtiva"
+              ? 1
+              : 0;
+      const valorB =
+        key === "receitaPerda"
+          ? b.receitaPerda
+          : key === "receita"
+            ? b.receita
+            : b.statusNota === "Produtiva"
+              ? 1
+              : 0;
+      if (valorA < valorB) return -1 * fator;
+      if (valorA > valorB) return 1 * fator;
+      return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+    });
+  }, [notasWoFiltradas, sortConfig]);
+
   const notasDetalheCard = useMemo<NotaDetalheCard[]>(() => {
     if (!detalheNotasTipo) return [];
 
     const desejaProdutiva = detalheNotasTipo === "produtivas";
-    const osFlat = flattenChamadosToa(
-      filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
-    ).filter((os) =>
-      desejaProdutiva ? isOsProdutiva(os) : isOsImprodutiva(os),
-    );
 
-    return osFlat
-      .map((os) => {
-        const login = normalizeToaLogin(os.login);
-        const valorBase = valorReceitaFaturadaOs(os, precosOs);
-        const receita = valorBase * fatorProjecao;
+    return chamadosToaPeriodo
+      .filter((chamado) => {
+        const produtiva = statusNotaToa(chamado.ordensDeServico) === "Produtiva";
+        return desejaProdutiva ? produtiva : !produtiva;
+      })
+      .map((chamado) => {
+        const login = normalizeToaLogin(chamado.login);
+        let receita = 0;
+        let temFaturavel = false;
+        const tipos: string[] = [];
 
+        for (const ordem of chamado.ordensDeServico) {
+          if (desejaProdutiva) {
+            if (!isOsProdutiva(ordem)) continue;
+            tipos.push(ordem.tipoOs || "—");
+            if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
+              receita += valorPrecoOs(precosOs, ordem.tipoOs);
+              temFaturavel = true;
+            }
+          } else if (isOsImprodutiva(ordem)) {
+            tipos.push(ordem.tipoOs || "—");
+            receita += valorPrecoOs(precosOs, ordem.tipoOs);
+          }
+        }
+
+        const status = statusNotaToa(chamado.ordensDeServico);
         return {
-          data: os.data,
+          data: chamado.data,
           login,
           colaborador: nomesColaboradorPorLogin.get(login) || login,
-          contrato: os.contrato,
-          numeroWo: os.numeroWo,
-          tipoOs: os.tipoOs,
-          receita,
-          isProdutiva: os.isProdutiva,
-          contaReceitaFaturada: os.contaReceitaFaturada,
-          status: os.status,
+          contrato: chamado.contrato,
+          numeroWo: chamado.numeroWo,
+          resumoOs:
+            tipos.length > 0
+              ? `${tipos.length} O.S.: ${tipos.slice(0, 2).join("; ")}${tipos.length > 2 ? "…" : ""}`
+              : "—",
+          receita: receita * fatorProjecao,
+          isProdutiva: status === "Produtiva",
+          contaReceitaFaturada: desejaProdutiva ? temFaturavel : false,
+          statusNota: status,
         };
       })
       .sort((a, b) => {
@@ -1293,8 +1440,7 @@ function KpiDesempenhoProjecaoToa({
       });
   }, [
     detalheNotasTipo,
-    chamadosProcessados,
-    filtroPeriodo,
+    chamadosToaPeriodo,
     precosOs,
     fatorProjecao,
     nomesColaboradorPorLogin,
@@ -1335,9 +1481,10 @@ function KpiDesempenhoProjecaoToa({
         Data: formatDataBr(nota.data),
         Colaborador: nota.colaborador,
         Contrato: nota.contrato || "—",
-        WO: nota.numeroWo || "—",
-        "Tipo OS": nota.tipoOs || "—",
+        "Número da WO": nota.numeroWo || "—",
+        "O.S. / Tipos": nota.resumoOs || "—",
         Receita: Number(receitaExibida.toFixed(2)),
+        "Status da Nota": nota.statusNota,
         Status: nota.contaReceitaFaturada
           ? "Produtivo / Faturável"
           : nota.isProdutiva
@@ -1412,23 +1559,15 @@ function KpiDesempenhoProjecaoToa({
   }, [tecnicosEquipe]);
 
   const exportarNotasDetalhamentoExcel = () => {
-    const chamadosPeriodo = filtrarChamadosToa(
-      chamadosProcessados,
-      filtroPeriodo,
+    const wosVisiveis = new Set(
+      notasWoFiltradas.map((n) => n.numeroWo),
     );
-
-    const loginsVisiveis = new Set(
-      tecnicosFiltrados.map((t) => normalizeToaLogin(t.id_tecnico)),
+    const chamadosVisiveis = chamadosToaPeriodo.filter((c) =>
+      wosVisiveis.has(c.numeroWo),
     );
-    const chamadosVisiveis =
-      buscaTecnico.trim().length > 0
-        ? chamadosPeriodo.filter((c) =>
-            loginsVisiveis.has(normalizeToaLogin(c.login)),
-          )
-        : chamadosPeriodo;
 
     if (chamadosVisiveis.length === 0) {
-      toast.error("Nenhuma nota no período para exportar.");
+      toast.error("Nenhuma nota (WO) no período para exportar.");
       return;
     }
 
@@ -1453,6 +1592,7 @@ function KpiDesempenhoProjecaoToa({
         "Nome",
         "Login do técnico",
         "Contrato",
+        "Número da WO",
         "Data",
         "Cód Baixa",
         "Nº O.S",
@@ -1470,17 +1610,12 @@ function KpiDesempenhoProjecaoToa({
         : "Completo";
     XLSX.writeFile(workbook, `Exportacao_Notas_${mesAno}.xlsx`);
     toast.success(
-      `Excel exportado: ${formatQuantidade(dadosExcel.length)} O.S. (${formatQuantidade(chamadosVisiveis.length)} notas).`,
+      `Excel exportado: ${formatQuantidade(dadosExcel.length)} O.S. (${formatQuantidade(chamadosVisiveis.length)} notas/WOs).`,
     );
   };
 
   const exportarComparacaoConciliacao = () => {
-    const chamadosPeriodo = filtrarChamadosToa(
-      chamadosProcessados,
-      filtroPeriodo,
-    );
-
-    if (analiticoFiltrado.length === 0 || chamadosPeriodo.length === 0) {
+    if (analiticoFiltrado.length === 0 || toaOsPeriodo.length === 0) {
       toast.error(
         "É necessário ter Analítico e TOA no período para gerar a conciliação.",
       );
@@ -1489,53 +1624,52 @@ function KpiDesempenhoProjecaoToa({
 
     const { faltandoNoToa, faltandoNoAnalitico } = conciliarAnaliticoVsToa(
       analiticoFiltrado,
-      chamadosPeriodo,
-      {
-        nomePorLogin: (login) =>
-          nomesPorLoginExport.get(normalizeToaLogin(login)) || login,
-        precosOs,
-      },
+      toaOsPeriodo,
     );
 
     if (faltandoNoToa.length === 0 && faltandoNoAnalitico.length === 0) {
       toast.success(
-        "Conciliação sem gaps: todos os contratos produtivos cruzaram entre Analítico e TOA.",
+        "Conciliação sem gaps: todas as O.S. cruzaram entre Analítico e TOA.",
       );
     }
 
     const workbook = XLSX.utils.book_new();
-    const sheetAnalitico =
-      faltandoNoToa.length > 0
-        ? XLSX.utils.json_to_sheet(faltandoNoToa)
-        : XLSX.utils.aoa_to_sheet([
-            ["NR_CONTRATO", "CD_OS", "VALOR_SERVICO", "DS_TIPO_OS"],
-          ]);
-    const sheetToa =
+    const sheetCobrar =
       faltandoNoAnalitico.length > 0
         ? XLSX.utils.json_to_sheet(faltandoNoAnalitico)
         : XLSX.utils.aoa_to_sheet([
             [
+              "Nome Técnico",
+              "Login",
               "Contrato",
-              "Número da WO",
-              "Nome do Técnico",
-              "Total de O.S. Produtivas",
-              "Receita Projetada",
+              "Número WO",
+              "Número OS",
+              "Tipo OS",
+              "Cód Baixa",
+              "Data TOA",
             ],
           ]);
+    const sheetNaoRegistrado =
+      faltandoNoToa.length > 0
+        ? XLSX.utils.json_to_sheet(faltandoNoToa)
+        : XLSX.utils.aoa_to_sheet([
+            ["Contrato", "CD_OS", "Tipo OS", "Data Baixa", "Valor Serviço"],
+          ]);
 
-    XLSX.utils.book_append_sheet(workbook, sheetAnalitico, "Somente no Analítico");
-    XLSX.utils.book_append_sheet(workbook, sheetToa, "Somente no TOA");
-
-    const mesAno =
-      filtroPeriodo.mes !== null && filtroPeriodo.ano !== null
-        ? `${String(filtroPeriodo.mes).padStart(2, "0")}${filtroPeriodo.ano}`
-        : "Completo";
-    XLSX.writeFile(
+    XLSX.utils.book_append_sheet(
       workbook,
-      `Conciliacao_Analitico_vs_TOA_${mesAno}.xlsx`,
+      sheetCobrar,
+      "Falta no Analitico (Cobrar)",
     );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      sheetNaoRegistrado,
+      "Falta no TOA (Não Registrado)",
+    );
+
+    XLSX.writeFile(workbook, "Conciliacao_Analitico_vs_TOA.xlsx");
     toast.success(
-      `Conciliação exportada: ${formatQuantidade(faltandoNoToa.length)} só no Analítico, ${formatQuantidade(faltandoNoAnalitico.length)} só no TOA.`,
+      `Conciliação exportada: ${formatQuantidade(faltandoNoAnalitico.length)} cobrar (falta no Analítico), ${formatQuantidade(faltandoNoToa.length)} não registrado (falta no TOA).`,
     );
   };
 
@@ -1581,7 +1715,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de notas (TOA)
+                  Total de notas / WOs (TOA)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1597,7 +1731,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de notas produtivas (TOA)
+                  Notas produtivas (WO c/ ≥1 O.S. prod.)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1613,7 +1747,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de notas improdutivas (TOA)
+                  Notas improdutivas (sem O.S. prod.)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1624,7 +1758,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <Layers className="h-5 w-5 shrink-0 text-blue-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de O.S (TOA)
+                  Total de O.S únicas (TOA)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1672,7 +1806,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Total de notas (TOA)
+                Total de notas / WOs (TOA)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1688,7 +1822,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Total de notas produtivas (TOA)
+                Notas produtivas (WO c/ ≥1 O.S. prod.)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1704,7 +1838,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <XCircle className="h-5 w-5 shrink-0 text-red-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Total de notas improdutivas (TOA)
+                Notas improdutivas (sem O.S. prod.)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1715,7 +1849,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <Layers className="h-5 w-5 shrink-0 text-blue-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Total de O.S (TOA)
+                Total de O.S únicas (TOA)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1923,7 +2057,7 @@ function KpiDesempenhoProjecaoToa({
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Users className="h-4 w-4 text-primary" />
-            Detalhamento por Técnico
+            Detalhamento TOA — por Nota (WO)
           </h2>
           {activeTab === "toa" ? (
             <button
@@ -2006,9 +2140,9 @@ function KpiDesempenhoProjecaoToa({
                 type="search"
                 value={buscaTecnico}
                 onChange={(e) => setBuscaTecnico(e.target.value)}
-                placeholder="Buscar por nome ou matrícula (Z)..."
-                aria-label="Buscar técnico por nome ou matrícula"
-                className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-72"
+                placeholder="Buscar por WO, contrato, nome ou matrícula..."
+                aria-label="Buscar nota por WO, contrato, nome ou matrícula"
+                className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
               />
 
               <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
@@ -2016,7 +2150,7 @@ function KpiDesempenhoProjecaoToa({
                   type="button"
                   onClick={exportarNotasDetalhamentoExcel}
                   className="inline-flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 transition hover:bg-green-100"
-                  title="Exportar notas do período com O.S. 1–10 e Status da Nota"
+                  title="Exportar notas (WOs) do período com O.S. filhas e Status da Nota"
                   aria-label="Exportar Excel com notas do período"
                 >
                   <Download className="h-4 w-4" />
@@ -2053,32 +2187,29 @@ function KpiDesempenhoProjecaoToa({
                 </label>
               </div>
             </div>
-            {enriquecidos.length === 0 ? (
+            {notasWoDetalhe.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhum técnico com baixa no período selecionado.
+                Nenhuma nota (WO) no período selecionado.
               </p>
-            ) : tecnicosFiltrados.length === 0 ? (
+            ) : notasWoFiltradas.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhum técnico encontrado para “{buscaTecnico.trim()}”.
+                Nenhuma nota encontrada para “{buscaTecnico.trim()}”.
               </p>
             ) : (
-              <div className="w-full">
+              <div className="w-full overflow-x-auto">
                 <div
-                  className={`${GRID_TECNICOS} items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
+                  className={`${GRID_NOTAS_WO} min-w-[56rem] items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
                 >
                   <span className="text-left">Nome</span>
-                  <span className="text-center">Total de Notas feitas</span>
-                  <span className="text-center">Total de Notas produtivas</span>
-                  <span className="text-center">Total de Notas improdutivas</span>
-                  <span className="text-center">O.S produtivas</span>
-                  <span className="text-center">O.S Improdutivas</span>
-                  <span className="text-center">Baixa misc</span>
-                  <span className="text-center">Média de material por nota</span>
-                  <span className="text-center">% Freq. Relativa</span>
-                  <span className="text-center">% Freq. Absoluta</span>
+                  <span className="text-left">Número da WO</span>
+                  <span className="text-left">Contrato</span>
+                  <span className="text-center">Data</span>
                   <span className="text-center">
-                    {cabecalhoOrdenavel("Aproveitamento", "aproveitamento")}
+                    {cabecalhoOrdenavel("Status Nota", "aproveitamento")}
                   </span>
+                  <span className="text-center">Total O.S.</span>
+                  <span className="text-center">O.S. Prod.</span>
+                  <span className="text-center">O.S. Improd.</span>
                   <span className="text-center">
                     {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
                   </span>
@@ -2087,75 +2218,78 @@ function KpiDesempenhoProjecaoToa({
                   </span>
                 </div>
 
-                <ul>
-                  {tecnicosOrdenados.map((tecnico) => {
+                <ul className="min-w-[56rem]">
+                  {notasWoOrdenadas.map((nota) => {
                     const isDemitido = isTecnicoDemitido(
                       demitidosKeys,
-                      tecnico.id_tecnico,
-                      tecnico.nome,
+                      nota.login,
+                      nota.nome,
                     );
                     return (
                       <li
-                        key={tecnico.id_tecnico}
-                        className={`${GRID_TECNICOS} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
+                        key={nota.numeroWo}
+                        className={`${GRID_NOTAS_WO} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
                       >
                         <button
                           type="button"
                           onClick={() =>
-                            abrirDetalheTecnico(tecnico.id_tecnico, tecnico.nome)
+                            abrirDetalheTecnico(nota.login, nota.nome)
                           }
                           className={
                             isDemitido
                               ? "max-w-[150px] truncate text-left font-medium text-gray-500 hover:underline"
                               : "max-w-[150px] truncate text-left font-medium text-primary hover:underline"
                           }
-                          title={tecnico.nome}
+                          title={nota.nome}
                         >
-                          {tecnico.nome}
+                          {nota.nome}
                         </button>
-                        <span className="text-center font-bold tabular-nums text-gray-900">
-                          {formatQuantidade(tecnico.totalNotasFeitas)}
+                        <span
+                          className="truncate font-semibold tabular-nums text-gray-900"
+                          title={nota.numeroWo}
+                        >
+                          {nota.numeroWo || "—"}
                         </span>
-                        <span className="text-center font-normal tabular-nums text-gray-500">
-                          {formatQuantidade(tecnico.notasProdutivas)}
+                        <span
+                          className="truncate tabular-nums text-gray-700"
+                          title={nota.contrato}
+                        >
+                          {nota.contrato || "—"}
                         </span>
-                        <span className="text-center font-normal tabular-nums text-gray-500">
-                          {formatQuantidade(tecnico.notasImprodutivas)}
+                        <span className="text-center tabular-nums text-gray-700">
+                          {formatDataBr(nota.data)}
                         </span>
-                        <span className="text-center font-normal tabular-nums text-gray-500">
-                          {tecnico.osProdutivas}
+                        <span
+                          className={`text-center font-semibold ${
+                            nota.statusNota === "Produtiva"
+                              ? "text-green-700"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {nota.statusNota}
                         </span>
-                        <span className="text-center font-normal tabular-nums text-gray-500">
-                          {tecnico.osImprodutivas}
+                        <span className="text-center tabular-nums text-gray-700">
+                          {formatQuantidade(nota.totalOs)}
                         </span>
-                        <span className="text-center font-normal tabular-nums text-gray-700">
-                          {formatQuantidade(tecnico.baixaMisc)}
+                        <span className="text-center tabular-nums text-gray-600">
+                          {formatQuantidade(nota.osProdutivas)}
                         </span>
-                        <span className="text-center font-normal tabular-nums text-gray-700">
-                          {formatMediaMaterial(tecnico.mediaMaterialPorNota)}
-                        </span>
-                        <span className="text-center font-normal tabular-nums text-gray-600">
-                          {tecnico.freqRelativa}
-                        </span>
-                        <span className="text-center font-normal tabular-nums text-gray-600">
-                          {tecnico.freqAbsoluta}
-                        </span>
-                        <span className="text-center font-semibold tabular-nums text-gray-800">
-                          {tecnico.mediaAproveitamento}
+                        <span className="text-center tabular-nums text-gray-600">
+                          {formatQuantidade(nota.osImprodutivas)}
                         </span>
                         <span className="text-center font-medium tabular-nums text-red-600">
-                          {formatReceita(tecnico.receitaPerda)}
+                          {formatReceita(nota.receitaPerda)}
                         </span>
                         <span
                           className={`text-center font-bold tabular-nums ${
-                            tecnico.receita > 0
+                            nota.receita > 0
                               ? "text-green-600"
-                              : tecnico.receita < 0
+                              : nota.receita < 0
                                 ? "text-red-600"
                                 : "text-gray-500"
                           }`}
                         >
-                          {formatReceita(tecnico.receita)}
+                          {formatReceita(nota.receita)}
                         </span>
                       </li>
                     );
@@ -2231,10 +2365,10 @@ function KpiDesempenhoProjecaoToa({
                     <th className="px-3 py-2 font-semibold">Data</th>
                     <th className="px-3 py-2 font-semibold">Colaborador</th>
                     <th className="px-3 py-2 font-semibold">Contrato</th>
-                    <th className="px-3 py-2 font-semibold">WO</th>
-                    <th className="px-3 py-2 font-semibold">Tipo OS</th>
+                    <th className="px-3 py-2 font-semibold">Número da WO</th>
+                    <th className="px-3 py-2 font-semibold">O.S. / Tipos</th>
                     <th className="px-3 py-2 font-semibold">Receita</th>
-                    <th className="px-3 py-2 font-semibold">Status</th>
+                    <th className="px-3 py-2 font-semibold">Status da Nota</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2271,11 +2405,11 @@ function KpiDesempenhoProjecaoToa({
                           <td className="px-3 py-2 text-gray-700">
                             {nota.contrato || "—"}
                           </td>
-                          <td className="px-3 py-2 text-gray-700">
+                          <td className="px-3 py-2 font-semibold text-gray-800">
                             {nota.numeroWo || "—"}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
-                            {nota.tipoOs || "—"}
+                            {nota.resumoOs || "—"}
                           </td>
                           <td
                             className={`whitespace-nowrap px-3 py-2 tabular-nums ${
@@ -2289,19 +2423,15 @@ function KpiDesempenhoProjecaoToa({
                             {formatReceita(receitaExibida)}
                           </td>
                           <td className="px-3 py-2">
-                            {nota.contaReceitaFaturada ? (
-                              <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                                Produtivo
-                              </span>
-                            ) : nota.isProdutiva ? (
-                              <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                                Bundlado
-                              </span>
-                            ) : (
-                              <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                                Quebra/Improdutivo
-                              </span>
-                            )}
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                nota.statusNota === "Produtiva"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-red-50 text-red-700"
+                              }`}
+                            >
+                              {nota.statusNota}
+                            </span>
                           </td>
                         </tr>
                       );
