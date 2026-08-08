@@ -262,6 +262,20 @@ function KpisPage() {
   );
 
   const modoFaturamento = useMemo((): ModoFaturamentoDisponibilidade | "indefinido" => {
+    // Histórico geral (Ano/Mês = Todos): visão macro TOA (modo projeção).
+    if (filtro.ano === null && filtro.mes === null) {
+      return detectarModoFaturamento({
+        temAnalitico: false,
+        temToa: toaOsRows.length > 0,
+      });
+    }
+    // Ano sem mês: agrega o ano inteiro com o que estiver carregado.
+    if (filtro.ano !== null && filtro.mes === null) {
+      return detectarModoFaturamento({
+        temAnalitico: analiticoRows.length > 0,
+        temToa: toaOsRows.length > 0,
+      });
+    }
     if (filtro.ano === null || filtro.mes === null) return "indefinido";
     return detectarModoFaturamento({
       temAnalitico: analiticoRows.length > 0,
@@ -326,30 +340,37 @@ function KpisPage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      if (filtro.ano === null || filtro.mes === null) {
-        setToaOsRows([]);
-        setAnaliticoRows([]);
-        setFaturamentoError(null);
-        setFaturamentoLoading(false);
-        return;
-      }
       setFaturamentoLoading(true);
       setFaturamentoError(null);
       try {
-        const [rows, toaFlat] = await Promise.all([
-          fetchAnaliticoHistorico({
-            ano: filtro.ano,
-            mes: filtro.mes,
-          }),
-          fetchToaImportacoes({
-            ano: filtro.ano,
-            mes: filtro.mes,
-            dia: filtro.dia,
-          }),
-        ]);
-        if (cancelled) return;
-        setAnaliticoRows(rows);
-        setToaOsRows(toaFlat);
+        const historicoGeral = filtro.ano === null && filtro.mes === null;
+
+        if (historicoGeral) {
+          // Ano/Mês = Todos → carrega toda a base TOA (visão macro / projeção).
+          const toaFlat = await fetchToaImportacoes({
+            ano: null,
+            mes: null,
+            dia: null,
+          });
+          if (cancelled) return;
+          setToaOsRows(toaFlat);
+          setAnaliticoRows([]);
+        } else {
+          const [rows, toaFlat] = await Promise.all([
+            fetchAnaliticoHistorico({
+              ano: filtro.ano,
+              mes: filtro.mes,
+            }),
+            fetchToaImportacoes({
+              ano: filtro.ano,
+              mes: filtro.mes,
+              dia: filtro.dia,
+            }),
+          ]);
+          if (cancelled) return;
+          setAnaliticoRows(rows);
+          setToaOsRows(toaFlat);
+        }
       } catch (err) {
         if (cancelled) return;
         console.error("Erro ao carregar faturamento:", err);
@@ -990,17 +1011,22 @@ function KpisPage() {
             <Select
               value={filtro.mes !== null ? String(filtro.mes) : "todos"}
               disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
-              onValueChange={(v) =>
+              onValueChange={(v) => {
+                if (v === "todos") {
+                  setKpiFiltro((prev) => ({ ...prev, mes: null, dia: null }));
+                  return;
+                }
                 setKpiFiltro((prev) => ({
                   ...prev,
                   mes: Number(v),
-                }))
-              }
+                }));
+              }}
             >
               <SelectTrigger id="filtro-mes" className="w-[160px]">
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
                 {mesesDoAnoSelecionado.map((mes) => {
                   const label =
                     MESES.find((m) => m.value === String(mes))?.label ?? String(mes);
@@ -1067,15 +1093,17 @@ function KpisPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isDesempenho
-                ? modoFaturamento === "COMPARISON_MODE"
-                  ? "Modo comparação: Analítico Claro e TOA disponíveis no período."
-                  : modoFaturamento === "ONLY_ANALITICO"
-                    ? "Modo Analítico Claro (valores reais pagos)."
-                    : modoFaturamento === "ONLY_TOA"
-                      ? "Modo projeção TOA × catálogo de preços."
-                      : modoFaturamento === "vazio"
-                        ? "Sem dados de Analítico ou TOA para o período selecionado."
-                        : "Selecione mês e ano para carregar o faturamento."
+                ? filtro.ano === null && filtro.mes === null
+                  ? "Histórico geral TOA — todos os meses consolidados (modo projeção)."
+                  : modoFaturamento === "COMPARISON_MODE"
+                    ? "Modo comparação: Analítico Claro e TOA disponíveis no período."
+                    : modoFaturamento === "ONLY_ANALITICO"
+                      ? "Modo Analítico Claro (valores reais pagos)."
+                      : modoFaturamento === "ONLY_TOA"
+                        ? "Modo projeção TOA × catálogo de preços."
+                        : modoFaturamento === "vazio"
+                          ? "Sem dados de Analítico ou TOA para o período selecionado."
+                          : "Carregando faturamento do período…"
                 : formatDataUltimaImportacao(ultimaImportacaoAt)}
             </p>
           </div>

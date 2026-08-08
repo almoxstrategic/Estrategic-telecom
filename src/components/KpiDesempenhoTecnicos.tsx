@@ -245,6 +245,39 @@ function descricaoPeriodoLocal(filtro: KpiFiltroPeriodo): string {
   return `${mesLabel} de ${filtro.ano}`;
 }
 
+/**
+ * Varre data_toa e devolve o range mês/ano (ex.: "Junho 2026 - Agosto 2026").
+ * Retorna null se não houver datas válidas.
+ */
+export function formatarRangeMesAnoToa(
+  rows: Array<{ data_toa: string }>,
+): string | null {
+  let minIso: string | null = null;
+  let maxIso: string | null = null;
+
+  for (const row of rows) {
+    const iso = String(row.data_toa ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
+    if (!minIso || iso < minIso) minIso = iso;
+    if (!maxIso || iso > maxIso) maxIso = iso;
+  }
+
+  if (!minIso || !maxIso) return null;
+
+  const formatMesAno = (iso: string): string => {
+    const ano = Number(iso.slice(0, 4));
+    const mes = Number(iso.slice(5, 7));
+    const mesLabel =
+      MESES_LABEL.find((m) => m.value === mes)?.label ?? String(mes);
+    return `${mesLabel} ${ano}`;
+  };
+
+  const inicio = formatMesAno(minIso);
+  const fim = formatMesAno(maxIso);
+  if (inicio === fim) return inicio;
+  return `${inicio} - ${fim}`;
+}
+
 function limiteDoFiltro(filtro: FiltroTop): number | null {
   switch (filtro) {
     case "Top 10":
@@ -492,7 +525,18 @@ export function KpiDesempenhoTecnicos({
   modoFaturamento = "indefinido",
   analiticoRows = [],
 }: KpiDesempenhoTecnicosProps) {
-  if (modoFaturamento === "indefinido") {
+  // Histórico geral (Ano/Mês = Todos) ou ano sem mês → renderiza projeção TOA
+  // quando houver linhas, em vez de bloquear com empty state.
+  const historicoGeral =
+    filtroPeriodo.ano === null && filtroPeriodo.mes === null;
+  const anoSemMes =
+    filtroPeriodo.ano !== null && filtroPeriodo.mes === null;
+
+  if (
+    modoFaturamento === "indefinido" &&
+    !historicoGeral &&
+    !anoSemMes
+  ) {
     return (
       <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
         Selecione <strong>mês</strong> e <strong>ano</strong> no filtro para
@@ -502,7 +546,12 @@ export function KpiDesempenhoTecnicos({
     );
   }
 
-  if (modoFaturamento === "vazio") {
+  if (
+    modoFaturamento === "vazio" ||
+    (modoFaturamento === "indefinido" &&
+      (historicoGeral || anoSemMes) &&
+      toaOsRows.length === 0)
+  ) {
     return (
       <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
         Nenhum dado de <strong>Analítico</strong> nem de <strong>TOA</strong>{" "}
@@ -689,6 +738,16 @@ function KpiDesempenhoProjecaoToa({
       ),
     [toaOsRows, filtroPeriodo],
   );
+
+  /** Range dinâmico a partir das data_toa do dataset (ex.: "Junho 2026 - Agosto 2026"). */
+  const rangePeriodoToa = useMemo(
+    () => formatarRangeMesAnoToa(toaOsPeriodo),
+    [toaOsPeriodo],
+  );
+
+  const tituloVisaoGeral = rangePeriodoToa
+    ? `Visão Geral de Desempenho — ${rangePeriodoToa}`
+    : "Visão Geral de Desempenho";
 
   const kpisToaFlat = useMemo(
     () => agregarKpisToaFlat(toaOsPeriodo),
@@ -1840,7 +1899,7 @@ function KpiDesempenhoProjecaoToa({
         <div className="flex justify-between items-center gap-3">
           <h2 className="flex items-center gap-2 font-bold text-foreground">
             <BarChart3 className="h-4 w-4 text-primary" />
-            Visão Geral de Desempenho
+            {tituloVisaoGeral}
           </h2>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             Visualizar:
