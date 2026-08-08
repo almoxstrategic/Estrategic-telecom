@@ -525,12 +525,14 @@ export function KpiDesempenhoTecnicos({
   modoFaturamento = "indefinido",
   analiticoRows = [],
 }: KpiDesempenhoTecnicosProps) {
-  // Histórico geral (Ano/Mês = Todos) ou ano sem mês → renderiza projeção TOA
-  // quando houver linhas, em vez de bloquear com empty state.
+  // Histórico geral (Ano/Mês = Todos) ou ano sem mês → renderiza painel
+  // quando houver TOA e/ou Analítico, em vez de bloquear com empty state.
   const historicoGeral =
     filtroPeriodo.ano === null && filtroPeriodo.mes === null;
   const anoSemMes =
     filtroPeriodo.ano !== null && filtroPeriodo.mes === null;
+  const semDadosFaturamento =
+    toaOsRows.length === 0 && analiticoRows.length === 0;
 
   if (
     modoFaturamento === "indefinido" &&
@@ -550,7 +552,7 @@ export function KpiDesempenhoTecnicos({
     modoFaturamento === "vazio" ||
     (modoFaturamento === "indefinido" &&
       (historicoGeral || anoSemMes) &&
-      toaOsRows.length === 0)
+      semDadosFaturamento)
   ) {
     return (
       <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
@@ -608,14 +610,19 @@ function KpiDesempenhoProjecaoToa({
   modoFaturamento: "ONLY_TOA" | "COMPARISON_MODE";
 }) {
   const isComparacao = modoFaturamento === "COMPARISON_MODE";
+  const historicoGeral =
+    filtroPeriodo.ano === null && filtroPeriodo.mes === null;
+  /** Macro: Analítico + TOA no histórico geral (ou comparação mensal). */
+  const mostrarCardsAnaliticoEToa =
+    isComparacao || (historicoGeral && analiticoRows.length > 0);
   const [activeTab, setActiveTab] = useState<AbaDetalhamento>(
-    isComparacao ? "analitico" : "toa",
+    mostrarCardsAnaliticoEToa ? "analitico" : "toa",
   );
 
   useEffect(() => {
-    if (modoFaturamento === "ONLY_TOA") setActiveTab("toa");
-    else setActiveTab("analitico");
-  }, [modoFaturamento, filtroPeriodo.ano, filtroPeriodo.mes]);
+    if (mostrarCardsAnaliticoEToa) setActiveTab("analitico");
+    else setActiveTab("toa");
+  }, [mostrarCardsAnaliticoEToa, filtroPeriodo.ano, filtroPeriodo.mes]);
 
   const analiticoFiltrado = useMemo(
     () => filtrarAnaliticoPorDhBaixa(analiticoRows, filtroPeriodo),
@@ -1751,18 +1758,19 @@ function KpiDesempenhoProjecaoToa({
 
   return (
     <div className="w-full space-y-6">
-      {isComparacao ? (
+      {mostrarCardsAnaliticoEToa ? (
         <>
           <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm text-sky-900">
-            Modo comparação — Analítico Claro e TOA disponíveis no período.
-            Use as abas abaixo para alternar o detalhamento.
+            {historicoGeral
+              ? "Histórico geral — Analítico Claro (faturamento real) e TOA (projeção) consolidados. Use as abas abaixo para alternar o detalhamento."
+              : "Modo comparação — Analítico Claro e TOA disponíveis no período. Use as abas abaixo para alternar o detalhamento."}
           </div>
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-3">
+          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-emerald-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de notas (Analítico Claro)
+                  Total de notas (Analítico)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1773,7 +1781,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 shrink-0 text-emerald-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Receita (Analítico Claro)
+                  Receita (Analítico)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-emerald-600">
@@ -2101,7 +2109,7 @@ function KpiDesempenhoProjecaoToa({
           ) : null}
         </div>
 
-        {isComparacao ? (
+        {mostrarCardsAnaliticoEToa ? (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div
               className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
@@ -2209,7 +2217,7 @@ function KpiDesempenhoProjecaoToa({
                     Exportar Excel (O.S.)
                   </button>
 
-                  {isComparacao ? (
+                  {mostrarCardsAnaliticoEToa ? (
                     <button
                       type="button"
                       onClick={exportarComparacaoConciliacao}

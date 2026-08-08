@@ -262,15 +262,11 @@ function KpisPage() {
   );
 
   const modoFaturamento = useMemo((): ModoFaturamentoDisponibilidade | "indefinido" => {
-    // Histórico geral (Ano/Mês = Todos): visão macro TOA (modo projeção).
-    if (filtro.ano === null && filtro.mes === null) {
-      return detectarModoFaturamento({
-        temAnalitico: false,
-        temToa: toaOsRows.length > 0,
-      });
-    }
-    // Ano sem mês: agrega o ano inteiro com o que estiver carregado.
-    if (filtro.ano !== null && filtro.mes === null) {
+    // Histórico geral (Ano/Mês = Todos) ou ano sem mês: detecta pelo que veio do banco.
+    if (
+      (filtro.ano === null && filtro.mes === null) ||
+      (filtro.ano !== null && filtro.mes === null)
+    ) {
       return detectarModoFaturamento({
         temAnalitico: analiticoRows.length > 0,
         temToa: toaOsRows.length > 0,
@@ -343,34 +339,21 @@ function KpisPage() {
       setFaturamentoLoading(true);
       setFaturamentoError(null);
       try {
-        const historicoGeral = filtro.ano === null && filtro.mes === null;
-
-        if (historicoGeral) {
-          // Ano/Mês = Todos → carrega toda a base TOA (visão macro / projeção).
-          const toaFlat = await fetchToaImportacoes({
-            ano: null,
-            mes: null,
-            dia: null,
-          });
-          if (cancelled) return;
-          setToaOsRows(toaFlat);
-          setAnaliticoRows([]);
-        } else {
-          const [rows, toaFlat] = await Promise.all([
-            fetchAnaliticoHistorico({
-              ano: filtro.ano,
-              mes: filtro.mes,
-            }),
-            fetchToaImportacoes({
-              ano: filtro.ano,
-              mes: filtro.mes,
-              dia: filtro.dia,
-            }),
-          ]);
-          if (cancelled) return;
-          setAnaliticoRows(rows);
-          setToaOsRows(toaFlat);
-        }
+        // Ano/Mês null = Histórico geral: busca tudo (novos meses importados entram automaticamente).
+        const [rows, toaFlat] = await Promise.all([
+          fetchAnaliticoHistorico({
+            ano: filtro.ano,
+            mes: filtro.mes,
+          }),
+          fetchToaImportacoes({
+            ano: filtro.ano,
+            mes: filtro.mes,
+            dia: filtro.dia,
+          }),
+        ]);
+        if (cancelled) return;
+        setAnaliticoRows(rows);
+        setToaOsRows(toaFlat);
       } catch (err) {
         if (cancelled) return;
         console.error("Erro ao carregar faturamento:", err);
@@ -1094,7 +1077,13 @@ function KpisPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {isDesempenho
                 ? filtro.ano === null && filtro.mes === null
-                  ? "Histórico geral TOA — todos os meses consolidados (modo projeção)."
+                  ? modoFaturamento === "COMPARISON_MODE"
+                    ? "Histórico geral — Analítico Claro (real) × TOA (projeção), todos os meses consolidados."
+                    : modoFaturamento === "ONLY_TOA"
+                      ? "Histórico geral TOA — todos os meses consolidados (modo projeção)."
+                      : modoFaturamento === "ONLY_ANALITICO"
+                        ? "Histórico geral — Analítico Claro consolidado."
+                        : "Sem dados de Analítico ou TOA no histórico geral."
                   : modoFaturamento === "COMPARISON_MODE"
                     ? "Modo comparação: Analítico Claro e TOA disponíveis no período."
                     : modoFaturamento === "ONLY_ANALITICO"
