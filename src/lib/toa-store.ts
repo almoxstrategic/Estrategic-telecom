@@ -222,7 +222,9 @@ export function normalizeStatusOs(value: string): string {
 }
 
 export function isStatusExecutada(status: string): boolean {
-  return normalizeStatusOs(status) === "EXECUTADA";
+  const s = normalizeStatusOs(status);
+  // Planilhas TOA usam "Executada"; exports/variantes podem vir "Executado".
+  return s === "EXECUTADA" || s === "EXECUTADO";
 }
 
 /** Status da Atividade = concluído (case/acento-insensitive). */
@@ -318,21 +320,20 @@ export function isOsReceitaFaturavelNaNota(
 function processarOrdem(ordem: ToaOrdemLinha): ToaOrdemServico | null {
   const numeroOs = ordem.numeroOs.trim();
   const codBaixaBruto = ordem.codBaixaBruto.trim();
-  if (!numeroOs && !codBaixaBruto) return null;
+  const tipoOs = ordem.tipoOs.trim();
+  const status = ordem.status.trim();
+  // Aceita slot se houver Nº O.S., cód. baixa, tipo ou status — não descarta por campo vazio.
+  if (!numeroOs && !codBaixaBruto && !tipoOs && !status) return null;
 
   const codBaixaExtraido = extrairNumeroCodBaixa(codBaixaBruto);
-  // Mantém O.S. mesmo sem código numérico (ex.: só Nº O.S.) — não classifica como produtiva.
-  if (codBaixaExtraido === null && !numeroOs) return null;
-
   const codBaixa = codBaixaExtraido ?? 0;
-  const status = ordem.status.trim();
   return {
     indice: ordem.indice,
-    numeroOs: numeroOs || String(ordem.indice),
+    numeroOs: numeroOs || (codBaixa > 0 || tipoOs || status ? String(ordem.indice) : ""),
     codBaixa,
     codBaixaBruto: codBaixaBruto || (codBaixa > 0 ? String(codBaixa) : ""),
     status,
-    tipoOs: ordem.tipoOs.trim(),
+    tipoOs,
     isExecutada: isStatusExecutada(status),
     isProdutiva: codBaixa > 0 && isCodBaixaProdutivo(codBaixa),
   };
@@ -348,21 +349,34 @@ export function processarChamadosTOA(
     const data = linha.data.trim();
     const numeroWo = normalizeNumeroWo(linha.numeroWo);
     const statusAtividade = (linha.statusAtividade ?? "").trim();
+    // Nunca dropar a WO por status secundário (cancelado/suspenso): persiste tudo.
+    // O KPI filtra contabilizáveis na leitura.
     if (!login || !data || !numeroWo) continue;
-    if (!isStatusAtividadeContabilizavel(statusAtividade)) continue;
 
     const ordensDeServico = linha.ordensDeServico
       .map(processarOrdem)
       .filter((ordem): ordem is ToaOrdemServico => ordem !== null);
 
-    if (ordensDeServico.length === 0) continue;
+    // WO sem slot O.S. ainda é persistida (placeholder) para não sumir da base.
+    if (ordensDeServico.length === 0) {
+      ordensDeServico.push({
+        indice: 1,
+        numeroOs: "",
+        codBaixa: 0,
+        codBaixaBruto: "",
+        status: "",
+        tipoOs: "",
+        isExecutada: false,
+        isProdutiva: false,
+      });
+    }
 
     chamados.push({
       data,
       login,
       nomeTecnico: (linha.nomeTecnico ?? "").trim(),
       numeroWo,
-      contrato: linha.contrato.trim(),
+      contrato: (linha.contrato ?? "").trim(),
       statusAtividade,
       ordensDeServico,
     });
@@ -423,7 +437,7 @@ export function flattenChamadosParaImportacaoFlat(
     for (const ordem of chamado.ordensDeServico) {
       const numeroOs = (ordem.numeroOs || "").trim();
       const codBruto = (ordem.codBaixaBruto || "").trim();
-      if (!numeroOs && !codBruto && !(ordem.codBaixa > 0)) continue;
+      // Persiste o slot mesmo sem Nº O.S./cód (WO sem baixa preenchida).
 
       rows.push({
         competencia,
@@ -432,7 +446,7 @@ export function flattenChamadosParaImportacaoFlat(
         login_tecnico: login,
         numero_wo: chamado.numeroWo,
         contrato: chamado.contrato || "",
-        numero_os: numeroOs || String(ordem.indice),
+        numero_os: numeroOs || (ordem.indice > 0 ? String(ordem.indice) : ""),
         tipo_os: ordem.tipoOs || "",
         cod_baixa: ordem.codBaixa > 0 ? ordem.codBaixa : null,
         status_os: ordem.status || "",

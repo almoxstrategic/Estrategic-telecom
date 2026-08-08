@@ -2,12 +2,39 @@ import { getSupabaseClient } from "./supabase";
 import type { ToaChamadoProcessado } from "./toa-store";
 import {
   flattenChamadosParaImportacaoFlat,
+  isStatusAtividadeContabilizavel,
   normalizeToaLogin,
   regroupFlatRowsToChamados,
 } from "./toa-store";
 
 /** Último mês inclusivo do gabarito Analítico (jun/2026). */
 export const FATURAMENTO_HISTORICO_ATE = 202606;
+
+/** PostgREST/Supabase limita cada response; paginar sempre acima disso. */
+const SUPABASE_PAGE_SIZE = 1000;
+
+/**
+ * Busca todas as páginas de uma query PostgREST (evita corte silencioso em 1000).
+ */
+async function fetchAllSupabasePages<T>(
+  fetchPage: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  for (;;) {
+    const to = from + SUPABASE_PAGE_SIZE - 1;
+    const { data, error } = await fetchPage(from, to);
+    if (error) throw error;
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+  return all;
+}
 
 /** Linha do consolidado IAT (62 campos de negócio + id). */
 export type AnaliticoHistoricoRow = {
@@ -555,31 +582,34 @@ export async function fetchAnaliticoHistorico(filtro: {
   mes: number | null;
 }): Promise<AnaliticoHistoricoRow[]> {
   const supabase = getSupabaseClient();
-  let query = supabase
-    .from("analitico_historico")
-    .select("*")
-    .order("dh_baixa", { ascending: true })
-    .order("cd_os", { ascending: true });
 
-  // Filtro temporal oficial: DH_BAIXA (não DATA_BASE).
-  if (filtro.ano !== null && filtro.mes !== null) {
-    const ini = `${filtro.ano}-${String(filtro.mes).padStart(2, "0")}-01T00:00:00`;
-    const mesSeguinte = filtro.mes === 12 ? 1 : filtro.mes + 1;
-    const anoSeguinte = filtro.mes === 12 ? filtro.ano + 1 : filtro.ano;
-    const fim = `${anoSeguinte}-${String(mesSeguinte).padStart(2, "0")}-01T00:00:00`;
-    query = query.gte("dh_baixa", ini).lt("dh_baixa", fim);
-  } else if (filtro.ano !== null) {
-    const ini = `${filtro.ano}-01-01T00:00:00`;
-    const fim = `${filtro.ano + 1}-01-01T00:00:00`;
-    query = query.gte("dh_baixa", ini).lt("dh_baixa", fim);
-  }
+  const rawRows = await fetchAllSupabasePages<Record<string, unknown>>(
+    async (from, to) => {
+      let query = supabase
+        .from("analitico_historico")
+        .select("*")
+        .order("dh_baixa", { ascending: true })
+        .order("cd_os", { ascending: true })
+        .range(from, to);
 
-  const { data, error } = await query;
-  if (error) throw error;
+      // Filtro temporal oficial: DH_BAIXA (não DATA_BASE).
+      if (filtro.ano !== null && filtro.mes !== null) {
+        const ini = `${filtro.ano}-${String(filtro.mes).padStart(2, "0")}-01T00:00:00`;
+        const mesSeguinte = filtro.mes === 12 ? 1 : filtro.mes + 1;
+        const anoSeguinte = filtro.mes === 12 ? filtro.ano + 1 : filtro.ano;
+        const fim = `${anoSeguinte}-${String(mesSeguinte).padStart(2, "0")}-01T00:00:00`;
+        query = query.gte("dh_baixa", ini).lt("dh_baixa", fim);
+      } else if (filtro.ano !== null) {
+        const ini = `${filtro.ano}-01-01T00:00:00`;
+        const fim = `${filtro.ano + 1}-01-01T00:00:00`;
+        query = query.gte("dh_baixa", ini).lt("dh_baixa", fim);
+      }
 
-  const mapped = (data ?? []).map((row) =>
-    mapDbRowToAnalitico(row as Record<string, unknown>),
+      return query;
+    },
   );
+
+  const mapped = rawRows.map((row) => mapDbRowToAnalitico(row));
   // Reforço no client (parse seguro de strings/ISO).
   return filtrarAnaliticoPorDhBaixa(mapped, filtro);
 }
@@ -713,12 +743,16 @@ export async function replaceToaImportacoes(
 /** Competências YYYYMM distintas presentes em toa_importacoes. */
 export async function fetchCompetenciasToa(): Promise<number[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("toa_importacoes")
-    .select("competencia");
-  if (error) throw error;
+  const data = await fetchAllSupabasePages<{ competencia: number | string }>(
+    (from, to) =>
+      supabase
+        .from("toa_importacoes")
+        .select("competencia")
+        .order("competencia", { ascending: true })
+        .range(from, to),
+  );
   const set = new Set<number>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     const c = Number(row.competencia);
     if (Number.isFinite(c) && c > 0) set.add(c);
   }
@@ -728,12 +762,16 @@ export async function fetchCompetenciasToa(): Promise<number[]> {
 /** DATA_BASE distintos presentes em analitico_historico. */
 export async function fetchCompetenciasAnalitico(): Promise<number[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("analitico_historico")
-    .select("data_base");
-  if (error) throw error;
+  const data = await fetchAllSupabasePages<{ data_base: number | string }>(
+    (from, to) =>
+      supabase
+        .from("analitico_historico")
+        .select("data_base")
+        .order("data_base", { ascending: true })
+        .range(from, to),
+  );
   const set = new Set<number>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     const c = Number(row.data_base);
     if (Number.isFinite(c) && c > 0) set.add(c);
   }
@@ -742,6 +780,8 @@ export async function fetchCompetenciasAnalitico(): Promise<number[]> {
 
 /**
  * Busca O.S. flat do TOA (1 linha = 1 O.S.).
+ * Pagina além do limite padrão (1000) do PostgREST — sem isso, dias finais do mês
+ * (ex.: 29–30/07) somem silenciosamente do Dashboard.
  * Use `regroupFlatRowsToChamados` quando precisar da visão por WO.
  */
 export async function fetchToaImportacoes(filtro: {
@@ -750,30 +790,37 @@ export async function fetchToaImportacoes(filtro: {
   dia: number | null;
 }): Promise<ToaImportacaoRow[]> {
   const supabase = getSupabaseClient();
-  let query = supabase
-    .from("toa_importacoes")
-    .select(
-      "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, imported_at",
-    )
-    .order("data_toa", { ascending: true });
 
-  if (filtro.ano !== null && filtro.mes !== null) {
-    query = query.eq("competencia", competenciaYm(filtro.ano, filtro.mes));
-  } else if (filtro.ano !== null) {
-    const ini = filtro.ano * 100 + 1;
-    const fim = filtro.ano * 100 + 12;
-    query = query.gte("competencia", ini).lte("competencia", fim);
-  }
+  const data = await fetchAllSupabasePages<Record<string, unknown>>(
+    async (from, to) => {
+      let query = supabase
+        .from("toa_importacoes")
+        .select(
+          "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, imported_at",
+        )
+        .order("data_toa", { ascending: true })
+        .order("numero_wo", { ascending: true })
+        .order("numero_os", { ascending: true })
+        .range(from, to);
 
-  if (filtro.dia !== null && filtro.ano !== null && filtro.mes !== null) {
-    const iso = `${filtro.ano}-${String(filtro.mes).padStart(2, "0")}-${String(filtro.dia).padStart(2, "0")}`;
-    query = query.eq("data_toa", iso);
-  }
+      if (filtro.ano !== null && filtro.mes !== null) {
+        query = query.eq("competencia", competenciaYm(filtro.ano, filtro.mes));
+      } else if (filtro.ano !== null) {
+        const ini = filtro.ano * 100 + 1;
+        const fim = filtro.ano * 100 + 12;
+        query = query.gte("competencia", ini).lte("competencia", fim);
+      }
 
-  const { data, error } = await query;
-  if (error) throw error;
+      if (filtro.dia !== null && filtro.ano !== null && filtro.mes !== null) {
+        const iso = `${filtro.ano}-${String(filtro.mes).padStart(2, "0")}-${String(filtro.dia).padStart(2, "0")}`;
+        query = query.eq("data_toa", iso);
+      }
 
-  return (data ?? []).map((row) => ({
+      return query;
+    },
+  );
+
+  return data.map((row) => ({
     id: row.id ? String(row.id) : undefined,
     competencia: Number(row.competencia) || 0,
     data_toa: String(row.data_toa ?? "").slice(0, 10),
@@ -797,11 +844,24 @@ export async function fetchToaImportacoes(filtro: {
   }));
 }
 
+/**
+ * Linhas TOA para KPI/cards: exclui cancelado/suspenso (ainda ficam no banco).
+ */
+export function filtrarToaOsContabilizaveis(
+  rows: ToaImportacaoRow[],
+): ToaImportacaoRow[] {
+  return rows.filter((row) =>
+    isStatusAtividadeContabilizavel(row.status_atividade ?? ""),
+  );
+}
+
 /** @deprecated Preferir fetchToaImportacoes (flat) + regroupFlatRowsToChamados. */
 export async function fetchToaImportacoesComoChamados(filtro: {
   ano: number | null;
   mes: number | null;
   dia: number | null;
 }): Promise<ToaChamadoProcessado[]> {
-  return regroupFlatRowsToChamados(await fetchToaImportacoes(filtro));
+  return regroupFlatRowsToChamados(
+    filtrarToaOsContabilizaveis(await fetchToaImportacoes(filtro)),
+  );
 }

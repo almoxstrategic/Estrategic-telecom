@@ -27,6 +27,7 @@ import {
 import {
   agregarChamadosToa,
   clearToaLocalStorage,
+  isStatusAtividadeContabilizavel,
   processarChamadosTOA,
 } from "@/lib/toa-store";
 import { cn } from "@/lib/utils";
@@ -383,10 +384,14 @@ function ImportacaoPage() {
       const linhas = await parseToaFile(file);
       const chamados = processarChamadosTOA(linhas);
       const resultado = agregarChamadosToa(chamados);
+      const canceladosSuspensos = chamados.filter(
+        (c) =>
+          !isStatusAtividadeContabilizavel(c.statusAtividade ?? ""),
+      ).length;
 
-      if (resultado.totalNotasFeitas === 0) {
+      if (chamados.length === 0) {
         toast.error(
-          "Nenhum chamado válido encontrado na aba Page 1. Verifique Data, Login do Técnico e Número da O.S 1–10.",
+          "Nenhum chamado com Data + Login + Número da WO encontrado na aba Page 1.",
         );
         return;
       }
@@ -397,7 +402,10 @@ function ImportacaoPage() {
       toast.success(
         `TOA salvo (achatado): ${persistido.totalOs} O.S. / ${persistido.totalNotas} notas-WO ` +
           `(competências ${persistido.competencias.join(", ") || "—"}). ` +
-          `${resultado.totalNotasProdutivas} produtivas / ${resultado.totalNotasImprodutivas} improdutivas.`,
+          `${resultado.totalNotasProdutivas} produtivas / ${resultado.totalNotasImprodutivas} improdutivas` +
+          (canceladosSuspensos > 0
+            ? ` · ${canceladosSuspensos} cancelado/suspenso gravados (fora do KPI).`
+            : "."),
       );
     } catch (err) {
       toast.error(formatImportError("toa", err));

@@ -9,7 +9,6 @@ import {
   DollarSign,
   Download,
   FilterX,
-  Layers,
   TrendingUp,
   Users,
   X,
@@ -41,6 +40,7 @@ import {
   filtrarAnaliticoPorDhBaixa,
   formatDhBaixaDisplay,
   resumirAnaliticoHistorico,
+  filtrarToaOsContabilizaveis,
   type AnaliticoHistoricoRow,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
@@ -52,11 +52,10 @@ import {
   filtrarChamadosToa,
   filtrarToaOsRows,
   flattenChamadosToa,
-  flattenChamadosToaParaExportacaoNotas,
   isOsImprodutiva,
   isOsProdutiva,
   isOsReceitaFaturavelNaNota,
-  avaliarNotaToa,
+  isStatusAtividadeContabilizavel,
   normalizeTipoOs,
   normalizeToaLogin,
   statusNotaToa,
@@ -79,33 +78,21 @@ type TecnicoSelecionado = {
 
 type TipoDetalheNotas = "produtivas" | "perdas";
 
-type NotaDetalheCard = {
+/** 1 linha = 1 O.S. (toa_importacoes), ordem de colunas do detalhamento TOA. */
+type ToaOsDetalheLinha = {
   data: string;
-  login: string;
-  colaborador: string;
+  idToa: string;
+  tecnico: string;
+  statusNota: "Produtiva" | "Improdutiva";
   contrato: string;
   numeroWo: string;
-  /** Resumo das O.S. da WO (ex.: quantidade ou tipos). */
-  resumoOs: string;
+  numeroOs: string;
+  tipoOs: string;
+  codBaixa: number | null;
+  statusOs: string;
   receita: number;
-  isProdutiva: boolean;
-  /** true se entra na receita projetada (não bundlada). */
+  /** true se a O.S. entra na receita projetada (não bundlada). */
   contaReceitaFaturada: boolean;
-  statusNota: "Produtiva" | "Improdutiva";
-};
-
-type NotaWoLinha = {
-  numeroWo: string;
-  contrato: string;
-  data: string;
-  login: string;
-  nome: string;
-  statusNota: "Produtiva" | "Improdutiva";
-  totalOs: number;
-  osProdutivas: number;
-  osImprodutivas: number;
-  receita: number;
-  receitaPerda: number;
 };
 
 export type ModoFaturamentoKpi =
@@ -143,10 +130,7 @@ type AbaDetalhamento = "analitico" | "toa";
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
 
-type SortKey =
-  | "aproveitamento"
-  | "receitaPerda"
-  | "receita";
+type SortKey = "statusNota" | "receita" | "data";
 
 type SortConfig = {
   key: SortKey | null;
@@ -200,15 +184,6 @@ const MESES_LABEL = [
   { value: 12, label: "Dezembro" },
 ] as const;
 
-function formatStatusOsExibicao(os: {
-  status: string;
-  isExecutada: boolean;
-  isProdutiva: boolean;
-}): string {
-  if (!os.isExecutada) return os.status?.trim() || "Não executada";
-  return os.isProdutiva ? "Executada - Produtivo" : "Executada - Improdutivo";
-}
-
 function formatReceita(valor: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -216,9 +191,9 @@ function formatReceita(valor: number): string {
   }).format(valor);
 }
 
-/** Colunas da tabela Detalhamento TOA: 1 linha = 1 WO (Nota). */
-const GRID_NOTAS_WO =
-  "grid grid-cols-[minmax(96px,1.3fr)_minmax(90px,1fr)_minmax(80px,0.95fr)_minmax(64px,0.7fr)_minmax(72px,0.75fr)_minmax(48px,0.55fr)_minmax(48px,0.55fr)_minmax(48px,0.55fr)_minmax(72px,0.85fr)_minmax(72px,0.85fr)] gap-2";
+/** Colunas do detalhamento TOA: 1 linha = 1 O.S. (toa_importacoes). */
+const GRID_OS_TOA =
+  "grid grid-cols-[minmax(72px,0.75fr)_minmax(72px,0.8fr)_minmax(96px,1.2fr)_minmax(80px,0.9fr)_minmax(80px,0.95fr)_minmax(80px,0.9fr)_minmax(64px,0.7fr)_minmax(100px,1.2fr)_minmax(64px,0.7fr)_minmax(88px,1fr)_minmax(80px,0.9fr)] gap-2";
 
 function formatMediaMaterial(valor: number): string {
   return valor.toLocaleString("pt-BR", {
@@ -614,6 +589,9 @@ function KpiDesempenhoProjecaoToa({
     useState<TecnicoSelecionado | null>(null);
   const [detalheNotasTipo, setDetalheNotasTipo] =
     useState<TipoDetalheNotas | null>(null);
+  /** Aba do detalhamento inferior TOA (produtivas / perdas). */
+  const [abaNotasToa, setAbaNotasToa] =
+    useState<TipoDetalheNotas>("produtivas");
   const [buscaDetalheNotas, setBuscaDetalheNotas] = useState("");
   const [filtroLocalAno, setFiltroLocalAno] = useState<number | null>(
     filtroPeriodo.ano,
@@ -665,6 +643,9 @@ function KpiDesempenhoProjecaoToa({
 
   const abrirDetalheNotas = (tipo: TipoDetalheNotas) => {
     setBuscaDetalheNotas("");
+    setBuscaTecnico("");
+    setAbaNotasToa(tipo);
+    setActiveTab("toa");
     setDetalheNotasTipo(tipo);
   };
 
@@ -690,18 +671,22 @@ function KpiDesempenhoProjecaoToa({
   /**
    * Fonte única de verdade: mesmas regras preditivas do card, tabela e drill-down.
    * Contagem de Nota = WO única (não Contrato).
+   * Cancelado/suspenso ficam no banco, mas fora do KPI.
    */
   const chamadosToaPeriodo = useMemo(
     () =>
       dedupeChamadosPorNumeroWo(
         filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
-      ),
+      ).filter((c) => isStatusAtividadeContabilizavel(c.statusAtividade)),
     [chamadosProcessados, filtroPeriodo],
   );
 
   /** Linhas flat (1 O.S.) no período — cards de volume usam status_* do banco. */
   const toaOsPeriodo = useMemo(
-    () => filtrarToaOsRows(toaOsRows, filtroPeriodo),
+    () =>
+      filtrarToaOsContabilizaveis(
+        filtrarToaOsRows(toaOsRows, filtroPeriodo),
+      ),
     [toaOsRows, filtroPeriodo],
   );
 
@@ -874,9 +859,6 @@ function KpiDesempenhoProjecaoToa({
     totalPerdaNotas,
     receitaTotal,
     totalNotasToa,
-    totalOsToa,
-    totalOsProdutivasToa,
-    totalOsImprodutivasToa,
   } = useMemo(() => {
     const agregado = agregarChamadosToa(chamadosToaPeriodo, precosOs);
     const usarFlat = toaOsPeriodo.length > 0;
@@ -891,15 +873,6 @@ function KpiDesempenhoProjecaoToa({
       totalNotasToa: usarFlat
         ? kpisToaFlat.totalNotas
         : agregado.totalNotasFeitas,
-      totalOsToa: usarFlat
-        ? kpisToaFlat.totalOs
-        : agregado.totalOsProdutivas + agregado.totalOsImprodutivas,
-      totalOsProdutivasToa: usarFlat
-        ? kpisToaFlat.osProdutivas
-        : agregado.totalOsProdutivas,
-      totalOsImprodutivasToa: usarFlat
-        ? kpisToaFlat.osImprodutivas
-        : agregado.totalOsImprodutivas,
     };
   }, [chamadosToaPeriodo, precosOs, fatorProjecao, kpisToaFlat, toaOsPeriodo.length]);
 
@@ -1209,6 +1182,19 @@ function KpiDesempenhoProjecaoToa({
     });
   }, [tecnicoSelecionado, chamadosDoTecnicoBrutos, filtroLocalPeriodo]);
 
+  const statusNotaPorWoTecnico = useMemo(() => {
+    const map = new Map<string, "Produtiva" | "Improdutiva">();
+    if (!tecnicoSelecionado) return map;
+    const chamadosFiltradosPeriodo = filtrarChamadosToa(
+      chamadosDoTecnicoBrutos,
+      filtroLocalPeriodo,
+    );
+    for (const chamado of chamadosFiltradosPeriodo) {
+      map.set(chamado.numeroWo, statusNotaToa(chamado.ordensDeServico));
+    }
+    return map;
+  }, [tecnicoSelecionado, chamadosDoTecnicoBrutos, filtroLocalPeriodo]);
+
   const receitaPeriodoModal = useMemo(() => {
     return osDoTecnico.reduce((total, os) => {
       return total + valorReceitaFaturadaOs(os, precosOs);
@@ -1243,7 +1229,8 @@ function KpiDesempenhoProjecaoToa({
   const statusOsModal = useMemo(() => {
     const unicos = new Set<string>();
     for (const os of osDoTecnico) {
-      unicos.add(formatStatusOsExibicao(os));
+      const status = (os.status || "").trim();
+      if (status) unicos.add(status);
     }
     return [...unicos].sort((a, b) =>
       a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
@@ -1271,7 +1258,7 @@ function KpiDesempenhoProjecaoToa({
         return false;
       }
 
-      if (statusFiltro && formatStatusOsExibicao(os) !== statusFiltro) {
+      if (statusFiltro && (os.status || "").trim() !== statusFiltro) {
         return false;
       }
 
@@ -1341,90 +1328,163 @@ function KpiDesempenhoProjecaoToa({
     return nomes;
   }, [tecnicosEquipe, tecnicos, enriquecidos]);
 
-  /** Detalhamento TOA: 1 linha = 1 WO (Nota). Contrato é atributo, não identidade. */
-  const notasWoDetalhe = useMemo<NotaWoLinha[]>(() => {
-    return chamadosToaPeriodo.map((chamado) => {
-      const login = normalizeToaLogin(chamado.login);
-      const metrica = avaliarNotaToa(chamado);
-      let receita = 0;
-      let receitaPerda = 0;
-
+  /** Mapa WO → set de numero_os faturáveis (regra de bundling). */
+  const osFaturaveisPorWo = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const chamado of chamadosToaPeriodo) {
+      const wo = chamado.numeroWo;
+      const set = new Set<string>();
       for (const ordem of chamado.ordensDeServico) {
-        const valor = valorPrecoOs(precosOs, ordem.tipoOs);
-        if (isOsProdutiva(ordem)) {
-          if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
-            receita += valor;
-          }
-        } else if (isOsImprodutiva(ordem)) {
-          receitaPerda += valor;
+        if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
+          const numeroOs =
+            (ordem.numeroOs || "").trim() || String(ordem.indice);
+          set.add(numeroOs);
         }
       }
+      map.set(wo, set);
+    }
+    return map;
+  }, [chamadosToaPeriodo]);
 
-      return {
-        numeroWo: chamado.numeroWo,
-        contrato: chamado.contrato,
-        data: chamado.data,
-        login,
-        nome:
-          chamado.nomeTecnico?.trim() ||
-          nomesColaboradorPorLogin.get(login) ||
-          login,
-        statusNota: metrica.statusNota,
-        totalOs: metrica.totalOs,
-        osProdutivas: metrica.osProdutivas,
-        osImprodutivas: metrica.osImprodutivas,
-        receita: receita * fatorProjecao,
-        receitaPerda: receitaPerda * fatorProjecao,
-      };
-    });
+  /** Detalhamento TOA: 1 linha = 1 O.S. (toa_importacoes). */
+  const osDetalheToa = useMemo<ToaOsDetalheLinha[]>(() => {
+    if (toaOsPeriodo.length > 0) {
+      return toaOsPeriodo.map((row) => {
+        const numeroOs = String(row.numero_os ?? "").trim();
+        const faturaveis = osFaturaveisPorWo.get(row.numero_wo);
+        const contaReceitaFaturada = faturaveis?.has(numeroOs) === true;
+        const valorCatalogo = valorPrecoOs(precosOs, row.tipo_os);
+        return {
+          data: row.data_toa,
+          idToa: normalizeToaLogin(row.login_tecnico),
+          tecnico:
+            row.nome_tecnico?.trim() ||
+            nomesColaboradorPorLogin.get(normalizeToaLogin(row.login_tecnico)) ||
+            normalizeToaLogin(row.login_tecnico),
+          statusNota: row.status_nota,
+          contrato: row.contrato || "",
+          numeroWo: row.numero_wo || "",
+          numeroOs,
+          tipoOs: row.tipo_os || "",
+          codBaixa: row.cod_baixa,
+          statusOs: row.status_os || "",
+          receita: valorCatalogo * fatorProjecao,
+          contaReceitaFaturada,
+        };
+      });
+    }
+
+    // Fallback: achata chamados processados quando não há flat no banco.
+    const linhas: ToaOsDetalheLinha[] = [];
+    for (const chamado of chamadosToaPeriodo) {
+      const login = normalizeToaLogin(chamado.login);
+      const statusNota = statusNotaToa(chamado.ordensDeServico);
+      const tecnico =
+        chamado.nomeTecnico?.trim() ||
+        nomesColaboradorPorLogin.get(login) ||
+        login;
+      for (const ordem of chamado.ordensDeServico) {
+        const numeroOs =
+          (ordem.numeroOs || "").trim() || String(ordem.indice);
+        const codBaixa =
+          ordem.codBaixa > 0
+            ? ordem.codBaixa
+            : null;
+        if (!numeroOs && !codBaixa) continue;
+        const valorCatalogo = valorPrecoOs(precosOs, ordem.tipoOs);
+        linhas.push({
+          data: chamado.data,
+          idToa: login,
+          tecnico,
+          statusNota,
+          contrato: chamado.contrato || "",
+          numeroWo: chamado.numeroWo || "",
+          numeroOs,
+          tipoOs: ordem.tipoOs || "",
+          codBaixa,
+          statusOs: ordem.status || "",
+          receita: valorCatalogo * fatorProjecao,
+          contaReceitaFaturada: isOsReceitaFaturavelNaNota(
+            ordem,
+            chamado.ordensDeServico,
+          ),
+        });
+      }
+    }
+    return linhas;
   }, [
+    toaOsPeriodo,
     chamadosToaPeriodo,
     precosOs,
     fatorProjecao,
     nomesColaboradorPorLogin,
+    osFaturaveisPorWo,
   ]);
 
-  const notasWoFiltradas = useMemo(() => {
+  const filtrarOsPorTipoNota = (
+    rows: ToaOsDetalheLinha[],
+    tipo: TipoDetalheNotas,
+  ) => {
+    const desejaProdutiva = tipo === "produtivas";
+    return rows.filter((row) =>
+      desejaProdutiva
+        ? row.statusNota === "Produtiva"
+        : row.statusNota === "Improdutiva",
+    );
+  };
+
+  const osTabelaInferior = useMemo(
+    () => filtrarOsPorTipoNota(osDetalheToa, abaNotasToa),
+    [osDetalheToa, abaNotasToa],
+  );
+
+  const osTabelaFiltradas = useMemo(() => {
     const termo = buscaTecnico.trim().toLowerCase();
-    if (!termo) return notasWoDetalhe;
-    return notasWoDetalhe.filter((nota) => {
-      const nome = (nota.nome || "").toLowerCase();
-      const login = (nota.login || "").toLowerCase();
-      const wo = (nota.numeroWo || "").toLowerCase();
-      const contrato = (nota.contrato || "").toLowerCase();
+    if (!termo) return osTabelaInferior;
+    return osTabelaInferior.filter((row) => {
+      const tecnico = (row.tecnico || "").toLowerCase();
+      const idToa = (row.idToa || "").toLowerCase();
+      const wo = (row.numeroWo || "").toLowerCase();
+      const contrato = (row.contrato || "").toLowerCase();
+      const os = (row.numeroOs || "").toLowerCase();
+      const tipo = (row.tipoOs || "").toLowerCase();
       return (
-        nome.includes(termo) ||
-        login.includes(termo) ||
+        tecnico.includes(termo) ||
+        idToa.includes(termo) ||
         wo.includes(termo) ||
-        contrato.includes(termo)
+        contrato.includes(termo) ||
+        os.includes(termo) ||
+        tipo.includes(termo)
       );
     });
-  }, [notasWoDetalhe, buscaTecnico]);
+  }, [osTabelaInferior, buscaTecnico]);
 
-  const notasWoOrdenadas = useMemo(() => {
+  const osTabelaOrdenadas = useMemo(() => {
     if (!sortConfig.key) {
-      return [...notasWoFiltradas].sort((a, b) => {
+      return [...osTabelaFiltradas].sort((a, b) => {
         const byDate = b.data.localeCompare(a.data);
         if (byDate !== 0) return byDate;
-        return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+        const byWo = a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+        if (byWo !== 0) return byWo;
+        return a.numeroOs.localeCompare(b.numeroOs, "pt-BR");
       });
     }
     const key = sortConfig.key;
     const fator = sortConfig.direction === "asc" ? 1 : -1;
-    return [...notasWoFiltradas].sort((a, b) => {
+    return [...osTabelaFiltradas].sort((a, b) => {
       const valorA =
-        key === "receitaPerda"
-          ? a.receitaPerda
-          : key === "receita"
-            ? a.receita
+        key === "receita"
+          ? a.receita
+          : key === "data"
+            ? a.data
             : a.statusNota === "Produtiva"
               ? 1
               : 0;
       const valorB =
-        key === "receitaPerda"
-          ? b.receitaPerda
-          : key === "receita"
-            ? b.receita
+        key === "receita"
+          ? b.receita
+          : key === "data"
+            ? b.data
             : b.statusNota === "Produtiva"
               ? 1
               : 0;
@@ -1432,118 +1492,84 @@ function KpiDesempenhoProjecaoToa({
       if (valorA > valorB) return 1 * fator;
       return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
     });
-  }, [notasWoFiltradas, sortConfig]);
+  }, [osTabelaFiltradas, sortConfig]);
 
-  const notasDetalheCard = useMemo<NotaDetalheCard[]>(() => {
+  const osDetalheCard = useMemo<ToaOsDetalheLinha[]>(() => {
     if (!detalheNotasTipo) return [];
-
-    const desejaProdutiva = detalheNotasTipo === "produtivas";
-
-    return chamadosToaPeriodo
-      .filter((chamado) => {
-        const produtiva = statusNotaToa(chamado.ordensDeServico) === "Produtiva";
-        return desejaProdutiva ? produtiva : !produtiva;
-      })
-      .map((chamado) => {
-        const login = normalizeToaLogin(chamado.login);
-        let receita = 0;
-        let temFaturavel = false;
-        const tipos: string[] = [];
-
-        for (const ordem of chamado.ordensDeServico) {
-          if (desejaProdutiva) {
-            if (!isOsProdutiva(ordem)) continue;
-            tipos.push(ordem.tipoOs || "—");
-            if (isOsReceitaFaturavelNaNota(ordem, chamado.ordensDeServico)) {
-              receita += valorPrecoOs(precosOs, ordem.tipoOs);
-              temFaturavel = true;
-            }
-          } else if (isOsImprodutiva(ordem)) {
-            tipos.push(ordem.tipoOs || "—");
-            receita += valorPrecoOs(precosOs, ordem.tipoOs);
-          }
-        }
-
-        const status = statusNotaToa(chamado.ordensDeServico);
-        return {
-          data: chamado.data,
-          login,
-          colaborador: nomesColaboradorPorLogin.get(login) || login,
-          contrato: chamado.contrato,
-          numeroWo: chamado.numeroWo,
-          resumoOs:
-            tipos.length > 0
-              ? `${tipos.length} O.S.: ${tipos.slice(0, 2).join("; ")}${tipos.length > 2 ? "…" : ""}`
-              : "—",
-          receita: receita * fatorProjecao,
-          isProdutiva: status === "Produtiva",
-          contaReceitaFaturada: desejaProdutiva ? temFaturavel : false,
-          statusNota: status,
-        };
-      })
-      .sort((a, b) => {
+    return filtrarOsPorTipoNota(osDetalheToa, detalheNotasTipo).sort(
+      (a, b) => {
         const byDate = a.data.localeCompare(b.data);
         if (byDate !== 0) return byDate;
-        const byNome = a.colaborador.localeCompare(b.colaborador, "pt-BR");
+        const byNome = a.tecnico.localeCompare(b.tecnico, "pt-BR");
         if (byNome !== 0) return byNome;
-        return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
-      });
-  }, [
-    detalheNotasTipo,
-    chamadosToaPeriodo,
-    precosOs,
-    fatorProjecao,
-    nomesColaboradorPorLogin,
-  ]);
+        const byWo = a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
+        if (byWo !== 0) return byWo;
+        return a.numeroOs.localeCompare(b.numeroOs, "pt-BR");
+      },
+    );
+  }, [detalheNotasTipo, osDetalheToa]);
 
-  const notasDetalheCardFiltradas = useMemo(() => {
+  const osDetalheCardFiltradas = useMemo(() => {
     const termo = buscaDetalheNotas.trim().toLowerCase();
-    if (!termo) return notasDetalheCard;
+    if (!termo) return osDetalheCard;
 
-    return notasDetalheCard.filter((nota) => {
-      const contrato = (nota.contrato || "").toLowerCase();
-      const wo = (nota.numeroWo || "").toLowerCase();
-      const nome = (nota.colaborador || "").toLowerCase();
+    return osDetalheCard.filter((row) => {
+      const contrato = (row.contrato || "").toLowerCase();
+      const wo = (row.numeroWo || "").toLowerCase();
+      const nome = (row.tecnico || "").toLowerCase();
+      const idToa = (row.idToa || "").toLowerCase();
+      const os = (row.numeroOs || "").toLowerCase();
       return (
-        contrato.includes(termo) || wo.includes(termo) || nome.includes(termo)
+        contrato.includes(termo) ||
+        wo.includes(termo) ||
+        nome.includes(termo) ||
+        idToa.includes(termo) ||
+        os.includes(termo)
       );
     });
-  }, [notasDetalheCard, buscaDetalheNotas]);
+  }, [osDetalheCard, buscaDetalheNotas]);
+
+  const mapearOsParaExcel = (rows: ToaOsDetalheLinha[]) =>
+    rows.map((row) => ({
+      Data: formatDataBr(row.data),
+      IdTOA: row.idToa || "—",
+      Técnico: row.tecnico || "—",
+      "Status da nota": row.statusNota,
+      Contrato: row.contrato || "—",
+      WO: row.numeroWo || "—",
+      OS: row.numeroOs || "—",
+      "Tipo OS": row.tipoOs || "—",
+      "Cod Baixa": row.codBaixa ?? "",
+      Status: row.statusOs || "—",
+      Receita: Number(row.receita.toFixed(2)),
+    }));
 
   const exportarDetalheNotasExcel = () => {
     if (!detalheNotasTipo) return;
 
-    if (notasDetalheCardFiltradas.length === 0) {
-      toast.error("Nenhuma nota visível para exportar.");
+    if (osDetalheCardFiltradas.length === 0) {
+      toast.error("Nenhuma O.S. visível para exportar.");
       return;
     }
 
-    const dadosExcel = notasDetalheCardFiltradas.map((nota) => {
-      const receitaExibida = nota.contaReceitaFaturada
-        ? nota.receita
-        : nota.isProdutiva
-          ? 0
-          : nota.receita > 0
-            ? -Math.abs(nota.receita)
-            : 0;
-
-      return {
-        Data: formatDataBr(nota.data),
-        Colaborador: nota.colaborador,
-        Contrato: nota.contrato || "—",
-        "Número da WO": nota.numeroWo || "—",
-        "O.S. / Tipos": nota.resumoOs || "—",
-        Receita: Number(receitaExibida.toFixed(2)),
-        "Status da Nota": nota.statusNota,
-        Status: nota.contaReceitaFaturada
-          ? "Produtivo / Faturável"
-          : nota.isProdutiva
-            ? "Produtivo / Bundlado"
-            : "Quebra/Improdutivo",
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const worksheet = XLSX.utils.json_to_sheet(
+      mapearOsParaExcel(osDetalheCardFiltradas),
+      {
+        header: [
+          "Data",
+          "IdTOA",
+          "Técnico",
+          "Status da nota",
+          "Contrato",
+          "WO",
+          "OS",
+          "Tipo OS",
+          "Cod Baixa",
+          "Status",
+          "Receita",
+        ],
+      },
+    );
     const workbook = XLSX.utils.book_new();
     const sheetName =
       detalheNotasTipo === "produtivas" ? "Notas Produtivas" : "Perdas";
@@ -1556,111 +1582,44 @@ function KpiDesempenhoProjecaoToa({
         : "Detalhamento_Perdas";
     XLSX.writeFile(workbook, `${prefixo}_${hoje}.xlsx`);
     toast.success(
-      `Excel exportado: ${formatQuantidade(notasDetalheCardFiltradas.length)} notas.`,
+      `Excel exportado: ${formatQuantidade(osDetalheCardFiltradas.length)} O.S.`,
     );
   };
 
-  const nomesPorLoginExport = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const tecnico of tecnicosEquipe) {
-      for (const identificador of [
-        tecnico.identificacao,
-        tecnico.login,
-        tecnico.id,
-      ]) {
-        if (identificador?.trim()) {
-          map.set(normalizeToaLogin(identificador), tecnico.nome);
-        }
-      }
-    }
-    for (const tecnico of tecnicos) {
-      const login = normalizeToaLogin(tecnico.id_tecnico);
-      if (tecnico.nome_tecnico?.trim() && !map.has(login)) {
-        map.set(login, tecnico.nome_tecnico.trim());
-      }
-    }
-    for (const tecnico of enriquecidos) {
-      map.set(tecnico.id_tecnico, tecnico.nome);
-    }
-    return map;
-  }, [tecnicosEquipe, tecnicos, enriquecidos]);
-
-  /** Código Z... (IdTOA / identificação) a partir do cadastro da equipe. */
-  const loginTecnicoPorLoginExport = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const tecnico of tecnicosEquipe) {
-      const codigoZ = (
-        tecnico.identificacao ||
-        tecnico.login ||
-        ""
-      ).trim();
-      if (!codigoZ) continue;
-      for (const identificador of [
-        tecnico.identificacao,
-        tecnico.login,
-        tecnico.id,
-      ]) {
-        if (identificador?.trim()) {
-          map.set(normalizeToaLogin(identificador), codigoZ);
-        }
-      }
-    }
-    return map;
-  }, [tecnicosEquipe]);
-
   const exportarNotasDetalhamentoExcel = () => {
-    const wosVisiveis = new Set(
-      notasWoFiltradas.map((n) => n.numeroWo),
-    );
-    const chamadosVisiveis = chamadosToaPeriodo.filter((c) =>
-      wosVisiveis.has(c.numeroWo),
-    );
-
-    if (chamadosVisiveis.length === 0) {
-      toast.error("Nenhuma nota (WO) no período para exportar.");
+    if (osTabelaFiltradas.length === 0) {
+      toast.error("Nenhuma O.S. no período para exportar.");
       return;
     }
 
-    const dadosExcel = flattenChamadosToaParaExportacaoNotas(chamadosVisiveis, {
-      nomePorLogin: (login) =>
-        nomesPorLoginExport.get(normalizeToaLogin(login)) || login,
-      loginTecnicoPorLogin: (login) => {
-        const key = normalizeToaLogin(login);
-        // Preferência: código Z do cadastro; senão o login bruto do TOA (Z...).
-        return loginTecnicoPorLoginExport.get(key) || key;
+    const worksheet = XLSX.utils.json_to_sheet(
+      mapearOsParaExcel(osTabelaFiltradas),
+      {
+        header: [
+          "Data",
+          "IdTOA",
+          "Técnico",
+          "Status da nota",
+          "Contrato",
+          "WO",
+          "OS",
+          "Tipo OS",
+          "Cod Baixa",
+          "Status",
+          "Receita",
+        ],
       },
-      formatData: formatDataBr,
-    });
-
-    if (dadosExcel.length === 0) {
-      toast.error("Nenhuma O.S. preenchida nas notas do período.");
-      return;
-    }
-
-    const worksheet = XLSX.utils.json_to_sheet(dadosExcel, {
-      header: [
-        "Nome",
-        "Login do técnico",
-        "Contrato",
-        "Número da WO",
-        "Data",
-        "Cód Baixa",
-        "Nº O.S",
-        "Tipo O.S",
-        "Status da O.S",
-        "Status da Nota",
-      ],
-    });
+    );
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Notas");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "O.S. TOA");
 
     const mesAno =
       filtroPeriodo.mes !== null && filtroPeriodo.ano !== null
         ? `${String(filtroPeriodo.mes).padStart(2, "0")}${filtroPeriodo.ano}`
         : "Completo";
-    XLSX.writeFile(workbook, `Exportacao_Notas_${mesAno}.xlsx`);
+    XLSX.writeFile(workbook, `Exportacao_OS_TOA_${mesAno}.xlsx`);
     toast.success(
-      `Excel exportado: ${formatQuantidade(dadosExcel.length)} O.S. (${formatQuantidade(chamadosVisiveis.length)} notas/WOs).`,
+      `Excel exportado: ${formatQuantidade(osTabelaFiltradas.length)} O.S.`,
     );
   };
 
@@ -1739,7 +1698,7 @@ function KpiDesempenhoProjecaoToa({
             Modo comparação — Analítico Claro e TOA disponíveis no período.
             Use as abas abaixo para alternar o detalhamento.
           </div>
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-3">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-emerald-600" />
@@ -1782,7 +1741,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Notas produtivas (WO c/ ≥1 O.S. prod.)
+                  Notas produtivas (WO c/ &gt;= O.S prod.)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1798,46 +1757,13 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Notas improdutivas (sem O.S. prod.)
+                  Notas improdutivas (Sem O.S Prod)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
                 {formatQuantidade(totalPerdaNotas)}
               </div>
             </button>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 shrink-0 text-blue-600" />
-                <span className="text-sm font-medium text-muted-foreground">
-                  Total de O.S únicas (TOA)
-                </span>
-              </div>
-              <div className="mt-3 text-3xl font-bold text-gray-900">
-                {formatQuantidade(totalOsToa)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 shrink-0 text-green-600" />
-                <span className="text-sm font-medium text-muted-foreground">
-                  Total de O.S Produtivas (TOA)
-                </span>
-              </div>
-              <div className="mt-3 text-3xl font-bold text-gray-900">
-                {formatQuantidade(totalOsProdutivasToa)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 shrink-0 text-red-600" />
-                <span className="text-sm font-medium text-muted-foreground">
-                  Total de O.S improdutivas (TOA)
-                </span>
-              </div>
-              <div className="mt-3 text-3xl font-bold text-gray-900">
-                {formatQuantidade(totalOsImprodutivasToa)}
-              </div>
-            </div>
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
@@ -1852,7 +1778,7 @@ function KpiDesempenhoProjecaoToa({
           </div>
         </>
       ) : (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" />
@@ -1873,7 +1799,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Notas produtivas (WO c/ ≥1 O.S. prod.)
+                Notas produtivas (WO c/ &gt;= O.S prod.)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1889,46 +1815,13 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <XCircle className="h-5 w-5 shrink-0 text-red-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Notas improdutivas (sem O.S. prod.)
+                Notas improdutivas (Sem O.S Prod)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
               {formatQuantidade(totalPerdaNotas)}
             </div>
           </button>
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 shrink-0 text-blue-600" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Total de O.S únicas (TOA)
-              </span>
-            </div>
-            <div className="mt-3 text-3xl font-bold text-gray-900">
-              {formatQuantidade(totalOsToa)}
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 shrink-0 text-green-600" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Total de O.S Produtivas (TOA)
-              </span>
-            </div>
-            <div className="mt-3 text-3xl font-bold text-gray-900">
-              {formatQuantidade(totalOsProdutivasToa)}
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 shrink-0 text-red-600" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Total de O.S improdutivas (TOA)
-              </span>
-            </div>
-            <div className="mt-3 text-3xl font-bold text-gray-900">
-              {formatQuantidade(totalOsImprodutivasToa)}
-            </div>
-          </div>
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 shrink-0 text-green-600" />
@@ -2108,7 +2001,7 @@ function KpiDesempenhoProjecaoToa({
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Users className="h-4 w-4 text-primary" />
-            Detalhamento TOA — por Nota (WO)
+            Detalhamento TOA — por O.S.
           </h2>
           {activeTab === "toa" ? (
             <button
@@ -2201,161 +2094,222 @@ function KpiDesempenhoProjecaoToa({
           <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
         ) : (
           <>
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <input
-                type="search"
-                value={buscaTecnico}
-                onChange={(e) => setBuscaTecnico(e.target.value)}
-                placeholder="Buscar por WO, contrato, nome ou matrícula..."
-                aria-label="Buscar nota por WO, contrato, nome ou matrícula"
-                className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
-              />
-
-              <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div
+                className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+                role="tablist"
+                aria-label="Tipo de detalhamento TOA"
+              >
                 <button
                   type="button"
-                  onClick={exportarNotasDetalhamentoExcel}
-                  className="inline-flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 transition hover:bg-green-100"
-                  title="Exportar notas (WOs) do período com O.S. filhas e Status da Nota"
-                  aria-label="Exportar Excel com notas do período"
+                  role="tab"
+                  aria-selected={abaNotasToa === "produtivas"}
+                  onClick={() => setAbaNotasToa("produtivas")}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    abaNotasToa === "produtivas"
+                      ? "bg-white text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <Download className="h-4 w-4" />
-                  Exportar Excel (Notas)
+                  Detalhamento de Notas Produtivas
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaNotasToa === "perdas"}
+                  onClick={() => setAbaNotasToa("perdas")}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    abaNotasToa === "perdas"
+                      ? "bg-white text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Detalhamento de Perdas
+                </button>
+              </div>
 
-                {isComparacao ? (
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <input
+                  type="search"
+                  value={buscaTecnico}
+                  onChange={(e) => setBuscaTecnico(e.target.value)}
+                  placeholder="Buscar por WO, OS, contrato, IdTOA ou técnico..."
+                  aria-label="Buscar O.S. por WO, OS, contrato, IdTOA ou técnico"
+                  className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
+                />
+
+                <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                   <button
                     type="button"
-                    onClick={exportarComparacaoConciliacao}
-                    className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
-                    title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
-                    aria-label="Exportar comparação Analítico vs TOA"
+                    onClick={exportarNotasDetalhamentoExcel}
+                    className="inline-flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 transition hover:bg-green-100"
+                    title="Exportar O.S. do detalhamento TOA com colunas de toa_importacoes"
+                    aria-label="Exportar Excel com O.S. do período"
                   >
                     <Download className="h-4 w-4" />
-                    Exportar Comparação
+                    Exportar Excel (O.S.)
                   </button>
-                ) : null}
 
-                <label className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    Aumento (%)
-                  </span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={percentualAumentoTexto}
-                    onChange={(e) => atualizarPercentualAumento(e.target.value)}
-                    placeholder="0"
-                    aria-label="Aumento percentual"
-                    className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </label>
+                  {isComparacao ? (
+                    <button
+                      type="button"
+                      onClick={exportarComparacaoConciliacao}
+                      className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                      title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
+                      aria-label="Exportar comparação Analítico vs TOA"
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportar Comparação
+                    </button>
+                  ) : null}
+
+                  <label className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      Aumento (%)
+                    </span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={percentualAumentoTexto}
+                      onChange={(e) =>
+                        atualizarPercentualAumento(e.target.value)
+                      }
+                      placeholder="0"
+                      aria-label="Aumento percentual"
+                      className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
-            {notasWoDetalhe.length === 0 ? (
+            {osTabelaInferior.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhuma nota (WO) no período selecionado.
+                Nenhuma O.S. no período para este detalhamento.
               </p>
-            ) : notasWoFiltradas.length === 0 ? (
+            ) : osTabelaFiltradas.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhuma nota encontrada para “{buscaTecnico.trim()}”.
+                Nenhuma O.S. encontrada para “{buscaTecnico.trim()}”.
               </p>
             ) : (
               <div className="w-full overflow-x-auto">
                 <div
-                  className={`${GRID_NOTAS_WO} min-w-[56rem] items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
+                  className={`${GRID_OS_TOA} min-w-[72rem] items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
                 >
-                  <span className="text-left">Nome</span>
-                  <span className="text-left">Número da WO</span>
+                  <span className="text-center">
+                    {cabecalhoOrdenavel("Data", "data")}
+                  </span>
+                  <span className="text-left">IdTOA</span>
+                  <span className="text-left">Técnico</span>
+                  <span className="text-center">
+                    {cabecalhoOrdenavel("Status da nota", "statusNota")}
+                  </span>
                   <span className="text-left">Contrato</span>
-                  <span className="text-center">Data</span>
+                  <span className="text-left">WO</span>
+                  <span className="text-left">OS</span>
+                  <span className="text-left">Tipo OS</span>
+                  <span className="text-center">Cod Baixa</span>
+                  <span className="text-left">Status</span>
                   <span className="text-center">
-                    {cabecalhoOrdenavel("Status Nota", "aproveitamento")}
-                  </span>
-                  <span className="text-center">Total O.S.</span>
-                  <span className="text-center">O.S. Prod.</span>
-                  <span className="text-center">O.S. Improd.</span>
-                  <span className="text-center">
-                    {cabecalhoOrdenavel("Receita Perda", "receitaPerda")}
-                  </span>
-                  <span className="text-center">
-                    {cabecalhoOrdenavel("Receita projetada", "receita")}
+                    {cabecalhoOrdenavel("Receita", "receita")}
                   </span>
                 </div>
 
-                <ul className="min-w-[56rem]">
-                  {notasWoOrdenadas.map((nota) => {
+                <ul className="min-w-[72rem]">
+                  {osTabelaOrdenadas.map((row, index) => {
                     const isDemitido = isTecnicoDemitido(
                       demitidosKeys,
-                      nota.login,
-                      nota.nome,
+                      row.idToa,
+                      row.tecnico,
                     );
+                    const ganhoReal =
+                      row.statusNota === "Produtiva" &&
+                      row.contaReceitaFaturada &&
+                      row.receita > 0;
+                    const perdaReal =
+                      row.statusNota === "Improdutiva" && row.receita > 0;
                     return (
                       <li
-                        key={nota.numeroWo}
-                        className={`${GRID_NOTAS_WO} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
+                        key={`${row.numeroWo}-${row.numeroOs}-${row.codBaixa}-${index}`}
+                        className={`${GRID_OS_TOA} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
                       >
+                        <span className="text-center tabular-nums text-gray-700">
+                          {formatDataBr(row.data)}
+                        </span>
+                        <span
+                          className="truncate tabular-nums text-gray-700"
+                          title={row.idToa}
+                        >
+                          {row.idToa || "—"}
+                        </span>
                         <button
                           type="button"
                           onClick={() =>
-                            abrirDetalheTecnico(nota.login, nota.nome)
+                            abrirDetalheTecnico(row.idToa, row.tecnico)
                           }
                           className={
                             isDemitido
                               ? "max-w-[150px] truncate text-left font-medium text-gray-500 hover:underline"
                               : "max-w-[150px] truncate text-left font-medium text-primary hover:underline"
                           }
-                          title={nota.nome}
+                          title={row.tecnico}
                         >
-                          {nota.nome}
+                          {row.tecnico}
                         </button>
                         <span
-                          className="truncate font-semibold tabular-nums text-gray-900"
-                          title={nota.numeroWo}
-                        >
-                          {nota.numeroWo || "—"}
-                        </span>
-                        <span
-                          className="truncate tabular-nums text-gray-700"
-                          title={nota.contrato}
-                        >
-                          {nota.contrato || "—"}
-                        </span>
-                        <span className="text-center tabular-nums text-gray-700">
-                          {formatDataBr(nota.data)}
-                        </span>
-                        <span
                           className={`text-center font-semibold ${
-                            nota.statusNota === "Produtiva"
+                            row.statusNota === "Produtiva"
                               ? "text-green-700"
                               : "text-red-600"
                           }`}
                         >
-                          {nota.statusNota}
+                          {row.statusNota}
+                        </span>
+                        <span
+                          className="truncate tabular-nums text-gray-700"
+                          title={row.contrato}
+                        >
+                          {row.contrato || "—"}
+                        </span>
+                        <span
+                          className="truncate font-semibold tabular-nums text-gray-900"
+                          title={row.numeroWo}
+                        >
+                          {row.numeroWo || "—"}
+                        </span>
+                        <span
+                          className="truncate tabular-nums text-gray-800"
+                          title={row.numeroOs}
+                        >
+                          {row.numeroOs || "—"}
+                        </span>
+                        <span
+                          className="truncate text-gray-700"
+                          title={row.tipoOs}
+                        >
+                          {row.tipoOs || "—"}
                         </span>
                         <span className="text-center tabular-nums text-gray-700">
-                          {formatQuantidade(nota.totalOs)}
+                          {row.codBaixa ?? "—"}
                         </span>
-                        <span className="text-center tabular-nums text-gray-600">
-                          {formatQuantidade(nota.osProdutivas)}
-                        </span>
-                        <span className="text-center tabular-nums text-gray-600">
-                          {formatQuantidade(nota.osImprodutivas)}
-                        </span>
-                        <span className="text-center font-medium tabular-nums text-red-600">
-                          {formatReceita(nota.receitaPerda)}
+                        <span
+                          className="truncate text-gray-700"
+                          title={row.statusOs}
+                        >
+                          {row.statusOs || "—"}
                         </span>
                         <span
                           className={`text-center font-bold tabular-nums ${
-                            nota.receita > 0
+                            ganhoReal
                               ? "text-green-600"
-                              : nota.receita < 0
+                              : perdaReal
                                 ? "text-red-600"
                                 : "text-gray-500"
                           }`}
                         >
-                          {formatReceita(nota.receita)}
+                          {formatReceita(
+                            perdaReal ? -Math.abs(row.receita) : row.receita,
+                          )}
                         </span>
                       </li>
                     );
@@ -2376,7 +2330,7 @@ function KpiDesempenhoProjecaoToa({
           onClick={fecharDetalheNotas}
         >
           <div
-            className="max-h-[90vh] w-11/12 max-w-6xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="max-h-[90vh] w-11/12 max-w-7xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -2388,11 +2342,11 @@ function KpiDesempenhoProjecaoToa({
                   {tituloDetalheNotas}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {formatQuantidade(notasDetalheCardFiltradas.length)}
+                  {formatQuantidade(osDetalheCardFiltradas.length)}
                   {buscaDetalheNotas.trim()
-                    ? ` de ${formatQuantidade(notasDetalheCard.length)}`
+                    ? ` de ${formatQuantidade(osDetalheCard.length)}`
                     : ""}{" "}
-                  notas no período selecionado
+                  O.S. no período selecionado
                 </p>
               </div>
               <button
@@ -2410,8 +2364,8 @@ function KpiDesempenhoProjecaoToa({
                 type="text"
                 value={buscaDetalheNotas}
                 onChange={(e) => setBuscaDetalheNotas(e.target.value)}
-                placeholder="Pesquisar por Contrato, WO ou Nome do Colaborador..."
-                aria-label="Pesquisar por Contrato, WO ou Nome do Colaborador"
+                placeholder="Pesquisar por Contrato, WO, OS, IdTOA ou Técnico..."
+                aria-label="Pesquisar por Contrato, WO, OS, IdTOA ou Técnico"
                 className="w-full flex-1 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <button
@@ -2429,53 +2383,82 @@ function KpiDesempenhoProjecaoToa({
                 <thead className="bg-gray-50 text-left text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-semibold">Data</th>
-                    <th className="px-3 py-2 font-semibold">Colaborador</th>
+                    <th className="px-3 py-2 font-semibold">IdTOA</th>
+                    <th className="px-3 py-2 font-semibold">Técnico</th>
+                    <th className="px-3 py-2 font-semibold">Status da nota</th>
                     <th className="px-3 py-2 font-semibold">Contrato</th>
-                    <th className="px-3 py-2 font-semibold">Número da WO</th>
-                    <th className="px-3 py-2 font-semibold">O.S. / Tipos</th>
+                    <th className="px-3 py-2 font-semibold">WO</th>
+                    <th className="px-3 py-2 font-semibold">OS</th>
+                    <th className="px-3 py-2 font-semibold">Tipo OS</th>
+                    <th className="px-3 py-2 font-semibold">Cod Baixa</th>
+                    <th className="px-3 py-2 font-semibold">Status</th>
                     <th className="px-3 py-2 font-semibold">Receita</th>
-                    <th className="px-3 py-2 font-semibold">Status da Nota</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {notasDetalheCardFiltradas.length === 0 ? (
+                  {osDetalheCardFiltradas.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={11}
                         className="px-3 py-8 text-center text-muted-foreground"
                       >
-                        Nenhuma nota para exibir.
+                        Nenhuma O.S. para exibir.
                       </td>
                     </tr>
                   ) : (
-                    notasDetalheCardFiltradas.map((nota, index) => {
+                    osDetalheCardFiltradas.map((row, index) => {
                       const ganhoReal =
-                        nota.contaReceitaFaturada && nota.receita > 0;
+                        row.statusNota === "Produtiva" &&
+                        row.contaReceitaFaturada &&
+                        row.receita > 0;
                       const perdaReal =
-                        !nota.isProdutiva && nota.receita > 0;
+                        row.statusNota === "Improdutiva" && row.receita > 0;
                       const receitaExibida = perdaReal
-                        ? -Math.abs(nota.receita)
-                        : nota.receita;
+                        ? -Math.abs(row.receita)
+                        : row.receita;
 
                       return (
                         <tr
-                          key={`${nota.data}-${nota.login}-${nota.numeroWo}-${index}`}
+                          key={`${row.data}-${row.idToa}-${row.numeroWo}-${row.numeroOs}-${index}`}
                           className="border-t border-gray-100"
                         >
                           <td className="px-3 py-2 tabular-nums text-gray-800">
-                            {formatDataBr(nota.data)}
+                            {formatDataBr(row.data)}
+                          </td>
+                          <td className="px-3 py-2 tabular-nums text-gray-700">
+                            {row.idToa || "—"}
                           </td>
                           <td className="px-3 py-2 font-medium text-gray-900">
-                            {nota.colaborador}
+                            {row.tecnico}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                row.statusNota === "Produtiva"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-red-50 text-red-700"
+                              }`}
+                            >
+                              {row.statusNota}
+                            </span>
                           </td>
                           <td className="px-3 py-2 text-gray-700">
-                            {nota.contrato || "—"}
+                            {row.contrato || "—"}
                           </td>
                           <td className="px-3 py-2 font-semibold text-gray-800">
-                            {nota.numeroWo || "—"}
+                            {row.numeroWo || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-800">
+                            {row.numeroOs || "—"}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
-                            {nota.resumoOs || "—"}
+                            {row.tipoOs || "—"}
+                          </td>
+                          <td className="px-3 py-2 tabular-nums text-gray-700">
+                            {row.codBaixa ?? "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {row.statusOs || "—"}
                           </td>
                           <td
                             className={`whitespace-nowrap px-3 py-2 tabular-nums ${
@@ -2487,17 +2470,6 @@ function KpiDesempenhoProjecaoToa({
                             }`}
                           >
                             {formatReceita(receitaExibida)}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                nota.statusNota === "Produtiva"
-                                  ? "bg-green-50 text-green-700"
-                                  : "bg-red-50 text-red-700"
-                              }`}
-                            >
-                              {nota.statusNota}
-                            </span>
                           </td>
                         </tr>
                       );
@@ -2767,19 +2739,23 @@ function KpiDesempenhoProjecaoToa({
                 <thead className="bg-gray-50 text-left text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-semibold">Data</th>
-                    <th className="px-3 py-2 font-semibold">Número da WO</th>
+                    <th className="px-3 py-2 font-semibold">IdTOA</th>
+                    <th className="px-3 py-2 font-semibold">Técnico</th>
+                    <th className="px-3 py-2 font-semibold">Status da nota</th>
                     <th className="px-3 py-2 font-semibold">Contrato</th>
-                    <th className="px-3 py-2 font-semibold">Tipo da OS</th>
-                    <th className="px-3 py-2 font-semibold">Cód de Baixa</th>
+                    <th className="px-3 py-2 font-semibold">WO</th>
+                    <th className="px-3 py-2 font-semibold">OS</th>
+                    <th className="px-3 py-2 font-semibold">Tipo OS</th>
+                    <th className="px-3 py-2 font-semibold">Cod Baixa</th>
                     <th className="px-3 py-2 font-semibold">Status</th>
-                    <th className="px-3 py-2 font-semibold">Valor</th>
+                    <th className="px-3 py-2 font-semibold">Receita</th>
                   </tr>
                 </thead>
                 <tbody>
                   {osDoTecnicoTabela.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={11}
                         className="px-3 py-8 text-center text-muted-foreground"
                       >
                         Nenhuma O.S. para exibir.
@@ -2791,6 +2767,9 @@ function KpiDesempenhoProjecaoToa({
                       const valorNota = valorReceitaFaturadaOs(os, precosOs);
                       const ganhoReal = os.contaReceitaFaturada && valorNota > 0;
                       const perdaReal = isOsImprodutiva(os) && valorCatalogo > 0;
+                      const statusNota =
+                        statusNotaPorWoTecnico.get(os.numeroWo) ??
+                        (os.isProdutiva ? "Produtiva" : "Improdutiva");
 
                       return (
                         <tr
@@ -2800,11 +2779,31 @@ function KpiDesempenhoProjecaoToa({
                           <td className="px-3 py-2 tabular-nums text-gray-800">
                             {formatDataBr(os.data)}
                           </td>
+                          <td className="px-3 py-2 tabular-nums text-gray-700">
+                            {tecnicoSelecionado.login}
+                          </td>
                           <td className="px-3 py-2 font-medium text-gray-900">
-                            {os.numeroWo || "—"}
+                            {tecnicoSelecionado.nome}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                statusNota === "Produtiva"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-red-50 text-red-700"
+                              }`}
+                            >
+                              {statusNota}
+                            </span>
                           </td>
                           <td className="px-3 py-2 text-gray-700">
                             {os.contrato || "—"}
+                          </td>
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {os.numeroWo || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-800">
+                            {os.numeroOs || "—"}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
                             {os.tipoOs || "—"}
@@ -2812,20 +2811,8 @@ function KpiDesempenhoProjecaoToa({
                           <td className="px-3 py-2 text-gray-700">
                             {os.codBaixaBruto || String(os.codBaixa)}
                           </td>
-                          <td className="px-3 py-2">
-                            {!os.isExecutada ? (
-                              <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
-                                {formatStatusOsExibicao(os)}
-                              </span>
-                            ) : os.isProdutiva ? (
-                              <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                                {formatStatusOsExibicao(os)}
-                              </span>
-                            ) : (
-                              <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                                {formatStatusOsExibicao(os)}
-                              </span>
-                            )}
+                          <td className="px-3 py-2 text-gray-700">
+                            {os.status || "—"}
                           </td>
                           <td
                             className={`whitespace-nowrap px-3 py-2 tabular-nums ${
@@ -2839,7 +2826,9 @@ function KpiDesempenhoProjecaoToa({
                             {formatReceita(
                               perdaReal
                                 ? -Math.abs(valorCatalogo)
-                                : valorNota,
+                                : valorNota > 0
+                                  ? valorNota
+                                  : valorCatalogo,
                             )}
                           </td>
                         </tr>

@@ -308,7 +308,9 @@ function parseToaData(value: string): string {
  *
  * Hierarquia na planilha: 1 linha Excel = 1 WO (pai) com slots O.S. 1–10.
  * Na persistência (Supabase) fazemos unpivot: 1 linha = 1 O.S.
- * Cancelado/suspenso não entram no KPI (filtro em processarChamadosTOA).
+ *
+ * Resiliência: não descarta a WO por campo secundário vazio (status, tipo, cód.).
+ * Cancelado/suspenso também são importados; o KPI filtra na leitura.
  */
 export async function parseToaFile(file: File): Promise<ToaLinha[]> {
   const name = file.name.toLowerCase();
@@ -351,26 +353,28 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
           `Código de Baixa ${indice}`,
           `Codigo de Baixa ${indice}`,
         );
-        // Slot válido se Número da O.S. ou Cód de Baixa estiver preenchido.
-        if (!numeroOs && !codBaixaBruto) continue;
+        const status = pick(
+          row,
+          `Status da O.S ${indice}`,
+          `Status da OS ${indice}`,
+          `Status O.S ${indice}`,
+          `Status OS ${indice}`,
+        );
+        const tipoOs = pick(
+          row,
+          `Tipo O.S ${indice}`,
+          `Tipo OS ${indice}`,
+          `Tipo O.S. ${indice}`,
+        );
+        // Slot válido se qualquer campo do slot estiver preenchido.
+        if (!numeroOs && !codBaixaBruto && !status && !tipoOs) continue;
 
         ordensDeServico.push({
           indice,
           numeroOs,
           codBaixaBruto,
-          status: pick(
-            row,
-            `Status da O.S ${indice}`,
-            `Status da OS ${indice}`,
-            `Status O.S ${indice}`,
-            `Status OS ${indice}`,
-          ),
-          tipoOs: pick(
-            row,
-            `Tipo O.S ${indice}`,
-            `Tipo OS ${indice}`,
-            `Tipo O.S. ${indice}`,
-          ),
+          status,
+          tipoOs,
         });
       }
 
@@ -401,14 +405,12 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
         ordensDeServico,
       };
     })
-    .filter(
-      (linha) =>
-        Boolean(
-          linha.data &&
-            linha.loginTecnico &&
-            normalizeNumeroWo(linha.numeroWo) &&
-            linha.ordensDeServico.length > 0,
-        ),
+    .filter((linha) =>
+      Boolean(
+        linha.data &&
+          linha.loginTecnico &&
+          normalizeNumeroWo(linha.numeroWo),
+      ),
     );
 }
 
