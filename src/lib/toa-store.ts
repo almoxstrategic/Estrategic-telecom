@@ -142,6 +142,59 @@ export function normalizeNumeroWo(value: string): string {
     .replace(/\s+/g, "");
 }
 
+/**
+ * Blindagem anti-sujeira do Excel (rodapés, nº de página, slots vazios).
+ * Contrato Claro real tem vários dígitos (ex.: 170614483); "2"/"3"/"4" são lixo.
+ */
+export function isContratoToaValido(contrato: string): boolean {
+  const raw = String(contrato ?? "").trim();
+  if (raw.length < 5) return false;
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 5;
+}
+
+/** WO real (ex.: 03230|739647607); rejeita vazio e tokens curtos. */
+export function isNumeroWoToaValido(numeroWo: string): boolean {
+  const wo = normalizeNumeroWo(numeroWo);
+  if (wo.length < 5) return false;
+  // Exige ao menos 5 dígitos no total (ignora separadores).
+  return wo.replace(/\D/g, "").length >= 5;
+}
+
+/**
+ * Nº O.S. real (ex.: 2648400271). Rejeita vazio e índices de slot 1–10
+ * que o unpivot antigo gravava quando o campo vinha vazio.
+ */
+export function isNumeroOsToaValido(numeroOs: string): boolean {
+  const raw = String(numeroOs ?? "").trim();
+  if (!raw) return false;
+  if (/^\d{1,2}$/.test(raw)) {
+    const n = Number(raw);
+    if (n >= 1 && n <= 10) return false;
+  }
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 5;
+}
+
+/** Tipo O.S. útil: rejeita vazio, "-" e travessões. */
+export function isTipoOsToaValido(tipoOs: string): boolean {
+  const t = String(tipoOs ?? "").trim();
+  if (!t) return false;
+  if (t === "-" || t === "—" || t === "–" || t === "−") return false;
+  return true;
+}
+
+/** Slot de O.S. elegível para persistência (unpivot → toa_importacoes). */
+export function isSlotOsToaPersistivel(ordem: {
+  numeroOs?: string;
+  tipoOs?: string;
+}): boolean {
+  return (
+    isNumeroOsToaValido(ordem.numeroOs ?? "") &&
+    isTipoOsToaValido(ordem.tipoOs ?? "")
+  );
+}
+
 /** Chave única de Nota no TOA = Número da WO (não o Contrato). */
 export function chaveNotaToa(
   chamado: Pick<ToaChamadoProcessado, "numeroWo"> | string,
@@ -322,14 +375,15 @@ function processarOrdem(ordem: ToaOrdemLinha): ToaOrdemServico | null {
   const codBaixaBruto = ordem.codBaixaBruto.trim();
   const tipoOs = ordem.tipoOs.trim();
   const status = ordem.status.trim();
-  // Aceita slot se houver Nº O.S., cód. baixa, tipo ou status — não descarta por campo vazio.
-  if (!numeroOs && !codBaixaBruto && !tipoOs && !status) return null;
+
+  // Slot só entra se Nº O.S. e Tipo O.S. forem dados reais (anti-sujeira Excel).
+  if (!isSlotOsToaPersistivel({ numeroOs, tipoOs })) return null;
 
   const codBaixaExtraido = extrairNumeroCodBaixa(codBaixaBruto);
   const codBaixa = codBaixaExtraido ?? 0;
   return {
     indice: ordem.indice,
-    numeroOs: numeroOs || (codBaixa > 0 || tipoOs || status ? String(ordem.indice) : ""),
+    numeroOs,
     codBaixa,
     codBaixaBruto: codBaixaBruto || (codBaixa > 0 ? String(codBaixa) : ""),
     status,
@@ -348,35 +402,27 @@ export function processarChamadosTOA(
     const login = normalizeToaLogin(linha.loginTecnico);
     const data = linha.data.trim();
     const numeroWo = normalizeNumeroWo(linha.numeroWo);
+    const contrato = (linha.contrato ?? "").trim();
     const statusAtividade = (linha.statusAtividade ?? "").trim();
-    // Nunca dropar a WO por status secundário (cancelado/suspenso): persiste tudo.
-    // O KPI filtra contabilizáveis na leitura.
-    if (!login || !data || !numeroWo) continue;
+
+    // Pula linha suja sem interromper o lote (WO/contrato inválidos).
+    if (!login || !data) continue;
+    if (!isNumeroWoToaValido(numeroWo)) continue;
+    if (!isContratoToaValido(contrato)) continue;
 
     const ordensDeServico = linha.ordensDeServico
       .map(processarOrdem)
       .filter((ordem): ordem is ToaOrdemServico => ordem !== null);
 
-    // WO sem slot O.S. ainda é persistida (placeholder) para não sumir da base.
-    if (ordensDeServico.length === 0) {
-      ordensDeServico.push({
-        indice: 1,
-        numeroOs: "",
-        codBaixa: 0,
-        codBaixaBruto: "",
-        status: "",
-        tipoOs: "",
-        isExecutada: false,
-        isProdutiva: false,
-      });
-    }
+    // Sem O.S. válida → não cria placeholder (evita contrato/OS inventados).
+    if (ordensDeServico.length === 0) continue;
 
     chamados.push({
       data,
       login,
       nomeTecnico: (linha.nomeTecnico ?? "").trim(),
       numeroWo,
-      contrato: (linha.contrato ?? "").trim(),
+      contrato,
       statusAtividade,
       ordensDeServico,
     });
@@ -426,6 +472,9 @@ export function flattenChamadosParaImportacaoFlat(
   for (const chamado of dedupeChamadosPorNumeroWo(chamados)) {
     const competenciaMatch = chamado.data.match(/^(\d{4})-(\d{2})/);
     if (!competenciaMatch) continue;
+    if (!isNumeroWoToaValido(chamado.numeroWo)) continue;
+    if (!isContratoToaValido(chamado.contrato)) continue;
+
     const competencia =
       Number(competenciaMatch[1]) * 100 + Number(competenciaMatch[2]);
     const statusNota = statusNotaToa(chamado.ordensDeServico);
@@ -436,8 +485,9 @@ export function flattenChamadosParaImportacaoFlat(
 
     for (const ordem of chamado.ordensDeServico) {
       const numeroOs = (ordem.numeroOs || "").trim();
-      const codBruto = (ordem.codBaixaBruto || "").trim();
-      // Persiste o slot mesmo sem Nº O.S./cód (WO sem baixa preenchida).
+      const tipoOs = (ordem.tipoOs || "").trim();
+      // Gate final do unpivot: só persiste O.S. com Nº e Tipo reais.
+      if (!isSlotOsToaPersistivel({ numeroOs, tipoOs })) continue;
 
       rows.push({
         competencia,
@@ -446,8 +496,8 @@ export function flattenChamadosParaImportacaoFlat(
         login_tecnico: login,
         numero_wo: chamado.numeroWo,
         contrato: chamado.contrato || "",
-        numero_os: numeroOs || (ordem.indice > 0 ? String(ordem.indice) : ""),
-        tipo_os: ordem.tipoOs || "",
+        numero_os: numeroOs,
+        tipo_os: tipoOs,
         cod_baixa: ordem.codBaixa > 0 ? ordem.codBaixa : null,
         status_os: ordem.status || "",
         status_nota: statusNota,

@@ -3,7 +3,12 @@ import { normalizeMatricula } from "./auth-identificacao";
 import { normalizeMaterialCode } from "./material-code";
 import { parseLocaleNumber } from "./parse-locale-number";
 import type { ToaLinha } from "./toa-store";
-import { normalizeNumeroWo } from "./toa-store";
+import {
+  isContratoToaValido,
+  isNumeroOsToaValido,
+  isNumeroWoToaValido,
+  isTipoOsToaValido,
+} from "./toa-store";
 
 type RawRow = Record<string, string>;
 
@@ -309,8 +314,8 @@ function parseToaData(value: string): string {
  * Hierarquia na planilha: 1 linha Excel = 1 WO (pai) com slots O.S. 1–10.
  * Na persistência (Supabase) fazemos unpivot: 1 linha = 1 O.S.
  *
- * Resiliência: não descarta a WO por campo secundário vazio (status, tipo, cód.).
- * Cancelado/suspenso também são importados; o KPI filtra na leitura.
+ * Blindagem: slots sem Nº O.S. real / Tipo O.S. válido são ignorados (continue).
+ * Cancelado/suspenso são importados; o KPI filtra na leitura.
  */
 export async function parseToaFile(file: File): Promise<ToaLinha[]> {
   const name = file.name.toLowerCase();
@@ -366,8 +371,14 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
           `Tipo OS ${indice}`,
           `Tipo O.S. ${indice}`,
         );
-        // Slot válido se qualquer campo do slot estiver preenchido.
-        if (!numeroOs && !codBaixaBruto && !status && !tipoOs) continue;
+
+        // Slot sujo (sem Nº O.S. real ou Tipo "-"/vazio): pula sem falhar o lote.
+        if (
+          !isNumeroOsToaValido(numeroOs) ||
+          !isTipoOsToaValido(tipoOs)
+        ) {
+          continue;
+        }
 
         ordensDeServico.push({
           indice,
@@ -405,12 +416,15 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
         ordensDeServico,
       };
     })
-    .filter((linha) =>
-      Boolean(
-        linha.data &&
-          linha.loginTecnico &&
-          normalizeNumeroWo(linha.numeroWo),
-      ),
+    .filter(
+      (linha) =>
+        Boolean(
+          linha.data &&
+            linha.loginTecnico &&
+            isNumeroWoToaValido(linha.numeroWo) &&
+            isContratoToaValido(linha.contrato) &&
+            linha.ordensDeServico.length > 0,
+        ),
     );
 }
 
