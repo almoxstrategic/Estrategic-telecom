@@ -1,9 +1,10 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
+import { KpiVolumeNotas } from "@/components/KpiVolumeNotas";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,7 +104,11 @@ import {
 } from "@/lib/toa-store";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
-const KPI_MODULOS = ["resumo-geral", "desempenho-tecnico"] as const;
+const KPI_MODULOS = [
+  "resumo-geral",
+  "desempenho-tecnico",
+  "volume-notas",
+] as const;
 type KpiModulo = (typeof KPI_MODULOS)[number];
 
 function isKpiModulo(value: string): value is KpiModulo {
@@ -125,7 +130,9 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
         title:
           params.modulo === "desempenho-tecnico"
             ? "Desempenho Técnicos — Estrategic Field"
-            : "KPI's — Estrategic Field",
+            : params.modulo === "volume-notas"
+              ? "Volume de Notas por período — Estrategic Field"
+              : "KPI's — Estrategic Field",
       },
       { name: "description", content: "Métricas de consumo de miscelâneas." },
     ],
@@ -398,6 +405,8 @@ function KpisPage() {
   const [tecnicosEquipe, setTecnicosEquipe] = useState<TecnicoProfile[]>([]);
   const { modulo: kpiModulo } = Route.useParams();
   const isDesempenho = kpiModulo === "desempenho-tecnico";
+  const isVolumeNotas = kpiModulo === "volume-notas";
+  const isResumoGeral = kpiModulo === "resumo-geral";
 
   useEffect(() => {
     if (!isDesempenho && filtro.dia !== null) {
@@ -889,7 +898,7 @@ function KpisPage() {
             to="/admin/kpis/$modulo"
             params={{ modulo: "resumo-geral" }}
             className={`flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
-              !isDesempenho
+              isResumoGeral
                 ? "bg-green-50 text-green-700"
                 : "cursor-pointer text-gray-600 hover:bg-gray-100"
             }`}
@@ -897,7 +906,7 @@ function KpisPage() {
           >
             <LayoutDashboard
               className={`h-5 w-5 shrink-0 ${
-                !isDesempenho ? "text-green-700" : "text-gray-500"
+                isResumoGeral ? "text-green-700" : "text-gray-500"
               }`}
             />
             Resumo Geral
@@ -924,10 +933,46 @@ function KpisPage() {
               />
               Desempenho Técnicos
             </Link>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "volume-notas" }}
+              className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isVolumeNotas
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <CalendarRange
+                className={`h-5 w-5 shrink-0 ${
+                  isVolumeNotas ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Volume de Notas por período
+            </Link>
           </div>
         </nav>
       </aside>
 
+      {isVolumeNotas ? (
+        <div className="sticky top-16 z-40 w-full border-b border-border bg-background shadow-sm">
+          <div className="mx-auto flex w-full max-w-[1920px] items-center gap-2 px-4 py-3 lg:px-8">
+            <button
+              type="button"
+              title="Abrir módulos de KPI"
+              aria-label="Abrir módulos de KPI"
+              onClick={() => setIsKpiNavOpen(true)}
+              className="mr-1 cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
+            >
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-sm font-bold text-foreground">
+              Volume de Notas por período
+            </span>
+          </div>
+        </div>
+      ) : (
       <div className="sticky top-16 z-40 w-full border-b border-border bg-background shadow-sm">
         <div className="mx-auto flex w-full max-w-[1920px] flex-row flex-wrap items-center gap-4 px-4 py-3 sm:gap-6 lg:px-8">
           <div className="flex items-center gap-2">
@@ -1067,15 +1112,22 @@ function KpisPage() {
           </Button>
         </div>
       </div>
+      )}
 
       <main className="mx-auto w-full max-w-[1920px] px-4 pb-10 pt-6 lg:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              {isDesempenho ? "Desempenho Técnicos" : "Resumo geral"}
+              {isVolumeNotas
+                ? "Volume de Notas por período"
+                : isDesempenho
+                  ? "Desempenho Técnicos"
+                  : "Resumo geral"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isDesempenho
+              {isVolumeNotas
+                ? "Linha do tempo TOA: compare o volume de notas produtivas e improdutivas por mês ou dia."
+                : isDesempenho
                 ? filtro.ano === null && filtro.mes === null
                   ? modoFaturamento === "COMPARISON_MODE"
                     ? "Histórico geral — Analítico Claro (real) × TOA (projeção), todos os meses consolidados."
@@ -1101,7 +1153,9 @@ function KpisPage() {
           </Link>
         </div>
 
-        {isDesempenho ? (
+        {isVolumeNotas ? (
+          <KpiVolumeNotas />
+        ) : isDesempenho ? (
           !filtroReady || loading || faturamentoLoading ? (
             <p className="text-sm text-muted-foreground">Carregando métricas...</p>
           ) : faturamentoError ? (

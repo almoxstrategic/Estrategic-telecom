@@ -262,6 +262,18 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         >
                           Desempenho técnico
                         </Link>
+                        <Link
+                          to="/admin/kpis/$modulo"
+                          params={{ modulo: "volume-notas" }}
+                          onClick={onNavigate}
+                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                            pathname.includes("/volume-notas")
+                              ? "bg-green-50 font-medium text-green-700"
+                              : ""
+                          }`}
+                        >
+                          Volume de Notas por período
+                        </Link>
                       </div>
                     )}
                   </div>
