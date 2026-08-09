@@ -702,13 +702,10 @@ function KpiDesempenhoProjecaoToa({
   /** Macro: Analítico + TOA no histórico geral (ou comparação mensal). */
   const mostrarCardsAnaliticoEToa =
     isComparacao || (historicoGeral && analiticoRows.length > 0);
-  const [activeTab, setActiveTab] = useState<AbaDetalhamento>(
-    mostrarCardsAnaliticoEToa ? "analitico" : "toa",
-  );
+  const [activeTab, setActiveTab] = useState<AbaDetalhamento>("toa");
 
   useEffect(() => {
-    if (mostrarCardsAnaliticoEToa) setActiveTab("analitico");
-    else setActiveTab("toa");
+    setActiveTab("toa");
   }, [mostrarCardsAnaliticoEToa, filtroPeriodo.ano, filtroPeriodo.mes]);
 
   const analiticoFiltrado = useMemo(
@@ -2159,7 +2156,7 @@ function KpiDesempenhoProjecaoToa({
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Users className="h-4 w-4 text-primary" />
-            Detalhamento TOA — por O.S.
+            Detalhamento TOA
           </h2>
           {activeTab === "toa" ? (
             <button
@@ -2201,25 +2198,12 @@ function KpiDesempenhoProjecaoToa({
         </div>
 
         {mostrarCardsAnaliticoEToa ? (
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4">
             <div
               className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
               role="tablist"
               aria-label="Fonte do detalhamento"
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "analitico"}
-                onClick={() => setActiveTab("analitico")}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                  activeTab === "analitico"
-                    ? "bg-white text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Analítico Claro
-              </button>
               <button
                 type="button"
                 role="tab"
@@ -2233,18 +2217,20 @@ function KpiDesempenhoProjecaoToa({
               >
                 Detalhamento TOA
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "analitico"}
+                onClick={() => setActiveTab("analitico")}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                  activeTab === "analitico"
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Analítico Claro
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={exportarComparacaoConciliacao}
-              className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
-              title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
-              aria-label="Exportar comparação Analítico vs TOA"
-            >
-              <Download className="h-4 w-4" />
-              Exportar Comparação
-            </button>
           </div>
         ) : null}
 
@@ -2307,6 +2293,19 @@ function KpiDesempenhoProjecaoToa({
                     <Download className="h-4 w-4" />
                     Exportar Excel (O.S.)
                   </button>
+
+                  {mostrarCardsAnaliticoEToa ? (
+                    <button
+                      type="button"
+                      onClick={exportarComparacaoConciliacao}
+                      className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                      title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
+                      aria-label="Exportar comparação Analítico vs TOA"
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportar Comparação
+                    </button>
+                  ) : null}
 
                   <label className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
