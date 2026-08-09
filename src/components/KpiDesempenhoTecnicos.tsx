@@ -39,6 +39,7 @@ import { ATIVIDADES_TOA_CATALOGO } from "@/lib/toa-atividades-catalogo";
 import {
   filtrarAnaliticoPorDhBaixa,
   formatDhBaixaDisplay,
+  parseDhBaixaAnoMes,
   resumirAnaliticoHistorico,
   filtrarToaOsContabilizaveis,
   type AnaliticoHistoricoRow,
@@ -193,6 +194,36 @@ const MESES_LABEL = [
   { value: 11, label: "Novembro" },
   { value: 12, label: "Dezembro" },
 ] as const;
+
+function mesAbreviado(mes: number): string {
+  const label =
+    MESES_LABEL.find((m) => m.value === mes)?.label ?? String(mes);
+  return label.slice(0, 3);
+}
+
+/** Ex.: "Dez 2025 - Jun 2026" a partir de DH_BAIXA do Analítico. */
+function formatPeriodoAnaliticoCards(
+  rows: AnaliticoHistoricoRow[],
+): string {
+  let minYm: number | null = null;
+  let maxYm: number | null = null;
+
+  for (const row of rows) {
+    const parts = parseDhBaixaAnoMes(row.dh_baixa);
+    if (!parts) continue;
+    const ym = parts.ano * 100 + parts.mes;
+    if (minYm === null || ym < minYm) minYm = ym;
+    if (maxYm === null || ym > maxYm) maxYm = ym;
+  }
+
+  if (minYm === null || maxYm === null) return "";
+
+  const fmt = (ym: number) =>
+    `${mesAbreviado(ym % 100)} ${Math.floor(ym / 100)}`;
+
+  if (minYm === maxYm) return fmt(minYm);
+  return `${fmt(minYm)} - ${fmt(maxYm)}`;
+}
 
 function formatReceita(valor: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -686,6 +717,10 @@ function KpiDesempenhoProjecaoToa({
   );
   const resumoAnalitico = useMemo(
     () => resumirAnaliticoHistorico(analiticoFiltrado),
+    [analiticoFiltrado],
+  );
+  const periodoAnaliticoLabel = useMemo(
+    () => formatPeriodoAnaliticoCards(analiticoFiltrado),
     [analiticoFiltrado],
   );
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
@@ -1815,27 +1850,19 @@ function KpiDesempenhoProjecaoToa({
               ? "Histórico geral — Analítico Claro (faturamento real) e TOA (projeção) consolidados. Use as abas abaixo para alternar o detalhamento."
               : "Modo comparação — Analítico Claro e TOA disponíveis no período. Use as abas abaixo para alternar o detalhamento."}
           </div>
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-emerald-600" />
                 <span className="text-sm font-medium text-muted-foreground">
                   Total de notas (Analítico)
+                  {periodoAnaliticoLabel
+                    ? ` - ${periodoAnaliticoLabel}`
+                    : ""}
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
                 {formatQuantidade(resumoAnalitico.totalNotas)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 shrink-0 text-emerald-600" />
-                <span className="text-sm font-medium text-muted-foreground">
-                  Receita (Analítico)
-                </span>
-              </div>
-              <div className="mt-3 text-3xl font-bold text-emerald-600">
-                {formatReceita(resumoAnalitico.receitaTotal)}
               </div>
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -1849,6 +1876,20 @@ function KpiDesempenhoProjecaoToa({
                 {formatQuantidade(totalNotasToa)}
               </div>
             </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 shrink-0 text-emerald-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Receita (Analítico)
+                  {periodoAnaliticoLabel
+                    ? ` - ${periodoAnaliticoLabel}`
+                    : ""}
+                </span>
+              </div>
+              <div className="mt-3 text-3xl font-bold text-emerald-600">
+                {formatReceita(resumoAnalitico.receitaTotal)}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => abrirDetalheNotas("produtivas")}
@@ -1858,7 +1899,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Notas produtivas (WO c/ &gt;= O.S prod.)
+                  Notas produtivas (Ctt c/ OS &gt;= 1 prod.)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1874,7 +1915,7 @@ function KpiDesempenhoProjecaoToa({
               <div className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Notas improdutivas (Sem O.S Prod)
+                  Notas improdutivas (Ctt c/ Sem OS prod.)
                 </span>
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1916,7 +1957,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 shrink-0 text-green-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Notas produtivas (WO c/ &gt;= O.S prod.)
+                Notas produtivas (Ctt c/ OS &gt;= 1 prod.)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
@@ -1932,7 +1973,7 @@ function KpiDesempenhoProjecaoToa({
             <div className="flex items-center gap-2">
               <XCircle className="h-5 w-5 shrink-0 text-red-600" />
               <span className="text-sm font-medium text-muted-foreground">
-                Notas improdutivas (Sem O.S Prod)
+                Notas improdutivas (Ctt c/ Sem OS prod.)
               </span>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900">
