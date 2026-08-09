@@ -49,11 +49,36 @@ const MESES = [
 
 const BAIRRO_NAO_INFORMADO = "Não Informado";
 
+export type TecnicoRankingItem = {
+  nome: string;
+  valor: number;
+};
+
 export type BairroVolumeAgg = {
   bairro: string;
   produtivas: number;
   improdutivas: number;
   total: number;
+  top5TecnicosProdutivos: TecnicoRankingItem[];
+  top5TecnicosImprodutivos: TecnicoRankingItem[];
+};
+
+type ChartBairroPoint = {
+  bairro: string;
+  volume: number;
+  tipo: "produtivas" | "quebras";
+  top5TecnicosProdutivos: TecnicoRankingItem[];
+  top5TecnicosImprodutivos: TecnicoRankingItem[];
+};
+
+type BairroChartTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: Array<{
+    value?: number | string;
+    dataKey?: string | number;
+    payload?: ChartBairroPoint;
+  }>;
 };
 
 function mesLabel(mes: number): string {
@@ -72,16 +97,99 @@ function normalizarBairro(value: string | null | undefined): string {
   return t || BAIRRO_NAO_INFORMADO;
 }
 
+function nomeTecnicoDaLinha(row: ToaImportacaoRow): string {
+  const nome = String(row.nome_tecnico ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (nome) return nome;
+  const login = String(row.login_tecnico ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return login || "Sem nome";
+}
+
+function top5FromRecord(rec: Record<string, number>): TecnicoRankingItem[] {
+  return Object.entries(rec)
+    .map(([nome, valor]) => ({ nome, valor }))
+    .sort(
+      (a, b) =>
+        b.valor - a.valor || a.nome.localeCompare(b.nome, "pt-BR"),
+    )
+    .slice(0, 5);
+}
+
+function BairroChartTooltip({
+  active,
+  payload,
+  label,
+}: BairroChartTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const entry = payload[0]!;
+  const data = entry.payload;
+  if (!data) return null;
+
+  const valor = Number(entry.value) || 0;
+  const isProdutivas = data.tipo === "produtivas";
+  const totalLabel = isProdutivas ? "Produtivas" : "Quebras";
+  const top5 = isProdutivas
+    ? data.top5TecnicosProdutivos
+    : data.top5TecnicosImprodutivos;
+
+  return (
+    <div className="rounded-md border border-gray-200 bg-white p-3 shadow-md">
+      <p className="text-sm font-bold text-gray-900">{String(label ?? data.bairro)}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {totalLabel}:{" "}
+        <span
+          className={`font-semibold tabular-nums ${
+            isProdutivas ? "text-green-700" : "text-red-600"
+          }`}
+        >
+          {formatQuantidade(valor)}
+        </span>
+      </p>
+      {top5.length > 0 ? (
+        <>
+          <p className="mt-2 text-xs font-semibold text-gray-700">
+            Top 5 Técnicos
+          </p>
+          <ul className="mt-1 space-y-0.5 text-xs text-gray-700">
+            {top5.map((t) => (
+              <li key={t.nome} className="flex justify-between gap-3">
+                <span className="truncate">{t.nome}</span>
+                <span className="shrink-0 tabular-nums font-medium">
+                  {formatQuantidade(t.valor)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Sem técnicos neste bairro.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Agrupa toa_importacoes por bairro contando WOs únicas.
  * Nota produtiva no bairro se ≥1 O.S. da WO for Produtiva.
+ * Inclui Top 5 técnicos produtivos/improdutivos por bairro.
  */
 export function agregarVolumeNotasPorBairro(
   rows: ToaImportacaoRow[],
 ): BairroVolumeAgg[] {
   const byWo = new Map<
     string,
-    { bairro: string; statusNota: "Produtiva" | "Improdutiva" }
+    {
+      bairro: string;
+      statusNota: "Produtiva" | "Improdutiva";
+      nomeTecnico: string;
+    }
   >();
 
   for (const row of rows) {
@@ -91,32 +199,55 @@ export function agregarVolumeNotasPorBairro(
     const bairro = normalizarBairro(row.bairro);
     const statusNota: "Produtiva" | "Improdutiva" =
       row.status_nota === "Produtiva" ? "Produtiva" : "Improdutiva";
+    const nomeTecnico = nomeTecnicoDaLinha(row);
 
     const prev = byWo.get(numeroWo);
     if (!prev) {
-      byWo.set(numeroWo, { bairro, statusNota });
+      byWo.set(numeroWo, { bairro, statusNota, nomeTecnico });
       continue;
     }
 
     if (statusNota === "Produtiva") prev.statusNota = "Produtiva";
-    // Prefere bairro informado sobre "Não Informado"
     if (
       prev.bairro === BAIRRO_NAO_INFORMADO &&
       bairro !== BAIRRO_NAO_INFORMADO
     ) {
       prev.bairro = bairro;
     }
+    if (
+      (prev.nomeTecnico === "Sem nome" || !prev.nomeTecnico) &&
+      nomeTecnico !== "Sem nome"
+    ) {
+      prev.nomeTecnico = nomeTecnico;
+    }
   }
 
   const byBairro = new Map<
     string,
-    { produtivas: number; improdutivas: number }
+    {
+      produtivas: number;
+      improdutivas: number;
+      tecnicosProdutivos: Record<string, number>;
+      tecnicosImprodutivos: Record<string, number>;
+    }
   >();
 
-  for (const { bairro, statusNota } of byWo.values()) {
-    const bucket = byBairro.get(bairro) ?? { produtivas: 0, improdutivas: 0 };
-    if (statusNota === "Produtiva") bucket.produtivas += 1;
-    else bucket.improdutivas += 1;
+  for (const { bairro, statusNota, nomeTecnico } of byWo.values()) {
+    const bucket = byBairro.get(bairro) ?? {
+      produtivas: 0,
+      improdutivas: 0,
+      tecnicosProdutivos: {},
+      tecnicosImprodutivos: {},
+    };
+    if (statusNota === "Produtiva") {
+      bucket.produtivas += 1;
+      bucket.tecnicosProdutivos[nomeTecnico] =
+        (bucket.tecnicosProdutivos[nomeTecnico] ?? 0) + 1;
+    } else {
+      bucket.improdutivas += 1;
+      bucket.tecnicosImprodutivos[nomeTecnico] =
+        (bucket.tecnicosImprodutivos[nomeTecnico] ?? 0) + 1;
+    }
     byBairro.set(bairro, bucket);
   }
 
@@ -126,8 +257,12 @@ export function agregarVolumeNotasPorBairro(
       produtivas: counts.produtivas,
       improdutivas: counts.improdutivas,
       total: counts.produtivas + counts.improdutivas,
+      top5TecnicosProdutivos: top5FromRecord(counts.tecnicosProdutivos),
+      top5TecnicosImprodutivos: top5FromRecord(counts.tecnicosImprodutivos),
     }))
-    .sort((a, b) => b.total - a.total || a.bairro.localeCompare(b.bairro, "pt-BR"));
+    .sort(
+      (a, b) => b.total - a.total || a.bairro.localeCompare(b.bairro, "pt-BR"),
+    );
 }
 
 export function KpiDetalhamentoNotas() {
@@ -237,22 +372,34 @@ export function KpiDetalhamentoNotas() {
   }, [porBairro]);
 
   const chartProdutivas = useMemo(
-    () =>
+    (): ChartBairroPoint[] =>
       [...porBairro]
         .filter((b) => b.produtivas > 0)
         .sort((a, b) => b.produtivas - a.produtivas)
         .slice(0, 10)
-        .map((b) => ({ bairro: b.bairro, volume: b.produtivas })),
+        .map((b) => ({
+          bairro: b.bairro,
+          volume: b.produtivas,
+          tipo: "produtivas" as const,
+          top5TecnicosProdutivos: b.top5TecnicosProdutivos,
+          top5TecnicosImprodutivos: b.top5TecnicosImprodutivos,
+        })),
     [porBairro],
   );
 
   const chartImprodutivas = useMemo(
-    () =>
+    (): ChartBairroPoint[] =>
       [...porBairro]
         .filter((b) => b.improdutivas > 0)
         .sort((a, b) => b.improdutivas - a.improdutivas)
         .slice(0, 10)
-        .map((b) => ({ bairro: b.bairro, volume: b.improdutivas })),
+        .map((b) => ({
+          bairro: b.bairro,
+          volume: b.improdutivas,
+          tipo: "quebras" as const,
+          top5TecnicosProdutivos: b.top5TecnicosProdutivos,
+          top5TecnicosImprodutivos: b.top5TecnicosImprodutivos,
+        })),
     [porBairro],
   );
 
@@ -454,10 +601,8 @@ export function KpiDetalhamentoNotas() {
                         reversed={false}
                       />
                       <Tooltip
-                        formatter={(value: number) => [
-                          formatQuantidade(value),
-                          "Produtivas",
-                        ]}
+                        content={<BairroChartTooltip />}
+                        cursor={{ fill: "#f3f4f6" }}
                       />
                       <Bar
                         dataKey="volume"
@@ -474,7 +619,7 @@ export function KpiDetalhamentoNotas() {
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
                 <ThumbsDown className="h-4 w-4 text-red-600" />
-                Top 10 Bairros Improdutivos
+                Top 10 Bairros Quebras
               </h2>
               {chartImprodutivas.length === 0 ? (
                 <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
@@ -502,10 +647,8 @@ export function KpiDetalhamentoNotas() {
                         reversed={false}
                       />
                       <Tooltip
-                        formatter={(value: number) => [
-                          formatQuantidade(value),
-                          "Improdutivas",
-                        ]}
+                        content={<BairroChartTooltip />}
+                        cursor={{ fill: "#f3f4f6" }}
                       />
                       <Bar
                         dataKey="volume"
