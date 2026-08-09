@@ -242,8 +242,8 @@ export function KpiDetalhamentoNotas() {
         .filter((b) => b.produtivas > 0)
         .sort((a, b) => b.produtivas - a.produtivas)
         .slice(0, 10)
-        .map((b) => ({ bairro: b.bairro, volume: b.produtivas }))
-        .reverse(),
+        .reverse()
+        .map((b) => ({ bairro: b.bairro, volume: b.produtivas })),
     [porBairro],
   );
 
@@ -253,8 +253,8 @@ export function KpiDetalhamentoNotas() {
         .filter((b) => b.improdutivas > 0)
         .sort((a, b) => b.improdutivas - a.improdutivas)
         .slice(0, 10)
-        .map((b) => ({ bairro: b.bairro, volume: b.improdutivas }))
-        .reverse(),
+        .reverse()
+        .map((b) => ({ bairro: b.bairro, volume: b.improdutivas })),
     [porBairro],
   );
 
@@ -407,7 +407,7 @@ export function KpiDetalhamentoNotas() {
               <div className="flex items-center gap-2">
                 <ThumbsDown className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Bairro + Improdutivo (Gargalo)
+                  Bairro + Improdutivo
                 </span>
               </div>
               <div className="mt-3 text-lg font-bold text-gray-900">
@@ -453,6 +453,7 @@ export function KpiDetalhamentoNotas() {
                         dataKey="bairro"
                         width={110}
                         tick={{ fontSize: 11 }}
+                        reversed={false}
                       />
                       <Tooltip
                         formatter={(value: number) => [
@@ -500,6 +501,7 @@ export function KpiDetalhamentoNotas() {
                         dataKey="bairro"
                         width={110}
                         tick={{ fontSize: 11 }}
+                        reversed={false}
                       />
                       <Tooltip
                         formatter={(value: number) => [
@@ -530,18 +532,18 @@ export function KpiDetalhamentoNotas() {
                 Nenhum bairro no período selecionado.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
                 <table className="w-full min-w-[28rem] text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-white shadow-sm">
                     <tr className="border-b border-border text-left text-muted-foreground">
-                      <th className="px-2 py-2 font-semibold">Bairro</th>
-                      <th className="px-2 py-2 text-right font-semibold">
+                      <th className="bg-white px-2 py-2 font-semibold">Bairro</th>
+                      <th className="bg-white px-2 py-2 text-right font-semibold">
                         Produtivas
                       </th>
-                      <th className="px-2 py-2 text-right font-semibold">
+                      <th className="bg-white px-2 py-2 text-right font-semibold">
                         Improdutivas
                       </th>
-                      <th className="px-2 py-2 text-right font-semibold">
+                      <th className="bg-white px-2 py-2 text-right font-semibold">
                         Total
                       </th>
                     </tr>
