@@ -42,6 +42,13 @@ export type ToaLinha = {
   contrato: string;
   /** Ex.: concluído, cancelado, suspenso — cancelado/suspenso fora do KPI. */
   statusAtividade: string;
+  /** Campos da WO-mãe (repetidos em cada O.S. flat). */
+  endereco: string;
+  bairro: string;
+  inicioFim: string;
+  duracao: string;
+  tipoAtividade: string;
+  categoriasCapacidade: string;
   ordensDeServico: ToaOrdemLinha[];
 };
 
@@ -72,6 +79,12 @@ export type ToaChamadoProcessado = {
   numeroWo: string;
   contrato: string;
   statusAtividade: string;
+  endereco: string;
+  bairro: string;
+  inicioFim: string;
+  duracao: string;
+  tipoAtividade: string;
+  categoriasCapacidade: string;
   ordensDeServico: ToaOrdemServico[];
 };
 
@@ -424,6 +437,12 @@ export function processarChamadosTOA(
       numeroWo,
       contrato,
       statusAtividade,
+      endereco: (linha.endereco ?? "").trim(),
+      bairro: (linha.bairro ?? "").trim(),
+      inicioFim: (linha.inicioFim ?? "").trim(),
+      duracao: (linha.duracao ?? "").trim(),
+      tipoAtividade: (linha.tipoAtividade ?? "").trim(),
+      categoriasCapacidade: (linha.categoriasCapacidade ?? "").trim(),
       ordensDeServico,
     });
   }
@@ -453,6 +472,12 @@ export function flattenChamadosParaImportacaoFlat(
   status_os: string;
   status_nota: "Produtiva" | "Improdutiva";
   status_atividade: string;
+  endereco: string;
+  bairro: string;
+  inicio_fim: string;
+  duracao: string;
+  tipo_atividade: string;
+  categorias_capacidade: string;
 }> {
   const rows: Array<{
     competencia: number;
@@ -467,6 +492,12 @@ export function flattenChamadosParaImportacaoFlat(
     status_os: string;
     status_nota: "Produtiva" | "Improdutiva";
     status_atividade: string;
+    endereco: string;
+    bairro: string;
+    inicio_fim: string;
+    duracao: string;
+    tipo_atividade: string;
+    categorias_capacidade: string;
   }> = [];
 
   for (const chamado of dedupeChamadosPorNumeroWo(chamados)) {
@@ -482,6 +513,12 @@ export function flattenChamadosParaImportacaoFlat(
     // Nome real da planilha (coluna "técnicos") — nunca repetir o login Z...
     const nomeTecnico = (chamado.nomeTecnico || "").trim();
     const statusAtividade = (chamado.statusAtividade || "").trim();
+    const endereco = (chamado.endereco || "").trim();
+    const bairro = (chamado.bairro || "").trim();
+    const inicioFim = (chamado.inicioFim || "").trim();
+    const duracao = (chamado.duracao || "").trim();
+    const tipoAtividade = (chamado.tipoAtividade || "").trim();
+    const categoriasCapacidade = (chamado.categoriasCapacidade || "").trim();
 
     for (const ordem of chamado.ordensDeServico) {
       const numeroOs = (ordem.numeroOs || "").trim();
@@ -502,6 +539,12 @@ export function flattenChamadosParaImportacaoFlat(
         status_os: ordem.status || "",
         status_nota: statusNota,
         status_atividade: statusAtividade,
+        endereco,
+        bairro,
+        inicio_fim: inicioFim,
+        duracao,
+        tipo_atividade: tipoAtividade,
+        categorias_capacidade: categoriasCapacidade,
       });
     }
   }
@@ -525,6 +568,12 @@ export function regroupFlatRowsToChamados(
     status_os: string;
     status_nota?: string;
     status_atividade?: string;
+    endereco?: string;
+    bairro?: string;
+    inicio_fim?: string;
+    duracao?: string;
+    tipo_atividade?: string;
+    categorias_capacidade?: string;
   }>,
 ): ToaChamadoProcessado[] {
   const byWo = new Map<
@@ -536,6 +585,12 @@ export function regroupFlatRowsToChamados(
       numeroWo: string;
       contrato: string;
       statusAtividade: string;
+      endereco: string;
+      bairro: string;
+      inicioFim: string;
+      duracao: string;
+      tipoAtividade: string;
+      categoriasCapacidade: string;
       ordens: ToaOrdemServico[];
     }
   >();
@@ -548,6 +603,12 @@ export function regroupFlatRowsToChamados(
     if (!login || !data) continue;
     const nomeTecnico = String(row.nome_tecnico ?? "").trim();
     const statusAtividade = String(row.status_atividade ?? "").trim();
+    const endereco = String(row.endereco ?? "").trim();
+    const bairro = String(row.bairro ?? "").trim();
+    const inicioFim = String(row.inicio_fim ?? "").trim();
+    const duracao = String(row.duracao ?? "").trim();
+    const tipoAtividade = String(row.tipo_atividade ?? "").trim();
+    const categoriasCapacidade = String(row.categorias_capacidade ?? "").trim();
 
     let group = byWo.get(numeroWo);
     if (!group) {
@@ -558,6 +619,12 @@ export function regroupFlatRowsToChamados(
         numeroWo,
         contrato: String(row.contrato ?? "").trim(),
         statusAtividade,
+        endereco,
+        bairro,
+        inicioFim,
+        duracao,
+        tipoAtividade,
+        categoriasCapacidade,
         ordens: [],
       };
       byWo.set(numeroWo, group);
@@ -565,6 +632,16 @@ export function regroupFlatRowsToChamados(
       if (nomeTecnico && !group.nomeTecnico) group.nomeTecnico = nomeTecnico;
       if (statusAtividade && !group.statusAtividade) {
         group.statusAtividade = statusAtividade;
+      }
+      if (endereco && !group.endereco) group.endereco = endereco;
+      if (bairro && !group.bairro) group.bairro = bairro;
+      if (inicioFim && !group.inicioFim) group.inicioFim = inicioFim;
+      if (duracao && !group.duracao) group.duracao = duracao;
+      if (tipoAtividade && !group.tipoAtividade) {
+        group.tipoAtividade = tipoAtividade;
+      }
+      if (categoriasCapacidade && !group.categoriasCapacidade) {
+        group.categoriasCapacidade = categoriasCapacidade;
       }
     }
 
@@ -596,6 +673,12 @@ export function regroupFlatRowsToChamados(
       numeroWo: g.numeroWo,
       contrato: g.contrato,
       statusAtividade: g.statusAtividade,
+      endereco: g.endereco,
+      bairro: g.bairro,
+      inicioFim: g.inicioFim,
+      duracao: g.duracao,
+      tipoAtividade: g.tipoAtividade,
+      categoriasCapacidade: g.categoriasCapacidade,
       ordensDeServico: g.ordens,
     })),
   );
@@ -790,6 +873,19 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
       numeroWo,
       contrato: item.contrato.trim(),
       statusAtividade,
+      endereco: typeof item.endereco === "string" ? item.endereco.trim() : "",
+      bairro: typeof item.bairro === "string" ? item.bairro.trim() : "",
+      inicioFim:
+        typeof item.inicioFim === "string" ? item.inicioFim.trim() : "",
+      duracao: typeof item.duracao === "string" ? item.duracao.trim() : "",
+      tipoAtividade:
+        typeof item.tipoAtividade === "string"
+          ? item.tipoAtividade.trim()
+          : "",
+      categoriasCapacidade:
+        typeof item.categoriasCapacidade === "string"
+          ? item.categoriasCapacidade.trim()
+          : "",
       ordensDeServico,
     };
   }
@@ -824,6 +920,16 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
     numeroWo,
     contrato: item.contrato.trim(),
     statusAtividade,
+    endereco: typeof item.endereco === "string" ? item.endereco.trim() : "",
+    bairro: typeof item.bairro === "string" ? item.bairro.trim() : "",
+    inicioFim: typeof item.inicioFim === "string" ? item.inicioFim.trim() : "",
+    duracao: typeof item.duracao === "string" ? item.duracao.trim() : "",
+    tipoAtividade:
+      typeof item.tipoAtividade === "string" ? item.tipoAtividade.trim() : "",
+    categoriasCapacidade:
+      typeof item.categoriasCapacidade === "string"
+        ? item.categoriasCapacidade.trim()
+        : "",
     ordensDeServico: [
       {
         indice: 1,

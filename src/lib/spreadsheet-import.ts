@@ -314,8 +314,8 @@ function parseToaData(value: string): string {
  * Hierarquia na planilha: 1 linha Excel = 1 WO (pai) com slots O.S. 1–10.
  * Na persistência (Supabase) fazemos unpivot: 1 linha = 1 O.S.
  *
+ * Filtro primário: só Status da Atividade = "concluído" (case-insensitive).
  * Blindagem: slots sem Nº O.S. real / Tipo O.S. válido são ignorados (continue).
- * Cancelado/suspenso são importados; o KPI filtra na leitura.
  */
 export async function parseToaFile(file: File): Promise<ToaLinha[]> {
   const name = file.name.toLowerCase();
@@ -340,6 +340,21 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
   }) as string[][];
 
   return rowsFromMatrix(matrix)
+    .filter((row) => {
+      const statusAtividade = pick(
+        row,
+        "Status da Atividade",
+        "Status Atividade",
+        "status da atividade",
+      );
+      return (
+        statusAtividade
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase() === "concluido"
+      );
+    })
     .map((row) => {
       const ordensDeServico: ToaLinha["ordensDeServico"] = [];
 
@@ -412,6 +427,30 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
           "Status da Atividade",
           "Status Atividade",
           "status da atividade",
+        ),
+        endereco: pick(row, "Endereço", "Endereco", "endereço", "endereco"),
+        bairro: pick(row, "Bairro", "bairro"),
+        inicioFim: pick(
+          row,
+          "Início - Fim",
+          "Inicio - Fim",
+          "Início-Fim",
+          "Inicio-Fim",
+          "Inicio Fim",
+        ),
+        duracao: pick(row, "Duração", "Duracao", "duração", "duracao"),
+        tipoAtividade: pick(
+          row,
+          "Tipo de Atividade",
+          "Tipo Atividade",
+          "tipo de atividade",
+        ),
+        categoriasCapacidade: pick(
+          row,
+          "Categorias da Capacidade",
+          "Categorias Capacidade",
+          "Categoria da Capacidade",
+          "categorias da capacidade",
         ),
         ordensDeServico,
       };

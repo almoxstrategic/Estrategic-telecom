@@ -106,18 +106,28 @@ export type AnaliticoHistoricoRow = {
 };
 
 /** 1 linha = 1 O.S. (granularidade alinhada ao Analítico). */
+/**
+ * Linha flat de toa_importacoes (1 = 1 O.S.).
+ * Ordem mental alinhada ao detalhamento UI (sem Receita — só no front).
+ */
 export type ToaImportacaoRow = {
   id?: string;
   competencia: number;
   data_toa: string;
-  nome_tecnico: string;
   login_tecnico: string;
-  numero_wo: string;
+  nome_tecnico: string;
+  tipo_atividade?: string;
+  cod_baixa: number | null;
   contrato: string;
+  numero_wo: string;
   numero_os: string;
   tipo_os: string;
-  cod_baixa: number | null;
   status_os: string;
+  endereco?: string;
+  bairro?: string;
+  inicio_fim?: string;
+  duracao?: string;
+  categorias_capacidade?: string;
   status_nota: "Produtiva" | "Improdutiva";
   /** Status da Atividade da WO-mãe (concluído, cancelado, suspenso, …). */
   status_atividade?: string;
@@ -796,7 +806,7 @@ export async function fetchToaImportacoes(filtro: {
       let query = supabase
         .from("toa_importacoes")
         .select(
-          "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, imported_at",
+          "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, endereco, bairro, inicio_fim, duracao, tipo_atividade, categorias_capacidade, imported_at",
         )
         .order("data_toa", { ascending: true })
         .order("numero_wo", { ascending: true })
@@ -840,6 +850,12 @@ export async function fetchToaImportacoes(filtro: {
         ? "Produtiva"
         : "Improdutiva",
     status_atividade: String(row.status_atividade ?? "").trim(),
+    endereco: String(row.endereco ?? "").trim(),
+    bairro: String(row.bairro ?? "").trim(),
+    inicio_fim: String(row.inicio_fim ?? "").trim(),
+    duracao: String(row.duracao ?? "").trim(),
+    tipo_atividade: String(row.tipo_atividade ?? "").trim(),
+    categorias_capacidade: String(row.categorias_capacidade ?? "").trim(),
     imported_at: row.imported_at ? String(row.imported_at) : undefined,
   }));
 }

@@ -78,18 +78,28 @@ type TecnicoSelecionado = {
 
 type TipoDetalheNotas = "produtivas" | "perdas";
 
-/** 1 linha = 1 O.S. (toa_importacoes), ordem de colunas do detalhamento TOA. */
+/**
+ * 1 linha = 1 O.S. (toa_importacoes).
+ * Ordem mental alinhada à UI de detalhamento (Receita só existe na exibição).
+ */
 type ToaOsDetalheLinha = {
   data: string;
   idToa: string;
   tecnico: string;
-  statusNota: "Produtiva" | "Improdutiva";
+  tipoAtividade: string;
+  codBaixa: number | null;
   contrato: string;
   numeroWo: string;
   numeroOs: string;
   tipoOs: string;
-  codBaixa: number | null;
   statusOs: string;
+  endereco: string;
+  bairro: string;
+  inicioFim: string;
+  duracao: string;
+  categoriasCapacidade: string;
+  statusNota: "Produtiva" | "Improdutiva";
+  /** Calculada no front (catálogo) — não persiste em toa_importacoes. */
   receita: number;
   /** true se a O.S. entra na receita projetada (não bundlada). */
   contaReceitaFaturada: boolean;
@@ -191,9 +201,55 @@ function formatReceita(valor: number): string {
   }).format(valor);
 }
 
-/** Colunas do detalhamento TOA: 1 linha = 1 O.S. (toa_importacoes). */
-const GRID_OS_TOA =
-  "grid grid-cols-[minmax(72px,0.75fr)_minmax(72px,0.8fr)_minmax(96px,1.2fr)_minmax(80px,0.9fr)_minmax(80px,0.95fr)_minmax(80px,0.9fr)_minmax(64px,0.7fr)_minmax(100px,1.2fr)_minmax(64px,0.7fr)_minmax(88px,1fr)_minmax(80px,0.9fr)] gap-2";
+/** Ordem de exportação = ordem visual do detalhamento (Receita só na UI/Excel). */
+const COLUNAS_EXCEL_OS_TOA = [
+  "Data",
+  "IdTOA",
+  "Técnico",
+  "Tipo de Atividade",
+  "Cod Baixa",
+  "Contrato",
+  "WO",
+  "OS",
+  "Tipo OS",
+  "Status",
+  "Endereço",
+  "Bairro",
+  "Início - Fim",
+  "Duração",
+  "Categorias da Capacidade",
+  "Status da nota",
+  "Receita",
+] as const;
+
+const TH_OS_TOA =
+  "px-1 py-1.5 text-left text-[11px] font-semibold leading-tight text-muted-foreground";
+const TD_OS_TOA =
+  "max-w-0 truncate whitespace-nowrap px-1 py-1 text-[11px] leading-tight text-gray-700";
+
+function ColgroupOsToa() {
+  return (
+    <colgroup>
+      <col style={{ width: "4%" }} />
+      <col style={{ width: "4.5%" }} />
+      <col style={{ width: "8%" }} />
+      <col style={{ width: "6.5%" }} />
+      <col style={{ width: "3.5%" }} />
+      <col style={{ width: "5%" }} />
+      <col style={{ width: "4.5%" }} />
+      <col style={{ width: "4.5%" }} />
+      <col style={{ width: "7%" }} />
+      <col style={{ width: "5%" }} />
+      <col style={{ width: "12%" }} />
+      <col style={{ width: "5%" }} />
+      <col style={{ width: "6%" }} />
+      <col style={{ width: "3.5%" }} />
+      <col style={{ width: "8%" }} />
+      <col style={{ width: "6%" }} />
+      <col style={{ width: "7%" }} />
+    </colgroup>
+  );
+}
 
 function formatMediaMaterial(valor: number): string {
   return valor.toLocaleString("pt-BR", {
@@ -1436,6 +1492,12 @@ function KpiDesempenhoProjecaoToa({
           statusOs: row.status_os || "",
           receita: valorCatalogo * fatorProjecao,
           contaReceitaFaturada,
+          endereco: row.endereco || "",
+          bairro: row.bairro || "",
+          inicioFim: row.inicio_fim || "",
+          duracao: row.duracao || "",
+          tipoAtividade: row.tipo_atividade || "",
+          categoriasCapacidade: row.categorias_capacidade || "",
         };
       });
     }
@@ -1474,6 +1536,12 @@ function KpiDesempenhoProjecaoToa({
             ordem,
             chamado.ordensDeServico,
           ),
+          endereco: chamado.endereco || "",
+          bairro: chamado.bairro || "",
+          inicioFim: chamado.inicioFim || "",
+          duracao: chamado.duracao || "",
+          tipoAtividade: chamado.tipoAtividade || "",
+          categoriasCapacidade: chamado.categoriasCapacidade || "",
         });
       }
     }
@@ -1600,13 +1668,19 @@ function KpiDesempenhoProjecaoToa({
       Data: formatDataBr(row.data),
       IdTOA: row.idToa || "—",
       Técnico: row.tecnico || "—",
-      "Status da nota": row.statusNota,
+      "Tipo de Atividade": row.tipoAtividade || "—",
+      "Cod Baixa": row.codBaixa ?? "",
       Contrato: row.contrato || "—",
       WO: row.numeroWo || "—",
       OS: row.numeroOs || "—",
       "Tipo OS": row.tipoOs || "—",
-      "Cod Baixa": row.codBaixa ?? "",
       Status: row.statusOs || "—",
+      Endereço: row.endereco || "—",
+      Bairro: row.bairro || "—",
+      "Início - Fim": row.inicioFim || "—",
+      Duração: row.duracao || "—",
+      "Categorias da Capacidade": row.categoriasCapacidade || "—",
+      "Status da nota": row.statusNota,
       Receita: Number(row.receita.toFixed(2)),
     }));
 
@@ -1621,19 +1695,7 @@ function KpiDesempenhoProjecaoToa({
     const worksheet = XLSX.utils.json_to_sheet(
       mapearOsParaExcel(osDetalheCardFiltradas),
       {
-        header: [
-          "Data",
-          "IdTOA",
-          "Técnico",
-          "Status da nota",
-          "Contrato",
-          "WO",
-          "OS",
-          "Tipo OS",
-          "Cod Baixa",
-          "Status",
-          "Receita",
-        ],
+        header: [...COLUNAS_EXCEL_OS_TOA],
       },
     );
     const workbook = XLSX.utils.book_new();
@@ -1661,19 +1723,7 @@ function KpiDesempenhoProjecaoToa({
     const worksheet = XLSX.utils.json_to_sheet(
       mapearOsParaExcel(osTabelaFiltradas),
       {
-        header: [
-          "Data",
-          "IdTOA",
-          "Técnico",
-          "Status da nota",
-          "Contrato",
-          "WO",
-          "OS",
-          "Tipo OS",
-          "Cod Baixa",
-          "Status",
-          "Receita",
-        ],
+        header: [...COLUNAS_EXCEL_OS_TOA],
       },
     );
     const workbook = XLSX.utils.book_new();
@@ -2259,129 +2309,168 @@ function KpiDesempenhoProjecaoToa({
                 Nenhuma O.S. encontrada para “{buscaTecnico.trim()}”.
               </p>
             ) : (
-              <div className="w-full overflow-x-auto">
-                <div
-                  className={`${GRID_OS_TOA} min-w-[72rem] items-end border-b border-border px-2 py-2 text-xs font-semibold leading-tight text-muted-foreground`}
-                >
-                  <span className="text-center">
-                    {cabecalhoOrdenavel("Data", "data")}
-                  </span>
-                  <span className="text-left">IdTOA</span>
-                  <span className="text-left">Técnico</span>
-                  <span className="text-center">
-                    {cabecalhoOrdenavel("Status da nota", "statusNota")}
-                  </span>
-                  <span className="text-left">Contrato</span>
-                  <span className="text-left">WO</span>
-                  <span className="text-left">OS</span>
-                  <span className="text-left">Tipo OS</span>
-                  <span className="text-center">Cod Baixa</span>
-                  <span className="text-left">Status</span>
-                  <span className="text-center">
-                    {cabecalhoOrdenavel("Receita", "receita")}
-                  </span>
-                </div>
-
-                <ul className="min-w-[72rem]">
-                  {osTabelaOrdenadas.map((row, index) => {
-                    const isDemitido = isTecnicoDemitido(
-                      demitidosKeys,
-                      row.idToa,
-                      row.tecnico,
-                    );
-                    const ganhoReal =
-                      row.statusNota === "Produtiva" &&
-                      row.contaReceitaFaturada &&
-                      row.receita > 0;
-                    const perdaReal =
-                      row.statusNota === "Improdutiva" && row.receita > 0;
-                    return (
-                      <li
-                        key={`${row.numeroWo}-${row.numeroOs}-${row.codBaixa}-${index}`}
-                        className={`${GRID_OS_TOA} items-center border-b border-border px-2 py-3 text-xs last:border-b-0`}
-                      >
-                        <span className="text-center tabular-nums text-gray-700">
-                          {formatDataBr(row.data)}
-                        </span>
-                        <span
-                          className="truncate tabular-nums text-gray-700"
-                          title={row.idToa}
+              <div className="w-full">
+                <table className="w-full table-fixed border-collapse text-[11px]">
+                  <ColgroupOsToa />
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className={`${TH_OS_TOA} text-center`}>
+                        {cabecalhoOrdenavel("Data", "data")}
+                      </th>
+                      <th className={TH_OS_TOA}>IdTOA</th>
+                      <th className={TH_OS_TOA}>Técnico</th>
+                      <th className={TH_OS_TOA} title="Tipo de Atividade">
+                        Tipo Ativ.
+                      </th>
+                      <th className={`${TH_OS_TOA} text-center`}>Cod</th>
+                      <th className={TH_OS_TOA}>Contrato</th>
+                      <th className={TH_OS_TOA}>WO</th>
+                      <th className={TH_OS_TOA}>OS</th>
+                      <th className={TH_OS_TOA}>Tipo OS</th>
+                      <th className={TH_OS_TOA}>Status</th>
+                      <th className={TH_OS_TOA}>Endereço</th>
+                      <th className={TH_OS_TOA}>Bairro</th>
+                      <th className={TH_OS_TOA} title="Início - Fim">
+                        Início-Fim
+                      </th>
+                      <th className={TH_OS_TOA}>Dur.</th>
+                      <th className={TH_OS_TOA} title="Categorias da Capacidade">
+                        Categorias
+                      </th>
+                      <th className={`${TH_OS_TOA} text-center`}>
+                        {cabecalhoOrdenavel("Status da nota", "statusNota")}
+                      </th>
+                      <th className={`${TH_OS_TOA} text-center`}>
+                        {cabecalhoOrdenavel("Receita", "receita")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {osTabelaOrdenadas.map((row, index) => {
+                      const isDemitido = isTecnicoDemitido(
+                        demitidosKeys,
+                        row.idToa,
+                        row.tecnico,
+                      );
+                      const ganhoReal =
+                        row.statusNota === "Produtiva" &&
+                        row.contaReceitaFaturada &&
+                        row.receita > 0;
+                      const perdaReal =
+                        row.statusNota === "Improdutiva" && row.receita > 0;
+                      const receitaExibida = perdaReal
+                        ? -Math.abs(row.receita)
+                        : row.receita;
+                      return (
+                        <tr
+                          key={`${row.numeroWo}-${row.numeroOs}-${row.codBaixa}-${index}`}
+                          className="border-b border-border last:border-b-0"
                         >
-                          {row.idToa || "—"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            abrirDetalheTecnico(row.idToa, row.tecnico)
-                          }
-                          className={
-                            isDemitido
-                              ? "max-w-[150px] truncate text-left font-medium text-gray-500 hover:underline"
-                              : "max-w-[150px] truncate text-left font-medium text-primary hover:underline"
-                          }
-                          title={row.tecnico}
-                        >
-                          {row.tecnico}
-                        </button>
-                        <span
-                          className={`text-center font-semibold ${
-                            row.statusNota === "Produtiva"
-                              ? "text-green-700"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {row.statusNota}
-                        </span>
-                        <span
-                          className="truncate tabular-nums text-gray-700"
-                          title={row.contrato}
-                        >
-                          {row.contrato || "—"}
-                        </span>
-                        <span
-                          className="truncate font-semibold tabular-nums text-gray-900"
-                          title={row.numeroWo}
-                        >
-                          {row.numeroWo || "—"}
-                        </span>
-                        <span
-                          className="truncate tabular-nums text-gray-800"
-                          title={row.numeroOs}
-                        >
-                          {row.numeroOs || "—"}
-                        </span>
-                        <span
-                          className="truncate text-gray-700"
-                          title={row.tipoOs}
-                        >
-                          {row.tipoOs || "—"}
-                        </span>
-                        <span className="text-center tabular-nums text-gray-700">
-                          {row.codBaixa ?? "—"}
-                        </span>
-                        <span
-                          className="truncate text-gray-700"
-                          title={row.statusOs}
-                        >
-                          {row.statusOs || "—"}
-                        </span>
-                        <span
-                          className={`text-center font-bold tabular-nums ${
-                            ganhoReal
-                              ? "text-green-600"
-                              : perdaReal
-                                ? "text-red-600"
-                                : "text-gray-500"
-                          }`}
-                        >
-                          {formatReceita(
-                            perdaReal ? -Math.abs(row.receita) : row.receita,
-                          )}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+                          <td
+                            className={`${TD_OS_TOA} text-center tabular-nums`}
+                            title={formatDataBr(row.data)}
+                          >
+                            {formatDataBr(row.data)}
+                          </td>
+                          <td className={`${TD_OS_TOA} tabular-nums`} title={row.idToa}>
+                            {row.idToa || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.tecnico}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                abrirDetalheTecnico(row.idToa, row.tecnico)
+                              }
+                              className={
+                                isDemitido
+                                  ? "block w-full truncate text-left font-medium text-gray-500 hover:underline"
+                                  : "block w-full truncate text-left font-medium text-primary hover:underline"
+                              }
+                              title={row.tecnico}
+                            >
+                              {row.tecnico}
+                            </button>
+                          </td>
+                          <td className={TD_OS_TOA} title={row.tipoAtividade}>
+                            {row.tipoAtividade || "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} text-center tabular-nums`}
+                            title={
+                              row.codBaixa != null ? String(row.codBaixa) : ""
+                            }
+                          >
+                            {row.codBaixa ?? "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} tabular-nums`}
+                            title={row.contrato}
+                          >
+                            {row.contrato || "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} font-semibold tabular-nums text-gray-900`}
+                            title={row.numeroWo}
+                          >
+                            {row.numeroWo || "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} tabular-nums`}
+                            title={row.numeroOs}
+                          >
+                            {row.numeroOs || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.tipoOs}>
+                            {row.tipoOs || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.statusOs}>
+                            {row.statusOs || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.endereco}>
+                            {row.endereco || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.bairro}>
+                            {row.bairro || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.inicioFim}>
+                            {row.inicioFim || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.duracao}>
+                            {row.duracao || "—"}
+                          </td>
+                          <td
+                            className={TD_OS_TOA}
+                            title={row.categoriasCapacidade}
+                          >
+                            {row.categoriasCapacidade || "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} text-center font-semibold ${
+                              row.statusNota === "Produtiva"
+                                ? "text-green-700"
+                                : "text-red-600"
+                            }`}
+                            title={row.statusNota}
+                          >
+                            {row.statusNota}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} text-center font-bold tabular-nums ${
+                              ganhoReal
+                                ? "text-green-600"
+                                : perdaReal
+                                  ? "text-red-600"
+                                  : "text-gray-500"
+                            }`}
+                            title={formatReceita(receitaExibida)}
+                          >
+                            {formatReceita(receitaExibida)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </>
@@ -2396,10 +2485,10 @@ function KpiDesempenhoProjecaoToa({
           aria-labelledby="modal-detalhe-notas-titulo"
           onClick={fecharDetalheNotas}
         >
-          <div
-            className="max-h-[90vh] w-11/12 max-w-7xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+            <div
+              className="max-h-[90vh] w-[min(98vw,100%)] max-w-[98vw] overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3
@@ -2445,29 +2534,42 @@ function KpiDesempenhoProjecaoToa({
               </button>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-muted-foreground">
+            <div className="w-full rounded-lg border border-gray-200">
+              <table className="w-full table-fixed border-collapse text-[11px]">
+                <ColgroupOsToa />
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">Data</th>
-                    <th className="px-3 py-2 font-semibold">IdTOA</th>
-                    <th className="px-3 py-2 font-semibold">Técnico</th>
-                    <th className="px-3 py-2 font-semibold">Status da nota</th>
-                    <th className="px-3 py-2 font-semibold">Contrato</th>
-                    <th className="px-3 py-2 font-semibold">WO</th>
-                    <th className="px-3 py-2 font-semibold">OS</th>
-                    <th className="px-3 py-2 font-semibold">Tipo OS</th>
-                    <th className="px-3 py-2 font-semibold">Cod Baixa</th>
-                    <th className="px-3 py-2 font-semibold">Status</th>
-                    <th className="px-3 py-2 font-semibold">Receita</th>
+                    <th className={`${TH_OS_TOA} text-center`}>Data</th>
+                    <th className={TH_OS_TOA}>IdTOA</th>
+                    <th className={TH_OS_TOA}>Técnico</th>
+                    <th className={TH_OS_TOA} title="Tipo de Atividade">
+                      Tipo Ativ.
+                    </th>
+                    <th className={`${TH_OS_TOA} text-center`}>Cod</th>
+                    <th className={TH_OS_TOA}>Contrato</th>
+                    <th className={TH_OS_TOA}>WO</th>
+                    <th className={TH_OS_TOA}>OS</th>
+                    <th className={TH_OS_TOA}>Tipo OS</th>
+                    <th className={TH_OS_TOA}>Status</th>
+                    <th className={TH_OS_TOA}>Endereço</th>
+                    <th className={TH_OS_TOA}>Bairro</th>
+                    <th className={TH_OS_TOA} title="Início - Fim">
+                      Início-Fim
+                    </th>
+                    <th className={TH_OS_TOA}>Dur.</th>
+                    <th className={TH_OS_TOA} title="Categorias da Capacidade">
+                      Categorias
+                    </th>
+                    <th className={`${TH_OS_TOA} text-center`}>Status nota</th>
+                    <th className={`${TH_OS_TOA} text-center`}>Receita</th>
                   </tr>
                 </thead>
                 <tbody>
                   {osDetalheCardFiltradas.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={11}
-                        className="px-3 py-8 text-center text-muted-foreground"
+                        colSpan={17}
+                        className="px-3 py-8 text-center text-[11px] text-muted-foreground"
                       >
                         Nenhuma O.S. para exibir.
                       </td>
@@ -2489,52 +2591,92 @@ function KpiDesempenhoProjecaoToa({
                           key={`${row.data}-${row.idToa}-${row.numeroWo}-${row.numeroOs}-${index}`}
                           className="border-t border-gray-100"
                         >
-                          <td className="px-3 py-2 tabular-nums text-gray-800">
+                          <td
+                            className={`${TD_OS_TOA} text-center tabular-nums`}
+                            title={formatDataBr(row.data)}
+                          >
                             {formatDataBr(row.data)}
                           </td>
-                          <td className="px-3 py-2 tabular-nums text-gray-700">
+                          <td
+                            className={`${TD_OS_TOA} tabular-nums`}
+                            title={row.idToa}
+                          >
                             {row.idToa || "—"}
                           </td>
-                          <td className="px-3 py-2 font-medium text-gray-900">
+                          <td
+                            className={`${TD_OS_TOA} font-medium text-gray-900`}
+                            title={row.tecnico}
+                          >
                             {row.tecnico}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className={TD_OS_TOA} title={row.tipoAtividade}>
+                            {row.tipoAtividade || "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} text-center tabular-nums`}
+                            title={
+                              row.codBaixa != null ? String(row.codBaixa) : ""
+                            }
+                          >
+                            {row.codBaixa ?? "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.contrato}>
+                            {row.contrato || "—"}
+                          </td>
+                          <td
+                            className={`${TD_OS_TOA} font-semibold text-gray-800`}
+                            title={row.numeroWo}
+                          >
+                            {row.numeroWo || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.numeroOs}>
+                            {row.numeroOs || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.tipoOs}>
+                            {row.tipoOs || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.statusOs}>
+                            {row.statusOs || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.endereco}>
+                            {row.endereco || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.bairro}>
+                            {row.bairro || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.inicioFim}>
+                            {row.inicioFim || "—"}
+                          </td>
+                          <td className={TD_OS_TOA} title={row.duracao}>
+                            {row.duracao || "—"}
+                          </td>
+                          <td
+                            className={TD_OS_TOA}
+                            title={row.categoriasCapacidade}
+                          >
+                            {row.categoriasCapacidade || "—"}
+                          </td>
+                          <td className={`${TD_OS_TOA} text-center`}>
                             <span
-                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
                                 row.statusNota === "Produtiva"
                                   ? "bg-green-50 text-green-700"
                                   : "bg-red-50 text-red-700"
                               }`}
+                              title={row.statusNota}
                             >
                               {row.statusNota}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.contrato || "—"}
-                          </td>
-                          <td className="px-3 py-2 font-semibold text-gray-800">
-                            {row.numeroWo || "—"}
-                          </td>
-                          <td className="px-3 py-2 text-gray-800">
-                            {row.numeroOs || "—"}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.tipoOs || "—"}
-                          </td>
-                          <td className="px-3 py-2 tabular-nums text-gray-700">
-                            {row.codBaixa ?? "—"}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.statusOs || "—"}
-                          </td>
                           <td
-                            className={`whitespace-nowrap px-3 py-2 tabular-nums ${
+                            className={`${TD_OS_TOA} text-center tabular-nums ${
                               ganhoReal
                                 ? "font-medium text-green-600"
                                 : perdaReal
                                   ? "font-medium text-red-600"
                                   : "font-normal text-gray-400"
                             }`}
+                            title={formatReceita(receitaExibida)}
                           >
                             {formatReceita(receitaExibida)}
                           </td>
