@@ -2267,19 +2267,6 @@ function KpiDesempenhoProjecaoToa({
                     Exportar Excel (O.S.)
                   </button>
 
-                  {mostrarCardsAnaliticoEToa ? (
-                    <button
-                      type="button"
-                      onClick={exportarComparacaoConciliacao}
-                      className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
-                      title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
-                      aria-label="Exportar comparação Analítico vs TOA"
-                    >
-                      <Download className="h-4 w-4" />
-                      Exportar Comparação
-                    </button>
-                  ) : null}
-
                   <label className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
                       <TrendingUp className="h-4 w-4 text-primary" />
@@ -2309,38 +2296,49 @@ function KpiDesempenhoProjecaoToa({
                 Nenhuma O.S. encontrada para “{buscaTecnico.trim()}”.
               </p>
             ) : (
-              <div className="w-full">
+              <div className="relative max-h-[500px] overflow-y-auto rounded-lg border border-gray-100">
                 <table className="w-full table-fixed border-collapse text-[11px]">
                   <ColgroupOsToa />
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-white shadow-sm">
                     <tr className="border-b border-border">
-                      <th className={`${TH_OS_TOA} text-center`}>
+                      <th className={`${TH_OS_TOA} bg-white text-center`}>
                         {cabecalhoOrdenavel("Data", "data")}
                       </th>
-                      <th className={TH_OS_TOA}>IdTOA</th>
-                      <th className={TH_OS_TOA}>Técnico</th>
-                      <th className={TH_OS_TOA} title="Tipo de Atividade">
+                      <th className={`${TH_OS_TOA} bg-white`}>IdTOA</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Técnico</th>
+                      <th
+                        className={`${TH_OS_TOA} bg-white`}
+                        title="Tipo de Atividade"
+                      >
                         Tipo Ativ.
                       </th>
-                      <th className={`${TH_OS_TOA} text-center`}>Cod</th>
-                      <th className={TH_OS_TOA}>Contrato</th>
-                      <th className={TH_OS_TOA}>WO</th>
-                      <th className={TH_OS_TOA}>OS</th>
-                      <th className={TH_OS_TOA}>Tipo OS</th>
-                      <th className={TH_OS_TOA}>Status</th>
-                      <th className={TH_OS_TOA}>Endereço</th>
-                      <th className={TH_OS_TOA}>Bairro</th>
-                      <th className={TH_OS_TOA} title="Início - Fim">
+                      <th className={`${TH_OS_TOA} bg-white text-center`}>
+                        Cod
+                      </th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Contrato</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>WO</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>OS</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Tipo OS</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Status</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Endereço</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Bairro</th>
+                      <th
+                        className={`${TH_OS_TOA} bg-white`}
+                        title="Início - Fim"
+                      >
                         Início-Fim
                       </th>
-                      <th className={TH_OS_TOA}>Dur.</th>
-                      <th className={TH_OS_TOA} title="Categorias da Capacidade">
+                      <th className={`${TH_OS_TOA} bg-white`}>Dur.</th>
+                      <th
+                        className={`${TH_OS_TOA} bg-white`}
+                        title="Categorias da Capacidade"
+                      >
                         Categorias
                       </th>
-                      <th className={`${TH_OS_TOA} text-center`}>
+                      <th className={`${TH_OS_TOA} bg-white text-center`}>
                         {cabecalhoOrdenavel("Status da nota", "statusNota")}
                       </th>
-                      <th className={`${TH_OS_TOA} text-center`}>
+                      <th className={`${TH_OS_TOA} bg-white text-center`}>
                         {cabecalhoOrdenavel("Receita", "receita")}
                       </th>
                     </tr>
