@@ -1625,6 +1625,24 @@ function KpiDesempenhoProjecaoToa({
     });
   }, [osTabelaInferior, buscaTecnico]);
 
+  /**
+   * Mini-card Total: mesma regra do card Receita (TOA) / receitaPerda.
+   * Produtivas → só O.S. com contaReceitaFaturada (evita double-count de bundling).
+   * Perdas → soma o valor de catálogo das O.S. da aba (WOs improdutivas).
+   */
+  const totalReceitaTabelaVisivel = useMemo(() => {
+    if (abaNotasToa === "produtivas") {
+      return osTabelaFiltradas.reduce((acc, row) => {
+        if (!row.contaReceitaFaturada) return acc;
+        return acc + (Number(row.receita) || 0);
+      }, 0);
+    }
+    return osTabelaFiltradas.reduce(
+      (acc, row) => acc + (Number(row.receita) || 0),
+      0,
+    );
+  }, [abaNotasToa, osTabelaFiltradas]);
+
   const osTabelaOrdenadas = useMemo(() => {
     if (!sortConfig.key) {
       return [...osTabelaFiltradas].sort((a, b) => {
@@ -2153,47 +2171,83 @@ function KpiDesempenhoProjecaoToa({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-            <Users className="h-4 w-4 text-primary" />
-            Detalhamento TOA
-          </h2>
+        <div className="mb-4 flex flex-wrap items-start gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+              <Users className="h-4 w-4 text-primary" />
+              Detalhamento TOA
+            </h2>
+            {activeTab === "toa" ? (
+              <button
+                type="button"
+                onClick={abrirTabelaPrecos}
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
+                title="Ver Tabela de Preços"
+                aria-label="Ver tabela de preços"
+              >
+                ?
+              </button>
+            ) : null}
+          </div>
+
           {activeTab === "toa" ? (
-            <button
-              type="button"
-              onClick={abrirTabelaPrecos}
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
-              title="Ver Tabela de Preços"
-              aria-label="Ver tabela de preços"
-            >
-              ?
-            </button>
-          ) : null}
-          {activeTab === "toa" && onRecalcularBase ? (
-            <button
-              type="button"
-              onClick={() => void recalcularBase()}
-              disabled={recalculandoBase || atualizandoCatalogoHistorico}
-              className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-              title="Regrava o catálogo calibrado no Supabase e invalida cache local de preços"
-            >
-              {recalculandoBase ? "Recalculando…" : "Recalcular Base"}
-            </button>
-          ) : null}
-          {activeTab === "toa" && onAtualizarCatalogoViaHistorico ? (
-            <button
-              type="button"
-              onClick={() => void atualizarCatalogoViaHistorico()}
-              disabled={atualizandoCatalogoHistorico || recalculandoBase}
-              className={`rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 ${
-                onRecalcularBase ? "" : "ml-auto"
-              }`}
-              title="Calcula a moda de valor_servico no Analítico e faz upsert em precos_os"
-            >
-              {atualizandoCatalogoHistorico
-                ? "Atualizando catálogo…"
-                : "Atualizar Catálogo via Histórico"}
-            </button>
+            <div className="ml-auto flex flex-col items-end gap-2">
+              {(onRecalcularBase || onAtualizarCatalogoViaHistorico) && (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {onRecalcularBase ? (
+                    <button
+                      type="button"
+                      onClick={() => void recalcularBase()}
+                      disabled={recalculandoBase || atualizandoCatalogoHistorico}
+                      className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      title="Regrava o catálogo calibrado no Supabase e invalida cache local de preços"
+                    >
+                      {recalculandoBase ? "Recalculando…" : "Recalcular Base"}
+                    </button>
+                  ) : null}
+                  {onAtualizarCatalogoViaHistorico ? (
+                    <button
+                      type="button"
+                      onClick={() => void atualizarCatalogoViaHistorico()}
+                      disabled={atualizandoCatalogoHistorico || recalculandoBase}
+                      className="rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      title="Calcula a moda de valor_servico no Analítico e faz upsert em precos_os"
+                    >
+                      {atualizandoCatalogoHistorico
+                        ? "Atualizando catálogo…"
+                        : "Atualizar Catálogo via Histórico"}
+                    </button>
+                  ) : null}
+                </div>
+              )}
+              <div
+                className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
+                title={
+                  abaNotasToa === "produtivas"
+                    ? "Receita faturável (mesma regra do card Receita TOA), filtrada pela tabela"
+                    : "Valor estimado deixado na mesa nas O.S. visíveis (aba Perdas)"
+                }
+              >
+                <span className="text-xs text-gray-500">
+                  {abaNotasToa === "produtivas"
+                    ? "Total (Receita Gerada)"
+                    : "Total (Deixado na mesa)"}
+                </span>
+                <span
+                  className={`text-sm font-bold tabular-nums ${
+                    abaNotasToa === "produtivas"
+                      ? "text-green-600"
+                      : "text-red-500"
+                  }`}
+                >
+                  {formatReceita(
+                    abaNotasToa === "perdas"
+                      ? -Math.abs(totalReceitaTabelaVisivel)
+                      : totalReceitaTabelaVisivel,
+                  )}
+                </span>
+              </div>
+            </div>
           ) : null}
         </div>
 
@@ -2238,9 +2292,9 @@ function KpiDesempenhoProjecaoToa({
           <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
         ) : (
           <>
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
               <div
-                className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+                className="inline-flex shrink-0 rounded-lg border border-border bg-muted/40 p-1"
                 role="tablist"
                 aria-label="Tipo de detalhamento TOA"
               >
@@ -2272,7 +2326,7 @@ function KpiDesempenhoProjecaoToa({
                 </button>
               </div>
 
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end lg:ml-auto lg:w-auto">
                 <input
                   type="search"
                   value={buscaTecnico}
