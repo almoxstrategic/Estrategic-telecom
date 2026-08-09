@@ -1,9 +1,10 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, UserCheck, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
+import { KpiDetalhamentoNotas } from "@/components/KpiDetalhamentoNotas";
 import { KpiVolumeNotas } from "@/components/KpiVolumeNotas";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +109,7 @@ const KPI_MODULOS = [
   "resumo-geral",
   "desempenho-tecnico",
   "volume-notas",
+  "detalhamento-notas",
 ] as const;
 type KpiModulo = (typeof KPI_MODULOS)[number];
 
@@ -132,7 +134,9 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
             ? "Desempenho Técnicos — Estrategic Field"
             : params.modulo === "volume-notas"
               ? "Volume de Notas por período — Estrategic Field"
-              : "KPI's — Estrategic Field",
+              : params.modulo === "detalhamento-notas"
+                ? "Detalhamento de notas — Estrategic Field"
+                : "KPI's — Estrategic Field",
       },
       { name: "description", content: "Métricas de consumo de miscelâneas." },
     ],
@@ -406,7 +410,9 @@ function KpisPage() {
   const { modulo: kpiModulo } = Route.useParams();
   const isDesempenho = kpiModulo === "desempenho-tecnico";
   const isVolumeNotas = kpiModulo === "volume-notas";
+  const isDetalhamentoNotas = kpiModulo === "detalhamento-notas";
   const isResumoGeral = kpiModulo === "resumo-geral";
+  const usaFiltroProprio = isVolumeNotas || isDetalhamentoNotas;
 
   useEffect(() => {
     if (!isDesempenho && filtro.dia !== null) {
@@ -950,11 +956,28 @@ function KpisPage() {
               />
               Volume de Notas por período
             </Link>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "detalhamento-notas" }}
+              className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isDetalhamentoNotas
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <MapPin
+                className={`h-5 w-5 shrink-0 ${
+                  isDetalhamentoNotas ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Detalhamento de notas
+            </Link>
           </div>
         </nav>
       </aside>
 
-      {isVolumeNotas ? (
+      {usaFiltroProprio ? (
         <div className="sticky top-16 z-40 w-full border-b border-border bg-background shadow-sm">
           <div className="mx-auto flex w-full max-w-[1920px] items-center gap-2 px-4 py-3 lg:px-8">
             <button
@@ -966,9 +989,15 @@ function KpisPage() {
             >
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
-            <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
+            {isDetalhamentoNotas ? (
+              <MapPin className="h-4 w-4 shrink-0 text-primary" />
+            ) : (
+              <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
+            )}
             <span className="text-sm font-bold text-foreground">
-              Volume de Notas por período
+              {isDetalhamentoNotas
+                ? "Detalhamento de notas"
+                : "Volume de Notas por período"}
             </span>
           </div>
         </div>
@@ -1118,14 +1147,18 @@ function KpisPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              {isVolumeNotas
-                ? "Volume de Notas por período"
-                : isDesempenho
-                  ? "Desempenho Técnicos"
-                  : "Resumo geral"}
+              {isDetalhamentoNotas
+                ? "Detalhamento de notas"
+                : isVolumeNotas
+                  ? "Volume de Notas por período"
+                  : isDesempenho
+                    ? "Desempenho Técnicos"
+                    : "Resumo geral"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isVolumeNotas
+              {isDetalhamentoNotas
+                ? "Análise geográfica: volume de notas produtivas e improdutivas por bairro."
+                : isVolumeNotas
                 ? "Linha do tempo TOA: compare o volume de notas produtivas e improdutivas por mês ou dia."
                 : isDesempenho
                 ? filtro.ano === null && filtro.mes === null
@@ -1153,7 +1186,9 @@ function KpisPage() {
           </Link>
         </div>
 
-        {isVolumeNotas ? (
+        {isDetalhamentoNotas ? (
+          <KpiDetalhamentoNotas />
+        ) : isVolumeNotas ? (
           <KpiVolumeNotas />
         ) : isDesempenho ? (
           !filtroReady || loading || faturamentoLoading ? (
