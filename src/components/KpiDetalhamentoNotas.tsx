@@ -242,7 +242,6 @@ export function KpiDetalhamentoNotas() {
         .filter((b) => b.produtivas > 0)
         .sort((a, b) => b.produtivas - a.produtivas)
         .slice(0, 10)
-        .reverse()
         .map((b) => ({ bairro: b.bairro, volume: b.produtivas })),
     [porBairro],
   );
@@ -253,7 +252,6 @@ export function KpiDetalhamentoNotas() {
         .filter((b) => b.improdutivas > 0)
         .sort((a, b) => b.improdutivas - a.improdutivas)
         .slice(0, 10)
-        .reverse()
         .map((b) => ({ bairro: b.bairro, volume: b.improdutivas })),
     [porBairro],
   );
