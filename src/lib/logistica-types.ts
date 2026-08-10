@@ -15,10 +15,14 @@ export type WoConsumoRow = {
   data_atendimento: string | null;
 };
 
+import type { KpiSemanaFiltro } from "@/lib/kpi-semana";
+
 export type KpisFiltro = {
   mes: number | null;
   ano: number | null;
   dia: number | null;
+  /** Fatia o mês em semanas de calendário (só Desempenho Técnicos). */
+  semana: KpiSemanaFiltro;
 };
 
 export type ConsumoTecnicoItem = {

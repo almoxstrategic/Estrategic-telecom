@@ -3,7 +3,12 @@ import type { KpisFiltro } from "@/lib/logistica-types";
 
 type Listener = () => void;
 
-let filtroState: KpisFiltro = { mes: null, ano: null, dia: null };
+let filtroState: KpisFiltro = {
+  mes: null,
+  ano: null,
+  dia: null,
+  semana: "Todos",
+};
 const listeners = new Set<Listener>();
 
 function emit(): void {
@@ -34,7 +39,7 @@ export function patchKpiFiltro(partial: Partial<KpisFiltro>): void {
   setKpiFiltro((prev) => ({ ...prev, ...partial }));
 }
 
-/** Estado compartilhado dos filtros de KPI (ano/mês/dia) entre módulos. */
+/** Estado compartilhado dos filtros de KPI (ano/mês/semana/dia) entre módulos. */
 export function useKpiFiltro(): KpisFiltro {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

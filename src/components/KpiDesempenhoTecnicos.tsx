@@ -65,11 +65,16 @@ import {
   type ToaChamadoProcessado,
   type ToaResumoTecnico,
 } from "@/lib/toa-store";
+import {
+  formatarIntervaloSemanaLabel,
+  type KpiSemanaFiltro,
+} from "@/lib/kpi-semana";
 
 type KpiFiltroPeriodo = {
   ano: number | null;
   mes: number | null;
   dia: number | null;
+  semana?: KpiSemanaFiltro;
 };
 
 type TecnicoSelecionado = {
@@ -328,6 +333,16 @@ function descricaoPeriodoLocal(filtro: KpiFiltroPeriodo): string {
     MESES_LABEL.find((m) => m.value === filtro.mes)?.label ?? String(filtro.mes);
   if (filtro.dia !== null) {
     return `${String(filtro.dia).padStart(2, "0")}/${String(filtro.mes).padStart(2, "0")}/${filtro.ano}`;
+  }
+  if (filtro.semana && filtro.semana !== "Todos") {
+    const intervalo = formatarIntervaloSemanaLabel(
+      filtro.semana,
+      filtro.ano,
+      filtro.mes,
+    );
+    if (intervalo) {
+      return `${mesLabel} ${filtro.ano} - ${filtro.semana} (${intervalo})`;
+    }
   }
   return `${mesLabel} de ${filtro.ano}`;
 }
@@ -840,9 +855,27 @@ function KpiDesempenhoProjecaoToa({
     [toaOsPeriodo],
   );
 
-  const tituloVisaoGeral = rangePeriodoToa
-    ? `Visão Geral de Desempenho — ${rangePeriodoToa}`
-    : "Visão Geral de Desempenho";
+  const tituloVisaoGeral = useMemo(() => {
+    const { ano, mes, dia, semana } = filtroPeriodo;
+    if (
+      ano !== null &&
+      mes !== null &&
+      dia === null &&
+      semana &&
+      semana !== "Todos"
+    ) {
+      const mesLabel =
+        MESES_LABEL.find((m) => m.value === mes)?.label ?? String(mes);
+      const intervalo = formatarIntervaloSemanaLabel(semana, ano, mes);
+      if (intervalo) {
+        return `Visão Geral de Desempenho — ${mesLabel} ${ano} - ${semana} (${intervalo}).`;
+      }
+    }
+    if (rangePeriodoToa) {
+      return `Visão Geral de Desempenho — ${rangePeriodoToa}`;
+    }
+    return "Visão Geral de Desempenho";
+  }, [filtroPeriodo, rangePeriodoToa]);
 
   const kpisToaFlat = useMemo(
     () => agregarKpisToaFlat(toaOsPeriodo),

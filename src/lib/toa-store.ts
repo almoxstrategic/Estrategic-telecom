@@ -1,4 +1,8 @@
 import { useSyncExternalStore } from "react";
+import {
+  diaPertenceASemana,
+  type KpiSemanaFiltro,
+} from "@/lib/kpi-semana";
 
 /**
  * Hierarquia TOA (regra de negócio):
@@ -951,17 +955,37 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
   };
 }
 
+type FiltroPeriodoToa = {
+  ano: number | null;
+  mes: number | null;
+  dia: number | null;
+  semana?: KpiSemanaFiltro;
+};
+
+function passaFiltroPeriodoDia(
+  ano: number,
+  mes: number,
+  dia: number,
+  filtro: FiltroPeriodoToa,
+): boolean {
+  if (filtro.ano !== null && ano !== filtro.ano) return false;
+  if (filtro.mes !== null && mes !== filtro.mes) return false;
+  // Dia específico tem prioridade sobre a fatia semanal.
+  if (filtro.dia !== null) return dia === filtro.dia;
+  if (filtro.semana && filtro.semana !== "Todos") {
+    return diaPertenceASemana(dia, filtro.semana, ano, mes);
+  }
+  return true;
+}
+
 export function filtrarChamadosToa(
   chamados: ToaChamadoProcessado[],
-  filtro: { ano: number | null; mes: number | null; dia: number | null },
+  filtro: FiltroPeriodoToa,
 ): ToaChamadoProcessado[] {
   return chamados.filter((chamado) => {
     const [ano, mes, dia] = chamado.data.split("-").map(Number);
     if (!ano || !mes || !dia) return false;
-    if (filtro.ano !== null && ano !== filtro.ano) return false;
-    if (filtro.mes !== null && mes !== filtro.mes) return false;
-    if (filtro.dia !== null && dia !== filtro.dia) return false;
-    return true;
+    return passaFiltroPeriodoDia(ano, mes, dia, filtro);
   });
 }
 
@@ -970,7 +994,7 @@ export function filtrarToaOsRows<
   T extends { data_toa: string },
 >(
   rows: T[],
-  filtro: { ano: number | null; mes: number | null; dia: number | null },
+  filtro: FiltroPeriodoToa,
 ): T[] {
   return rows.filter((row) => {
     const [ano, mes, dia] = String(row.data_toa ?? "")
@@ -978,10 +1002,7 @@ export function filtrarToaOsRows<
       .split("-")
       .map(Number);
     if (!ano || !mes || !dia) return false;
-    if (filtro.ano !== null && ano !== filtro.ano) return false;
-    if (filtro.mes !== null && mes !== filtro.mes) return false;
-    if (filtro.dia !== null && dia !== filtro.dia) return false;
-    return true;
+    return passaFiltroPeriodoDia(ano, mes, dia, filtro);
   });
 }
 

@@ -6,6 +6,10 @@ import {
   normalizeToaLogin,
   regroupFlatRowsToChamados,
 } from "./toa-store";
+import {
+  diaPertenceASemana,
+  type KpiSemanaFiltro,
+} from "./kpi-semana";
 
 /** Último mês inclusivo do gabarito Analítico (jun/2026). */
 export const FATURAMENTO_HISTORICO_ATE = 202606;
@@ -659,10 +663,15 @@ export function parseDhBaixaAnoMes(
   return null;
 }
 
-/** Filtra Analítico pelo mês/ano (e dia, se houver) de DH_BAIXA. */
+/** Filtra Analítico pelo mês/ano (e dia/semana, se houver) de DH_BAIXA. */
 export function filtrarAnaliticoPorDhBaixa(
   rows: AnaliticoHistoricoRow[],
-  filtro: { ano: number | null; mes: number | null; dia?: number | null },
+  filtro: {
+    ano: number | null;
+    mes: number | null;
+    dia?: number | null;
+    semana?: KpiSemanaFiltro;
+  },
 ): AnaliticoHistoricoRow[] {
   if (filtro.ano === null && filtro.mes === null) return rows;
 
@@ -671,8 +680,15 @@ export function filtrarAnaliticoPorDhBaixa(
     if (!parts) return false;
     if (filtro.ano !== null && parts.ano !== filtro.ano) return false;
     if (filtro.mes !== null && parts.mes !== filtro.mes) return false;
-    if (filtro.dia != null && parts.dia !== filtro.dia) {
-      return false;
+    // Dia específico tem prioridade sobre a fatia semanal.
+    if (filtro.dia != null) return parts.dia === filtro.dia;
+    if (filtro.semana && filtro.semana !== "Todos") {
+      return diaPertenceASemana(
+        parts.dia,
+        filtro.semana,
+        parts.ano,
+        parts.mes,
+      );
     }
     return true;
   });

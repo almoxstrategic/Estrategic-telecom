@@ -77,6 +77,12 @@ import {
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
 import { setKpiFiltro, useKpiFiltro } from "@/lib/kpi-filtro-store";
+import {
+  formatarIntervaloSemanaLabel,
+  isKpiSemanaFiltro,
+  KPI_SEMANA_OPCOES,
+  type KpiSemanaFiltro,
+} from "@/lib/kpi-semana";
 import { useKpiUltimaImportacao } from "@/lib/kpi-importacao-meta-store";
 import {
   consolidarMateriaisPorCodigo,
@@ -241,6 +247,16 @@ function descricaoPeriodo(filtro: KpisFiltro): string {
   if (filtro.dia !== null) {
     return `${String(filtro.dia).padStart(2, "0")}/${String(filtro.mes).padStart(2, "0")}/${filtro.ano}`;
   }
+  if (filtro.semana !== "Todos") {
+    const intervalo = formatarIntervaloSemanaLabel(
+      filtro.semana,
+      filtro.ano,
+      filtro.mes,
+    );
+    if (intervalo) {
+      return `${mesLabel} ${filtro.ano} - ${filtro.semana} (${intervalo})`;
+    }
+  }
   return `${mesLabel} de ${filtro.ano}`;
 }
 
@@ -399,10 +415,11 @@ function KpisPage() {
           ano: filtro.ano,
           mes: filtro.mes,
           dia: filtro.dia,
+          semana: filtro.semana,
         }),
         precosOs,
       ),
-    [chamadosToa, filtro.ano, filtro.mes, filtro.dia, precosOs],
+    [chamadosToa, filtro.ano, filtro.mes, filtro.dia, filtro.semana, precosOs],
   );
   const [kpis, setKpis] = useState<KpisConsumo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -429,10 +446,10 @@ function KpisPage() {
     isMotivosQuebra;
 
   useEffect(() => {
-    if (!isDesempenho && filtro.dia !== null) {
-      setKpiFiltro((prev) => ({ ...prev, dia: null }));
+    if (!isDesempenho && (filtro.dia !== null || filtro.semana !== "Todos")) {
+      setKpiFiltro((prev) => ({ ...prev, dia: null, semana: "Todos" }));
     }
-  }, [isDesempenho, filtro.dia]);
+  }, [isDesempenho, filtro.dia, filtro.semana]);
 
   useEffect(() => {
     void (async () => {
@@ -1088,7 +1105,12 @@ function KpisPage() {
               disabled={anosComDados.length === 0}
               onValueChange={(v) => {
                 if (v === "todos") {
-                  setKpiFiltro({ mes: null, ano: null, dia: null });
+                  setKpiFiltro({
+                    mes: null,
+                    ano: null,
+                    dia: null,
+                    semana: "Todos",
+                  });
                   return;
                 }
                 const ano = Number(v);
@@ -1100,6 +1122,7 @@ function KpisPage() {
                   ano,
                   mes: meses[meses.length - 1] ?? null,
                   dia: null,
+                  semana: "Todos",
                 });
               }}
             >
@@ -1126,12 +1149,19 @@ function KpisPage() {
               disabled={filtro.ano === null || mesesDoAnoSelecionado.length === 0}
               onValueChange={(v) => {
                 if (v === "todos") {
-                  setKpiFiltro((prev) => ({ ...prev, mes: null, dia: null }));
+                  setKpiFiltro((prev) => ({
+                    ...prev,
+                    mes: null,
+                    dia: null,
+                    semana: "Todos",
+                  }));
                   return;
                 }
                 setKpiFiltro((prev) => ({
                   ...prev,
                   mes: Number(v),
+                  dia: null,
+                  semana: "Todos",
                 }));
               }}
             >
@@ -1155,6 +1185,40 @@ function KpisPage() {
 
           {isDesempenho && (
             <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-semana" className="shrink-0 text-sm font-medium">
+                Semana:
+              </Label>
+              <Select
+                value={filtro.semana}
+                disabled={filtro.mes === null}
+                onValueChange={(v) => {
+                  const semana: KpiSemanaFiltro = isKpiSemanaFiltro(v)
+                    ? v
+                    : "Todos";
+                  setKpiFiltro((prev) => ({
+                    ...prev,
+                    semana,
+                    // Semana e dia são mutuamente exclusivos: semana limpa o dia.
+                    dia: semana === "Todos" ? prev.dia : null,
+                  }));
+                }}
+              >
+                <SelectTrigger id="filtro-semana" className="w-[150px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KPI_SEMANA_OPCOES.map((opcao) => (
+                    <SelectItem key={opcao} value={opcao}>
+                      {opcao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {isDesempenho && (
+            <div className="flex items-center gap-2">
               <Label htmlFor="filtro-dia" className="shrink-0 text-sm font-medium">
                 Dia:
               </Label>
@@ -1165,7 +1229,12 @@ function KpisPage() {
                     setKpiFiltro((prev) => ({ ...prev, dia: null }));
                     return;
                   }
-                  setKpiFiltro((prev) => ({ ...prev, dia: Number(v) }));
+                  setKpiFiltro((prev) => ({
+                    ...prev,
+                    dia: Number(v),
+                    // Dia específico tem prioridade: limpa a semana.
+                    semana: "Todos",
+                  }));
                 }}
               >
                 <SelectTrigger id="filtro-dia" className="w-[140px]">
@@ -1189,7 +1258,12 @@ function KpisPage() {
             size="sm"
             className="ml-auto gap-1.5"
             onClick={() => {
-              setKpiFiltro({ mes: null, ano: null, dia: null });
+              setKpiFiltro({
+                mes: null,
+                ano: null,
+                dia: null,
+                semana: "Todos",
+              });
             }}
           >
             <FilterX className="h-4 w-4" />
@@ -1277,6 +1351,7 @@ function KpisPage() {
                 ano: filtro.ano,
                 mes: filtro.mes,
                 dia: filtro.dia,
+                semana: filtro.semana,
               }}
               demitidosKeys={tecnicosDemitidosKeys}
               precosOs={precosOs}
