@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, DollarSign, Target, Users } from "lucide-react";
+import { CalendarDays, DollarSign, Target, TrendingUp, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -137,6 +137,7 @@ export function EstimativaVolume() {
   const [competencias, setCompetencias] = useState<number[]>([]);
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
+  const [aumento, setAumento] = useState<number>(0);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
 
   useEffect(() => {
@@ -250,7 +251,8 @@ export function EstimativaVolume() {
     ).receitaFaturadaTotal;
     const ticketMedio =
       kpis.notasProdutivas > 0 ? receitaAtual / kpis.notasProdutivas : 0;
-    const valorEstimado = ticketMedio * projecaoProdutiva;
+    const fatorAumento = 1 + (Number.isFinite(aumento) ? aumento : 0) / 100;
+    const valorEstimado = ticketMedio * projecaoProdutiva * fatorAumento;
 
     return {
       produtivasAtual: kpis.notasProdutivas,
@@ -267,7 +269,7 @@ export function EstimativaVolume() {
       ticketMedio,
       valorEstimado,
     };
-  }, [rows, ano, mes, precosOs]);
+  }, [rows, ano, mes, precosOs, aumento]);
 
   const porTecnico = useMemo<TecnicoEstimativa[]>(() => {
     const diasUteis = estimativa.diasUteis;
@@ -417,6 +419,33 @@ export function EstimativaVolume() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="estimativa-aumento"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+          >
+            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+            Aumento (%)
+          </Label>
+          <input
+            id="estimativa-aumento"
+            type="number"
+            step="0.1"
+            value={Number.isFinite(aumento) ? aumento : 0}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw.trim() === "") {
+                setAumento(0);
+                return;
+              }
+              const n = Number(raw);
+              setAumento(Number.isFinite(n) ? n : 0);
+            }}
+            placeholder="0"
+            aria-label="Aumento percentual"
+            className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
         </div>
       </div>
 

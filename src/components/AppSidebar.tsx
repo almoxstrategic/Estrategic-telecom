@@ -7,19 +7,23 @@ import {
   Brain,
   Building2,
   CalendarClock,
+  CalendarRange,
   ChartColumn,
   ChevronDown,
   ChevronRight,
   ClipboardList,
   FileUp,
+  LayoutDashboard,
   LogOut,
   Home,
   Map,
+  MapPin,
   Send,
   ShieldCheck,
   Database,
   Target,
   TrendingUp,
+  UserCheck,
   UserSearch,
   Users,
   Warehouse,
@@ -249,72 +253,78 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                           to="/admin/kpis/$modulo"
                           params={{ modulo: "baixa-consumo-miscelanea" }}
                           onClick={onNavigate}
-                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
                             pathname.includes("/baixa-consumo-miscelanea")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
+                          <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
                           Baixa de Consumo - Miscelânea
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
                           params={{ modulo: "desempenho-tecnico" }}
                           onClick={onNavigate}
-                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
                             pathname.includes("/desempenho-tecnico")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
+                          <UserCheck className="h-3.5 w-3.5 shrink-0" />
                           Desempenho Técnicos por Nota
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
                           params={{ modulo: "volume-notas" }}
                           onClick={onNavigate}
-                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
                             pathname.includes("/volume-notas")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
+                          <CalendarRange className="h-3.5 w-3.5 shrink-0" />
                           Volume de Notas por período
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
                           params={{ modulo: "detalhamento-notas" }}
                           onClick={onNavigate}
-                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
                             pathname.includes("/detalhamento-notas")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
                           Detalhamento de notas
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
                           params={{ modulo: "nota-por-tecnico" }}
                           onClick={onNavigate}
-                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
                             pathname.includes("/nota-por-tecnico")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
+                          <UserSearch className="h-3.5 w-3.5 shrink-0" />
                           Nota por técnico
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
                           params={{ modulo: "motivos-quebra" }}
                           onClick={onNavigate}
-                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
                             pathname.includes("/motivos-quebra")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                           Motivos de Quebra
                         </Link>
                         <Link
