@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   FilterX,
   MapPin,
+  Search,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
@@ -348,6 +349,7 @@ export function KpiDetalhamentoNotas() {
   const [mes, setMes] = useState<number | null>(null);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
   const [paretoView, setParetoView] = useState<ParetoView>("Produtivas");
+  const [buscaBairro, setBuscaBairro] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -529,6 +531,14 @@ export function KpiDetalhamentoNotas() {
     totalProdutivasGeral,
     totalImprodutivasGeral,
   ]);
+
+  const bairrosFiltrados = useMemo(() => {
+    const termo = buscaBairro.trim().toLowerCase();
+    if (!termo) return rankingBairros;
+    return rankingBairros.filter((b) =>
+      b.bairro.toLowerCase().includes(termo),
+    );
+  }, [rankingBairros, buscaBairro]);
 
   const filtrosLimpos = ano === null && mes === null;
 
@@ -904,17 +914,34 @@ export function KpiDetalhamentoNotas() {
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
-              <MapPin className="h-4 w-4 text-primary" />
-              Todos os bairros
-            </h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-bold text-foreground">
+                <MapPin className="h-4 w-4 text-green-600" />
+                Todos os bairros
+              </h2>
+              <div className="relative w-full max-w-xs sm:ml-auto">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={buscaBairro}
+                  onChange={(e) => setBuscaBairro(e.target.value)}
+                  placeholder="Buscar bairro..."
+                  aria-label="Buscar bairro"
+                  className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+                />
+              </div>
+            </div>
             {porBairro.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Nenhum bairro no período selecionado.
               </p>
+            ) : bairrosFiltrados.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhum bairro encontrado para “{buscaBairro.trim()}”.
+              </p>
             ) : (
               <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                <table className="w-full min-w-[28rem] text-sm">
+                <table className="w-full min-w-[36rem] text-sm">
                   <thead className="sticky top-0 z-10 bg-white shadow-sm">
                     <tr className="border-b border-border text-left text-muted-foreground">
                       <th className="bg-white px-2 py-2 font-semibold">Bairro</th>
@@ -922,7 +949,13 @@ export function KpiDetalhamentoNotas() {
                         Produtivas
                       </th>
                       <th className="bg-white px-2 py-2 text-right font-semibold">
+                        % Produt.
+                      </th>
+                      <th className="bg-white px-2 py-2 text-right font-semibold">
                         Improdutivas
+                      </th>
+                      <th className="bg-white px-2 py-2 text-right font-semibold">
+                        % Improd.
                       </th>
                       <th className="bg-white px-2 py-2 text-right font-semibold">
                         Total
@@ -930,7 +963,7 @@ export function KpiDetalhamentoNotas() {
                     </tr>
                   </thead>
                   <tbody>
-                    {porBairro.map((row) => (
+                    {bairrosFiltrados.map((row) => (
                       <tr
                         key={row.bairro}
                         className="border-b border-border/60 last:border-b-0"
@@ -941,8 +974,14 @@ export function KpiDetalhamentoNotas() {
                         <td className="px-2 py-2 text-right tabular-nums text-green-700">
                           {formatQuantidade(row.produtivas)}
                         </td>
+                        <td className="px-2 py-2 text-right tabular-nums text-green-700">
+                          {formatPct(row.produtivas, totalProdutivasGeral)}
+                        </td>
                         <td className="px-2 py-2 text-right tabular-nums text-red-600">
                           {formatQuantidade(row.improdutivas)}
+                        </td>
+                        <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                          {formatPct(row.improdutivas, totalImprodutivasGeral)}
                         </td>
                         <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">
                           {formatQuantidade(row.total)}
