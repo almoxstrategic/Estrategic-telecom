@@ -943,27 +943,32 @@ function KpisPage() {
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
-          <Link
-            to="/admin/kpis/$modulo"
-            params={{ modulo: "baixa-consumo-miscelanea" }}
-            className={`flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
-              isBaixaConsumoMiscelanea
-                ? "bg-green-50 text-green-700"
-                : "cursor-pointer text-gray-600 hover:bg-gray-100"
-            }`}
-            onClick={() => setIsKpiNavOpen(false)}
-          >
-            <LayoutDashboard
-              className={`h-5 w-5 shrink-0 ${
-                isBaixaConsumoMiscelanea ? "text-green-700" : "text-gray-500"
+          <div>
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              KPI - Miscelâneas
+            </p>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "baixa-consumo-miscelanea" }}
+              className={`flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isBaixaConsumoMiscelanea
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
               }`}
-            />
-            Baixa de Consumo - Miscelânea
-          </Link>
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <LayoutDashboard
+                className={`h-5 w-5 shrink-0 ${
+                  isBaixaConsumoMiscelanea ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Baixa de Consumo - Miscelânea
+            </Link>
+          </div>
 
           <div className="mt-6 border-t border-gray-100 pt-2">
             <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              Detalhamento
+              KPI - Notas
             </p>
             <Link
               to="/admin/kpis/$modulo"
