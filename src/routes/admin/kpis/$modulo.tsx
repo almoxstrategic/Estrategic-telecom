@@ -1,9 +1,10 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, Brain, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, UserCheck, UserSearch, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, Brain, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, Target, UserCheck, UserSearch, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { AnaliseComportamento } from "@/components/AnaliseComportamento";
+import { EstimativaVolume } from "@/components/EstimativaVolume";
 import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
 import { KpiDetalhamentoNotas } from "@/components/KpiDetalhamentoNotas";
 import { KpiNotaPorTecnico } from "@/components/KpiNotaPorTecnico";
@@ -123,6 +124,7 @@ const KPI_MODULOS = [
   "nota-por-tecnico",
   "motivos-quebra",
   "analise-comportamento",
+  "estimativa-volume",
 ] as const;
 type KpiModulo = (typeof KPI_MODULOS)[number];
 
@@ -167,6 +169,8 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
                     ? "Motivos de Quebra — Estrategic Field"
                     : params.modulo === "analise-comportamento"
                       ? "Análise de Comportamento — Estrategic Field"
+                      : params.modulo === "estimativa-volume"
+                        ? "Estimativa - Volume de Nota — Estrategic Field"
                       : params.modulo === KPI_MODULO_DEFAULT
                       ? "Baixa de Consumo - Miscelânea — Estrategic Field"
                       : "KPI's — Estrategic Field",
@@ -443,13 +447,15 @@ function KpisPage() {
   const isNotaPorTecnico = kpiModulo === "nota-por-tecnico";
   const isMotivosQuebra = kpiModulo === "motivos-quebra";
   const isAnaliseComportamento = kpiModulo === "analise-comportamento";
+  const isEstimativaVolume = kpiModulo === "estimativa-volume";
   const isBaixaConsumoMiscelanea = kpiModulo === "baixa-consumo-miscelanea";
   const usaFiltroProprio =
     isVolumeNotas ||
     isDetalhamentoNotas ||
     isNotaPorTecnico ||
     isMotivosQuebra ||
-    isAnaliseComportamento;
+    isAnaliseComportamento ||
+    isEstimativaVolume;
 
   useEffect(() => {
     if (!isDesempenho && (filtro.dia !== null || filtro.semana !== "Todos")) {
@@ -1061,6 +1067,23 @@ function KpisPage() {
               />
               Análise de Comportamento
             </Link>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "estimativa-volume" }}
+              className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isEstimativaVolume
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <Target
+                className={`h-5 w-5 shrink-0 ${
+                  isEstimativaVolume ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Estimativa - Volume de Nota
+            </Link>
           </div>
         </nav>
       </aside>
@@ -1077,7 +1100,9 @@ function KpisPage() {
             >
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
-            {isAnaliseComportamento ? (
+            {isEstimativaVolume ? (
+              <Target className="h-4 w-4 shrink-0 text-primary" />
+            ) : isAnaliseComportamento ? (
               <Brain className="h-4 w-4 shrink-0 text-primary" />
             ) : isMotivosQuebra ? (
               <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
@@ -1089,7 +1114,9 @@ function KpisPage() {
               <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
             )}
             <span className="text-sm font-bold text-foreground">
-              {isAnaliseComportamento
+              {isEstimativaVolume
+                ? "Estimativa - Volume de Nota"
+                : isAnaliseComportamento
                 ? "Análise de Comportamento"
                 : isMotivosQuebra
                 ? "Motivos de Quebra"
@@ -1304,7 +1331,9 @@ function KpisPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              {isAnaliseComportamento
+              {isEstimativaVolume
+                ? "Estimativa - Volume de Nota"
+                : isAnaliseComportamento
                 ? "Análise de Comportamento"
                 : isMotivosQuebra
                 ? "Motivos de Quebra"
@@ -1319,7 +1348,9 @@ function KpisPage() {
                       : "Baixa de Consumo - Miscelânea"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isAnaliseComportamento
+              {isEstimativaVolume
+                ? "Projeção de fechamento do mês baseada no ritmo (média diária) atual."
+                : isAnaliseComportamento
                 ? "Identifique padrões de fadiga, tendências de quebra por dia da semana e fuga de complexidade operacional."
                 : isMotivosQuebra
                 ? "Análise de volumetria dos códigos de baixa das notas improdutivas."
@@ -1355,7 +1386,9 @@ function KpisPage() {
           </Link>
         </div>
 
-        {isAnaliseComportamento ? (
+        {isEstimativaVolume ? (
+          <EstimativaVolume />
+        ) : isAnaliseComportamento ? (
           <AnaliseComportamento />
         ) : isMotivosQuebra ? (
           <MotivosQuebra />

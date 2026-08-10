@@ -18,6 +18,7 @@ import {
   Send,
   ShieldCheck,
   Database,
+  Target,
   TrendingUp,
   UserSearch,
   Users,
@@ -328,6 +329,19 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         >
                           <Brain className="h-3.5 w-3.5 shrink-0" />
                           Análise de Comportamento
+                        </Link>
+                        <Link
+                          to="/admin/kpis/$modulo"
+                          params={{ modulo: "estimativa-volume" }}
+                          onClick={onNavigate}
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                            pathname.includes("/estimativa-volume")
+                              ? "bg-green-50 font-medium text-green-700"
+                              : ""
+                          }`}
+                        >
+                          <Target className="h-3.5 w-3.5 shrink-0" />
+                          Estimativa - Volume de Nota
                         </Link>
                       </div>
                     )}
