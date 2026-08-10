@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   BarChart3,
+  Brain,
   Building2,
   CalendarClock,
   ChartColumn,
@@ -308,6 +309,19 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                           }`}
                         >
                           Motivos de Quebra
+                        </Link>
+                        <Link
+                          to="/admin/kpis/$modulo"
+                          params={{ modulo: "analise-comportamento" }}
+                          onClick={onNavigate}
+                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                            pathname.includes("/analise-comportamento")
+                              ? "bg-green-50 font-medium text-green-700"
+                              : ""
+                          }`}
+                        >
+                          <Brain className="h-3.5 w-3.5 shrink-0" />
+                          Análise de Comportamento
                         </Link>
                       </div>
                     )}

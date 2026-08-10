@@ -1,8 +1,9 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, UserCheck, UserSearch, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, Brain, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, UserCheck, UserSearch, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { AnaliseComportamento } from "@/components/AnaliseComportamento";
 import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
 import { KpiDetalhamentoNotas } from "@/components/KpiDetalhamentoNotas";
 import { KpiNotaPorTecnico } from "@/components/KpiNotaPorTecnico";
@@ -121,6 +122,7 @@ const KPI_MODULOS = [
   "detalhamento-notas",
   "nota-por-tecnico",
   "motivos-quebra",
+  "analise-comportamento",
 ] as const;
 type KpiModulo = (typeof KPI_MODULOS)[number];
 
@@ -163,7 +165,9 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
                   ? "Nota por técnico — Estrategic Field"
                   : params.modulo === "motivos-quebra"
                     ? "Motivos de Quebra — Estrategic Field"
-                    : params.modulo === KPI_MODULO_DEFAULT
+                    : params.modulo === "analise-comportamento"
+                      ? "Análise de Comportamento — Estrategic Field"
+                      : params.modulo === KPI_MODULO_DEFAULT
                       ? "Baixa de Consumo - Miscelânea — Estrategic Field"
                       : "KPI's — Estrategic Field",
       },
@@ -438,12 +442,14 @@ function KpisPage() {
   const isDetalhamentoNotas = kpiModulo === "detalhamento-notas";
   const isNotaPorTecnico = kpiModulo === "nota-por-tecnico";
   const isMotivosQuebra = kpiModulo === "motivos-quebra";
+  const isAnaliseComportamento = kpiModulo === "analise-comportamento";
   const isBaixaConsumoMiscelanea = kpiModulo === "baixa-consumo-miscelanea";
   const usaFiltroProprio =
     isVolumeNotas ||
     isDetalhamentoNotas ||
     isNotaPorTecnico ||
-    isMotivosQuebra;
+    isMotivosQuebra ||
+    isAnaliseComportamento;
 
   useEffect(() => {
     if (!isDesempenho && (filtro.dia !== null || filtro.semana !== "Todos")) {
@@ -1038,6 +1044,23 @@ function KpisPage() {
               />
               Motivos de Quebra
             </Link>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "analise-comportamento" }}
+              className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isAnaliseComportamento
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <Brain
+                className={`h-5 w-5 shrink-0 ${
+                  isAnaliseComportamento ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Análise de Comportamento
+            </Link>
           </div>
         </nav>
       </aside>
@@ -1054,7 +1077,9 @@ function KpisPage() {
             >
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
-            {isMotivosQuebra ? (
+            {isAnaliseComportamento ? (
+              <Brain className="h-4 w-4 shrink-0 text-primary" />
+            ) : isMotivosQuebra ? (
               <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
             ) : isNotaPorTecnico ? (
               <UserSearch className="h-4 w-4 shrink-0 text-primary" />
@@ -1064,7 +1089,9 @@ function KpisPage() {
               <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
             )}
             <span className="text-sm font-bold text-foreground">
-              {isMotivosQuebra
+              {isAnaliseComportamento
+                ? "Análise de Comportamento"
+                : isMotivosQuebra
                 ? "Motivos de Quebra"
                 : isNotaPorTecnico
                 ? "Nota por técnico"
@@ -1277,7 +1304,9 @@ function KpisPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              {isMotivosQuebra
+              {isAnaliseComportamento
+                ? "Análise de Comportamento"
+                : isMotivosQuebra
                 ? "Motivos de Quebra"
                 : isNotaPorTecnico
                 ? "Nota por técnico"
@@ -1290,7 +1319,9 @@ function KpisPage() {
                       : "Baixa de Consumo - Miscelânea"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isMotivosQuebra
+              {isAnaliseComportamento
+                ? "Identifique padrões de fadiga, tendências de quebra por dia da semana e fuga de complexidade operacional."
+                : isMotivosQuebra
                 ? "Análise de volumetria dos códigos de baixa das notas improdutivas."
                 : isNotaPorTecnico
                 ? "Análise geográfica individual: descubra as regiões de maior produtividade e os gargalos de cada técnico."
@@ -1324,7 +1355,9 @@ function KpisPage() {
           </Link>
         </div>
 
-        {isMotivosQuebra ? (
+        {isAnaliseComportamento ? (
+          <AnaliseComportamento />
+        ) : isMotivosQuebra ? (
           <MotivosQuebra />
         ) : isNotaPorTecnico ? (
           <KpiNotaPorTecnico />
