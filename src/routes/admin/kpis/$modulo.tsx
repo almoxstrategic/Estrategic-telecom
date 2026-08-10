@@ -7,6 +7,7 @@ import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
 import { KpiDetalhamentoNotas } from "@/components/KpiDetalhamentoNotas";
 import { KpiNotaPorTecnico } from "@/components/KpiNotaPorTecnico";
 import { KpiVolumeNotas } from "@/components/KpiVolumeNotas";
+import { MotivosQuebra } from "@/components/MotivosQuebra";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,7 @@ const KPI_MODULOS = [
   "volume-notas",
   "detalhamento-notas",
   "nota-por-tecnico",
+  "motivos-quebra",
 ] as const;
 type KpiModulo = (typeof KPI_MODULOS)[number];
 
@@ -140,7 +142,9 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
                 ? "Detalhamento de notas — Estrategic Field"
                 : params.modulo === "nota-por-tecnico"
                   ? "Nota por técnico — Estrategic Field"
-                  : "KPI's — Estrategic Field",
+                  : params.modulo === "motivos-quebra"
+                    ? "Motivos de Quebra — Estrategic Field"
+                    : "KPI's — Estrategic Field",
       },
       { name: "description", content: "Métricas de consumo de miscelâneas." },
     ],
@@ -416,9 +420,13 @@ function KpisPage() {
   const isVolumeNotas = kpiModulo === "volume-notas";
   const isDetalhamentoNotas = kpiModulo === "detalhamento-notas";
   const isNotaPorTecnico = kpiModulo === "nota-por-tecnico";
+  const isMotivosQuebra = kpiModulo === "motivos-quebra";
   const isResumoGeral = kpiModulo === "resumo-geral";
   const usaFiltroProprio =
-    isVolumeNotas || isDetalhamentoNotas || isNotaPorTecnico;
+    isVolumeNotas ||
+    isDetalhamentoNotas ||
+    isNotaPorTecnico ||
+    isMotivosQuebra;
 
   useEffect(() => {
     if (!isDesempenho && filtro.dia !== null) {
@@ -996,6 +1004,23 @@ function KpisPage() {
               />
               Nota por técnico
             </Link>
+            <Link
+              to="/admin/kpis/$modulo"
+              params={{ modulo: "motivos-quebra" }}
+              className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
+                isMotivosQuebra
+                  ? "bg-green-50 text-green-700"
+                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => setIsKpiNavOpen(false)}
+            >
+              <AlertTriangle
+                className={`h-5 w-5 shrink-0 ${
+                  isMotivosQuebra ? "text-green-700" : "text-gray-500"
+                }`}
+              />
+              Motivos de Quebra
+            </Link>
           </div>
         </nav>
       </aside>
@@ -1012,7 +1037,9 @@ function KpisPage() {
             >
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
-            {isNotaPorTecnico ? (
+            {isMotivosQuebra ? (
+              <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
+            ) : isNotaPorTecnico ? (
               <UserSearch className="h-4 w-4 shrink-0 text-primary" />
             ) : isDetalhamentoNotas ? (
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
@@ -1020,7 +1047,9 @@ function KpisPage() {
               <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
             )}
             <span className="text-sm font-bold text-foreground">
-              {isNotaPorTecnico
+              {isMotivosQuebra
+                ? "Motivos de Quebra"
+                : isNotaPorTecnico
                 ? "Nota por técnico"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
@@ -1174,7 +1203,9 @@ function KpisPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              {isNotaPorTecnico
+              {isMotivosQuebra
+                ? "Motivos de Quebra"
+                : isNotaPorTecnico
                 ? "Nota por técnico"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
@@ -1185,7 +1216,9 @@ function KpisPage() {
                       : "Resumo geral"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isNotaPorTecnico
+              {isMotivosQuebra
+                ? "Análise de volumetria dos códigos de baixa das notas improdutivas."
+                : isNotaPorTecnico
                 ? "Análise geográfica individual: descubra as regiões de maior produtividade e os gargalos de cada técnico."
                 : isDetalhamentoNotas
                 ? "Análise geográfica: volume de notas produtivas e improdutivas por bairro."
@@ -1217,7 +1250,9 @@ function KpisPage() {
           </Link>
         </div>
 
-        {isNotaPorTecnico ? (
+        {isMotivosQuebra ? (
+          <MotivosQuebra />
+        ) : isNotaPorTecnico ? (
           <KpiNotaPorTecnico />
         ) : isDetalhamentoNotas ? (
           <KpiDetalhamentoNotas />

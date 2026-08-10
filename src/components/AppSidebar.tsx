@@ -298,6 +298,18 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         >
                           Nota por técnico
                         </Link>
+                        <Link
+                          to="/admin/kpis/$modulo"
+                          params={{ modulo: "motivos-quebra" }}
+                          onClick={onNavigate}
+                          className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
+                            pathname.includes("/motivos-quebra")
+                              ? "bg-green-50 font-medium text-green-700"
+                              : ""
+                          }`}
+                        >
+                          Motivos de Quebra
+                        </Link>
                       </div>
                     )}
                   </div>
