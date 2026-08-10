@@ -9,6 +9,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -71,6 +73,15 @@ type ChartBairroPoint = {
   top5TecnicosImprodutivos: TecnicoRankingItem[];
 };
 
+type ParetoView = "Produtivas" | "Improdutivas";
+
+type ParetoPoint = {
+  bairro: string;
+  volume: number;
+  acumulado: number;
+  pctAcumulada: number;
+};
+
 type BairroChartTooltipProps = {
   active?: boolean;
   label?: string | number;
@@ -79,6 +90,8 @@ type BairroChartTooltipProps = {
     dataKey?: string | number;
     payload?: ChartBairroPoint;
   }>;
+  totalProdutivasGeral?: number;
+  totalImprodutivasGeral?: number;
 };
 
 function mesLabel(mes: number): string {
@@ -87,6 +100,15 @@ function mesLabel(mes: number): string {
 
 function formatQuantidade(n: number): string {
   return n.toLocaleString("pt-BR");
+}
+
+function formatPct(valor: number, total: number): string {
+  if (total <= 0) return "0.0%";
+  return `${((valor / total) * 100).toFixed(1)}%`;
+}
+
+function formatCardShare(valor: number, total: number): string {
+  return `${formatQuantidade(valor)} de ${formatQuantidade(total)} = ${formatPct(valor, total)}`;
 }
 
 function normalizarBairro(value: string | null | undefined): string {
@@ -124,6 +146,8 @@ function BairroChartTooltip({
   active,
   payload,
   label,
+  totalProdutivasGeral = 0,
+  totalImprodutivasGeral = 0,
 }: BairroChartTooltipProps) {
   if (!active || !payload?.length) return null;
   const entry = payload[0]!;
@@ -133,6 +157,10 @@ function BairroChartTooltip({
   const valor = Number(entry.value) || 0;
   const isProdutivas = data.tipo === "produtivas";
   const totalLabel = isProdutivas ? "Produtivas" : "Quebras";
+  const totalGeral = isProdutivas
+    ? totalProdutivasGeral
+    : totalImprodutivasGeral;
+  const pct = formatPct(valor, totalGeral);
   const top5 = isProdutivas
     ? data.top5TecnicosProdutivos
     : data.top5TecnicosImprodutivos;
@@ -147,7 +175,7 @@ function BairroChartTooltip({
             isProdutivas ? "text-green-700" : "text-red-600"
           }`}
         >
-          {formatQuantidade(valor)}
+          {formatQuantidade(valor)} ({pct})
         </span>
       </p>
       {top5.length > 0 ? (
@@ -171,6 +199,52 @@ function BairroChartTooltip({
           Sem técnicos neste bairro.
         </p>
       )}
+    </div>
+  );
+}
+
+type ParetoTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: Array<{
+    value?: number | string;
+    dataKey?: string | number;
+    name?: string;
+  }>;
+  paretoView: ParetoView;
+};
+
+function ParetoTooltip({
+  active,
+  payload,
+  label,
+  paretoView,
+}: ParetoTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const volumeEntry = payload.find((p) => p.dataKey === "volume");
+  const pctEntry = payload.find((p) => p.dataKey === "pctAcumulada");
+  const volume = Number(volumeEntry?.value) || 0;
+  const pctAcum = Number(pctEntry?.value) || 0;
+
+  return (
+    <div className="rounded-md border border-gray-200 bg-white p-3 shadow-md">
+      <p className="text-sm font-bold text-gray-900">{String(label ?? "")}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {paretoView}:{" "}
+        <span
+          className={`font-semibold tabular-nums ${
+            paretoView === "Produtivas" ? "text-green-700" : "text-red-600"
+          }`}
+        >
+          {formatQuantidade(volume)}
+        </span>
+      </p>
+      <p className="mt-0.5 text-sm text-amber-700">
+        Acumulado:{" "}
+        <span className="font-semibold tabular-nums">
+          {pctAcum.toFixed(1)}%
+        </span>
+      </p>
     </div>
   );
 }
@@ -273,6 +347,7 @@ export function KpiDetalhamentoNotas() {
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
+  const [paretoView, setParetoView] = useState<ParetoView>("Produtivas");
 
   useEffect(() => {
     let cancelled = false;
@@ -349,7 +424,22 @@ export function KpiDetalhamentoNotas() {
     return [...set].sort((a, b) => a - b);
   }, [competencias, ano]);
 
-  const porBairro = useMemo(() => agregarVolumeNotasPorBairro(rows), [rows]);
+  const rankingBairros = useMemo(() => agregarVolumeNotasPorBairro(rows), [rows]);
+
+  const { totalProdutivasGeral, totalImprodutivasGeral } = useMemo(() => {
+    let produtivas = 0;
+    let improdutivas = 0;
+    for (const b of rankingBairros) {
+      produtivas += b.produtivas;
+      improdutivas += b.improdutivas;
+    }
+    return {
+      totalProdutivasGeral: produtivas,
+      totalImprodutivasGeral: improdutivas,
+    };
+  }, [rankingBairros]);
+
+  const porBairro = rankingBairros;
 
   const topProdutivo = useMemo(() => {
     if (porBairro.length === 0) return null;
@@ -402,6 +492,43 @@ export function KpiDetalhamentoNotas() {
         })),
     [porBairro],
   );
+
+  const paretoData = useMemo((): ParetoPoint[] => {
+    const totalBase =
+      paretoView === "Produtivas"
+        ? totalProdutivasGeral
+        : totalImprodutivasGeral;
+    const ordenado = [...rankingBairros]
+      .map((b) => ({
+        bairro: b.bairro,
+        volume:
+          paretoView === "Produtivas" ? b.produtivas : b.improdutivas,
+      }))
+      .filter((b) => b.volume > 0)
+      .sort(
+        (a, b) =>
+          b.volume - a.volume || a.bairro.localeCompare(b.bairro, "pt-BR"),
+      );
+
+    let acumulado = 0;
+    return ordenado.map((item) => {
+      acumulado += item.volume;
+      return {
+        bairro: item.bairro,
+        volume: item.volume,
+        acumulado,
+        pctAcumulada:
+          totalBase > 0
+            ? Math.round((acumulado / totalBase) * 1000) / 10
+            : 0,
+      };
+    });
+  }, [
+    rankingBairros,
+    paretoView,
+    totalProdutivasGeral,
+    totalImprodutivasGeral,
+  ]);
 
   const filtrosLimpos = ano === null && mes === null;
 
@@ -541,11 +668,16 @@ export function KpiDetalhamentoNotas() {
                   ? topProdutivo.bairro
                   : "—"}
               </div>
-              <div className="mt-1 text-3xl font-bold text-green-700">
-                {formatQuantidade(topProdutivo?.produtivas ?? 0)}
+              <div className="mt-1 text-2xl font-bold tabular-nums text-green-700 sm:text-3xl">
+                {topProdutivo && topProdutivo.produtivas > 0
+                  ? formatCardShare(
+                      topProdutivo.produtivas,
+                      totalProdutivasGeral,
+                    )
+                  : formatCardShare(0, totalProdutivasGeral)}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                notas produtivas
+                notas produtivas · peso no total do período
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -560,11 +692,16 @@ export function KpiDetalhamentoNotas() {
                   ? topImprodutivo.bairro
                   : "—"}
               </div>
-              <div className="mt-1 text-3xl font-bold text-red-600">
-                {formatQuantidade(topImprodutivo?.improdutivas ?? 0)}
+              <div className="mt-1 text-2xl font-bold tabular-nums text-red-600 sm:text-3xl">
+                {topImprodutivo && topImprodutivo.improdutivas > 0
+                  ? formatCardShare(
+                      topImprodutivo.improdutivas,
+                      totalImprodutivasGeral,
+                    )
+                  : formatCardShare(0, totalImprodutivasGeral)}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                notas improdutivas
+                notas improdutivas · peso no total do período
               </p>
             </div>
           </div>
@@ -601,7 +738,12 @@ export function KpiDetalhamentoNotas() {
                         reversed={false}
                       />
                       <Tooltip
-                        content={<BairroChartTooltip />}
+                        content={
+                          <BairroChartTooltip
+                            totalProdutivasGeral={totalProdutivasGeral}
+                            totalImprodutivasGeral={totalImprodutivasGeral}
+                          />
+                        }
                         cursor={{ fill: "#f3f4f6" }}
                       />
                       <Bar
@@ -647,7 +789,12 @@ export function KpiDetalhamentoNotas() {
                         reversed={false}
                       />
                       <Tooltip
-                        content={<BairroChartTooltip />}
+                        content={
+                          <BairroChartTooltip
+                            totalProdutivasGeral={totalProdutivasGeral}
+                            totalImprodutivasGeral={totalImprodutivasGeral}
+                          />
+                        }
                         cursor={{ fill: "#f3f4f6" }}
                       />
                       <Bar
@@ -661,6 +808,99 @@ export function KpiDetalhamentoNotas() {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-bold text-foreground">
+                <MapPin className="h-4 w-4 text-amber-600" />
+                Análise de Pareto — Bairros
+              </h2>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="pareto-view"
+                  className="shrink-0 text-sm font-medium text-muted-foreground"
+                >
+                  Visão:
+                </Label>
+                <Select
+                  value={paretoView}
+                  onValueChange={(v) =>
+                    setParetoView(v as ParetoView)
+                  }
+                >
+                  <SelectTrigger id="pareto-view" className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Produtivas">Produtivas</SelectItem>
+                    <SelectItem value="Improdutivas">Improdutivas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {paretoData.length === 0 ? (
+              <p className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                Sem dados para montar o Pareto neste período.
+              </p>
+            ) : (
+              <div className="h-[28rem] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={paretoData}
+                    margin={{ top: 8, right: 24, left: 8, bottom: 64 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="bairro"
+                      interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      height={70}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      allowDecimals={false}
+                      tick={{ fontSize: 11 }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fontSize: 11 }}
+                    />
+                    <Tooltip
+                      content={<ParetoTooltip paretoView={paretoView} />}
+                    />
+                    <Bar
+                      yAxisId="left"
+                      dataKey="volume"
+                      name={paretoView}
+                      fill={
+                        paretoView === "Produtivas" ? "#16a34a" : "#ef4444"
+                      }
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={36}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="pctAcumulada"
+                      name="% acumulada"
+                      stroke="#f59e0b"
+                      strokeWidth={2.5}
+                      dot={{ r: 3, fill: "#f59e0b" }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Barras = volume absoluto · Linha âmbar = % acumulada (0–100%).
+            </p>
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
