@@ -144,18 +144,11 @@ type KpiDesempenhoTecnicosProps = {
   analiticoRows?: AnaliticoHistoricoRow[];
 };
 
-type AbaDetalhamento = "analitico" | "toa" | "simular-fatura";
-
-type FaturaSimuladaLinha = {
-  contrato: string;
-  numeroOs: string;
-  tipoOs: string;
-  codBaixa: number | null;
-  dataBaixa: string;
-  valorServico: number;
-};
+type AbaDetalhamento = "analitico" | "toa";
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
+
+type RankMode = "quantidade" | "financeiro";
 
 type SortKey = "statusNota" | "receita" | "data";
 
@@ -707,8 +700,6 @@ function KpiDesempenhoProjecaoToa({
   demitidosKeys,
   precosOs,
   onSalvarPrecos,
-  onRecalcularBase,
-  onAtualizarCatalogoViaHistorico,
   modoFaturamento = "ONLY_TOA",
   analiticoRows = [],
 }: Omit<KpiDesempenhoTecnicosProps, "modoFaturamento"> & {
@@ -745,14 +736,12 @@ function KpiDesempenhoProjecaoToa({
     [analiticoFiltrado],
   );
   const [filtroTop, setFiltroTop] = useState<FiltroTop>("Geral");
+  const [rankMode, setRankMode] = useState<RankMode>("quantidade");
   const [buscaTecnico, setBuscaTecnico] = useState("");
   const percentualAumento = usePercentualAumento();
   const [percentualAumentoTexto, setPercentualAumentoTexto] = useState(() =>
     String(getPercentualAumento()),
   );
-  const [recalculandoBase, setRecalculandoBase] = useState(false);
-  const [atualizandoCatalogoHistorico, setAtualizandoCatalogoHistorico] =
-    useState(false);
   const [tecnicoSelecionado, setTecnicoSelecionado] =
     useState<TecnicoSelecionado | null>(null);
   const [detalheNotasTipo, setDetalheNotasTipo] =
@@ -1199,47 +1188,6 @@ function KpiDesempenhoProjecaoToa({
     setIsTabelaPrecosOpen(true);
   };
 
-  const recalcularBase = async () => {
-    if (!onRecalcularBase || recalculandoBase) return;
-    setRecalculandoBase(true);
-    try {
-      await onRecalcularBase();
-      toast.success(
-        "Base de preços recalculada. Receita projetada atualizada em todos os cards.",
-      );
-    } catch (err) {
-      console.error(err);
-      toast.error("Não foi possível recalcular a base de preços.");
-    } finally {
-      setRecalculandoBase(false);
-    }
-  };
-
-  const atualizarCatalogoViaHistorico = async () => {
-    if (!onAtualizarCatalogoViaHistorico || atualizandoCatalogoHistorico) return;
-    setAtualizandoCatalogoHistorico(true);
-    try {
-      const { atualizados, estimados } = await onAtualizarCatalogoViaHistorico();
-      if (atualizados === 0 && estimados === 0) {
-        toast.success(
-          "Nenhum preço novo no Analítico e nada a estimar por semelhança.",
-        );
-      } else {
-        toast.success(
-          `Catálogo: ${formatQuantidade(atualizados)} do histórico` +
-            (estimados > 0
-              ? ` + ${formatQuantidade(estimados)} estimado(s) por semelhança.`
-              : "."),
-        );
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Não foi possível atualizar o catálogo via histórico.");
-    } finally {
-      setAtualizandoCatalogoHistorico(false);
-    }
-  };
-
   const salvarValoresAlterados = async () => {
     let temValorInvalido = false;
     const alterados = tiposOsImportados.flatMap(
@@ -1302,9 +1250,12 @@ function KpiDesempenhoProjecaoToa({
       };
     });
 
-    const ordenados = [...comProjecao].sort(
-      (a, b) => b.notasProdutivas - a.notasProdutivas,
-    );
+    const ordenados = [...comProjecao].sort((a, b) => {
+      if (rankMode === "financeiro") {
+        return b.receitaGanha - a.receitaGanha;
+      }
+      return b.notasProdutivas - a.notasProdutivas;
+    });
     const limite = limiteDoFiltro(filtroTop);
     const fatia = limite === null ? ordenados : ordenados.slice(0, limite);
     const totalNotasFatia = fatia.reduce(
@@ -1332,7 +1283,7 @@ function KpiDesempenhoProjecaoToa({
         pareto,
       } satisfies ChartBarPayload;
     });
-  }, [enriquecidos, fatorProjecao, filtroTop]);
+  }, [enriquecidos, fatorProjecao, filtroTop, rankMode]);
 
   const selecionarTecnicoDoGrafico = (data: unknown) => {
     const raw = data as ChartBarPayload & { payload?: ChartBarPayload };
@@ -1689,118 +1640,6 @@ function KpiDesempenhoProjecaoToa({
     );
   }, [abaNotasToa, osTabelaFiltradas]);
 
-  /**
-   * Simular Fatura: 1 O.S. pagadora por Contrato (a produtiva de maior valor).
-   * Contrato vazio → agrupa por numero_wo. Aumento (%) via fatorProjecao.
-   */
-  const dadosFaturaSimulada = useMemo<FaturaSimuladaLinha[]>(() => {
-    type Candidata = {
-      grupoKey: string;
-      contrato: string;
-      numeroOs: string;
-      tipoOs: string;
-      codBaixa: number | null;
-      dataBaixa: string;
-      sortKey: string;
-      valorServico: number;
-    };
-
-    const porContrato = new Map<string, Candidata[]>();
-
-    const pushCandidata = (cand: Candidata) => {
-      const lista = porContrato.get(cand.grupoKey) ?? [];
-      lista.push(cand);
-      porContrato.set(cand.grupoKey, lista);
-    };
-
-    if (toaOsPeriodo.length > 0) {
-      for (const row of toaOsPeriodo) {
-        const codBaixa = row.cod_baixa ?? 0;
-        const produtiva =
-          isStatusExecutada(row.status_os || "") &&
-          codBaixa > 0 &&
-          isCodBaixaProdutivo(codBaixa);
-        if (!produtiva) continue;
-
-        const contrato = String(row.contrato ?? "").trim();
-        const wo = String(row.numero_wo ?? "").trim();
-        const numeroOs = String(row.numero_os ?? "").trim();
-        const grupoKey = contrato || wo || numeroOs;
-        if (!grupoKey) continue;
-
-        const dataBaixa = String(row.data_toa ?? "").slice(0, 10);
-        pushCandidata({
-          grupoKey,
-          contrato: contrato || wo || "—",
-          numeroOs: numeroOs || "—",
-          tipoOs: String(row.tipo_os ?? "").trim() || "—",
-          codBaixa: row.cod_baixa,
-          dataBaixa,
-          sortKey: `${dataBaixa}|${String(row.inicio_fim ?? "").trim()}|${numeroOs}`,
-          valorServico: valorPrecoOs(precosOs, row.tipo_os) * fatorProjecao,
-        });
-      }
-    } else {
-      for (const chamado of chamadosToaPeriodo) {
-        const contrato = String(chamado.contrato ?? "").trim();
-        const wo = String(chamado.numeroWo ?? "").trim();
-        const dataBaixa = String(chamado.data ?? "").slice(0, 10);
-        for (const ordem of chamado.ordensDeServico) {
-          if (!isOsProdutiva(ordem)) continue;
-          const numeroOs =
-            (ordem.numeroOs || "").trim() || String(ordem.indice);
-          const grupoKey = contrato || wo || numeroOs;
-          if (!grupoKey) continue;
-          pushCandidata({
-            grupoKey,
-            contrato: contrato || wo || "—",
-            numeroOs: numeroOs || "—",
-            tipoOs: String(ordem.tipoOs ?? "").trim() || "—",
-            codBaixa: ordem.codBaixa > 0 ? ordem.codBaixa : null,
-            dataBaixa,
-            sortKey: `${dataBaixa}|${String(chamado.inicioFim ?? "").trim()}|${numeroOs}`,
-            valorServico: valorPrecoOs(precosOs, ordem.tipoOs) * fatorProjecao,
-          });
-        }
-      }
-    }
-
-    const selecionadas: FaturaSimuladaLinha[] = [];
-    for (const candidatas of porContrato.values()) {
-      // Pagadora = O.S. produtiva de maior valor no contrato.
-      candidatas.sort(
-        (a, b) =>
-          b.valorServico - a.valorServico ||
-          a.sortKey.localeCompare(b.sortKey),
-      );
-      const maisCara = candidatas[0];
-      if (!maisCara) continue;
-      selecionadas.push({
-        contrato: maisCara.contrato,
-        numeroOs: maisCara.numeroOs,
-        tipoOs: maisCara.tipoOs,
-        codBaixa: maisCara.codBaixa,
-        dataBaixa: maisCara.dataBaixa,
-        valorServico: maisCara.valorServico,
-      });
-    }
-
-    return selecionadas.sort((a, b) => {
-      const byDate = b.dataBaixa.localeCompare(a.dataBaixa);
-      if (byDate !== 0) return byDate;
-      return a.contrato.localeCompare(b.contrato, "pt-BR");
-    });
-  }, [toaOsPeriodo, chamadosToaPeriodo, precosOs, fatorProjecao]);
-
-  const totalFaturaSimulada = useMemo(
-    () =>
-      dadosFaturaSimulada.reduce(
-        (acc, row) => acc + (Number(row.valorServico) || 0),
-        0,
-      ),
-    [dadosFaturaSimulada],
-  );
-
   const osTabelaOrdenadas = useMemo(() => {
     if (!sortConfig.key) {
       return [...osTabelaFiltradas].sort((a, b) => {
@@ -2009,9 +1848,9 @@ function KpiDesempenhoProjecaoToa({
 
   const tituloDetalheNotas =
     detalheNotasTipo === "produtivas"
-      ? "Detalhamento de Notas Produtivas"
+      ? "Detalhamento de Notas Produtivas - OS"
       : detalheNotasTipo === "perdas"
-        ? "Detalhamento de Perdas"
+        ? "Detalhamento de Notas Improdutivas - OS"
         : "";
 
   return (
@@ -2168,24 +2007,54 @@ function KpiDesempenhoProjecaoToa({
       )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex justify-between items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex min-w-0 flex-wrap items-center gap-2 font-bold text-foreground">
             <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
             <span className="leading-snug">{tituloVisaoGeral}</span>
           </h2>
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            Visualizar:
-            <select
-              value={filtroTop}
-              onChange={(e) => setFiltroTop(e.target.value as FiltroTop)}
-              className="border border-gray-300 text-sm rounded-md px-2 py-1 outline-none text-foreground bg-background"
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div
+              className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+              role="group"
+              aria-label="Modo de ranking do gráfico"
             >
-              <option value="Geral">Geral</option>
-              <option value="Top 10">Top 10</option>
-              <option value="Top 5">Top 5</option>
-              <option value="Top 3">Top 3</option>
-            </select>
-          </label>
+              <button
+                type="button"
+                onClick={() => setRankMode("quantidade")}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                  rankMode === "quantidade"
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Rank de Notas
+              </button>
+              <button
+                type="button"
+                onClick={() => setRankMode("financeiro")}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                  rankMode === "financeiro"
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Rank Financeiro
+              </button>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              Visualizar:
+              <select
+                value={filtroTop}
+                onChange={(e) => setFiltroTop(e.target.value as FiltroTop)}
+                className="border border-gray-300 text-sm rounded-md px-2 py-1 outline-none text-foreground bg-background"
+              >
+                <option value="Geral">Geral</option>
+                <option value="Top 10">Top 10</option>
+                <option value="Top 5">Top 5</option>
+                <option value="Top 3">Top 3</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="mt-4 h-80 w-full">
@@ -2331,9 +2200,9 @@ function KpiDesempenhoProjecaoToa({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
               <Users className="h-4 w-4 text-primary" />
-              Detalhamento TOA
+              Detalhamento TOA - OS
             </h2>
-            {activeTab === "toa" || activeTab === "simular-fatura" ? (
+            {activeTab === "toa" ? (
               <button
                 type="button"
                 onClick={abrirTabelaPrecos}
@@ -2346,68 +2215,32 @@ function KpiDesempenhoProjecaoToa({
             ) : null}
           </div>
 
-          {activeTab === "toa" || activeTab === "simular-fatura" ? (
+          {activeTab === "toa" ? (
             <div className="ml-auto flex flex-col items-end gap-2">
-              {(onRecalcularBase || onAtualizarCatalogoViaHistorico) && (
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {onRecalcularBase ? (
-                    <button
-                      type="button"
-                      onClick={() => void recalcularBase()}
-                      disabled={recalculandoBase || atualizandoCatalogoHistorico}
-                      className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      title="Regrava o catálogo calibrado no Supabase e invalida cache local de preços"
-                    >
-                      {recalculandoBase ? "Recalculando…" : "Recalcular Base"}
-                    </button>
-                  ) : null}
-                  {onAtualizarCatalogoViaHistorico ? (
-                    <button
-                      type="button"
-                      onClick={() => void atualizarCatalogoViaHistorico()}
-                      disabled={atualizandoCatalogoHistorico || recalculandoBase}
-                      className="rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      title="Calcula a moda de valor_servico no Analítico e faz upsert em precos_os"
-                    >
-                      {atualizandoCatalogoHistorico
-                        ? "Atualizando catálogo…"
-                        : "Atualizar Catálogo via Histórico"}
-                    </button>
-                  ) : null}
-                </div>
-              )}
               <div
                 className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
                 title={
-                  activeTab === "simular-fatura"
-                    ? "Soma da O.S. produtiva de maior valor por contrato (fatura simulada)"
-                    : abaNotasToa === "produtivas"
-                      ? "Receita faturável (mesma regra do card Receita TOA), filtrada pela tabela"
-                      : "Valor estimado deixado na mesa nas O.S. visíveis (aba Perdas)"
+                  abaNotasToa === "produtivas"
+                    ? "Receita faturável (mesma regra do card Receita TOA), filtrada pela tabela"
+                    : "Valor estimado deixado na mesa nas O.S. visíveis (aba Perdas)"
                 }
               >
                 <span className="text-xs text-gray-500">
-                  {activeTab === "simular-fatura"
-                    ? "Total (Fatura simulada)"
-                    : abaNotasToa === "produtivas"
-                      ? "Total (Receita Gerada)"
-                      : "Total (Deixado na mesa)"}
+                  {abaNotasToa === "produtivas"
+                    ? "Total (Receita Gerada)"
+                    : "Total (Deixado na mesa)"}
                 </span>
                 <span
                   className={`text-sm font-bold tabular-nums ${
-                    activeTab === "simular-fatura"
+                    abaNotasToa === "produtivas"
                       ? "text-green-600"
-                      : abaNotasToa === "produtivas"
-                        ? "text-green-600"
-                        : "text-red-500"
+                      : "text-red-500"
                   }`}
                 >
                   {formatReceita(
-                    activeTab === "simular-fatura"
-                      ? totalFaturaSimulada
-                      : abaNotasToa === "perdas"
-                        ? -Math.abs(totalReceitaTabelaVisivel)
-                        : totalReceitaTabelaVisivel,
+                    abaNotasToa === "perdas"
+                      ? -Math.abs(totalReceitaTabelaVisivel)
+                      : totalReceitaTabelaVisivel,
                   )}
                 </span>
               </div>
@@ -2432,7 +2265,7 @@ function KpiDesempenhoProjecaoToa({
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Detalhamento TOA
+              Detalhamento TOA - OS
             </button>
             {mostrarCardsAnaliticoEToa ? (
               <button
@@ -2449,121 +2282,11 @@ function KpiDesempenhoProjecaoToa({
                 Analítico Claro
               </button>
             ) : null}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "simular-fatura"}
-              onClick={() => setActiveTab("simular-fatura")}
-              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                activeTab === "simular-fatura"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Simular Fatura
-            </button>
           </div>
         </div>
 
         {activeTab === "analitico" ? (
           <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
-        ) : activeTab === "simular-fatura" ? (
-          <>
-            <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
-              <label className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  Aumento (%)
-                </span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={percentualAumentoTexto}
-                  onChange={(e) => atualizarPercentualAumento(e.target.value)}
-                  placeholder="0"
-                  aria-label="Aumento percentual"
-                  className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </label>
-            </div>
-            {dadosFaturaSimulada.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhuma O.S. produtiva no período para simular a fatura.
-              </p>
-            ) : (
-              <div className="relative max-h-[500px] overflow-y-auto rounded-lg border border-gray-100">
-                <table className="w-full table-fixed border-collapse text-[11px]">
-                  <colgroup>
-                    <col style={{ width: "18%" }} />
-                    <col style={{ width: "14%" }} />
-                    <col style={{ width: "28%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "16%" }} />
-                  </colgroup>
-                  <thead className="sticky top-0 z-10 bg-white shadow-sm">
-                    <tr className="border-b border-border">
-                      <th className={`${TH_OS_TOA} bg-white`}>Contrato</th>
-                      <th className={`${TH_OS_TOA} bg-white`}>Cód OS</th>
-                      <th className={`${TH_OS_TOA} bg-white`}>Tipo OS</th>
-                      <th className={`${TH_OS_TOA} bg-white text-center`}>
-                        Cód de baixa
-                      </th>
-                      <th className={`${TH_OS_TOA} bg-white text-center`}>
-                        Data Baixa
-                      </th>
-                      <th className={`${TH_OS_TOA} bg-white text-right`}>
-                        Valor serviço
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dadosFaturaSimulada.map((row, idx) => (
-                      <tr
-                        key={`${row.contrato}-${row.numeroOs}-${row.dataBaixa}-${idx}`}
-                        className="border-b border-border/60 hover:bg-muted/40"
-                      >
-                        <td
-                          className={`${TD_OS_TOA} tabular-nums`}
-                          title={row.contrato}
-                        >
-                          {row.contrato}
-                        </td>
-                        <td
-                          className={`${TD_OS_TOA} font-semibold tabular-nums text-gray-900`}
-                          title={row.numeroOs}
-                        >
-                          {row.numeroOs}
-                        </td>
-                        <td className={TD_OS_TOA} title={row.tipoOs}>
-                          {row.tipoOs}
-                        </td>
-                        <td
-                          className={`${TD_OS_TOA} text-center tabular-nums`}
-                          title={
-                            row.codBaixa != null
-                              ? String(row.codBaixa)
-                              : undefined
-                          }
-                        >
-                          {row.codBaixa ?? "—"}
-                        </td>
-                        <td className={`${TD_OS_TOA} text-center tabular-nums`}>
-                          {formatDataBr(row.dataBaixa)}
-                        </td>
-                        <td
-                          className={`${TD_OS_TOA} text-right font-bold tabular-nums text-green-600`}
-                          title={formatReceita(row.valorServico)}
-                        >
-                          {formatReceita(row.valorServico)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
         ) : (
           <>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
@@ -2583,7 +2306,7 @@ function KpiDesempenhoProjecaoToa({
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Detalhamento de Notas Produtivas
+                  Detalhamento de Notas Produtivas - OS
                 </button>
                 <button
                   type="button"
@@ -2596,7 +2319,7 @@ function KpiDesempenhoProjecaoToa({
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Detalhamento de Perdas
+                  Detalhamento de Notas Improdutivas - OS
                 </button>
               </div>
 
