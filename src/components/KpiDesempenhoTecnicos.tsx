@@ -56,7 +56,9 @@ import {
   isOsImprodutiva,
   isOsProdutiva,
   isOsReceitaFaturavelNaNota,
+  isCodBaixaProdutivo,
   isStatusAtividadeContabilizavel,
+  isStatusExecutada,
   normalizeTipoOs,
   normalizeToaLogin,
   statusNotaToa,
@@ -142,7 +144,16 @@ type KpiDesempenhoTecnicosProps = {
   analiticoRows?: AnaliticoHistoricoRow[];
 };
 
-type AbaDetalhamento = "analitico" | "toa";
+type AbaDetalhamento = "analitico" | "toa" | "simular-fatura";
+
+type FaturaSimuladaLinha = {
+  contrato: string;
+  numeroOs: string;
+  tipoOs: string;
+  codBaixa: number | null;
+  dataBaixa: string;
+  valorServico: number;
+};
 
 type FiltroTop = "Geral" | "Top 10" | "Top 5" | "Top 3";
 
@@ -714,6 +725,12 @@ function KpiDesempenhoProjecaoToa({
   useEffect(() => {
     setActiveTab("toa");
   }, [mostrarCardsAnaliticoEToa, filtroPeriodo.ano, filtroPeriodo.mes]);
+
+  useEffect(() => {
+    if (activeTab === "analitico" && !mostrarCardsAnaliticoEToa) {
+      setActiveTab("toa");
+    }
+  }, [activeTab, mostrarCardsAnaliticoEToa]);
 
   const analiticoFiltrado = useMemo(
     () => filtrarAnaliticoPorDhBaixa(analiticoRows, filtroPeriodo),
@@ -1672,6 +1689,113 @@ function KpiDesempenhoProjecaoToa({
     );
   }, [abaNotasToa, osTabelaFiltradas]);
 
+  /**
+   * Simular Fatura: 1 O.S. pagadora por Contrato (1ª produtiva cronológica).
+   * Contrato vazio → agrupa por numero_wo.
+   */
+  const dadosFaturaSimulada = useMemo<FaturaSimuladaLinha[]>(() => {
+    type Candidata = {
+      grupoKey: string;
+      contrato: string;
+      numeroOs: string;
+      tipoOs: string;
+      codBaixa: number | null;
+      dataBaixa: string;
+      sortKey: string;
+      valorServico: number;
+    };
+
+    const porContrato = new Map<string, Candidata[]>();
+
+    const pushCandidata = (cand: Candidata) => {
+      const lista = porContrato.get(cand.grupoKey) ?? [];
+      lista.push(cand);
+      porContrato.set(cand.grupoKey, lista);
+    };
+
+    if (toaOsPeriodo.length > 0) {
+      for (const row of toaOsPeriodo) {
+        const codBaixa = row.cod_baixa ?? 0;
+        const produtiva =
+          isStatusExecutada(row.status_os || "") &&
+          codBaixa > 0 &&
+          isCodBaixaProdutivo(codBaixa);
+        if (!produtiva) continue;
+
+        const contrato = String(row.contrato ?? "").trim();
+        const wo = String(row.numero_wo ?? "").trim();
+        const numeroOs = String(row.numero_os ?? "").trim();
+        const grupoKey = contrato || wo || numeroOs;
+        if (!grupoKey) continue;
+
+        const dataBaixa = String(row.data_toa ?? "").slice(0, 10);
+        pushCandidata({
+          grupoKey,
+          contrato: contrato || wo || "—",
+          numeroOs: numeroOs || "—",
+          tipoOs: String(row.tipo_os ?? "").trim() || "—",
+          codBaixa: row.cod_baixa,
+          dataBaixa,
+          sortKey: `${dataBaixa}|${String(row.inicio_fim ?? "").trim()}|${numeroOs}`,
+          valorServico: valorPrecoOs(precosOs, row.tipo_os) * fatorProjecao,
+        });
+      }
+    } else {
+      for (const chamado of chamadosToaPeriodo) {
+        const contrato = String(chamado.contrato ?? "").trim();
+        const wo = String(chamado.numeroWo ?? "").trim();
+        const dataBaixa = String(chamado.data ?? "").slice(0, 10);
+        for (const ordem of chamado.ordensDeServico) {
+          if (!isOsProdutiva(ordem)) continue;
+          const numeroOs =
+            (ordem.numeroOs || "").trim() || String(ordem.indice);
+          const grupoKey = contrato || wo || numeroOs;
+          if (!grupoKey) continue;
+          pushCandidata({
+            grupoKey,
+            contrato: contrato || wo || "—",
+            numeroOs: numeroOs || "—",
+            tipoOs: String(ordem.tipoOs ?? "").trim() || "—",
+            codBaixa: ordem.codBaixa > 0 ? ordem.codBaixa : null,
+            dataBaixa,
+            sortKey: `${dataBaixa}|${String(chamado.inicioFim ?? "").trim()}|${numeroOs}`,
+            valorServico: valorPrecoOs(precosOs, ordem.tipoOs) * fatorProjecao,
+          });
+        }
+      }
+    }
+
+    const selecionadas: FaturaSimuladaLinha[] = [];
+    for (const candidatas of porContrato.values()) {
+      candidatas.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      const primeira = candidatas[0];
+      if (!primeira) continue;
+      selecionadas.push({
+        contrato: primeira.contrato,
+        numeroOs: primeira.numeroOs,
+        tipoOs: primeira.tipoOs,
+        codBaixa: primeira.codBaixa,
+        dataBaixa: primeira.dataBaixa,
+        valorServico: primeira.valorServico,
+      });
+    }
+
+    return selecionadas.sort((a, b) => {
+      const byDate = b.dataBaixa.localeCompare(a.dataBaixa);
+      if (byDate !== 0) return byDate;
+      return a.contrato.localeCompare(b.contrato, "pt-BR");
+    });
+  }, [toaOsPeriodo, chamadosToaPeriodo, precosOs, fatorProjecao]);
+
+  const totalFaturaSimulada = useMemo(
+    () =>
+      dadosFaturaSimulada.reduce(
+        (acc, row) => acc + (Number(row.valorServico) || 0),
+        0,
+      ),
+    [dadosFaturaSimulada],
+  );
+
   const osTabelaOrdenadas = useMemo(() => {
     if (!sortConfig.key) {
       return [...osTabelaFiltradas].sort((a, b) => {
@@ -2204,7 +2328,7 @@ function KpiDesempenhoProjecaoToa({
               <Users className="h-4 w-4 text-primary" />
               Detalhamento TOA
             </h2>
-            {activeTab === "toa" ? (
+            {activeTab === "toa" || activeTab === "simular-fatura" ? (
               <button
                 type="button"
                 onClick={abrirTabelaPrecos}
@@ -2217,7 +2341,7 @@ function KpiDesempenhoProjecaoToa({
             ) : null}
           </div>
 
-          {activeTab === "toa" ? (
+          {activeTab === "toa" || activeTab === "simular-fatura" ? (
             <div className="ml-auto flex flex-col items-end gap-2">
               {(onRecalcularBase || onAtualizarCatalogoViaHistorico) && (
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -2250,27 +2374,35 @@ function KpiDesempenhoProjecaoToa({
               <div
                 className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
                 title={
-                  abaNotasToa === "produtivas"
-                    ? "Receita faturável (mesma regra do card Receita TOA), filtrada pela tabela"
-                    : "Valor estimado deixado na mesa nas O.S. visíveis (aba Perdas)"
+                  activeTab === "simular-fatura"
+                    ? "Soma da 1ª O.S. produtiva por contrato (fatura simulada)"
+                    : abaNotasToa === "produtivas"
+                      ? "Receita faturável (mesma regra do card Receita TOA), filtrada pela tabela"
+                      : "Valor estimado deixado na mesa nas O.S. visíveis (aba Perdas)"
                 }
               >
                 <span className="text-xs text-gray-500">
-                  {abaNotasToa === "produtivas"
-                    ? "Total (Receita Gerada)"
-                    : "Total (Deixado na mesa)"}
+                  {activeTab === "simular-fatura"
+                    ? "Total (Fatura simulada)"
+                    : abaNotasToa === "produtivas"
+                      ? "Total (Receita Gerada)"
+                      : "Total (Deixado na mesa)"}
                 </span>
                 <span
                   className={`text-sm font-bold tabular-nums ${
-                    abaNotasToa === "produtivas"
+                    activeTab === "simular-fatura"
                       ? "text-green-600"
-                      : "text-red-500"
+                      : abaNotasToa === "produtivas"
+                        ? "text-green-600"
+                        : "text-red-500"
                   }`}
                 >
                   {formatReceita(
-                    abaNotasToa === "perdas"
-                      ? -Math.abs(totalReceitaTabelaVisivel)
-                      : totalReceitaTabelaVisivel,
+                    activeTab === "simular-fatura"
+                      ? totalFaturaSimulada
+                      : abaNotasToa === "perdas"
+                        ? -Math.abs(totalReceitaTabelaVisivel)
+                        : totalReceitaTabelaVisivel,
                   )}
                 </span>
               </div>
@@ -2278,26 +2410,26 @@ function KpiDesempenhoProjecaoToa({
           ) : null}
         </div>
 
-        {mostrarCardsAnaliticoEToa ? (
-          <div className="mb-4">
-            <div
-              className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
-              role="tablist"
-              aria-label="Fonte do detalhamento"
+        <div className="mb-4">
+          <div
+            className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+            role="tablist"
+            aria-label="Fonte do detalhamento"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "toa"}
+              onClick={() => setActiveTab("toa")}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                activeTab === "toa"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "toa"}
-                onClick={() => setActiveTab("toa")}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                  activeTab === "toa"
-                    ? "bg-white text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Detalhamento TOA
-              </button>
+              Detalhamento TOA
+            </button>
+            {mostrarCardsAnaliticoEToa ? (
               <button
                 type="button"
                 role="tab"
@@ -2311,12 +2443,122 @@ function KpiDesempenhoProjecaoToa({
               >
                 Analítico Claro
               </button>
-            </div>
+            ) : null}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "simular-fatura"}
+              onClick={() => setActiveTab("simular-fatura")}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                activeTab === "simular-fatura"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Simular Fatura
+            </button>
           </div>
-        ) : null}
+        </div>
 
         {activeTab === "analitico" ? (
           <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
+        ) : activeTab === "simular-fatura" ? (
+          <>
+            <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+              <label className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  Aumento (%)
+                </span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={percentualAumentoTexto}
+                  onChange={(e) => atualizarPercentualAumento(e.target.value)}
+                  placeholder="0"
+                  aria-label="Aumento percentual"
+                  className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </label>
+            </div>
+            {dadosFaturaSimulada.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                Nenhuma O.S. produtiva no período para simular a fatura.
+              </p>
+            ) : (
+              <div className="relative max-h-[500px] overflow-y-auto rounded-lg border border-gray-100">
+                <table className="w-full table-fixed border-collapse text-[11px]">
+                  <colgroup>
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "28%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "16%" }} />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10 bg-white shadow-sm">
+                    <tr className="border-b border-border">
+                      <th className={`${TH_OS_TOA} bg-white`}>Contrato</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Cód OS</th>
+                      <th className={`${TH_OS_TOA} bg-white`}>Tipo OS</th>
+                      <th className={`${TH_OS_TOA} bg-white text-center`}>
+                        Cód de baixa
+                      </th>
+                      <th className={`${TH_OS_TOA} bg-white text-center`}>
+                        Data Baixa
+                      </th>
+                      <th className={`${TH_OS_TOA} bg-white text-right`}>
+                        Valor serviço
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dadosFaturaSimulada.map((row, idx) => (
+                      <tr
+                        key={`${row.contrato}-${row.numeroOs}-${row.dataBaixa}-${idx}`}
+                        className="border-b border-border/60 hover:bg-muted/40"
+                      >
+                        <td
+                          className={`${TD_OS_TOA} tabular-nums`}
+                          title={row.contrato}
+                        >
+                          {row.contrato}
+                        </td>
+                        <td
+                          className={`${TD_OS_TOA} font-semibold tabular-nums text-gray-900`}
+                          title={row.numeroOs}
+                        >
+                          {row.numeroOs}
+                        </td>
+                        <td className={TD_OS_TOA} title={row.tipoOs}>
+                          {row.tipoOs}
+                        </td>
+                        <td
+                          className={`${TD_OS_TOA} text-center tabular-nums`}
+                          title={
+                            row.codBaixa != null
+                              ? String(row.codBaixa)
+                              : undefined
+                          }
+                        >
+                          {row.codBaixa ?? "—"}
+                        </td>
+                        <td className={`${TD_OS_TOA} text-center tabular-nums`}>
+                          {formatDataBr(row.dataBaixa)}
+                        </td>
+                        <td
+                          className={`${TD_OS_TOA} text-right font-bold tabular-nums text-green-600`}
+                          title={formatReceita(row.valorServico)}
+                        >
+                          {formatReceita(row.valorServico)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
