@@ -6,6 +6,7 @@ import {
   getSupabaseServiceRoleKey,
   getSupabaseUrl,
 } from "@/lib/server-env";
+import { hasPainelAdminAccess } from "@/lib/roles";
 
 type BatchMaterialPayload = {
   tipo: string;
@@ -147,7 +148,7 @@ async function resolveSubmitClient(
     .maybeSingle();
 
   if (profileError) throw profileError;
-  if (profile?.role !== "admin") {
+  if (!hasPainelAdminAccess(profile?.role)) {
     throw new Error("Técnico não autorizado para este envio.");
   }
 

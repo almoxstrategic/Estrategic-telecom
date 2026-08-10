@@ -5,6 +5,7 @@ import {
   getSupabaseServiceRoleKey,
   getSupabaseUrl,
 } from "@/lib/server-env";
+import { hasPainelAdminAccess } from "@/lib/roles";
 
 const EVIDENCIAS_BUCKET = "evidencias-fotos";
 const MAX_PHOTO_BYTES = 512 * 1024;
@@ -55,7 +56,7 @@ async function assertAdmin(accessToken: string) {
     .maybeSingle();
 
   if (profileError) throw profileError;
-  if (profile?.role !== "admin") {
+  if (!hasPainelAdminAccess(profile?.role)) {
     throw new Error("Apenas administradores podem enviar evidências em nome de técnicos.");
   }
 

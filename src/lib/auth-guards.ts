@@ -6,13 +6,20 @@ import {
   homePathForUser,
   waitForAuth,
 } from "./auth-session";
-import type { AppUser, UserRole } from "./types";
+import { hasPainelAdminAccess, normalizeUserRole } from "./roles";
+import type { AppUser } from "./types";
 
 function isClient(): boolean {
   return typeof window !== "undefined";
 }
 
+/**
+ * Perfil do usuário logado — sempre filtrado por id (nunca por role).
+ * Evita PGRST116/.single() quando existem vários admins/gerentes.
+ */
 export async function fetchProfile(userId: string): Promise<AppUser | null> {
+  if (!userId) return null;
+
   const supabase = getSupabaseClient();
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -20,7 +27,11 @@ export async function fetchProfile(userId: string): Promise<AppUser | null> {
     .eq("id", userId)
     .maybeSingle();
 
-  if (profileError || !profile) return null;
+  if (profileError) {
+    console.error("Erro ao carregar perfil:", profileError.message);
+    return null;
+  }
+  if (!profile) return null;
 
   const { data: authData } = await supabase.auth.getUser();
   const email = authData.user?.email ?? "";
@@ -31,7 +42,7 @@ export async function fetchProfile(userId: string): Promise<AppUser | null> {
     identificacao: profile.identificacao ?? undefined,
     login: profile.login ?? undefined,
     nome: profile.nome,
-    role: profile.role as UserRole,
+    role: normalizeUserRole(profile.role),
   };
 }
 
@@ -69,7 +80,7 @@ export async function requireGuest() {
 
 export async function requireAdmin(): Promise<AppUser> {
   const authUser = await requireAuth();
-  if (authUser.role !== "admin") {
+  if (!hasPainelAdminAccess(authUser.role)) {
     throw redirect({ to: "/" });
   }
   return authUser;
@@ -77,7 +88,7 @@ export async function requireAdmin(): Promise<AppUser> {
 
 export async function requireTecnico(): Promise<AppUser> {
   const authUser = await requireAuth();
-  if (authUser.role !== "admin") {
+  if (!hasPainelAdminAccess(authUser.role)) {
     return authUser;
   }
   throw redirect({ to: "/admin" });
@@ -87,7 +98,7 @@ export async function requireTecnicoOrAdmin(): Promise<AppUser> {
   return requireAuth();
 }
 
-/** Rota raiz: sem sessão → login; admin → painel admin. */
+/** Rota raiz: sem sessão → login; admin/gerente → painel admin. */
 export async function requireHomeEntry(): Promise<AppUser> {
   if (!isClient()) {
     return { id: "", email: "", nome: "", role: "tecnico" };
@@ -106,7 +117,7 @@ export async function requireHomeEntry(): Promise<AppUser> {
     throw redirect({ to: "/login" });
   }
 
-  if (profile.role === "admin") {
+  if (hasPainelAdminAccess(profile.role)) {
     throw redirect({ to: "/admin" });
   }
 

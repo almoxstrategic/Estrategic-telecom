@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { fetchProfile } from "./auth-guards";
+import { hasPainelAdminAccess } from "./roles";
 import { getSupabaseClient } from "./supabase";
 import type { AppUser } from "./types";
 
@@ -27,7 +28,7 @@ export function getAuthSnapshot() {
 }
 
 export function homePathForUser(profile: AppUser): "/" | "/admin" {
-  return profile.role === "admin" ? "/admin" : "/";
+  return hasPainelAdminAccess(profile.role) ? "/admin" : "/";
 }
 
 export function waitForAuth(): Promise<void> {

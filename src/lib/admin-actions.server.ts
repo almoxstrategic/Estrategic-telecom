@@ -8,6 +8,7 @@ import {
   normalizeLogin,
   normalizeMatricula,
 } from "./auth-identificacao";
+import { hasPainelAdminAccess } from "./roles";
 import {
   getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
@@ -20,7 +21,7 @@ function getServiceClient() {
   });
 }
 
-/** Valida o JWT do admin com a anon key — não usar service_role aqui. */
+/** Valida o JWT do admin/gerente com a anon key — não usar service_role aqui. */
 function getAuthedClient(accessToken: string) {
   return createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -39,14 +40,15 @@ async function assertAdmin(accessToken: string) {
     throw new Error("Sessão inválida. Faça login novamente como administrador.");
   }
 
+  // Sempre pelo id do usuário da sessão — seguro com N admins/gerentes.
   const { data: profile, error: profileError } = await client
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (profileError || profile?.role !== "admin") {
-    throw new Error("Acesso restrito a administradores.");
+  if (profileError || !hasPainelAdminAccess(profile?.role)) {
+    throw new Error("Acesso restrito a administradores e gerentes.");
   }
 
   return user;
@@ -85,7 +87,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
       login: loginField,
       password: z.string().min(6),
       nome: z.string().min(2),
-      role: z.enum(["admin", "tecnico"]).default("tecnico"),
+      role: z.enum(["admin", "gerente", "tecnico"]).default("tecnico"),
     }),
   )
   .handler(async ({ data }) => {

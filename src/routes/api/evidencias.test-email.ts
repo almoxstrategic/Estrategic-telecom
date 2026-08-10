@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { testSapEmailConnection } from "@/lib/notify-sap-evidencia.server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/server-env";
+import { hasPainelAdminAccess } from "@/lib/roles";
 
 function jsonError(message: string, status: number): Response {
   return Response.json({ error: message }, { status });
@@ -29,7 +30,7 @@ async function assertAdmin(accessToken: string) {
     .maybeSingle();
 
   if (profileError) throw profileError;
-  if (profile?.role !== "admin") {
+  if (!hasPainelAdminAccess(profile?.role)) {
     throw new Error("Apenas administradores podem testar o envio de e-mail.");
   }
 

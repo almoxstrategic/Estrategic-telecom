@@ -4,6 +4,7 @@ import { resolveEvidenciaWebhookSecret } from "@/lib/evidencia-webhook-secret";
 import { isStoragePublicUrl } from "@/lib/evidencias-grouping";
 import { notifySapEvidenciaBatch } from "@/lib/notify-sap-evidencia.server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/server-env";
+import { hasPainelAdminAccess } from "@/lib/roles";
 
 type NotifyMaterialPayload = {
   tipo: string;
@@ -143,7 +144,7 @@ async function assertSenderAuthorized(accessToken: string, tecnicoId: string) {
     .maybeSingle();
 
   if (profileError) throw profileError;
-  if (profile?.role !== "admin") {
+  if (!hasPainelAdminAccess(profile?.role)) {
     throw new Error("Técnico não autorizado para este envio.");
   }
 }

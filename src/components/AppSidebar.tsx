@@ -26,6 +26,7 @@ import {
 import { Logo } from "./Logo";
 import { useApp } from "@/lib/app-store";
 import { resetAdminTabToInicio } from "@/lib/admin-tab";
+import { hasPainelAdminAccess } from "@/lib/roles";
 
 const MISCELANEAS_PATHS = [
   "/todos",
@@ -88,7 +89,7 @@ function matchesPainelAdminGroup(pathname: string): boolean {
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useApp();
   const navigate = useNavigate();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasPainelAdminAccess(user?.role);
   const { pathname, search } = useRouterState({
     select: (s) => ({
       pathname: s.location.pathname,
@@ -149,7 +150,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         {user && (
           <div className="mt-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              {isAdmin ? "Administrador" : "Técnico"}
+              {isAdmin
+                ? user.role === "gerente"
+                  ? "Gerente"
+                  : "Administrador"
+                : "Técnico"}
             </div>
             <div className="truncate font-semibold">{user.nome}</div>
             <div className="truncate text-xs text-muted-foreground">
