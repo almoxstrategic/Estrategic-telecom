@@ -25,6 +25,7 @@ import {
   filtrarToaOsContabilizaveis,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   isCodBaixaProdutivo,
   isStatusExecutada,
@@ -45,13 +46,19 @@ const MESES = [
   { value: 12, label: "Dezembro" },
 ] as const;
 
+const DESCRICAO_DESCONHECIDA = "Motivo Desconhecido";
+
 export type MotivoQuebraAgg = {
   codigo: string;
+  descricao: string;
   quantidade: number;
+  labelCompleta: string;
 };
 
 type ChartMotivoPoint = {
   codigo: string;
+  descricao: string;
+  labelCompleta: string;
   quantidade: number;
 };
 
@@ -72,6 +79,25 @@ function formatQuantidade(n: number): string {
   return n.toLocaleString("pt-BR");
 }
 
+function normalizeCodigoBaixa(value: string | number | null | undefined): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return String(n);
+  return raw;
+}
+
+function descricaoDoCodigo(
+  codigo: string,
+  dicionario: Record<string, string>,
+): string {
+  return (
+    dicionario[codigo] ||
+    dicionario[codigo.padStart(3, "0")] ||
+    DESCRICAO_DESCONHECIDA
+  );
+}
+
 /** O.S. improdutiva: não é (Executada + Cód Baixa produtivo). */
 function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
   const cod =
@@ -87,10 +113,11 @@ function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
 
 /**
  * Volumetria de códigos de baixa em O.S. improdutivas (notas falhas).
- * Agrupa por cod_baixa contando ocorrências de O.S.
+ * Cruza com dicionario_codigos_baixa para descrição textual.
  */
 export function agregarMotivosQuebra(
   rows: ToaImportacaoRow[],
+  dicionario: Record<string, string> = {},
 ): MotivoQuebraAgg[] {
   const counts = new Map<string, number>();
 
@@ -98,18 +125,44 @@ export function agregarMotivosQuebra(
     if (row.status_nota !== "Improdutiva") continue;
     if (!isLinhaOsImprodutiva(row)) continue;
 
-    const codigo = String(Number(row.cod_baixa));
+    const codigo = normalizeCodigoBaixa(row.cod_baixa);
+    if (!codigo) continue;
     counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
   }
 
   return [...counts.entries()]
-    .map(([codigo, quantidade]) => ({ codigo, quantidade }))
+    .map(([codigo, quantidade]) => {
+      const descricao = descricaoDoCodigo(codigo, dicionario);
+      return {
+        codigo,
+        descricao,
+        quantidade,
+        labelCompleta: `${codigo} - ${descricao}`,
+      };
+    })
     .sort(
       (a, b) =>
         b.quantidade - a.quantidade ||
         Number(a.codigo) - Number(b.codigo) ||
         a.codigo.localeCompare(b.codigo, "pt-BR"),
     );
+}
+
+async function fetchDicionarioCodigosBaixa(): Promise<Record<string, string>> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("dicionario_codigos_baixa")
+    .select("codigo, descricao");
+  if (error) throw error;
+
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) {
+    const codigo = normalizeCodigoBaixa(row.codigo);
+    const descricao = String(row.descricao ?? "").trim();
+    if (!codigo || !descricao) continue;
+    map[codigo] = descricao;
+  }
+  return map;
 }
 
 function MotivoChartTooltip({
@@ -121,11 +174,13 @@ function MotivoChartTooltip({
   const entry = payload[0]!;
   const data = entry.payload;
   const valor = Number(entry.value) || 0;
+  const codigo = String(label ?? data?.codigo ?? "—");
+  const descricao = data?.descricao || DESCRICAO_DESCONHECIDA;
 
   return (
-    <div className="rounded-md border border-gray-200 bg-white p-3 shadow-md">
+    <div className="max-w-sm rounded-md border border-gray-200 bg-white p-3 shadow-md">
       <p className="text-sm font-bold text-gray-900">
-        Cód. Baixa {String(label ?? data?.codigo ?? "—")}
+        Cód. Baixa {codigo} - {descricao}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         Quantidade:{" "}
@@ -141,6 +196,7 @@ export function MotivosQuebra() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ToaImportacaoRow[]>([]);
+  const [dicionario, setDicionario] = useState<Record<string, string>>({});
   const [competencias, setCompetencias] = useState<number[]>([]);
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
@@ -150,9 +206,16 @@ export function MotivosQuebra() {
     let cancelled = false;
     void (async () => {
       try {
-        const comps = await fetchCompetenciasToa();
+        const [comps, dic] = await Promise.all([
+          fetchCompetenciasToa(),
+          fetchDicionarioCodigosBaixa().catch((err) => {
+            console.error("Erro ao carregar dicionário de códigos de baixa:", err);
+            return {} as Record<string, string>;
+          }),
+        ]);
         if (cancelled) return;
         setCompetencias(comps);
+        setDicionario(dic);
       } catch {
         if (!cancelled) setCompetencias([]);
       }
@@ -221,7 +284,10 @@ export function MotivosQuebra() {
     return [...set].sort((a, b) => a - b);
   }, [competencias, ano]);
 
-  const porMotivo = useMemo(() => agregarMotivosQuebra(rows), [rows]);
+  const porMotivo = useMemo(
+    () => agregarMotivosQuebra(rows, dicionario),
+    [rows, dicionario],
+  );
 
   const totalQuebras = useMemo(
     () => porMotivo.reduce((acc, row) => acc + row.quantidade, 0),
@@ -240,6 +306,8 @@ export function MotivosQuebra() {
         .slice(0, 10)
         .map((m) => ({
           codigo: m.codigo,
+          descricao: m.descricao,
+          labelCompleta: m.labelCompleta,
           quantidade: m.quantidade,
         })),
     [porMotivo],
@@ -392,9 +460,9 @@ export function MotivosQuebra() {
                   Principal Ofensor
                 </span>
               </div>
-              <div className="mt-3 text-lg font-bold text-gray-900">
+              <div className="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-lg">
                 {principalOfensor && principalOfensor.quantidade > 0
-                  ? `Cód. ${principalOfensor.codigo}`
+                  ? `Cód. ${principalOfensor.labelCompleta}`
                   : "—"}
               </div>
               <div className="mt-1 text-3xl font-bold text-red-600">
@@ -463,11 +531,14 @@ export function MotivosQuebra() {
               </p>
             ) : (
               <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                <table className="w-full min-w-[20rem] text-sm">
+                <table className="w-full min-w-[32rem] text-sm">
                   <thead>
                     <tr className="border-b border-border text-left text-muted-foreground">
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
                         Cód. Baixa
+                      </th>
+                      <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                        Motivo / Descrição
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
                         Quantidade
@@ -480,8 +551,11 @@ export function MotivosQuebra() {
                         key={row.codigo}
                         className="border-b border-border/60 last:border-b-0"
                       >
-                        <td className="px-2 py-2 font-medium text-gray-900">
+                        <td className="px-2 py-2 font-medium tabular-nums text-gray-900">
                           {row.codigo}
+                        </td>
+                        <td className="px-2 py-2 text-gray-700">
+                          {row.descricao}
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums text-red-600">
                           {formatQuantidade(row.quantidade)}

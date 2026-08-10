@@ -113,8 +113,9 @@ import {
 } from "@/lib/toa-store";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
+const KPI_MODULO_DEFAULT = "baixa-consumo-miscelanea" as const;
 const KPI_MODULOS = [
-  "resumo-geral",
+  KPI_MODULO_DEFAULT,
   "desempenho-tecnico",
   "volume-notas",
   "detalhamento-notas",
@@ -123,16 +124,28 @@ const KPI_MODULOS = [
 ] as const;
 type KpiModulo = (typeof KPI_MODULOS)[number];
 
+/** Slugs antigos redirecionados para o módulo atual. */
+const KPI_MODULO_ALIASES: Record<string, KpiModulo> = {
+  "resumo-geral": KPI_MODULO_DEFAULT,
+};
+
 function isKpiModulo(value: string): value is KpiModulo {
   return (KPI_MODULOS as readonly string[]).includes(value);
 }
 
 export const Route = createFileRoute("/admin/kpis/$modulo")({
   beforeLoad: ({ params }) => {
+    const alias = KPI_MODULO_ALIASES[params.modulo];
+    if (alias) {
+      throw redirect({
+        to: "/admin/kpis/$modulo",
+        params: { modulo: alias },
+      });
+    }
     if (!isKpiModulo(params.modulo)) {
       throw redirect({
         to: "/admin/kpis/$modulo",
-        params: { modulo: "resumo-geral" },
+        params: { modulo: KPI_MODULO_DEFAULT },
       });
     }
   },
@@ -150,7 +163,9 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
                   ? "Nota por técnico — Estrategic Field"
                   : params.modulo === "motivos-quebra"
                     ? "Motivos de Quebra — Estrategic Field"
-                    : "KPI's — Estrategic Field",
+                    : params.modulo === KPI_MODULO_DEFAULT
+                      ? "Baixa de Consumo - Miscelânea — Estrategic Field"
+                      : "KPI's — Estrategic Field",
       },
       { name: "description", content: "Métricas de consumo de miscelâneas." },
     ],
@@ -222,22 +237,7 @@ function formatKpiMoeda(valor: number): string {
   }).format(valor);
 }
 
-function formatDataUltimaImportacao(iso: string | null): string {
-  if (!iso) return "Data da última importação: —";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "Data da última importação: —";
-  const data = date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-  const hora = date.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return `Data da última importação: ${data} as ${hora} Horas`;
-}
+
 
 function descricaoPeriodo(filtro: KpisFiltro): string {
   if (filtro.mes === null || filtro.ano === null) {
@@ -438,7 +438,7 @@ function KpisPage() {
   const isDetalhamentoNotas = kpiModulo === "detalhamento-notas";
   const isNotaPorTecnico = kpiModulo === "nota-por-tecnico";
   const isMotivosQuebra = kpiModulo === "motivos-quebra";
-  const isResumoGeral = kpiModulo === "resumo-geral";
+  const isBaixaConsumoMiscelanea = kpiModulo === "baixa-consumo-miscelanea";
   const usaFiltroProprio =
     isVolumeNotas ||
     isDetalhamentoNotas ||
@@ -933,9 +933,9 @@ function KpisPage() {
         <nav className="flex-1 overflow-y-auto p-3">
           <Link
             to="/admin/kpis/$modulo"
-            params={{ modulo: "resumo-geral" }}
+            params={{ modulo: "baixa-consumo-miscelanea" }}
             className={`flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
-              isResumoGeral
+              isBaixaConsumoMiscelanea
                 ? "bg-green-50 text-green-700"
                 : "cursor-pointer text-gray-600 hover:bg-gray-100"
             }`}
@@ -943,10 +943,10 @@ function KpisPage() {
           >
             <LayoutDashboard
               className={`h-5 w-5 shrink-0 ${
-                isResumoGeral ? "text-green-700" : "text-gray-500"
+                isBaixaConsumoMiscelanea ? "text-green-700" : "text-gray-500"
               }`}
             />
-            Resumo Geral
+            Baixa de Consumo - Miscelânea
           </Link>
 
           <div className="mt-6 border-t border-gray-100 pt-2">
@@ -1287,7 +1287,7 @@ function KpisPage() {
                     ? "Volume de Notas por período"
                     : isDesempenho
                       ? "Desempenho Técnicos"
-                      : "Resumo geral"}
+                      : "Baixa de Consumo - Miscelânea"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isMotivosQuebra
@@ -1316,7 +1316,7 @@ function KpisPage() {
                         : modoFaturamento === "vazio"
                           ? "Sem dados de Analítico ou TOA para o período selecionado."
                           : "Carregando faturamento do período…"
-                : formatDataUltimaImportacao(ultimaImportacaoAt)}
+                : "Acompanhamento do consumo de materiais e miscelâneas por técnico."}
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -1576,7 +1576,7 @@ function KpisPage() {
                             <span className="text-left">Nome</span>
                             <span className="text-center">Baixa Misc</span>
                             <span className="text-center">Notas feitas</span>
-                            <span className="text-center">Receita projetada</span>
+                            <span className="text-center">Média de consumo por nota</span>
                           </div>
                           <ul>
                             {(kpis?.top_tecnicos ?? []).map((t) => {
@@ -1590,7 +1590,9 @@ function KpisPage() {
                                   normalizeToaLogin(t.id_tecnico)
                                 ];
                               const notasFeitas = resumoToa?.totalNotasFeitas ?? 0;
-                              const receitaLiquida = resumoToa?.receitaFaturada ?? 0;
+                              const baixaMisc = Number(t.total) || 0;
+                              const mediaConsumo =
+                                notasFeitas > 0 ? baixaMisc / notasFeitas : 0;
                               return (
                               <li
                                 key={t.id_tecnico}
@@ -1619,8 +1621,8 @@ function KpisPage() {
                                   <span className="text-center text-sm font-normal tabular-nums text-muted-foreground">
                                     {formatQuantidade(notasFeitas)}
                                   </span>
-                                  <span className="text-center text-sm font-semibold tabular-nums text-green-600">
-                                    {formatKpiMoeda(receitaLiquida)}
+                                  <span className="text-center text-sm font-semibold tabular-nums text-gray-700">
+                                    {mediaConsumo.toFixed(1)}
                                   </span>
                                 </button>
                               </li>

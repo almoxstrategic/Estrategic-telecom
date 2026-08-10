@@ -201,7 +201,7 @@ function AdminHome() {
 
             <Link
               to="/admin/kpis/$modulo"
-              params={{ modulo: "resumo-geral" }}
+              params={{ modulo: "baixa-consumo-miscelanea" }}
               className="block w-full"
             >
               <div className={`${MODULE_CARD_CLASS} border-border`}>

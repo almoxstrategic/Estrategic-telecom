@@ -72,15 +72,14 @@ function matchesSerializadosGroup(
 }
 
 function matchesKpiGroup(pathname: string): boolean {
-  return (
-    pathname.includes("/resumo-geral") || pathname.includes("/desempenho-tecnico")
-  );
+  return pathMatches(pathname, "/admin/kpis");
 }
 
 function matchesPainelAdminGroup(pathname: string): boolean {
   return (
     isAdminHomePath(pathname) ||
     pathMatches(pathname, "/admin/kpis") ||
+    pathMatches(pathname, "/admin/importacao") ||
     pathMatches(pathname, "/tecnicos")
   );
 }
@@ -240,15 +239,15 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <div className="mt-1 space-y-1 pl-10">
                         <Link
                           to="/admin/kpis/$modulo"
-                          params={{ modulo: "resumo-geral" }}
+                          params={{ modulo: "baixa-consumo-miscelanea" }}
                           onClick={onNavigate}
                           className={`block rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
-                            pathname.includes("/resumo-geral")
+                            pathname.includes("/baixa-consumo-miscelanea")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}
                         >
-                          Resumo geral
+                          Baixa de Consumo - Miscelânea
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
@@ -313,6 +312,19 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       </div>
                     )}
                   </div>
+                  <Link
+                    to="/admin/importacao"
+                    search={{ tab: "toa" }}
+                    onClick={onNavigate}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                      pathMatches(pathname, "/admin/importacao")
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : ""
+                    }`}
+                  >
+                    <FileUp className="h-5 w-5 text-primary" />
+                    Importação
+                  </Link>
                 </div>
               )}
             </div>

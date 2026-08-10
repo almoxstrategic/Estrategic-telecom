@@ -4,7 +4,7 @@ export const Route = createFileRoute("/admin/kpis/")({
   beforeLoad: () => {
     throw redirect({
       to: "/admin/kpis/$modulo",
-      params: { modulo: "resumo-geral" },
+      params: { modulo: "baixa-consumo-miscelanea" },
     });
   },
 });
