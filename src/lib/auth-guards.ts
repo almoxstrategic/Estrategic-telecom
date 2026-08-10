@@ -6,7 +6,11 @@ import {
   homePathForUser,
   waitForAuth,
 } from "./auth-session";
-import { hasPainelAdminAccess, normalizeUserRole } from "./roles";
+import {
+  canAccessAdminPanel,
+  canManageTeam,
+  normalizeUserRole,
+} from "./roles";
 import type { AppUser } from "./types";
 
 function isClient(): boolean {
@@ -78,17 +82,27 @@ export async function requireGuest() {
   }
 }
 
+/** Painel Admin (inclui COP em modo visualização). */
 export async function requireAdmin(): Promise<AppUser> {
   const authUser = await requireAuth();
-  if (!hasPainelAdminAccess(authUser.role)) {
+  if (!canAccessAdminPanel(authUser.role)) {
     throw redirect({ to: "/" });
+  }
+  return authUser;
+}
+
+/** Cadastro / mutações de equipe: só Admin e Gerente. */
+export async function requireTeamManager(): Promise<AppUser> {
+  const authUser = await requireAuth();
+  if (!canManageTeam(authUser.role)) {
+    throw redirect({ to: "/tecnicos" });
   }
   return authUser;
 }
 
 export async function requireTecnico(): Promise<AppUser> {
   const authUser = await requireAuth();
-  if (!hasPainelAdminAccess(authUser.role)) {
+  if (!canAccessAdminPanel(authUser.role)) {
     return authUser;
   }
   throw redirect({ to: "/admin" });
@@ -98,7 +112,7 @@ export async function requireTecnicoOrAdmin(): Promise<AppUser> {
   return requireAuth();
 }
 
-/** Rota raiz: sem sessão → login; admin/gerente → painel admin. */
+/** Rota raiz: sem sessão → login; painel (admin/gerente/cop) → /admin. */
 export async function requireHomeEntry(): Promise<AppUser> {
   if (!isClient()) {
     return { id: "", email: "", nome: "", role: "tecnico" };
@@ -117,7 +131,7 @@ export async function requireHomeEntry(): Promise<AppUser> {
     throw redirect({ to: "/login" });
   }
 
-  if (hasPainelAdminAccess(profile.role)) {
+  if (canAccessAdminPanel(profile.role)) {
     throw redirect({ to: "/admin" });
   }
 

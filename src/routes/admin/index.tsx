@@ -25,6 +25,8 @@ import {
   type AdminTab,
   type AdminTabSearch,
 } from "@/lib/admin-tab";
+import { useApp } from "@/lib/app-store";
+import { canAccessOperacionalMenus } from "@/lib/roles";
 
 type AdminSearch = {
   tab?: AdminTabSearch;
@@ -52,26 +54,43 @@ const MODULE_CARD_CLASS =
   "relative flex h-40 w-full flex-col justify-between rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md";
 
 function AdminHome() {
+  const { user } = useApp();
+  const showOperacional = canAccessOperacionalMenus(user?.role);
   const { tab: tabSearch } = Route.useSearch();
   const [activeTab, setActiveTab] = useState<AdminTab>("Início");
 
   useEffect(() => {
     const fromSearch = adminTabFromSearch(tabSearch);
     if (fromSearch) {
+      if (!showOperacional && fromSearch !== "Início") {
+        setActiveTab("Início");
+        persistAdminTab("Início");
+        return;
+      }
       setActiveTab(fromSearch);
       persistAdminTab(fromSearch);
       return;
     }
     const saved = loadPersistedAdminTab();
     if (saved) {
+      if (!showOperacional && saved !== "Início") {
+        setActiveTab("Início");
+        persistAdminTab("Início");
+        return;
+      }
       setActiveTab(saved);
     }
-  }, [tabSearch]);
+  }, [tabSearch, showOperacional]);
 
   const selecionarAba = (tab: AdminTab) => {
+    if (!showOperacional && tab !== "Início") return;
     setActiveTab(tab);
     persistAdminTab(tab);
   };
+
+  const abasVisiveis = showOperacional
+    ? ADMIN_TABS
+    : (["Início"] as const satisfies readonly AdminTab[]);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -84,7 +103,7 @@ function AdminHome() {
           </p>
 
           <div className="mt-4 flex justify-start gap-1 border-b border-border">
-            {ADMIN_TABS.map((tab) => (
+            {abasVisiveis.map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -101,7 +120,7 @@ function AdminHome() {
           </div>
         </section>
 
-        {activeTab === "Miscelâneas" ? (
+        {showOperacional && activeTab === "Miscelâneas" ? (
           <section className={MODULE_GRID_CLASS}>
             <Link to="/todos" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-primary/20`}>
@@ -231,7 +250,7 @@ function AdminHome() {
               </div>
             </Link>
           </section>
-        ) : (
+        ) : showOperacional ? (
           <section className={MODULE_GRID_CLASS}>
             <div className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
@@ -299,7 +318,7 @@ function AdminHome() {
               </div>
             </div>
           </section>
-        )}
+        ) : null}
       </main>
     </div>
   );

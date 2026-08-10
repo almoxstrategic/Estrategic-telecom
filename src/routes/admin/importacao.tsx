@@ -4,6 +4,7 @@ import { FileSpreadsheet, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
+import { useApp } from "@/lib/app-store";
 import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
 import {
   parseAnaliticoFaturamentoFile,
@@ -24,6 +25,10 @@ import {
   replaceAnaliticoHistoricoLote,
   replaceToaImportacoes,
 } from "@/lib/faturamento-service";
+import {
+  canAccessImportacaoAbasCompletas,
+  canImportToa,
+} from "@/lib/roles";
 import {
   agregarChamadosToa,
   clearToaLocalStorage,
@@ -218,14 +223,23 @@ function MiscelaneaImportCard({
 function ImportacaoPage() {
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const [activeTab, setActiveTab] = useState<ImportacaoTab>(tab);
+  const { user } = useApp();
+  const abasCompletas = canAccessImportacaoAbasCompletas(user?.role);
+  const activeTab: ImportacaoTab = abasCompletas ? tab : "toa";
 
   useEffect(() => {
-    setActiveTab(tab);
-  }, [tab]);
+    if (abasCompletas) return;
+    if (tab === "toa") return;
+    toast.error("Acesso negado. O perfil COP só pode usar a aba TOA.");
+    void navigate({ search: { tab: "toa" }, replace: true });
+  }, [abasCompletas, tab, navigate]);
 
   const selecionarAba = (next: ImportacaoTab) => {
-    setActiveTab(next);
+    if (!abasCompletas && next !== "toa") {
+      toast.error("Acesso negado. O perfil COP só pode usar a aba TOA.");
+      void navigate({ search: { tab: "toa" }, replace: true });
+      return;
+    }
     void navigate({ search: { tab: next }, replace: true });
   };
 
@@ -379,6 +393,10 @@ function ImportacaoPage() {
   };
 
   const handleToa = async (file: File) => {
+    if (!canImportToa(user?.role)) {
+      toast.error("Sem permissão para importar TOA.");
+      return;
+    }
     setBusyToa(true);
     try {
       const linhas = await parseToaFile(file);
@@ -415,6 +433,10 @@ function ImportacaoPage() {
   };
 
   const handleAnalitico = async (file: File) => {
+    if (!abasCompletas) {
+      toast.error("Acesso negado. O perfil COP não importa Analítico.");
+      return;
+    }
     setBusyAnalitico(true);
     try {
       const rows = await parseAnaliticoFaturamentoFile(file);
@@ -447,8 +469,9 @@ function ImportacaoPage() {
               Importação de Dados
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              TOA e Analítico são gravados no Supabase (overwrite por mês). Demais
-              importações seguem o fluxo atual.
+              {abasCompletas
+                ? "TOA e Analítico são gravados no Supabase (overwrite por mês). Demais importações seguem o fluxo atual."
+                : "Perfil COP: importação liberada apenas na aba TOA (upload e processamento no Supabase)."}
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
@@ -457,28 +480,32 @@ function ImportacaoPage() {
         </div>
 
         <div className="mb-6 flex gap-1 border-b border-border">
-          <button
-            type="button"
-            onClick={() => selecionarAba("miscelaneas")}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === "miscelaneas"
-                ? "border-b-2 border-primary text-foreground"
-                : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Miscelâneas
-          </button>
-          <button
-            type="button"
-            onClick={() => selecionarAba("serializados")}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === "serializados"
-                ? "border-b-2 border-primary text-foreground"
-                : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Serializados
-          </button>
+          {abasCompletas ? (
+            <>
+              <button
+                type="button"
+                onClick={() => selecionarAba("miscelaneas")}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "miscelaneas"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Miscelâneas
+              </button>
+              <button
+                type="button"
+                onClick={() => selecionarAba("serializados")}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "serializados"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Serializados
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={() => selecionarAba("toa")}
@@ -492,7 +519,7 @@ function ImportacaoPage() {
           </button>
         </div>
 
-        {activeTab === "miscelaneas" ? (
+        {activeTab === "miscelaneas" && abasCompletas ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <MiscelaneaImportCard
               title="Cabeçalho da WO"
@@ -525,7 +552,7 @@ function ImportacaoPage() {
               onFileChange={setArquivoEstoqueTecnico}
             />
           </div>
-        ) : activeTab === "serializados" ? (
+        ) : activeTab === "serializados" && abasCompletas ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ImportFileCard
               title="Estoque Atlas"
@@ -566,14 +593,16 @@ function ImportacaoPage() {
               busy={busyToa}
               onImport={handleToa}
             />
-            <ImportFileCard
-              title="Analítico Claro (histórico)"
-              description='Lê a aba "Consolidado" do arquivo mestre IAT (62 colunas) e grava em analitico_historico. Overwrite automático por DATA_BASE. Fallback: abas mensais / ANALITICO / primeira aba.'
-              file={arquivoAnalitico}
-              onFileChange={setArquivoAnalitico}
-              busy={busyAnalitico}
-              onImport={handleAnalitico}
-            />
+            {abasCompletas ? (
+              <ImportFileCard
+                title="Analítico Claro (histórico)"
+                description='Lê a aba "Consolidado" do arquivo mestre IAT (62 colunas) e grava em analitico_historico. Overwrite automático por DATA_BASE. Fallback: abas mensais / ANALITICO / primeira aba.'
+                file={arquivoAnalitico}
+                onFileChange={setArquivoAnalitico}
+                busy={busyAnalitico}
+                onImport={handleAnalitico}
+              />
+            ) : null}
           </div>
         )}
       </main>

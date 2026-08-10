@@ -10,6 +10,8 @@ import {
   diaPertenceASemana,
   type KpiSemanaFiltro,
 } from "./kpi-semana";
+import { getCachedUser } from "./auth-session";
+import { canImportToa } from "./roles";
 
 /** Último mês inclusivo do gabarito Analítico (jun/2026). */
 export const FATURAMENTO_HISTORICO_ATE = 202606;
@@ -739,6 +741,13 @@ export function groupChamadosByCompetencia(
 export async function replaceToaImportacoes(
   chamados: ToaChamadoProcessado[],
 ): Promise<{ competencias: number[]; totalOs: number; totalNotas: number }> {
+  const role = getCachedUser()?.role;
+  if (!canImportToa(role)) {
+    throw new Error(
+      "Sem permissão para importar TOA. Papéis permitidos: ADMIN, GERENTE, COP.",
+    );
+  }
+
   const flat = flattenChamadosParaImportacaoFlat(chamados);
   const competencias = [
     ...new Set(flat.map((r) => r.competencia).filter((c) => c > 0)),

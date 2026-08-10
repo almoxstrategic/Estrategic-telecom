@@ -87,7 +87,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
       login: loginField,
       password: z.string().min(6),
       nome: z.string().min(2),
-      role: z.enum(["admin", "gerente", "tecnico"]).default("tecnico"),
+      role: z.enum(["admin", "gerente", "tecnico", "cop"]).default("tecnico"),
     }),
   )
   .handler(async ({ data }) => {

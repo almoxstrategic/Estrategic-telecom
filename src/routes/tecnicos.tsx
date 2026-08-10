@@ -41,6 +41,7 @@ import { useApp } from "@/lib/app-store";
 import { requireAdmin } from "@/lib/auth-guards";
 import { formatCelularMask, isValidCelular } from "@/lib/auth-identificacao";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
+import { canManageTeam } from "@/lib/roles";
 import {
   deleteTecnico,
   fetchTecnicos,
@@ -82,7 +83,8 @@ function buildPerfilCopyText(tecnico: TecnicoProfile): string {
 }
 
 function TecnicosPage() {
-  const { getAccessToken } = useApp();
+  const { getAccessToken, user } = useApp();
+  const podeGerenciarEquipe = canManageTeam(user?.role);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -304,13 +306,15 @@ function TecnicosPage() {
               <FileSpreadsheet className="h-4 w-4" />
               Exportar Excel
             </Button>
-            <Link
-              to="/cadastro"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover"
-            >
-              <UserPlus className="h-4 w-4" />
-              Adicionar colaborador
-            </Link>
+            {podeGerenciarEquipe ? (
+              <Link
+                to="/cadastro"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover"
+              >
+                <UserPlus className="h-4 w-4" />
+                Adicionar colaborador
+              </Link>
+            ) : null}
           </div>
         </header>
 
@@ -353,12 +357,14 @@ function TecnicosPage() {
           <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
             <Users className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Nenhum técnico cadastrado.</p>
-            <Link
-              to="/cadastro"
-              className="mt-3 inline-block text-sm font-semibold text-primary hover:underline"
-            >
-              Cadastrar técnico
-            </Link>
+            {podeGerenciarEquipe ? (
+              <Link
+                to="/cadastro"
+                className="mt-3 inline-block text-sm font-semibold text-primary hover:underline"
+              >
+                Cadastrar usuário
+              </Link>
+            ) : null}
           </div>
         ) : (
           <section className="rounded-2xl border border-border bg-card shadow-sm">
@@ -427,7 +433,7 @@ function TecnicosPage() {
                           <span className="hidden text-xs font-semibold sm:inline">Perfil</span>
                         </button>
 
-                        {tecnico.login ? (
+                        {podeGerenciarEquipe && tecnico.login ? (
                           <Link
                             to="/todos"
                             search={{ login: tecnico.login }}
@@ -437,15 +443,10 @@ function TecnicosPage() {
                           >
                             <ClipboardList className="h-5 w-5" />
                           </Link>
-                        ) : (
-                          <span
-                            title="Login não cadastrado"
-                            className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-lg text-muted-foreground/40"
-                          >
-                            <ClipboardList className="h-5 w-5" />
-                          </span>
-                        )}
+                        ) : null}
 
+                        {podeGerenciarEquipe ? (
+                          <>
                         <button
                           type="button"
                           onClick={() => abrirEdicao(tecnico)}
@@ -485,6 +486,8 @@ function TecnicosPage() {
                         >
                           {abaAtiva === "ativos" ? "Demitir" : "Contratar"}
                         </button>
+                          </>
+                        ) : null}
                       </div>
                     </li>
                   ))}

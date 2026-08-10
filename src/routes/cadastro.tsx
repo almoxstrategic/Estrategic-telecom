@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireTeamManager } from "@/lib/auth-guards";
 import { useApp } from "@/lib/app-store";
 import { createUserAccount } from "@/lib/admin-actions.server";
 import { PasswordInput } from "@/components/PasswordInput";
@@ -13,13 +13,18 @@ import {
   isValidMatricula,
   normalizeMatricula,
 } from "@/lib/auth-identificacao";
+import {
+  ROLE_SELECT_OPTIONS,
+  roleFromPoderesSelect,
+} from "@/lib/roles";
+import type { UserRole } from "@/lib/types";
 
 export const Route = createFileRoute("/cadastro")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireTeamManager(),
   head: () => ({
     meta: [
       { title: "Cadastro — Estrategic Field" },
-      { name: "description", content: "Cadastro de técnicos da Estrategic." },
+      { name: "description", content: "Cadastro de usuários da Estrategic." },
     ],
   }),
   component: CadastroPage,
@@ -31,6 +36,7 @@ function CadastroPage() {
   const [nome, setNome] = useState("");
   const [identificacao, setIdentificacao] = useState("");
   const [celular, setCelular] = useState("");
+  const [poderes, setPoderes] = useState<string>("TECNICO");
   const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
@@ -58,6 +64,8 @@ function CadastroPage() {
       return;
     }
 
+    const role: UserRole = roleFromPoderesSelect(poderes);
+
     const accessToken = getAccessToken();
     if (!accessToken) {
       toast.error("Sessão expirada. Faça login novamente.");
@@ -74,13 +82,13 @@ function CadastroPage() {
           login: login.trim(),
           password: senha,
           nome: nome.trim(),
-          role: "tecnico",
+          role,
         },
       });
-      toast.success("Técnico cadastrado com sucesso!");
-      navigate({ to: "/admin" });
+      toast.success("Usuário cadastrado com sucesso!");
+      navigate({ to: "/tecnicos" });
     } catch (err) {
-      toast.error((err as Error).message || "Erro ao cadastrar técnico.");
+      toast.error((err as Error).message || "Erro ao cadastrar usuário.");
     } finally {
       setLoading(false);
     }
@@ -94,8 +102,10 @@ function CadastroPage() {
             E
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-black tracking-tight">Cadastrar Técnico</h1>
-            <p className="text-sm text-muted-foreground">Acesso restrito ao administrador</p>
+            <h1 className="text-2xl font-black tracking-tight">Cadastrar Usuário</h1>
+            <p className="text-sm text-muted-foreground">
+              Defina os poderes de acesso do novo usuário
+            </p>
           </div>
         </div>
 
@@ -126,7 +136,7 @@ function CadastroPage() {
               required
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Código alfanumérico do técnico no sistema legado.
+              Código alfanumérico do colaborador no sistema legado.
             </p>
           </div>
           <div>
@@ -142,6 +152,27 @@ function CadastroPage() {
             />
           </div>
           <div>
+            <label htmlFor="cadastro-poderes" className="mb-1.5 block text-sm font-semibold">
+              Poderes
+            </label>
+            <select
+              id="cadastro-poderes"
+              value={poderes}
+              onChange={(e) => setPoderes(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              required
+            >
+              {ROLE_SELECT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Técnico = app de campo · Admin/Gerente = painel completo · COP = painel somente leitura
+            </p>
+          </div>
+          <div>
             <label className="mb-1.5 block text-sm font-semibold">Login</label>
             <input
               type="text"
@@ -155,7 +186,7 @@ function CadastroPage() {
               required
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Usado pelo técnico para entrar no sistema.
+              Usado para entrar no sistema.
             </p>
           </div>
           <div>
@@ -172,12 +203,12 @@ function CadastroPage() {
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60"
           >
             <UserPlus className="h-5 w-5" />
-            {loading ? "Cadastrando..." : "Cadastrar Técnico"}
+            {loading ? "Cadastrando..." : "Cadastrar Usuário"}
           </button>
 
           <p className="pt-2 text-center text-sm text-muted-foreground">
-            <Link to="/admin" className="font-semibold text-primary hover:underline">
-              Voltar ao painel
+            <Link to="/tecnicos" className="font-semibold text-primary hover:underline">
+              Voltar à Gestão de Equipe
             </Link>
           </p>
         </form>

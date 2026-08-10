@@ -26,7 +26,11 @@ import {
 import { Logo } from "./Logo";
 import { useApp } from "@/lib/app-store";
 import { resetAdminTabToInicio } from "@/lib/admin-tab";
-import { hasPainelAdminAccess } from "@/lib/roles";
+import {
+  canAccessAdminPanel,
+  canAccessOperacionalMenus,
+  roleLabel,
+} from "@/lib/roles";
 
 const MISCELANEAS_PATHS = [
   "/todos",
@@ -89,7 +93,8 @@ function matchesPainelAdminGroup(pathname: string): boolean {
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useApp();
   const navigate = useNavigate();
-  const isAdmin = hasPainelAdminAccess(user?.role);
+  const isAdmin = canAccessAdminPanel(user?.role);
+  const showOperacional = canAccessOperacionalMenus(user?.role);
   const { pathname, search } = useRouterState({
     select: (s) => ({
       pathname: s.location.pathname,
@@ -150,11 +155,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         {user && (
           <div className="mt-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              {isAdmin
-                ? user.role === "gerente"
-                  ? "Gerente"
-                  : "Administrador"
-                : "Técnico"}
+              {isAdmin ? roleLabel(user.role) : "Técnico"}
             </div>
             <div className="truncate font-semibold">{user.nome}</div>
             <div className="truncate text-xs text-muted-foreground">
@@ -348,6 +349,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               )}
             </div>
 
+            {showOperacional ? (
             <div>
               <button
                 type="button"
@@ -438,7 +440,9 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 </div>
               </div>
             </div>
+            ) : null}
 
+            {showOperacional ? (
             <div>
               <button
                 type="button"
@@ -514,6 +518,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 </div>
               </div>
             </div>
+            ) : null}
           </>
         ) : (
           <>
