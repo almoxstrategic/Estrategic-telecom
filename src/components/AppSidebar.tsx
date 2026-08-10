@@ -259,7 +259,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                               : ""
                           }`}
                         >
-                          Desempenho técnico
+                          Desempenho Técnicos por Nota
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"

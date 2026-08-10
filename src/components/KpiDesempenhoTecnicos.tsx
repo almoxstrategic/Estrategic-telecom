@@ -180,8 +180,7 @@ type ChartBarPayload = {
   notasImprodutivas: number;
   receitaGanha: number;
   receitaPerda: number;
-  lucro: number;
-  mediaMaterialPorNota: number;
+  aproveitamento: number;
   pareto: number;
 };
 
@@ -285,13 +284,6 @@ function ColgroupOsToa() {
       <col style={{ width: "7%" }} />
     </colgroup>
   );
-}
-
-function formatMediaMaterial(valor: number): string {
-  return valor.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }
 
 function formatDataBr(isoDate: string): string {
@@ -855,28 +847,6 @@ function KpiDesempenhoProjecaoToa({
     [toaOsPeriodo],
   );
 
-  const tituloVisaoGeral = useMemo(() => {
-    const { ano, mes, dia, semana } = filtroPeriodo;
-    if (
-      ano !== null &&
-      mes !== null &&
-      dia === null &&
-      semana &&
-      semana !== "Todos"
-    ) {
-      const mesLabel =
-        MESES_LABEL.find((m) => m.value === mes)?.label ?? String(mes);
-      const intervalo = formatarIntervaloSemanaLabel(semana, ano, mes);
-      if (intervalo) {
-        return `Visão Geral de Desempenho — ${mesLabel} ${ano} - ${semana} (${intervalo}).`;
-      }
-    }
-    if (rangePeriodoToa) {
-      return `Visão Geral de Desempenho — ${rangePeriodoToa}`;
-    }
-    return "Visão Geral de Desempenho";
-  }, [filtroPeriodo, rangePeriodoToa]);
-
   const kpisToaFlat = useMemo(
     () => agregarKpisToaFlat(toaOsPeriodo),
     [toaOsPeriodo],
@@ -1062,6 +1032,28 @@ function KpiDesempenhoProjecaoToa({
         : agregado.totalNotasFeitas,
     };
   }, [chamadosToaPeriodo, precosOs, fatorProjecao, kpisToaFlat, toaOsPeriodo.length]);
+
+  const tituloVisaoGeral = useMemo(() => {
+    const { ano, mes, dia, semana } = filtroPeriodo;
+    if (
+      ano !== null &&
+      mes !== null &&
+      dia === null &&
+      semana &&
+      semana !== "Todos"
+    ) {
+      const mesLabel =
+        MESES_LABEL.find((m) => m.value === mes)?.label ?? String(mes);
+      const intervalo = formatarIntervaloSemanaLabel(semana, ano, mes);
+      if (intervalo) {
+        return `Visão Geral de Desempenho — ${mesLabel} ${ano} - ${semana} (${intervalo})`;
+      }
+    }
+    if (rangePeriodoToa) {
+      return `Visão Geral de Desempenho — ${rangePeriodoToa}`;
+    }
+    return "Visão Geral de Desempenho";
+  }, [filtroPeriodo, rangePeriodoToa]);
 
   const tiposOsImportados = useMemo(() => {
     const map = new Map<
@@ -1280,11 +1272,16 @@ function KpiDesempenhoProjecaoToa({
     const comProjecao = enriquecidos.map((tecnico) => {
       const receitaGanha = tecnico.receita * fatorProjecao;
       const receitaPerda = tecnico.receitaPerda * fatorProjecao;
+      const totalNotas = tecnico.notasProdutivas + tecnico.notasImprodutivas;
+      const aproveitamento =
+        totalNotas > 0
+          ? (tecnico.notasProdutivas / totalNotas) * 100
+          : 0;
       return {
         ...tecnico,
         receitaGanha,
         receitaPerda,
-        lucro: receitaGanha,
+        aproveitamento,
       };
     });
 
@@ -1314,8 +1311,7 @@ function KpiDesempenhoProjecaoToa({
         notasImprodutivas: t.notasImprodutivas,
         receitaGanha: t.receitaGanha,
         receitaPerda: t.receitaPerda,
-        lucro: t.lucro,
-        mediaMaterialPorNota: t.mediaMaterialPorNota,
+        aproveitamento: t.aproveitamento,
         pareto,
       } satisfies ChartBarPayload;
     });
@@ -2044,9 +2040,9 @@ function KpiDesempenhoProjecaoToa({
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex justify-between items-center gap-3">
-          <h2 className="flex items-center gap-2 font-bold text-foreground">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            {tituloVisaoGeral}
+          <h2 className="flex min-w-0 flex-wrap items-center gap-2 font-bold text-foreground">
+            <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
+            <span className="leading-snug">{tituloVisaoGeral}</span>
           </h2>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             Visualizar:
@@ -2105,31 +2101,32 @@ function KpiDesempenhoProjecaoToa({
                   content={({ active, payload }) => {
                     if (!active || !payload?.[0]) return null;
                     const item = payload[0].payload as ChartBarPayload;
+                    const totalNotas =
+                      item.notasProdutivas + item.notasImprodutivas;
+                    const aproveitamento =
+                      totalNotas > 0
+                        ? (item.notasProdutivas / totalNotas) * 100
+                        : 0;
                     return (
                       <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
-                        <p className="font-semibold">{item.nomeCompleto}</p>
+                        <p className="font-bold">{item.nomeCompleto}</p>
                         <p className="text-green-600">
-                          Notas Produtivas: {formatQuantidade(item.notasProdutivas)} -{" "}
+                          Notas Produtivas:{" "}
+                          {formatQuantidade(item.notasProdutivas)} -{" "}
                           {formatReceita(item.receitaGanha)}
                         </p>
                         <p className="text-red-600">
-                          Notas Improdutivas: {formatQuantidade(item.notasImprodutivas)} -{" "}
+                          Notas Improdutivas:{" "}
+                          {formatQuantidade(item.notasImprodutivas)} -{" "}
                           {formatReceita(item.receitaPerda)}
                         </p>
-                        <p
-                          className={
-                            item.lucro > 0
-                              ? "text-green-600"
-                              : item.lucro < 0
-                                ? "text-red-600"
-                                : "text-gray-500"
-                          }
-                        >
-                          Lucro: {formatReceita(item.lucro)}
-                        </p>
                         <p className="text-gray-700">
-                          Média Misc/Nota:{" "}
-                          {formatMediaMaterial(item.mediaMaterialPorNota)}
+                          Aproveitamento:{" "}
+                          {aproveitamento.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}
+                          %
                         </p>
                         <p className="text-amber-500">
                           Pareto:{" "}
@@ -2138,9 +2135,6 @@ function KpiDesempenhoProjecaoToa({
                             maximumFractionDigits: 1,
                           })}
                           %
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Clique na barra para ver o detalhamento
                         </p>
                       </div>
                     );

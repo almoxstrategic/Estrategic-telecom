@@ -154,7 +154,7 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
       {
         title:
           params.modulo === "desempenho-tecnico"
-            ? "Desempenho Técnicos — Estrategic Field"
+            ? "Desempenho Técnicos por Nota — Estrategic Field"
             : params.modulo === "volume-notas"
               ? "Volume de Notas por período — Estrategic Field"
               : params.modulo === "detalhamento-notas"
@@ -968,7 +968,7 @@ function KpisPage() {
                   isDesempenho ? "text-green-700" : "text-gray-500"
                 }`}
               />
-              Desempenho Técnicos
+              Desempenho Técnicos por Nota
             </Link>
             <Link
               to="/admin/kpis/$modulo"
@@ -1286,7 +1286,7 @@ function KpisPage() {
                   : isVolumeNotas
                     ? "Volume de Notas por período"
                     : isDesempenho
-                      ? "Desempenho Técnicos"
+                      ? "Desempenho Técnicos por Nota"
                       : "Baixa de Consumo - Miscelânea"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
