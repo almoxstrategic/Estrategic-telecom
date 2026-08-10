@@ -1690,8 +1690,8 @@ function KpiDesempenhoProjecaoToa({
   }, [abaNotasToa, osTabelaFiltradas]);
 
   /**
-   * Simular Fatura: 1 O.S. pagadora por Contrato (1ª produtiva cronológica).
-   * Contrato vazio → agrupa por numero_wo.
+   * Simular Fatura: 1 O.S. pagadora por Contrato (a produtiva de maior valor).
+   * Contrato vazio → agrupa por numero_wo. Aumento (%) via fatorProjecao.
    */
   const dadosFaturaSimulada = useMemo<FaturaSimuladaLinha[]>(() => {
     type Candidata = {
@@ -1767,16 +1767,21 @@ function KpiDesempenhoProjecaoToa({
 
     const selecionadas: FaturaSimuladaLinha[] = [];
     for (const candidatas of porContrato.values()) {
-      candidatas.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-      const primeira = candidatas[0];
-      if (!primeira) continue;
+      // Pagadora = O.S. produtiva de maior valor no contrato.
+      candidatas.sort(
+        (a, b) =>
+          b.valorServico - a.valorServico ||
+          a.sortKey.localeCompare(b.sortKey),
+      );
+      const maisCara = candidatas[0];
+      if (!maisCara) continue;
       selecionadas.push({
-        contrato: primeira.contrato,
-        numeroOs: primeira.numeroOs,
-        tipoOs: primeira.tipoOs,
-        codBaixa: primeira.codBaixa,
-        dataBaixa: primeira.dataBaixa,
-        valorServico: primeira.valorServico,
+        contrato: maisCara.contrato,
+        numeroOs: maisCara.numeroOs,
+        tipoOs: maisCara.tipoOs,
+        codBaixa: maisCara.codBaixa,
+        dataBaixa: maisCara.dataBaixa,
+        valorServico: maisCara.valorServico,
       });
     }
 
@@ -2375,7 +2380,7 @@ function KpiDesempenhoProjecaoToa({
                 className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
                 title={
                   activeTab === "simular-fatura"
-                    ? "Soma da 1ª O.S. produtiva por contrato (fatura simulada)"
+                    ? "Soma da O.S. produtiva de maior valor por contrato (fatura simulada)"
                     : abaNotasToa === "produtivas"
                       ? "Receita faturável (mesma regra do card Receita TOA), filtrada pela tabela"
                       : "Valor estimado deixado na mesa nas O.S. visíveis (aba Perdas)"
