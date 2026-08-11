@@ -83,6 +83,7 @@ export type TecnicoRankingItem = {
 
 export type BairroVolumeAgg = {
   bairro: string;
+  cidade: string;
   produtivas: number;
   improdutivas: number;
   /** Alias legado — mesmo valor de totalNotasBairro. */
@@ -106,6 +107,7 @@ type ParetoView = "Produtivas" | "Improdutivas";
 
 type ParetoPoint = {
   bairro: string;
+  cidade: string;
   volume: number;
   totalNotasBairro: number;
   acumulado: number;
@@ -521,10 +523,14 @@ function ParetoTooltip({
   const point = volumeEntry?.payload ?? payload[0]?.payload;
   const totalLocal = point?.totalNotasBairro ?? 0;
   const taxaLocal = formatPct(volume, totalLocal);
+  const bairro = point?.bairro ?? String(label ?? "");
+  const cidade = point?.cidade?.trim() || "";
+  const titulo =
+    bairro && cidade ? `${bairro} - ${cidade}` : bairro || cidade || "—";
 
   return (
     <div className="rounded-md border border-gray-200 bg-white p-3 shadow-md">
-      <p className="text-sm font-bold text-gray-900">{String(label ?? "")}</p>
+      <p className="text-sm font-bold text-gray-900">{titulo}</p>
       <p className="mt-1 text-sm text-muted-foreground">
         {paretoView}:{" "}
         <span
@@ -557,6 +563,7 @@ export function agregarVolumeNotasPorBairro(
     string,
     {
       bairro: string;
+      cidade: string;
       statusNota: "Produtiva" | "Improdutiva";
       nomeTecnico: string;
     }
@@ -567,13 +574,14 @@ export function agregarVolumeNotasPorBairro(
     if (!numeroWo) continue;
 
     const bairro = normalizarBairro(row.bairro);
+    const cidade = normalizarCidade(row.cidade);
     const statusNota: "Produtiva" | "Improdutiva" =
       row.status_nota === "Produtiva" ? "Produtiva" : "Improdutiva";
     const nomeTecnico = nomeTecnicoDaLinha(row);
 
     const prev = byWo.get(numeroWo);
     if (!prev) {
-      byWo.set(numeroWo, { bairro, statusNota, nomeTecnico });
+      byWo.set(numeroWo, { bairro, cidade, statusNota, nomeTecnico });
       continue;
     }
 
@@ -584,6 +592,7 @@ export function agregarVolumeNotasPorBairro(
     ) {
       prev.bairro = bairro;
     }
+    if (!prev.cidade && cidade) prev.cidade = cidade;
     if (
       (prev.nomeTecnico === "Sem nome" || !prev.nomeTecnico) &&
       nomeTecnico !== "Sem nome"
@@ -599,15 +608,17 @@ export function agregarVolumeNotasPorBairro(
       improdutivas: number;
       tecnicosProdutivos: Record<string, number>;
       tecnicosImprodutivos: Record<string, number>;
+      cidades: Record<string, number>;
     }
   >();
 
-  for (const { bairro, statusNota, nomeTecnico } of byWo.values()) {
+  for (const { bairro, cidade, statusNota, nomeTecnico } of byWo.values()) {
     const bucket = byBairro.get(bairro) ?? {
       produtivas: 0,
       improdutivas: 0,
       tecnicosProdutivos: {},
       tecnicosImprodutivos: {},
+      cidades: {},
     };
     if (statusNota === "Produtiva") {
       bucket.produtivas += 1;
@@ -618,14 +629,23 @@ export function agregarVolumeNotasPorBairro(
       bucket.tecnicosImprodutivos[nomeTecnico] =
         (bucket.tecnicosImprodutivos[nomeTecnico] ?? 0) + 1;
     }
+    if (cidade) {
+      bucket.cidades[cidade] = (bucket.cidades[cidade] ?? 0) + 1;
+    }
     byBairro.set(bairro, bucket);
   }
 
   return Array.from(byBairro.entries())
     .map(([bairro, counts]) => {
       const totalNotasBairro = counts.produtivas + counts.improdutivas;
+      const cidadePredominante =
+        Object.entries(counts.cidades).sort(
+          (a, b) =>
+            b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"),
+        )[0]?.[0] ?? "";
       return {
         bairro,
+        cidade: cidadePredominante,
         produtivas: counts.produtivas,
         improdutivas: counts.improdutivas,
         total: totalNotasBairro,
@@ -999,6 +1019,7 @@ export function KpiDetalhamentoNotas() {
     const ordenado = [...rankingBairros]
       .map((b) => ({
         bairro: b.bairro,
+        cidade: b.cidade,
         volume:
           paretoView === "Produtivas" ? b.produtivas : b.improdutivas,
         totalNotasBairro: b.totalNotasBairro,
@@ -1014,6 +1035,7 @@ export function KpiDetalhamentoNotas() {
       acumulado += item.volume;
       return {
         bairro: item.bairro,
+        cidade: item.cidade,
         volume: item.volume,
         totalNotasBairro: item.totalNotasBairro,
         acumulado,
