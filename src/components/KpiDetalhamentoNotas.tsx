@@ -61,7 +61,10 @@ export type BairroVolumeAgg = {
   bairro: string;
   produtivas: number;
   improdutivas: number;
+  /** Alias legado — mesmo valor de totalNotasBairro. */
   total: number;
+  /** Soma local: produtivas + improdutivas do bairro. */
+  totalNotasBairro: number;
   top5TecnicosProdutivos: TecnicoRankingItem[];
   top5TecnicosImprodutivos: TecnicoRankingItem[];
 };
@@ -69,6 +72,7 @@ export type BairroVolumeAgg = {
 type ChartBairroPoint = {
   bairro: string;
   volume: number;
+  totalNotasBairro: number;
   tipo: "produtivas" | "quebras";
   top5TecnicosProdutivos: TecnicoRankingItem[];
   top5TecnicosImprodutivos: TecnicoRankingItem[];
@@ -79,6 +83,7 @@ type ParetoView = "Produtivas" | "Improdutivas";
 type ParetoPoint = {
   bairro: string;
   volume: number;
+  totalNotasBairro: number;
   acumulado: number;
   pctAcumulada: number;
 };
@@ -91,8 +96,6 @@ type BairroChartTooltipProps = {
     dataKey?: string | number;
     payload?: ChartBairroPoint;
   }>;
-  totalProdutivasGeral?: number;
-  totalImprodutivasGeral?: number;
 };
 
 function mesLabel(mes: number): string {
@@ -147,8 +150,6 @@ function BairroChartTooltip({
   active,
   payload,
   label,
-  totalProdutivasGeral = 0,
-  totalImprodutivasGeral = 0,
 }: BairroChartTooltipProps) {
   if (!active || !payload?.length) return null;
   const entry = payload[0]!;
@@ -158,10 +159,8 @@ function BairroChartTooltip({
   const valor = Number(entry.value) || 0;
   const isProdutivas = data.tipo === "produtivas";
   const totalLabel = isProdutivas ? "Produtivas" : "Quebras";
-  const totalGeral = isProdutivas
-    ? totalProdutivasGeral
-    : totalImprodutivasGeral;
-  const pct = formatPct(valor, totalGeral);
+  const totalLocal = data.totalNotasBairro;
+  const pct = formatPct(valor, totalLocal);
   const top5 = isProdutivas
     ? data.top5TecnicosProdutivos
     : data.top5TecnicosImprodutivos;
@@ -211,6 +210,7 @@ type ParetoTooltipProps = {
     value?: number | string;
     dataKey?: string | number;
     name?: string;
+    payload?: ParetoPoint;
   }>;
   paretoView: ParetoView;
 };
@@ -226,6 +226,9 @@ function ParetoTooltip({
   const pctEntry = payload.find((p) => p.dataKey === "pctAcumulada");
   const volume = Number(volumeEntry?.value) || 0;
   const pctAcum = Number(pctEntry?.value) || 0;
+  const point = volumeEntry?.payload ?? payload[0]?.payload;
+  const totalLocal = point?.totalNotasBairro ?? 0;
+  const taxaLocal = formatPct(volume, totalLocal);
 
   return (
     <div className="rounded-md border border-gray-200 bg-white p-3 shadow-md">
@@ -237,7 +240,7 @@ function ParetoTooltip({
             paretoView === "Produtivas" ? "text-green-700" : "text-red-600"
           }`}
         >
-          {formatQuantidade(volume)}
+          {formatQuantidade(volume)} ({taxaLocal})
         </span>
       </p>
       <p className="mt-0.5 text-sm text-amber-700">
@@ -327,16 +330,22 @@ export function agregarVolumeNotasPorBairro(
   }
 
   return Array.from(byBairro.entries())
-    .map(([bairro, counts]) => ({
-      bairro,
-      produtivas: counts.produtivas,
-      improdutivas: counts.improdutivas,
-      total: counts.produtivas + counts.improdutivas,
-      top5TecnicosProdutivos: top5FromRecord(counts.tecnicosProdutivos),
-      top5TecnicosImprodutivos: top5FromRecord(counts.tecnicosImprodutivos),
-    }))
+    .map(([bairro, counts]) => {
+      const totalNotasBairro = counts.produtivas + counts.improdutivas;
+      return {
+        bairro,
+        produtivas: counts.produtivas,
+        improdutivas: counts.improdutivas,
+        total: totalNotasBairro,
+        totalNotasBairro,
+        top5TecnicosProdutivos: top5FromRecord(counts.tecnicosProdutivos),
+        top5TecnicosImprodutivos: top5FromRecord(counts.tecnicosImprodutivos),
+      };
+    })
     .sort(
-      (a, b) => b.total - a.total || a.bairro.localeCompare(b.bairro, "pt-BR"),
+      (a, b) =>
+        b.totalNotasBairro - a.totalNotasBairro ||
+        a.bairro.localeCompare(b.bairro, "pt-BR"),
     );
 }
 
@@ -472,6 +481,7 @@ export function KpiDetalhamentoNotas() {
         .map((b) => ({
           bairro: b.bairro,
           volume: b.produtivas,
+          totalNotasBairro: b.totalNotasBairro,
           tipo: "produtivas" as const,
           top5TecnicosProdutivos: b.top5TecnicosProdutivos,
           top5TecnicosImprodutivos: b.top5TecnicosImprodutivos,
@@ -488,6 +498,7 @@ export function KpiDetalhamentoNotas() {
         .map((b) => ({
           bairro: b.bairro,
           volume: b.improdutivas,
+          totalNotasBairro: b.totalNotasBairro,
           tipo: "quebras" as const,
           top5TecnicosProdutivos: b.top5TecnicosProdutivos,
           top5TecnicosImprodutivos: b.top5TecnicosImprodutivos,
@@ -505,6 +516,7 @@ export function KpiDetalhamentoNotas() {
         bairro: b.bairro,
         volume:
           paretoView === "Produtivas" ? b.produtivas : b.improdutivas,
+        totalNotasBairro: b.totalNotasBairro,
       }))
       .filter((b) => b.volume > 0)
       .sort(
@@ -518,6 +530,7 @@ export function KpiDetalhamentoNotas() {
       return {
         bairro: item.bairro,
         volume: item.volume,
+        totalNotasBairro: item.totalNotasBairro,
         acumulado,
         pctAcumulada:
           totalBase > 0
@@ -682,12 +695,12 @@ export function KpiDetalhamentoNotas() {
                 {topProdutivo && topProdutivo.produtivas > 0
                   ? formatCardShare(
                       topProdutivo.produtivas,
-                      totalProdutivasGeral,
+                      topProdutivo.totalNotasBairro,
                     )
-                  : formatCardShare(0, totalProdutivasGeral)}
+                  : formatCardShare(0, 0)}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                notas produtivas · peso no total do período
+                notas produtivas · taxa de sucesso local
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -706,12 +719,12 @@ export function KpiDetalhamentoNotas() {
                 {topImprodutivo && topImprodutivo.improdutivas > 0
                   ? formatCardShare(
                       topImprodutivo.improdutivas,
-                      totalImprodutivasGeral,
+                      topImprodutivo.totalNotasBairro,
                     )
-                  : formatCardShare(0, totalImprodutivasGeral)}
+                  : formatCardShare(0, 0)}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                notas improdutivas · peso no total do período
+                notas improdutivas · taxa de quebra local
               </p>
             </div>
           </div>
@@ -748,12 +761,7 @@ export function KpiDetalhamentoNotas() {
                         reversed={false}
                       />
                       <Tooltip
-                        content={
-                          <BairroChartTooltip
-                            totalProdutivasGeral={totalProdutivasGeral}
-                            totalImprodutivasGeral={totalImprodutivasGeral}
-                          />
-                        }
+                        content={<BairroChartTooltip />}
                         cursor={{ fill: "#f3f4f6" }}
                       />
                       <Bar
@@ -799,12 +807,7 @@ export function KpiDetalhamentoNotas() {
                         reversed={false}
                       />
                       <Tooltip
-                        content={
-                          <BairroChartTooltip
-                            totalProdutivasGeral={totalProdutivasGeral}
-                            totalImprodutivasGeral={totalImprodutivasGeral}
-                          />
-                        }
+                        content={<BairroChartTooltip />}
                         cursor={{ fill: "#f3f4f6" }}
                       />
                       <Bar
@@ -975,16 +978,16 @@ export function KpiDetalhamentoNotas() {
                           {formatQuantidade(row.produtivas)}
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums text-green-700">
-                          {formatPct(row.produtivas, totalProdutivasGeral)}
+                          {formatPct(row.produtivas, row.totalNotasBairro)}
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums text-red-600">
                           {formatQuantidade(row.improdutivas)}
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums text-red-600">
-                          {formatPct(row.improdutivas, totalImprodutivasGeral)}
+                          {formatPct(row.improdutivas, row.totalNotasBairro)}
                         </td>
                         <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">
-                          {formatQuantidade(row.total)}
+                          {formatQuantidade(row.totalNotasBairro)}
                         </td>
                       </tr>
                     ))}
