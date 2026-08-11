@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -673,6 +673,9 @@ export function KpiDetalhamentoNotas() {
   const [buscaBairro, setBuscaBairro] = useState("");
   const [cidadeSelecionada, setCidadeSelecionada] = useState(CIDADE_TODAS);
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState(TECNICO_TODOS);
+  const [dropdownTecnicoAberto, setDropdownTecnicoAberto] = useState(false);
+  const [buscaTecnicoFiltro, setBuscaTecnicoFiltro] = useState("");
+  const dropdownTecnicoRef = useRef<HTMLDivElement | null>(null);
   const [bairroDetalhe, setBairroDetalhe] = useState<string | null>(null);
   const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
   const [anoModal, setAnoModal] = useState<number | null>(null);
@@ -796,6 +799,25 @@ export function KpiDetalhamentoNotas() {
     }
     return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows, cidadeSelecionada]);
+
+  const tecnicosFiltrados = useMemo(() => {
+    const termo = buscaTecnicoFiltro.trim().toLowerCase();
+    if (!termo) return listaTecnicos;
+    return listaTecnicos.filter((t) => t.toLowerCase().includes(termo));
+  }, [listaTecnicos, buscaTecnicoFiltro]);
+
+  useEffect(() => {
+    if (!dropdownTecnicoAberto) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const el = dropdownTecnicoRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setDropdownTecnicoAberto(false);
+        setBuscaTecnicoFiltro("");
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [dropdownTecnicoAberto]);
 
   useEffect(() => {
     if (tecnicoSelecionado === TECNICO_TODOS) return;
@@ -1087,6 +1109,8 @@ export function KpiDetalhamentoNotas() {
     setMes(null);
     setCidadeSelecionada(CIDADE_TODAS);
     setTecnicoSelecionado(TECNICO_TODOS);
+    setBuscaTecnicoFiltro("");
+    setDropdownTecnicoAberto(false);
   };
 
   const dadosModalBairro = useMemo(() => {
@@ -1387,29 +1411,105 @@ export function KpiDetalhamentoNotas() {
             </Select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="relative flex items-center gap-2" ref={dropdownTecnicoRef}>
             <Label
               htmlFor="detalhe-notas-tecnico"
               className="shrink-0 text-sm font-medium"
             >
               Técnico:
             </Label>
-            <Select
-              value={tecnicoSelecionado}
-              onValueChange={setTecnicoSelecionado}
-            >
-              <SelectTrigger id="detalhe-notas-tecnico" className="w-[220px]">
-                <SelectValue placeholder={TECNICO_TODOS} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TECNICO_TODOS}>{TECNICO_TODOS}</SelectItem>
-                {listaTecnicos.map((nome) => (
-                  <SelectItem key={nome} value={nome}>
-                    {nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="relative w-[220px]">
+              <button
+                id="detalhe-notas-tecnico"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={dropdownTecnicoAberto}
+                onClick={() =>
+                  setDropdownTecnicoAberto((aberto) => !aberto)
+                }
+                className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none hover:bg-accent/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <span className="truncate text-left">
+                  {tecnicoSelecionado}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                    dropdownTecnicoAberto ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {dropdownTecnicoAberto ? (
+                <div className="absolute left-0 top-full z-20 mt-1 w-full min-w-[16rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                  <div className="sticky top-0 z-10 border-b border-gray-100 bg-white p-2">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={buscaTecnicoFiltro}
+                        onChange={(e) => setBuscaTecnicoFiltro(e.target.value)}
+                        placeholder="Buscar técnico..."
+                        aria-label="Buscar técnico no filtro"
+                        autoFocus
+                        className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+                      />
+                    </div>
+                  </div>
+                  <ul
+                    role="listbox"
+                    className="max-h-64 overflow-y-auto py-1"
+                  >
+                    <li>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={tecnicoSelecionado === TECNICO_TODOS}
+                        onClick={() => {
+                          setTecnicoSelecionado(TECNICO_TODOS);
+                          setBuscaTecnicoFiltro("");
+                          setDropdownTecnicoAberto(false);
+                        }}
+                        className={`flex w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
+                          tecnicoSelecionado === TECNICO_TODOS
+                            ? "bg-gray-100 font-semibold text-foreground"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {TECNICO_TODOS}
+                      </button>
+                    </li>
+                    {tecnicosFiltrados.length === 0 ? (
+                      <li className="px-3 py-2 text-sm text-muted-foreground">
+                        Nenhum técnico encontrado.
+                      </li>
+                    ) : (
+                      tecnicosFiltrados.map((nome) => (
+                        <li key={nome}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={tecnicoSelecionado === nome}
+                            title={nome}
+                            onClick={() => {
+                              setTecnicoSelecionado(nome);
+                              setBuscaTecnicoFiltro("");
+                              setDropdownTecnicoAberto(false);
+                            }}
+                            className={`flex w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
+                              tecnicoSelecionado === nome
+                                ? "bg-gray-100 font-semibold text-foreground"
+                                : "text-foreground"
+                            }`}
+                          >
+                            <span className="truncate">{nome}</span>
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <Button

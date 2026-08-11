@@ -303,19 +303,6 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
-                          params={{ modulo: "nota-por-tecnico" }}
-                          onClick={onNavigate}
-                          className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
-                            pathname.includes("/nota-por-tecnico")
-                              ? "bg-green-50 font-medium text-green-700"
-                              : ""
-                          }`}
-                        >
-                          <UserSearch className="h-3.5 w-3.5 shrink-0" />
-                          Nota por técnico
-                        </Link>
-                        <Link
-                          to="/admin/kpis/$modulo"
                           params={{ modulo: "motivos-quebra" }}
                           onClick={onNavigate}
                           className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${

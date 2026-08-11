@@ -1,13 +1,12 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { AlertTriangle, BarChart3, Brain, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, Target, UserCheck, UserSearch, Users, X, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, Brain, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, Target, UserCheck, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { AnaliseComportamento } from "@/components/AnaliseComportamento";
 import { EstimativaVolume } from "@/components/EstimativaVolume";
 import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
 import { KpiDetalhamentoNotas } from "@/components/KpiDetalhamentoNotas";
-import { KpiNotaPorTecnico } from "@/components/KpiNotaPorTecnico";
 import { KpiVolumeNotas } from "@/components/KpiVolumeNotas";
 import { MotivosQuebra } from "@/components/MotivosQuebra";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
@@ -121,7 +120,6 @@ const KPI_MODULOS = [
   "desempenho-tecnico",
   "volume-notas",
   "detalhamento-notas",
-  "nota-por-tecnico",
   "motivos-quebra",
   "analise-comportamento",
   "estimativa-volume",
@@ -131,6 +129,7 @@ type KpiModulo = (typeof KPI_MODULOS)[number];
 /** Slugs antigos redirecionados para o módulo atual. */
 const KPI_MODULO_ALIASES: Record<string, KpiModulo> = {
   "resumo-geral": KPI_MODULO_DEFAULT,
+  "nota-por-tecnico": "detalhamento-notas",
 };
 
 function isKpiModulo(value: string): value is KpiModulo {
@@ -163,9 +162,7 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
               ? "Volume de Notas por período — Estrategic Field"
               : params.modulo === "detalhamento-notas"
                 ? "Detalhamento de notas — Estrategic Field"
-                : params.modulo === "nota-por-tecnico"
-                  ? "Nota por técnico — Estrategic Field"
-                  : params.modulo === "motivos-quebra"
+                : params.modulo === "motivos-quebra"
                     ? "Motivos de Quebra — Estrategic Field"
                     : params.modulo === "analise-comportamento"
                       ? "Análise de Comportamento — Estrategic Field"
@@ -444,7 +441,6 @@ function KpisPage() {
   const isDesempenho = kpiModulo === "desempenho-tecnico";
   const isVolumeNotas = kpiModulo === "volume-notas";
   const isDetalhamentoNotas = kpiModulo === "detalhamento-notas";
-  const isNotaPorTecnico = kpiModulo === "nota-por-tecnico";
   const isMotivosQuebra = kpiModulo === "motivos-quebra";
   const isAnaliseComportamento = kpiModulo === "analise-comportamento";
   const isEstimativaVolume = kpiModulo === "estimativa-volume";
@@ -452,7 +448,6 @@ function KpisPage() {
   const usaFiltroProprio =
     isVolumeNotas ||
     isDetalhamentoNotas ||
-    isNotaPorTecnico ||
     isMotivosQuebra ||
     isAnaliseComportamento ||
     isEstimativaVolume;
@@ -1023,23 +1018,6 @@ function KpisPage() {
             </Link>
             <Link
               to="/admin/kpis/$modulo"
-              params={{ modulo: "nota-por-tecnico" }}
-              className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
-                isNotaPorTecnico
-                  ? "bg-green-50 text-green-700"
-                  : "cursor-pointer text-gray-600 hover:bg-gray-100"
-              }`}
-              onClick={() => setIsKpiNavOpen(false)}
-            >
-              <UserSearch
-                className={`h-5 w-5 shrink-0 ${
-                  isNotaPorTecnico ? "text-green-700" : "text-gray-500"
-                }`}
-              />
-              Nota por técnico
-            </Link>
-            <Link
-              to="/admin/kpis/$modulo"
               params={{ modulo: "motivos-quebra" }}
               className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
                 isMotivosQuebra
@@ -1111,8 +1089,6 @@ function KpisPage() {
               <Brain className="h-4 w-4 shrink-0 text-primary" />
             ) : isMotivosQuebra ? (
               <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
-            ) : isNotaPorTecnico ? (
-              <UserSearch className="h-4 w-4 shrink-0 text-primary" />
             ) : isDetalhamentoNotas ? (
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
             ) : (
@@ -1125,8 +1101,6 @@ function KpisPage() {
                 ? "Análise de Comportamento"
                 : isMotivosQuebra
                 ? "Motivos de Quebra"
-                : isNotaPorTecnico
-                ? "Nota por técnico"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
                   : "Volume de Notas por período"}
@@ -1342,8 +1316,6 @@ function KpisPage() {
                 ? "Análise de Comportamento"
                 : isMotivosQuebra
                 ? "Motivos de Quebra"
-                : isNotaPorTecnico
-                ? "Nota por técnico"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
                   : isVolumeNotas
@@ -1359,8 +1331,6 @@ function KpisPage() {
                 ? "Identifique padrões de fadiga, tendências de quebra por dia da semana e fuga de complexidade operacional."
                 : isMotivosQuebra
                 ? "Análise de volumetria dos códigos de baixa das notas improdutivas."
-                : isNotaPorTecnico
-                ? "Análise geográfica individual: descubra as regiões de maior produtividade e os gargalos de cada técnico."
                 : isDetalhamentoNotas
                 ? "Análise geográfica: volume de notas produtivas e improdutivas por bairro."
                 : isVolumeNotas
@@ -1397,8 +1367,6 @@ function KpisPage() {
           <AnaliseComportamento />
         ) : isMotivosQuebra ? (
           <MotivosQuebra />
-        ) : isNotaPorTecnico ? (
-          <KpiNotaPorTecnico />
         ) : isDetalhamentoNotas ? (
           <KpiDetalhamentoNotas />
         ) : isVolumeNotas ? (
