@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -756,6 +756,10 @@ function KpiDesempenhoProjecaoToa({
     "painel" | "detalhamento"
   >("painel");
   const [rankPainel, setRankPainel] = useState<"nota" | "financeiro">("nota");
+  /** Quantidade de linhas O.S. renderizadas (infinite scroll client-side). */
+  const [visibleCount, setVisibleCount] = useState(50);
+  const tabelaOsScrollRef = useRef<HTMLDivElement>(null);
+  const osTabelaTotalRef = useRef(0);
   const [buscaDetalheNotas, setBuscaDetalheNotas] = useState("");
   /** Período local do modal (independente do filtro global da página). */
   const [anoModal, setAnoModal] = useState<number | null>(filtroPeriodo.ano);
@@ -1793,6 +1797,65 @@ function KpiDesempenhoProjecaoToa({
     });
   }, [osTabelaFiltradas, sortConfig]);
 
+  const osTabelaExibidas = useMemo(
+    () => osTabelaOrdenadas.slice(0, visibleCount),
+    [osTabelaOrdenadas, visibleCount],
+  );
+
+  osTabelaTotalRef.current = osTabelaOrdenadas.length;
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [buscaTecnico, abaNotasToa]);
+
+  /**
+   * Infinite scroll via scroll do container (mais confiável que IntersectionObserver
+   * quando a tabela monta depois, ao trocar da aba Painel → Detalhamento).
+   * Também auto-carrega enquanto o conteúdo não gera overflow.
+   */
+  useEffect(() => {
+    if (abaPrincipalAtiva !== "detalhamento" || activeTab !== "toa") return;
+    if (osTabelaOrdenadas.length === 0) return;
+    if (visibleCount >= osTabelaOrdenadas.length) return;
+
+    const root = tabelaOsScrollRef.current;
+    if (!root) return;
+
+    const carregarMais = () => {
+      setVisibleCount((prev) => {
+        const total = osTabelaTotalRef.current;
+        if (prev >= total) return prev;
+        return Math.min(prev + 50, total);
+      });
+    };
+
+    const onScroll = () => {
+      const restante =
+        root.scrollHeight - root.scrollTop - root.clientHeight;
+      if (restante < 160) carregarMais();
+    };
+
+    root.addEventListener("scroll", onScroll, { passive: true });
+
+    const rafId = requestAnimationFrame(() => {
+      if (root.scrollHeight <= root.clientHeight + 8) {
+        carregarMais();
+      }
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      root.removeEventListener("scroll", onScroll);
+    };
+  }, [
+    abaPrincipalAtiva,
+    activeTab,
+    visibleCount,
+    osTabelaOrdenadas.length,
+    buscaTecnico,
+    abaNotasToa,
+  ]);
+
   const osDetalheCard = useMemo<ToaOsDetalheLinha[]>(() => {
     if (!detalheNotasTipo) return [];
     return filtrarOsPorTipoNota(osDetalheToa, detalheNotasTipo).sort(
@@ -2675,7 +2738,10 @@ function KpiDesempenhoProjecaoToa({
                 Nenhuma O.S. encontrada para “{buscaTecnico.trim()}”.
               </p>
             ) : (
-              <div className="relative max-h-[500px] overflow-y-auto rounded-lg border border-gray-100">
+              <div
+                ref={tabelaOsScrollRef}
+                className="relative max-h-[600px] overflow-y-auto rounded-lg border border-gray-100"
+              >
                 <table className="w-full table-fixed border-collapse text-[11px]">
                   <ColgroupOsToa />
                   <thead className="sticky top-0 z-10 bg-white shadow-sm">
@@ -2723,7 +2789,7 @@ function KpiDesempenhoProjecaoToa({
                     </tr>
                   </thead>
                   <tbody>
-                    {osTabelaOrdenadas.map((row, index) => {
+                    {osTabelaExibidas.map((row, index) => {
                       const isDemitido = isTecnicoDemitido(
                         demitidosKeys,
                         row.idToa,
@@ -2846,6 +2912,30 @@ function KpiDesempenhoProjecaoToa({
                         </tr>
                       );
                     })}
+                    {visibleCount < osTabelaOrdenadas.length ? (
+                      <tr>
+                        <td
+                          colSpan={100}
+                          className="py-4 text-center text-sm text-gray-500"
+                        >
+                          Role para carregar mais notas... (
+                          {formatQuantidade(visibleCount)} de{" "}
+                          {formatQuantidade(osTabelaOrdenadas.length)})
+                        </td>
+                      </tr>
+                    ) : null}
+                    {osTabelaOrdenadas.length > 0 &&
+                    visibleCount >= osTabelaOrdenadas.length ? (
+                      <tr>
+                        <td
+                          colSpan={100}
+                          className="bg-gray-50 py-4 text-center text-sm text-gray-400"
+                        >
+                          Todas as {formatQuantidade(osTabelaOrdenadas.length)}{" "}
+                          notas foram carregadas.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </div>
