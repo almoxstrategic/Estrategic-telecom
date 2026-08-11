@@ -2379,16 +2379,36 @@ function KpiDesempenhoProjecaoToa({
                 </button>
               </div>
 
-              <div
-                className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
-                title="Soma da receita faturável dos técnicos no período"
-              >
-                <span className="text-xs text-gray-500">
-                  Total (Receita Gerada)
-                </span>
-                <span className="text-sm font-bold tabular-nums text-green-600">
-                  {formatReceita(totalReceitaPainel)}
-                </span>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Aumento (%)
+                  </span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={percentualAumentoTexto}
+                    onChange={(e) =>
+                      atualizarPercentualAumento(e.target.value)
+                    }
+                    placeholder="0"
+                    aria-label="Aumento percentual"
+                    className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </label>
+
+                <div
+                  className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
+                  title="Soma da receita faturável dos técnicos no período"
+                >
+                  <span className="text-xs text-gray-500">
+                    Total (Receita Gerada)
+                  </span>
+                  <span className="text-sm font-bold tabular-nums text-green-600">
+                    {formatReceita(totalReceitaPainel)}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -2475,7 +2495,7 @@ function KpiDesempenhoProjecaoToa({
           </>
         ) : (
           <>
-        <div className="mb-4 flex flex-wrap items-start gap-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
               <Users className="h-4 w-4 text-primary" />
@@ -2495,7 +2515,25 @@ function KpiDesempenhoProjecaoToa({
           </div>
 
           {activeTab === "toa" ? (
-            <div className="ml-auto flex flex-col items-end gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  Aumento (%)
+                </span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={percentualAumentoTexto}
+                  onChange={(e) =>
+                    atualizarPercentualAumento(e.target.value)
+                  }
+                  placeholder="0"
+                  aria-label="Aumento percentual"
+                  className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </label>
+
               <div
                 className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
                 title={
@@ -2568,7 +2606,7 @@ function KpiDesempenhoProjecaoToa({
           <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
         ) : (
           <>
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
               <div
                 className="inline-flex shrink-0 rounded-lg border border-border bg-muted/40 p-1"
                 role="tablist"
@@ -2602,7 +2640,7 @@ function KpiDesempenhoProjecaoToa({
                 </button>
               </div>
 
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end lg:ml-auto lg:w-auto">
+              <div className="ml-auto flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
                 <input
                   type="search"
                   value={buscaTecnico}
@@ -2612,7 +2650,7 @@ function KpiDesempenhoProjecaoToa({
                   className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
                 />
 
-                <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
+                <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                   <button
                     type="button"
                     onClick={exportarNotasDetalhamentoExcel}
@@ -2636,24 +2674,6 @@ function KpiDesempenhoProjecaoToa({
                       Exportar Comparação
                     </button>
                   ) : null}
-
-                  <label className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      Aumento (%)
-                    </span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={percentualAumentoTexto}
-                      onChange={(e) =>
-                        atualizarPercentualAumento(e.target.value)
-                      }
-                      placeholder="0"
-                      aria-label="Aumento percentual"
-                      className="w-24 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </label>
                 </div>
               </div>
             </div>
