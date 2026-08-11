@@ -63,6 +63,18 @@ const CIDADE_TODAS = "Todas";
 type ModalSortKey = "produtivas" | "improdutivas" | "aproveitamento";
 type ModalSortConfig = { key: ModalSortKey; direction: "asc" | "desc" };
 
+export type Top3TipoItem = {
+  label: string;
+  pct: number;
+};
+
+export type TipoOsDetalheTecnico = {
+  tipoOs: string;
+  produtivas: number;
+  improdutivas: number;
+  aproveitamento: number;
+};
+
 export type TecnicoRankingItem = {
   nome: string;
   valor: number;
@@ -201,7 +213,7 @@ function topNLabelsFromRecord(
   rec: Record<string, number>,
   n: number,
   totalBase: number,
-): string[] {
+): Top3TipoItem[] {
   return Object.entries(rec)
     .map(([label, qtd]) => ({ label, qtd }))
     .sort(
@@ -209,11 +221,30 @@ function topNLabelsFromRecord(
         b.qtd - a.qtd || a.label.localeCompare(b.label, "pt-BR"),
     )
     .slice(0, n)
-    .map((item) => {
-      const pct =
-        totalBase > 0 ? (item.qtd / totalBase) * 100 : 0;
-      return `${item.label} (${pct.toFixed(1)}%)`;
-    });
+    .map((item) => ({
+      label: item.label,
+      pct: totalBase > 0 ? (item.qtd / totalBase) * 100 : 0,
+    }));
+}
+
+function Top3TipoLista({ items }: { items: Top3TipoItem[] }) {
+  if (items.length === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <ul className="space-y-0.5">
+      {items.map((item) => (
+        <li key={item.label} title={`${item.label} (${item.pct.toFixed(1)}%)`}>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="min-w-0 truncate">{item.label}</span>
+            <span className="shrink-0 whitespace-nowrap font-medium tabular-nums text-gray-500">
+              ({item.pct.toFixed(1)}%)
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 async function fetchDicionarioCodigosBaixa(): Promise<Record<string, string>> {
@@ -239,8 +270,8 @@ export type TecnicoDetalheBairro = {
   improdutivas: number;
   /** Percentual 0–100: produtivas / (produtivas + improdutivas). */
   aproveitamento: number;
-  top3TipoOsProd: string[];
-  top3TipoOsImprod: string[];
+  top3TipoOsProd: Top3TipoItem[];
+  top3TipoOsImprod: Top3TipoItem[];
 };
 
 /**
@@ -366,6 +397,43 @@ export function agregarDetalheTecnicosPorBairro(
         b.produtivas + b.improdutivas - (a.produtivas + a.improdutivas) ||
         b.produtivas - a.produtivas ||
         a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+}
+
+/**
+ * Agrupa linhas de um técnico por tipo_os (contagem de O.S. produtivas/improdutivas).
+ */
+export function agregarTiposOsPorTecnico(
+  rows: ToaImportacaoRow[],
+): TipoOsDetalheTecnico[] {
+  const byTipo = new Map<
+    string,
+    { produtivas: number; improdutivas: number }
+  >();
+
+  for (const row of rows) {
+    const tipoOs = labelTipoOs(row);
+    const bucket = byTipo.get(tipoOs) ?? { produtivas: 0, improdutivas: 0 };
+    if (row.status_nota === "Produtiva") bucket.produtivas += 1;
+    else bucket.improdutivas += 1;
+    byTipo.set(tipoOs, bucket);
+  }
+
+  return Array.from(byTipo.entries())
+    .map(([tipoOs, counts]) => {
+      const total = counts.produtivas + counts.improdutivas;
+      return {
+        tipoOs,
+        produtivas: counts.produtivas,
+        improdutivas: counts.improdutivas,
+        aproveitamento: total > 0 ? (counts.produtivas / total) * 100 : 0,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.produtivas + b.improdutivas - (a.produtivas + a.improdutivas) ||
+        b.produtivas - a.produtivas ||
+        a.tipoOs.localeCompare(b.tipoOs, "pt-BR"),
     );
 }
 
@@ -590,6 +658,17 @@ export function KpiDetalhamentoNotas() {
   const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
   const [sortConfig, setSortConfig] = useState<ModalSortConfig | null>(null);
+  const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(
+    null,
+  );
+  const [anoTecnicoModal, setAnoTecnicoModal] = useState<number | null>(null);
+  const [mesTecnicoModal, setMesTecnicoModal] = useState<number | null>(null);
+  const [rowsTecnicoModal, setRowsTecnicoModal] = useState<ToaImportacaoRow[]>(
+    [],
+  );
+  const [loadingTecnicoModal, setLoadingTecnicoModal] = useState(false);
+  const [sortConfigTecnico, setSortConfigTecnico] =
+    useState<ModalSortConfig | null>(null);
   const [dicionarioBaixa, setDicionarioBaixa] = useState<
     Record<string, string>
   >({});
@@ -719,15 +798,35 @@ export function KpiDetalhamentoNotas() {
     return [...set].sort((a, b) => a - b);
   }, [competencias, anoModal]);
 
+  const mesesDisponiveisTecnicoModal = useMemo(() => {
+    const set = new Set<number>();
+    for (const ym of competencias) {
+      const a = Math.floor(ym / 100);
+      const m = ym % 100;
+      if (anoTecnicoModal !== null && a !== anoTecnicoModal) continue;
+      if (m >= 1 && m <= 12) set.add(m);
+    }
+    return [...set].sort((a, b) => a - b);
+  }, [competencias, anoTecnicoModal]);
+
   useEffect(() => {
     if (bairroDetalhe == null) return;
     setAnoModal(ano);
     setMesModal(mes);
     setBuscaTecnicoModal("");
     setSortConfig(null);
+    setTecnicoSelecionado(null);
     // Sincroniza apenas na abertura/troca do bairro (não quando o filtro global muda com o modal aberto).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- herdar ano/mes no momento da abertura
   }, [bairroDetalhe]);
+
+  useEffect(() => {
+    if (tecnicoSelecionado == null) return;
+    setAnoTecnicoModal(anoModal);
+    setMesTecnicoModal(mesModal);
+    setSortConfigTecnico(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- herdar período do modal de bairro na abertura
+  }, [tecnicoSelecionado]);
 
   useEffect(() => {
     if (bairroDetalhe == null) {
@@ -758,6 +857,36 @@ export function KpiDetalhamentoNotas() {
       cancelled = true;
     };
   }, [bairroDetalhe, anoModal, mesModal]);
+
+  useEffect(() => {
+    if (tecnicoSelecionado == null || bairroDetalhe == null) {
+      setRowsTecnicoModal([]);
+      setLoadingTecnicoModal(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setLoadingTecnicoModal(true);
+      try {
+        const flat = await fetchToaImportacoes({
+          ano: anoTecnicoModal,
+          mes: mesTecnicoModal,
+          dia: null,
+        });
+        if (cancelled) return;
+        setRowsTecnicoModal(filtrarToaOsContabilizaveis(flat));
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Erro ao carregar detalhe do técnico:", err);
+        setRowsTecnicoModal([]);
+      } finally {
+        if (!cancelled) setLoadingTecnicoModal(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tecnicoSelecionado, bairroDetalhe, anoTecnicoModal, mesTecnicoModal]);
 
   const rankingBairros = useMemo(
     () => agregarVolumeNotasPorBairro(rowsFiltrados),
@@ -975,6 +1104,57 @@ export function KpiDetalhamentoNotas() {
     return ordenado[0]?.[0] ?? "";
   }, [bairroDetalhe, cidadeSelecionada, rowsModal]);
 
+  const dadosOSPorTecnico = useMemo(() => {
+    if (!tecnicoSelecionado || !bairroDetalhe) return [];
+    const bairroNorm = normalizarBairro(bairroDetalhe);
+    const filtradas = rowsTecnicoModal.filter((row) => {
+      if (normalizarBairro(row.bairro) !== bairroNorm) return false;
+      if (nomeTecnicoDaLinha(row) !== tecnicoSelecionado) return false;
+      if (
+        cidadeModalBairro &&
+        normalizarCidade(row.cidade) !== cidadeModalBairro
+      ) {
+        return false;
+      }
+      return true;
+    });
+    return agregarTiposOsPorTecnico(filtradas);
+  }, [
+    tecnicoSelecionado,
+    bairroDetalhe,
+    rowsTecnicoModal,
+    cidadeModalBairro,
+  ]);
+
+  const dadosOSPorTecnicoOrdenados = useMemo(() => {
+    if (!sortConfigTecnico) return dadosOSPorTecnico;
+    const { key, direction } = sortConfigTecnico;
+    return [...dadosOSPorTecnico].sort((a, b) => {
+      const diff = a[key] - b[key];
+      if (diff !== 0) return direction === "asc" ? diff : -diff;
+      if (key === "aproveitamento") {
+        const empateProd =
+          direction === "asc"
+            ? a.produtivas - b.produtivas
+            : b.produtivas - a.produtivas;
+        if (empateProd !== 0) return empateProd;
+      }
+      return a.tipoOs.localeCompare(b.tipoOs, "pt-BR");
+    });
+  }, [dadosOSPorTecnico, sortConfigTecnico]);
+
+  const handleSortTecnico = (key: ModalSortKey) => {
+    setSortConfigTecnico((prev) => {
+      if (prev?.key === key) {
+        return {
+          key,
+          direction: prev.direction === "asc" ? "desc" : "asc",
+        };
+      }
+      return { key, direction: "desc" };
+    });
+  };
+
   const tituloModalBairro = useMemo(() => {
     if (!bairroDetalhe) return "";
     return cidadeModalBairro
@@ -982,14 +1162,30 @@ export function KpiDetalhamentoNotas() {
       : bairroDetalhe;
   }, [bairroDetalhe, cidadeModalBairro]);
 
+  const tituloModalTecnico = useMemo(() => {
+    if (!tecnicoSelecionado || !bairroDetalhe) return "";
+    const cidade = cidadeModalBairro || "—";
+    return `Detalhamento - ${tecnicoSelecionado} - ${cidade} - ${bairroDetalhe}`;
+  }, [tecnicoSelecionado, bairroDetalhe, cidadeModalBairro]);
+
   useEffect(() => {
     if (!bairroDetalhe) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setBairroDetalhe(null);
+      if (e.key !== "Escape") return;
+      if (tecnicoSelecionado) {
+        setTecnicoSelecionado(null);
+        return;
+      }
+      setBairroDetalhe(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [bairroDetalhe]);
+  }, [bairroDetalhe, tecnicoSelecionado]);
+
+  const fecharModalBairro = () => {
+    setTecnicoSelecionado(null);
+    setBairroDetalhe(null);
+  };
 
   const abrirDetalheBairro = (payload: unknown) => {
     const data = payload as {
@@ -1005,6 +1201,7 @@ export function KpiDetalhamentoNotas() {
       setAnoModal(ano);
       setMesModal(mes);
       setBuscaTecnicoModal("");
+      setTecnicoSelecionado(null);
       setBairroDetalhe(bairro);
     }
   };
@@ -1474,10 +1671,10 @@ export function KpiDetalhamentoNotas() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-bairro-titulo"
-          onClick={() => setBairroDetalhe(null)}
+          onClick={fecharModalBairro}
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            className="flex max-h-[90vh] w-[90vw] max-w-6xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -1491,7 +1688,7 @@ export function KpiDetalhamentoNotas() {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Detalhamento por técnico · clique fora ou Esc para fechar
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">
                   <div className="relative w-full max-w-xs">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
@@ -1576,6 +1773,21 @@ export function KpiDetalhamentoNotas() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      setBuscaTecnicoModal("");
+                      setAnoModal(null);
+                      setMesModal(null);
+                    }}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar Filtros
+                  </Button>
                 </div>
               </div>
               <Button
@@ -1584,7 +1796,7 @@ export function KpiDetalhamentoNotas() {
                 size="icon"
                 className="shrink-0"
                 aria-label="Fechar"
-                onClick={() => setBairroDetalhe(null)}
+                onClick={fecharModalBairro}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -1605,7 +1817,7 @@ export function KpiDetalhamentoNotas() {
                 </p>
               ) : (
                 <div className="relative max-h-[min(70vh,32rem)] overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[58rem] text-sm">
+                  <table className="w-full min-w-[64rem] text-sm">
                     <thead className="sticky top-0 z-10 bg-white shadow-sm">
                       <tr className="border-b border-border text-left text-muted-foreground">
                         <th className="bg-white px-2 py-2 font-semibold">
@@ -1674,7 +1886,13 @@ export function KpiDetalhamentoNotas() {
                           className="border-b border-border/60 last:border-b-0"
                         >
                           <td className="px-2 py-2 font-medium text-gray-900">
-                            {tec.nome}
+                            <button
+                              type="button"
+                              onClick={() => setTecnicoSelecionado(tec.nome)}
+                              className="cursor-pointer text-left hover:text-blue-600 hover:underline"
+                            >
+                              {tec.nome}
+                            </button>
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums text-green-700">
                             {formatQuantidade(tec.produtivas)}
@@ -1691,39 +1909,267 @@ export function KpiDetalhamentoNotas() {
                           >
                             {formatAproveitamento(tec.aproveitamento)}
                           </td>
-                          <td className="max-w-[14rem] px-2 py-2 text-xs text-gray-700">
-                            {tec.top3TipoOsProd.length > 0 ? (
-                              <ul className="space-y-0.5">
-                                {tec.top3TipoOsProd.map((item) => (
-                                  <li
-                                    key={item}
-                                    className="truncate"
-                                    title={item}
-                                  >
-                                    {item}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                          <td className="min-w-[14rem] max-w-[20rem] px-2 py-2 text-xs text-gray-700">
+                            <Top3TipoLista items={tec.top3TipoOsProd} />
                           </td>
-                          <td className="max-w-[16rem] px-2 py-2 text-xs text-gray-700">
-                            {tec.top3TipoOsImprod.length > 0 ? (
-                              <ul className="space-y-0.5">
-                                {tec.top3TipoOsImprod.map((item) => (
-                                  <li
-                                    key={item}
-                                    className="truncate"
-                                    title={item}
-                                  >
-                                    {item}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                          <td className="min-w-[14rem] max-w-[20rem] px-2 py-2 text-xs text-gray-700">
+                            <Top3TipoLista items={tec.top3TipoOsImprod} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {tecnicoSelecionado && bairroDetalhe ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-tecnico-titulo"
+          onClick={() => setTecnicoSelecionado(null)}
+        >
+          <div
+            className="flex max-h-[90vh] w-[90vw] max-w-5xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="modal-tecnico-titulo"
+                  className="text-lg font-bold text-foreground"
+                >
+                  {tituloModalTecnico}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Tipos de O.S. do técnico · Esc ou Voltar retorna ao bairro
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-tecnico-ano"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Ano:
+                    </Label>
+                    <Select
+                      value={
+                        anoTecnicoModal !== null
+                          ? String(anoTecnicoModal)
+                          : "todos"
+                      }
+                      disabled={anosDisponiveis.length === 0}
+                      onValueChange={(v) => {
+                        if (v === "todos") {
+                          setAnoTecnicoModal(null);
+                          setMesTecnicoModal(null);
+                          return;
+                        }
+                        const novoAno = Number(v);
+                        const mesesDoAno = competencias
+                          .filter((ym) => Math.floor(ym / 100) === novoAno)
+                          .map((ym) => ym % 100)
+                          .sort((a, b) => a - b);
+                        setAnoTecnicoModal(novoAno);
+                        setMesTecnicoModal(
+                          mesesDoAno[mesesDoAno.length - 1] ?? null,
+                        );
+                      }}
+                    >
+                      <SelectTrigger
+                        id="modal-tecnico-ano"
+                        className="w-[120px]"
+                      >
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {anosDisponiveis.map((a) => (
+                          <SelectItem key={a} value={String(a)}>
+                            {a}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-tecnico-mes"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Mês:
+                    </Label>
+                    <Select
+                      value={
+                        mesTecnicoModal !== null
+                          ? String(mesTecnicoModal)
+                          : "todos"
+                      }
+                      disabled={
+                        anoTecnicoModal === null ||
+                        mesesDisponiveisTecnicoModal.length === 0
+                      }
+                      onValueChange={(v) => {
+                        if (v === "todos") {
+                          setMesTecnicoModal(null);
+                          return;
+                        }
+                        setMesTecnicoModal(Number(v));
+                      }}
+                    >
+                      <SelectTrigger
+                        id="modal-tecnico-mes"
+                        className="w-[140px]"
+                      >
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {mesesDisponiveisTecnicoModal.map((m) => (
+                          <SelectItem key={m} value={String(m)}>
+                            {mesLabel(m)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      setAnoTecnicoModal(null);
+                      setMesTecnicoModal(null);
+                    }}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar Filtros
+                  </Button>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTecnicoSelecionado(null)}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Fechar detalhe do técnico"
+                  onClick={() => setTecnicoSelecionado(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
+              {loadingTecnicoModal ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Carregando tipos de O.S....
+                </p>
+              ) : dadosOSPorTecnico.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Nenhum tipo de O.S. encontrado para este técnico no filtro
+                  atual.
+                </p>
+              ) : (
+                <div className="relative max-h-[min(70vh,32rem)] overflow-y-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[40rem] text-sm">
+                    <thead className="sticky top-0 z-10 bg-white shadow-sm">
+                      <tr className="border-b border-border text-left text-muted-foreground">
+                        <th className="bg-white px-2 py-2 font-semibold">
+                          Tipo de OS
+                        </th>
+                        <th className="bg-white px-2 py-2 text-right font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleSortTecnico("produtivas")}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-gray-50"
+                          >
+                            Qnt. Produtivas
+                            {sortConfigTecnico?.key === "produtivas" ? (
+                              sortConfigTecnico.direction === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                        <th className="bg-white px-2 py-2 text-right font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleSortTecnico("improdutivas")}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-gray-50"
+                          >
+                            Qnt. Improdutivas
+                            {sortConfigTecnico?.key === "improdutivas" ? (
+                              sortConfigTecnico.direction === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                        <th className="bg-white px-2 py-2 text-right font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleSortTecnico("aproveitamento")}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-gray-50"
+                          >
+                            Aproveitamento
+                            {sortConfigTecnico?.key === "aproveitamento" ? (
+                              sortConfigTecnico.direction === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dadosOSPorTecnicoOrdenados.map((row) => (
+                        <tr
+                          key={row.tipoOs}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td
+                            className="max-w-[28rem] px-2 py-2 font-medium text-gray-900"
+                            title={row.tipoOs}
+                          >
+                            <span className="block truncate">{row.tipoOs}</span>
+                          </td>
+                          <td className="px-2 py-2 text-right tabular-nums text-green-700">
+                            {formatQuantidade(row.produtivas)}
+                          </td>
+                          <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                            {formatQuantidade(row.improdutivas)}
+                          </td>
+                          <td
+                            className={`px-2 py-2 text-right tabular-nums font-semibold ${
+                              row.aproveitamento >= 70
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {formatAproveitamento(row.aproveitamento)}
                           </td>
                         </tr>
                       ))}
