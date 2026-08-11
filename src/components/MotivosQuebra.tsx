@@ -25,7 +25,12 @@ import {
   filtrarToaOsContabilizaveis,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
-import { getSupabaseClient } from "@/lib/supabase";
+import {
+  descricaoDoCodigoBaixa,
+  fetchDicionarioCodigosBaixa,
+  normalizeCodigoBaixa,
+  type DicionarioCodigosBaixaMap,
+} from "@/lib/dicionario-codigos-baixa";
 import {
   isCodBaixaProdutivo,
   isStatusExecutada,
@@ -79,25 +84,6 @@ function formatQuantidade(n: number): string {
   return n.toLocaleString("pt-BR");
 }
 
-function normalizeCodigoBaixa(value: string | number | null | undefined): string {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  const n = Number(raw);
-  if (Number.isFinite(n) && n > 0) return String(n);
-  return raw;
-}
-
-function descricaoDoCodigo(
-  codigo: string,
-  dicionario: Record<string, string>,
-): string {
-  return (
-    dicionario[codigo] ||
-    dicionario[codigo.padStart(3, "0")] ||
-    DESCRICAO_DESCONHECIDA
-  );
-}
-
 /** O.S. improdutiva: não é (Executada + Cód Baixa produtivo). */
 function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
   const cod =
@@ -117,7 +103,7 @@ function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
  */
 export function agregarMotivosQuebra(
   rows: ToaImportacaoRow[],
-  dicionario: Record<string, string> = {},
+  dicionario: DicionarioCodigosBaixaMap | Record<string, string> = {},
 ): MotivoQuebraAgg[] {
   const counts = new Map<string, number>();
 
@@ -132,7 +118,7 @@ export function agregarMotivosQuebra(
 
   return [...counts.entries()]
     .map(([codigo, quantidade]) => {
-      const descricao = descricaoDoCodigo(codigo, dicionario);
+      const descricao = descricaoDoCodigoBaixa(codigo, dicionario);
       return {
         codigo,
         descricao,
@@ -146,23 +132,6 @@ export function agregarMotivosQuebra(
         Number(a.codigo) - Number(b.codigo) ||
         a.codigo.localeCompare(b.codigo, "pt-BR"),
     );
-}
-
-async function fetchDicionarioCodigosBaixa(): Promise<Record<string, string>> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("dicionario_codigos_baixa")
-    .select("codigo, descricao");
-  if (error) throw error;
-
-  const map: Record<string, string> = {};
-  for (const row of data ?? []) {
-    const codigo = normalizeCodigoBaixa(row.codigo);
-    const descricao = String(row.descricao ?? "").trim();
-    if (!codigo || !descricao) continue;
-    map[codigo] = descricao;
-  }
-  return map;
 }
 
 function MotivoChartTooltip({
@@ -196,7 +165,7 @@ export function MotivosQuebra() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ToaImportacaoRow[]>([]);
-  const [dicionario, setDicionario] = useState<Record<string, string>>({});
+  const [dicionario, setDicionario] = useState<DicionarioCodigosBaixaMap>({});
   const [competencias, setCompetencias] = useState<number[]>([]);
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
@@ -210,7 +179,7 @@ export function MotivosQuebra() {
           fetchCompetenciasToa(),
           fetchDicionarioCodigosBaixa().catch((err) => {
             console.error("Erro ao carregar dicionário de códigos de baixa:", err);
-            return {} as Record<string, string>;
+            return {} as DicionarioCodigosBaixaMap;
           }),
         ]);
         if (cancelled) return;

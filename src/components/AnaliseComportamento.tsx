@@ -38,7 +38,12 @@ import {
   filtrarToaOsContabilizaveis,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
-import { getSupabaseClient } from "@/lib/supabase";
+import {
+  descricaoDoCodigoBaixa,
+  fetchDicionarioCodigosBaixa,
+  normalizeCodigoBaixa,
+  type DicionarioCodigosBaixaMap,
+} from "@/lib/dicionario-codigos-baixa";
 import {
   isCodBaixaProdutivo,
   isStatusExecutada,
@@ -129,27 +134,6 @@ function formatDataBr(isoDate: string): string {
   return `${dia}/${mes}/${ano}`;
 }
 
-function normalizeCodigoBaixa(
-  value: string | number | null | undefined,
-): string {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  const n = Number(raw);
-  if (Number.isFinite(n) && n > 0) return String(n);
-  return raw;
-}
-
-function descricaoDoCodigo(
-  codigo: string,
-  dicionario: Record<string, string>,
-): string {
-  return (
-    dicionario[codigo] ||
-    dicionario[codigo.padStart(3, "0")] ||
-    DESCRICAO_DESCONHECIDA
-  );
-}
-
 function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
   const cod =
     row.cod_baixa != null && Number.isFinite(Number(row.cod_baixa))
@@ -215,23 +199,6 @@ function nomeTecnicoRow(row: ToaImportacaoRow): string {
   return login || "—";
 }
 
-async function fetchDicionarioCodigosBaixa(): Promise<Record<string, string>> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("dicionario_codigos_baixa")
-    .select("codigo, descricao");
-  if (error) throw error;
-
-  const map: Record<string, string> = {};
-  for (const row of data ?? []) {
-    const codigo = normalizeCodigoBaixa(row.codigo);
-    const descricao = String(row.descricao ?? "").trim();
-    if (!codigo || !descricao) continue;
-    map[codigo] = descricao;
-  }
-  return map;
-}
-
 /** 1 nota (WO) por chave — status_nota da visita. */
 function dedupeNotasPorWo(rows: ToaImportacaoRow[]): ToaImportacaoRow[] {
   const map = new Map<string, ToaImportacaoRow>();
@@ -261,7 +228,7 @@ export function AnaliseComportamento() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ToaImportacaoRow[]>([]);
-  const [dicionario, setDicionario] = useState<Record<string, string>>({});
+  const [dicionario, setDicionario] = useState<DicionarioCodigosBaixaMap>({});
   const [competencias, setCompetencias] = useState<number[]>([]);
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
@@ -279,7 +246,7 @@ export function AnaliseComportamento() {
               "Erro ao carregar dicionário de códigos de baixa:",
               err,
             );
-            return {} as Record<string, string>;
+            return {} as DicionarioCodigosBaixaMap;
           }),
         ]);
         if (cancelled) return;
@@ -599,7 +566,7 @@ export function AnaliseComportamento() {
         hora: formatHoraDeInicioFim(nota.inicio_fim || principal.inicio_fim),
         codBaixa: codigo || "—",
         descricao: codigo
-          ? descricaoDoCodigo(codigo, dicionario)
+          ? descricaoDoCodigoBaixa(codigo, dicionario)
           : DESCRICAO_DESCONHECIDA,
         bairro: (nota.bairro || principal.bairro || "").trim() || "—",
         numeroWo: String(nota.numero_wo ?? "").trim() || "—",

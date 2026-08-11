@@ -36,10 +36,14 @@ import {
   filtrarToaOsContabilizaveis,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
-import { getSupabaseClient } from "@/lib/supabase";
+import {
+  descricaoDoCodigoBaixa,
+  fetchDicionarioCodigosBaixa,
+  normalizeCodigoBaixa,
+  type DicionarioCodigosBaixaMap,
+} from "@/lib/dicionario-codigos-baixa";
 import { normalizeNumeroWo } from "@/lib/toa-store";
 
-const DESCRICAO_BAIXA_DESCONHECIDA = "Motivo Desconhecido";
 const TIPO_OS_NAO_INFORMADO = "Tipo não informado";
 
 const MESES = [
@@ -183,27 +187,6 @@ function top5FromRecord(rec: Record<string, number>): TecnicoRankingItem[] {
     .slice(0, 5);
 }
 
-function normalizeCodigoBaixa(
-  value: string | number | null | undefined,
-): string {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  const n = Number(raw);
-  if (Number.isFinite(n) && n > 0) return String(n);
-  return raw;
-}
-
-function descricaoDoCodigoBaixa(
-  codigo: string,
-  dicionario: Record<string, string>,
-): string {
-  return (
-    dicionario[codigo] ||
-    dicionario[codigo.padStart(3, "0")] ||
-    DESCRICAO_BAIXA_DESCONHECIDA
-  );
-}
-
 function labelTipoOs(row: ToaImportacaoRow): string {
   const tipo = String(row.tipo_os ?? "")
     .replace(/\u00a0/g, " ")
@@ -250,23 +233,6 @@ function Top3TipoLista({ items }: { items: Top3TipoItem[] }) {
   );
 }
 
-async function fetchDicionarioCodigosBaixa(): Promise<Record<string, string>> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("dicionario_codigos_baixa")
-    .select("codigo, descricao");
-  if (error) throw error;
-
-  const map: Record<string, string> = {};
-  for (const row of data ?? []) {
-    const codigo = normalizeCodigoBaixa(row.codigo);
-    const descricao = String(row.descricao ?? "").trim();
-    if (!codigo || !descricao) continue;
-    map[codigo] = descricao;
-  }
-  return map;
-}
-
 export type TecnicoDetalheBairro = {
   nome: string;
   produtivas: number;
@@ -284,7 +250,7 @@ export type TecnicoDetalheBairro = {
 export function agregarDetalheTecnicosPorBairro(
   rows: ToaImportacaoRow[],
   bairroAlvo: string,
-  dicionario: Record<string, string> = {},
+  dicionario: DicionarioCodigosBaixaMap | Record<string, string> = {},
 ): TecnicoDetalheBairro[] {
   const bairroNorm = normalizarBairro(bairroAlvo);
   const rowsBairro = rows.filter(
@@ -694,9 +660,9 @@ export function KpiDetalhamentoNotas() {
   const [loadingTecnicoModal, setLoadingTecnicoModal] = useState(false);
   const [sortConfigTecnico, setSortConfigTecnico] =
     useState<ModalSortConfig | null>(null);
-  const [dicionarioBaixa, setDicionarioBaixa] = useState<
-    Record<string, string>
-  >({});
+  const [dicionarioBaixa, setDicionarioBaixa] = useState<DicionarioCodigosBaixaMap>(
+    {},
+  );
 
   useEffect(() => {
     let cancelled = false;
