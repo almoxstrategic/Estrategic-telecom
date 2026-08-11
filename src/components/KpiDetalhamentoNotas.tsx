@@ -51,6 +51,7 @@ const MESES = [
 ] as const;
 
 const BAIRRO_NAO_INFORMADO = "Não Informado";
+const CIDADE_TODAS = "Todas";
 
 export type TecnicoRankingItem = {
   nome: string;
@@ -113,6 +114,13 @@ function formatPct(valor: number, total: number): string {
 
 function formatCardShare(valor: number, total: number): string {
   return `${formatQuantidade(valor)} de ${formatQuantidade(total)} = ${formatPct(valor, total)}`;
+}
+
+function normalizarCidade(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizarBairro(value: string | null | undefined): string {
@@ -359,6 +367,7 @@ export function KpiDetalhamentoNotas() {
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
   const [paretoView, setParetoView] = useState<ParetoView>("Produtivas");
   const [buscaBairro, setBuscaBairro] = useState("");
+  const [cidadeSelecionada, setCidadeSelecionada] = useState(CIDADE_TODAS);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,6 +424,29 @@ export function KpiDetalhamentoNotas() {
     };
   }, [ano, mes]);
 
+  const cidadesDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      const cidade = normalizarCidade(row.cidade);
+      if (cidade) set.add(cidade);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [rows]);
+
+  useEffect(() => {
+    if (cidadeSelecionada === CIDADE_TODAS) return;
+    if (!cidadesDisponiveis.includes(cidadeSelecionada)) {
+      setCidadeSelecionada(CIDADE_TODAS);
+    }
+  }, [cidadesDisponiveis, cidadeSelecionada]);
+
+  const rowsFiltrados = useMemo(() => {
+    if (cidadeSelecionada === CIDADE_TODAS) return rows;
+    return rows.filter(
+      (row) => normalizarCidade(row.cidade) === cidadeSelecionada,
+    );
+  }, [rows, cidadeSelecionada]);
+
   const anosDisponiveis = useMemo(() => {
     const set = new Set<number>();
     for (const ym of competencias) {
@@ -435,7 +467,10 @@ export function KpiDetalhamentoNotas() {
     return [...set].sort((a, b) => a - b);
   }, [competencias, ano]);
 
-  const rankingBairros = useMemo(() => agregarVolumeNotasPorBairro(rows), [rows]);
+  const rankingBairros = useMemo(
+    () => agregarVolumeNotasPorBairro(rowsFiltrados),
+    [rowsFiltrados],
+  );
 
   const { totalProdutivasGeral, totalImprodutivasGeral } = useMemo(() => {
     let produtivas = 0;
@@ -556,17 +591,23 @@ export function KpiDetalhamentoNotas() {
   const filtrosLimpos = ano === null && mes === null;
 
   const periodoDescricao = useMemo(() => {
-    if (filtrosLimpos) return "Histórico completo TOA";
-    if (ano !== null && mes !== null) {
-      return `${mesLabel(mes)} de ${ano}`;
-    }
-    if (ano !== null) return `Ano ${ano} · todos os meses`;
-    return "Período filtrado";
-  }, [filtrosLimpos, ano, mes]);
+    const base =
+      filtrosLimpos
+        ? "Histórico completo TOA"
+        : ano !== null && mes !== null
+          ? `${mesLabel(mes)} de ${ano}`
+          : ano !== null
+            ? `Ano ${ano} · todos os meses`
+            : "Período filtrado";
+    return cidadeSelecionada === CIDADE_TODAS
+      ? `${base} · Todas as cidades`
+      : `${base} · ${cidadeSelecionada}`;
+  }, [filtrosLimpos, ano, mes, cidadeSelecionada]);
 
   const limparFiltros = () => {
     setAno(null);
     setMes(null);
+    setCidadeSelecionada(CIDADE_TODAS);
   };
 
   return (
@@ -650,6 +691,31 @@ export function KpiDetalhamentoNotas() {
                 {mesesDisponiveis.map((m) => (
                   <SelectItem key={m} value={String(m)}>
                     {mesLabel(m)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="detalhe-notas-cidade"
+              className="shrink-0 text-sm font-medium"
+            >
+              Cidade:
+            </Label>
+            <Select
+              value={cidadeSelecionada}
+              onValueChange={setCidadeSelecionada}
+            >
+              <SelectTrigger id="detalhe-notas-cidade" className="w-[200px]">
+                <SelectValue placeholder={CIDADE_TODAS} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={CIDADE_TODAS}>{CIDADE_TODAS}</SelectItem>
+                {cidadesDisponiveis.map((cidade) => (
+                  <SelectItem key={cidade} value={cidade}>
+                    {cidade}
                   </SelectItem>
                 ))}
               </SelectContent>

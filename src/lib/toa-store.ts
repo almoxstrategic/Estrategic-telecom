@@ -49,6 +49,7 @@ export type ToaLinha = {
   /** Campos da WO-mãe (repetidos em cada O.S. flat). */
   endereco: string;
   bairro: string;
+  cidade: string;
   inicioFim: string;
   duracao: string;
   tipoAtividade: string;
@@ -85,6 +86,7 @@ export type ToaChamadoProcessado = {
   statusAtividade: string;
   endereco: string;
   bairro: string;
+  cidade: string;
   inicioFim: string;
   duracao: string;
   tipoAtividade: string;
@@ -443,6 +445,7 @@ export function processarChamadosTOA(
       statusAtividade,
       endereco: (linha.endereco ?? "").trim(),
       bairro: (linha.bairro ?? "").trim(),
+      cidade: (linha.cidade ?? "").trim(),
       inicioFim: (linha.inicioFim ?? "").trim(),
       duracao: (linha.duracao ?? "").trim(),
       tipoAtividade: (linha.tipoAtividade ?? "").trim(),
@@ -478,6 +481,7 @@ export function flattenChamadosParaImportacaoFlat(
   status_atividade: string;
   endereco: string;
   bairro: string;
+  cidade: string;
   inicio_fim: string;
   duracao: string;
   tipo_atividade: string;
@@ -498,6 +502,7 @@ export function flattenChamadosParaImportacaoFlat(
     status_atividade: string;
     endereco: string;
     bairro: string;
+    cidade: string;
     inicio_fim: string;
     duracao: string;
     tipo_atividade: string;
@@ -519,6 +524,7 @@ export function flattenChamadosParaImportacaoFlat(
     const statusAtividade = (chamado.statusAtividade || "").trim();
     const endereco = (chamado.endereco || "").trim();
     const bairro = (chamado.bairro || "").trim();
+    const cidade = (chamado.cidade || "").trim();
     const inicioFim = (chamado.inicioFim || "").trim();
     const duracao = (chamado.duracao || "").trim();
     const tipoAtividade = (chamado.tipoAtividade || "").trim();
@@ -545,6 +551,7 @@ export function flattenChamadosParaImportacaoFlat(
         status_atividade: statusAtividade,
         endereco,
         bairro,
+        cidade,
         inicio_fim: inicioFim,
         duracao,
         tipo_atividade: tipoAtividade,
@@ -574,6 +581,7 @@ export function regroupFlatRowsToChamados(
     status_atividade?: string;
     endereco?: string;
     bairro?: string;
+    cidade?: string;
     inicio_fim?: string;
     duracao?: string;
     tipo_atividade?: string;
@@ -591,6 +599,7 @@ export function regroupFlatRowsToChamados(
       statusAtividade: string;
       endereco: string;
       bairro: string;
+      cidade: string;
       inicioFim: string;
       duracao: string;
       tipoAtividade: string;
@@ -609,6 +618,7 @@ export function regroupFlatRowsToChamados(
     const statusAtividade = String(row.status_atividade ?? "").trim();
     const endereco = String(row.endereco ?? "").trim();
     const bairro = String(row.bairro ?? "").trim();
+    const cidade = String(row.cidade ?? "").trim();
     const inicioFim = String(row.inicio_fim ?? "").trim();
     const duracao = String(row.duracao ?? "").trim();
     const tipoAtividade = String(row.tipo_atividade ?? "").trim();
@@ -625,6 +635,7 @@ export function regroupFlatRowsToChamados(
         statusAtividade,
         endereco,
         bairro,
+        cidade,
         inicioFim,
         duracao,
         tipoAtividade,
@@ -639,6 +650,7 @@ export function regroupFlatRowsToChamados(
       }
       if (endereco && !group.endereco) group.endereco = endereco;
       if (bairro && !group.bairro) group.bairro = bairro;
+      if (cidade && !group.cidade) group.cidade = cidade;
       if (inicioFim && !group.inicioFim) group.inicioFim = inicioFim;
       if (duracao && !group.duracao) group.duracao = duracao;
       if (tipoAtividade && !group.tipoAtividade) {
@@ -679,6 +691,7 @@ export function regroupFlatRowsToChamados(
       statusAtividade: g.statusAtividade,
       endereco: g.endereco,
       bairro: g.bairro,
+      cidade: g.cidade,
       inicioFim: g.inicioFim,
       duracao: g.duracao,
       tipoAtividade: g.tipoAtividade,
@@ -879,6 +892,7 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
       statusAtividade,
       endereco: typeof item.endereco === "string" ? item.endereco.trim() : "",
       bairro: typeof item.bairro === "string" ? item.bairro.trim() : "",
+      cidade: typeof item.cidade === "string" ? item.cidade.trim() : "",
       inicioFim:
         typeof item.inicioFim === "string" ? item.inicioFim.trim() : "",
       duracao: typeof item.duracao === "string" ? item.duracao.trim() : "",
@@ -926,6 +940,7 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
     statusAtividade,
     endereco: typeof item.endereco === "string" ? item.endereco.trim() : "",
     bairro: typeof item.bairro === "string" ? item.bairro.trim() : "",
+    cidade: typeof item.cidade === "string" ? item.cidade.trim() : "",
     inicioFim: typeof item.inicioFim === "string" ? item.inicioFim.trim() : "",
     duracao: typeof item.duracao === "string" ? item.duracao.trim() : "",
     tipoAtividade:

@@ -430,6 +430,7 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
         ),
         endereco: pick(row, "Endereço", "Endereco", "endereço", "endereco"),
         bairro: pick(row, "Bairro", "bairro"),
+        cidade: pick(row, "Cidade", "cidade"),
         inicioFim: pick(
           row,
           "Início - Fim",
