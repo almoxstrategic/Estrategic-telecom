@@ -133,6 +133,8 @@ export type ToaImportacaoRow = {
   bairro?: string;
   cidade?: string;
   inicio_fim?: string;
+  janela_servico_1?: string;
+  janela_servico_2?: string;
   duracao?: string;
   categorias_capacidade?: string;
   status_nota: "Produtiva" | "Improdutiva";
@@ -832,7 +834,7 @@ export async function fetchToaImportacoes(filtro: {
       let query = supabase
         .from("toa_importacoes")
         .select(
-          "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, endereco, bairro, cidade, inicio_fim, duracao, tipo_atividade, categorias_capacidade, imported_at",
+          "id, competencia, data_toa, nome_tecnico, login_tecnico, numero_wo, contrato, numero_os, tipo_os, cod_baixa, status_os, status_nota, status_atividade, endereco, bairro, cidade, inicio_fim, janela_servico_1, janela_servico_2, duracao, tipo_atividade, categorias_capacidade, imported_at",
         )
         .order("data_toa", { ascending: true })
         .order("numero_wo", { ascending: true })
@@ -880,6 +882,8 @@ export async function fetchToaImportacoes(filtro: {
     bairro: String(row.bairro ?? "").trim(),
     cidade: String(row.cidade ?? "").trim(),
     inicio_fim: String(row.inicio_fim ?? "").trim(),
+    janela_servico_1: String(row.janela_servico_1 ?? "").trim(),
+    janela_servico_2: String(row.janela_servico_2 ?? "").trim(),
     duracao: String(row.duracao ?? "").trim(),
     tipo_atividade: String(row.tipo_atividade ?? "").trim(),
     categorias_capacidade: String(row.categorias_capacidade ?? "").trim(),

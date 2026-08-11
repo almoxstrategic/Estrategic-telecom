@@ -51,6 +51,10 @@ export type ToaLinha = {
   bairro: string;
   cidade: string;
   inicioFim: string;
+  /** Primeira coluna "Janela de Serviço" da planilha. */
+  janelaServico1: string;
+  /** Segunda coluna "Janela de Serviço" (header duplicado → _1). */
+  janelaServico2: string;
   duracao: string;
   tipoAtividade: string;
   categoriasCapacidade: string;
@@ -88,6 +92,8 @@ export type ToaChamadoProcessado = {
   bairro: string;
   cidade: string;
   inicioFim: string;
+  janelaServico1: string;
+  janelaServico2: string;
   duracao: string;
   tipoAtividade: string;
   categoriasCapacidade: string;
@@ -447,6 +453,8 @@ export function processarChamadosTOA(
       bairro: (linha.bairro ?? "").trim(),
       cidade: (linha.cidade ?? "").trim(),
       inicioFim: (linha.inicioFim ?? "").trim(),
+      janelaServico1: (linha.janelaServico1 ?? "").trim(),
+      janelaServico2: (linha.janelaServico2 ?? "").trim(),
       duracao: (linha.duracao ?? "").trim(),
       tipoAtividade: (linha.tipoAtividade ?? "").trim(),
       categoriasCapacidade: (linha.categoriasCapacidade ?? "").trim(),
@@ -483,6 +491,8 @@ export function flattenChamadosParaImportacaoFlat(
   bairro: string;
   cidade: string;
   inicio_fim: string;
+  janela_servico_1: string;
+  janela_servico_2: string;
   duracao: string;
   tipo_atividade: string;
   categorias_capacidade: string;
@@ -504,6 +514,8 @@ export function flattenChamadosParaImportacaoFlat(
     bairro: string;
     cidade: string;
     inicio_fim: string;
+    janela_servico_1: string;
+    janela_servico_2: string;
     duracao: string;
     tipo_atividade: string;
     categorias_capacidade: string;
@@ -526,6 +538,8 @@ export function flattenChamadosParaImportacaoFlat(
     const bairro = (chamado.bairro || "").trim();
     const cidade = (chamado.cidade || "").trim();
     const inicioFim = (chamado.inicioFim || "").trim();
+    const janelaServico1 = (chamado.janelaServico1 || "").trim();
+    const janelaServico2 = (chamado.janelaServico2 || "").trim();
     const duracao = (chamado.duracao || "").trim();
     const tipoAtividade = (chamado.tipoAtividade || "").trim();
     const categoriasCapacidade = (chamado.categoriasCapacidade || "").trim();
@@ -553,6 +567,8 @@ export function flattenChamadosParaImportacaoFlat(
         bairro,
         cidade,
         inicio_fim: inicioFim,
+        janela_servico_1: janelaServico1,
+        janela_servico_2: janelaServico2,
         duracao,
         tipo_atividade: tipoAtividade,
         categorias_capacidade: categoriasCapacidade,
@@ -583,6 +599,8 @@ export function regroupFlatRowsToChamados(
     bairro?: string;
     cidade?: string;
     inicio_fim?: string;
+    janela_servico_1?: string;
+    janela_servico_2?: string;
     duracao?: string;
     tipo_atividade?: string;
     categorias_capacidade?: string;
@@ -601,6 +619,8 @@ export function regroupFlatRowsToChamados(
       bairro: string;
       cidade: string;
       inicioFim: string;
+      janelaServico1: string;
+      janelaServico2: string;
       duracao: string;
       tipoAtividade: string;
       categoriasCapacidade: string;
@@ -620,6 +640,8 @@ export function regroupFlatRowsToChamados(
     const bairro = String(row.bairro ?? "").trim();
     const cidade = String(row.cidade ?? "").trim();
     const inicioFim = String(row.inicio_fim ?? "").trim();
+    const janelaServico1 = String(row.janela_servico_1 ?? "").trim();
+    const janelaServico2 = String(row.janela_servico_2 ?? "").trim();
     const duracao = String(row.duracao ?? "").trim();
     const tipoAtividade = String(row.tipo_atividade ?? "").trim();
     const categoriasCapacidade = String(row.categorias_capacidade ?? "").trim();
@@ -637,6 +659,8 @@ export function regroupFlatRowsToChamados(
         bairro,
         cidade,
         inicioFim,
+        janelaServico1,
+        janelaServico2,
         duracao,
         tipoAtividade,
         categoriasCapacidade,
@@ -652,6 +676,12 @@ export function regroupFlatRowsToChamados(
       if (bairro && !group.bairro) group.bairro = bairro;
       if (cidade && !group.cidade) group.cidade = cidade;
       if (inicioFim && !group.inicioFim) group.inicioFim = inicioFim;
+      if (janelaServico1 && !group.janelaServico1) {
+        group.janelaServico1 = janelaServico1;
+      }
+      if (janelaServico2 && !group.janelaServico2) {
+        group.janelaServico2 = janelaServico2;
+      }
       if (duracao && !group.duracao) group.duracao = duracao;
       if (tipoAtividade && !group.tipoAtividade) {
         group.tipoAtividade = tipoAtividade;
@@ -693,6 +723,8 @@ export function regroupFlatRowsToChamados(
       bairro: g.bairro,
       cidade: g.cidade,
       inicioFim: g.inicioFim,
+      janelaServico1: g.janelaServico1,
+      janelaServico2: g.janelaServico2,
       duracao: g.duracao,
       tipoAtividade: g.tipoAtividade,
       categoriasCapacidade: g.categoriasCapacidade,
@@ -895,6 +927,14 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
       cidade: typeof item.cidade === "string" ? item.cidade.trim() : "",
       inicioFim:
         typeof item.inicioFim === "string" ? item.inicioFim.trim() : "",
+      janelaServico1:
+        typeof item.janelaServico1 === "string"
+          ? item.janelaServico1.trim()
+          : "",
+      janelaServico2:
+        typeof item.janelaServico2 === "string"
+          ? item.janelaServico2.trim()
+          : "",
       duracao: typeof item.duracao === "string" ? item.duracao.trim() : "",
       tipoAtividade:
         typeof item.tipoAtividade === "string"
@@ -942,6 +982,10 @@ function normalizeChamado(value: unknown): ToaChamadoProcessado | null {
     bairro: typeof item.bairro === "string" ? item.bairro.trim() : "",
     cidade: typeof item.cidade === "string" ? item.cidade.trim() : "",
     inicioFim: typeof item.inicioFim === "string" ? item.inicioFim.trim() : "",
+    janelaServico1:
+      typeof item.janelaServico1 === "string" ? item.janelaServico1.trim() : "",
+    janelaServico2:
+      typeof item.janelaServico2 === "string" ? item.janelaServico2.trim() : "",
     duracao: typeof item.duracao === "string" ? item.duracao.trim() : "",
     tipoAtividade:
       typeof item.tipoAtividade === "string" ? item.tipoAtividade.trim() : "",

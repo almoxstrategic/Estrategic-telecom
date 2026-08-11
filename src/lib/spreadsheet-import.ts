@@ -152,7 +152,15 @@ function detectDelimiter(headerLine: string): string {
 
 function rowsFromMatrix(matrix: string[][]): RawRow[] {
   if (matrix.length < 2) return [];
-  const headers = matrix[0].map((h) => trimCell(h));
+  const rawHeaders = matrix[0].map((h) => trimCell(h));
+  // Colunas com o mesmo nome (ex.: duas "Janela de Serviço") recebem sufixo _1, _2…
+  const seen = new Map<string, number>();
+  const headers = rawHeaders.map((h) => {
+    if (!h) return h;
+    const count = seen.get(h) ?? 0;
+    seen.set(h, count + 1);
+    return count === 0 ? h : `${h}_${count}`;
+  });
   return matrix.slice(1).map((cells) => {
     const row: RawRow = {};
     headers.forEach((h, i) => {
@@ -438,6 +446,22 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
           "Início-Fim",
           "Inicio-Fim",
           "Inicio Fim",
+        ),
+        janelaServico1: pick(
+          row,
+          "Janela de Serviço",
+          "Janela de Servico",
+          "Janela Serviço",
+          "Janela Servico",
+        ),
+        janelaServico2: pick(
+          row,
+          "Janela de Serviço_1",
+          "Janela de Servico_1",
+          "Janela de Serviço.1",
+          "Janela de Servico.1",
+          "Janela Serviço_1",
+          "Janela Servico_1",
         ),
         duracao: pick(row, "Duração", "Duracao", "duração", "duracao"),
         tipoAtividade: pick(
