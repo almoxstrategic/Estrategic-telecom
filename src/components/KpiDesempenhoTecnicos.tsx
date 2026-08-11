@@ -2314,42 +2314,53 @@ function KpiDesempenhoProjecaoToa({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div
-          className="mb-4 inline-flex rounded-lg border border-border bg-muted/40 p-1"
-          role="tablist"
-          aria-label="Seção inferior de desempenho"
-        >
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div
+            className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+            role="tablist"
+            aria-label="Seção inferior de desempenho"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={abaPrincipalAtiva === "painel"}
+              onClick={() => setAbaPrincipalAtiva("painel")}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                abaPrincipalAtiva === "painel"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Painel de Técnicos
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={abaPrincipalAtiva === "detalhamento"}
+              onClick={() => setAbaPrincipalAtiva("detalhamento")}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                abaPrincipalAtiva === "detalhamento"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Detalhamento TOA - OS
+            </button>
+          </div>
           <button
             type="button"
-            role="tab"
-            aria-selected={abaPrincipalAtiva === "painel"}
-            onClick={() => setAbaPrincipalAtiva("painel")}
-            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-              abaPrincipalAtiva === "painel"
-                ? "bg-white text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={abrirTabelaPrecos}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
+            title="Ver Tabela de Preços"
+            aria-label="Ver tabela de preços"
           >
-            Painel de Técnicos
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={abaPrincipalAtiva === "detalhamento"}
-            onClick={() => setAbaPrincipalAtiva("detalhamento")}
-            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-              abaPrincipalAtiva === "detalhamento"
-                ? "bg-white text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Detalhamento TOA - OS
+            ?
           </button>
         </div>
 
         {abaPrincipalAtiva === "painel" ? (
           <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
               <div
                 className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
                 role="group"
@@ -2379,7 +2390,7 @@ function KpiDesempenhoProjecaoToa({
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
                     <TrendingUp className="h-4 w-4 text-primary" />
@@ -2495,27 +2506,44 @@ function KpiDesempenhoProjecaoToa({
           </>
         ) : (
           <>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-              <Users className="h-4 w-4 text-primary" />
+        <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
+          <div
+            className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+            role="tablist"
+            aria-label="Fonte do detalhamento"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "toa"}
+              onClick={() => setActiveTab("toa")}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                activeTab === "toa"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
               Detalhamento TOA - OS
-            </h2>
-            {activeTab === "toa" ? (
+            </button>
+            {mostrarCardsAnaliticoEToa ? (
               <button
                 type="button"
-                onClick={abrirTabelaPrecos}
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-300"
-                title="Ver Tabela de Preços"
-                aria-label="Ver tabela de preços"
+                role="tab"
+                aria-selected={activeTab === "analitico"}
+                onClick={() => setActiveTab("analitico")}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                  activeTab === "analitico"
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                ?
+                Analítico Claro
               </button>
             ) : null}
           </div>
 
           {activeTab === "toa" ? (
-            <div className="ml-auto flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-4">
               <label className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
                   <TrendingUp className="h-4 w-4 text-primary" />
@@ -2565,48 +2593,11 @@ function KpiDesempenhoProjecaoToa({
           ) : null}
         </div>
 
-        <div className="mb-4">
-          <div
-            className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
-            role="tablist"
-            aria-label="Fonte do detalhamento"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "toa"}
-              onClick={() => setActiveTab("toa")}
-              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                activeTab === "toa"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Detalhamento TOA - OS
-            </button>
-            {mostrarCardsAnaliticoEToa ? (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "analitico"}
-                onClick={() => setActiveTab("analitico")}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                  activeTab === "analitico"
-                    ? "bg-white text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Analítico Claro
-              </button>
-            ) : null}
-          </div>
-        </div>
-
         {activeTab === "analitico" ? (
           <TabelaDetalhamentoAnalitico rows={analiticoFiltrado} />
         ) : (
           <>
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+            <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
               <div
                 className="inline-flex shrink-0 rounded-lg border border-border bg-muted/40 p-1"
                 role="tablist"
@@ -2640,7 +2631,7 @@ function KpiDesempenhoProjecaoToa({
                 </button>
               </div>
 
-              <div className="ml-auto flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex items-center gap-2">
                 <input
                   type="search"
                   value={buscaTecnico}
@@ -2650,31 +2641,29 @@ function KpiDesempenhoProjecaoToa({
                   className="w-full rounded-md border border-gray-300 bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500 md:w-80"
                 />
 
-                <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={exportarNotasDetalhamentoExcel}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 transition hover:bg-green-100"
+                  title="Exportar O.S. do detalhamento TOA com colunas de toa_importacoes"
+                  aria-label="Exportar Excel com O.S. do período"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar Excel (O.S.)
+                </button>
+
+                {mostrarCardsAnaliticoEToa ? (
                   <button
                     type="button"
-                    onClick={exportarNotasDetalhamentoExcel}
-                    className="inline-flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 transition hover:bg-green-100"
-                    title="Exportar O.S. do detalhamento TOA com colunas de toa_importacoes"
-                    aria-label="Exportar Excel com O.S. do período"
+                    onClick={exportarComparacaoConciliacao}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                    title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
+                    aria-label="Exportar comparação Analítico vs TOA"
                   >
                     <Download className="h-4 w-4" />
-                    Exportar Excel (O.S.)
+                    Exportar Comparação
                   </button>
-
-                  {mostrarCardsAnaliticoEToa ? (
-                    <button
-                      type="button"
-                      onClick={exportarComparacaoConciliacao}
-                      className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
-                      title="Exporta gaps: contratos só no Analítico vs só no TOA (notas produtivas)"
-                      aria-label="Exportar comparação Analítico vs TOA"
-                    >
-                      <Download className="h-4 w-4" />
-                      Exportar Comparação
-                    </button>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
             </div>
             {osTabelaInferior.length === 0 ? (
