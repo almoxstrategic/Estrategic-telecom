@@ -752,6 +752,10 @@ function KpiDesempenhoProjecaoToa({
   /** Aba do detalhamento inferior TOA (produtivas / perdas). */
   const [abaNotasToa, setAbaNotasToa] =
     useState<TipoDetalheNotas>("produtivas");
+  const [abaPrincipalAtiva, setAbaPrincipalAtiva] = useState<
+    "painel" | "detalhamento"
+  >("painel");
+  const [rankPainel, setRankPainel] = useState<"nota" | "financeiro">("nota");
   const [buscaDetalheNotas, setBuscaDetalheNotas] = useState("");
   /** Período local do modal (independente do filtro global da página). */
   const [anoModal, setAnoModal] = useState<number | null>(filtroPeriodo.ano);
@@ -845,6 +849,7 @@ function KpiDesempenhoProjecaoToa({
   const abrirDetalheNotas = (tipo: TipoDetalheNotas) => {
     setBuscaDetalheNotas("");
     setBuscaTecnico("");
+    setAbaPrincipalAtiva("detalhamento");
     setAbaNotasToa(tipo);
     setActiveTab("toa");
     setDetalheNotasTipo(tipo);
@@ -1027,6 +1032,53 @@ function KpiDesempenhoProjecaoToa({
   }, [resumoToa, tecnicos, tecnicosEquipe, toaOsPeriodo, chamadosToaPeriodo]);
 
   const fatorProjecao = 1 + percentualAumento / 100;
+
+  type PainelTecnicoRow = {
+    idToa: string;
+    nome: string;
+    produtivas: number;
+    improdutivas: number;
+    aproveitamento: number;
+    lucro: number;
+    perda: number;
+  };
+
+  const dadosPainelTecnicos = useMemo((): PainelTecnicoRow[] => {
+    const rows = enriquecidos.map((t) => {
+      const produtivas = t.osProdutivas;
+      const improdutivas = t.osImprodutivas;
+      const total = produtivas + improdutivas;
+      return {
+        idToa: t.id_tecnico,
+        nome: t.nome,
+        produtivas,
+        improdutivas,
+        aproveitamento: total > 0 ? (produtivas / total) * 100 : 0,
+        lucro: t.receita * fatorProjecao,
+        perda: t.receitaPerda * fatorProjecao,
+      };
+    });
+
+    return [...rows].sort((a, b) => {
+      if (rankPainel === "financeiro") {
+        return (
+          b.lucro - a.lucro ||
+          b.aproveitamento - a.aproveitamento ||
+          a.nome.localeCompare(b.nome, "pt-BR")
+        );
+      }
+      return (
+        b.produtivas - a.produtivas ||
+        b.aproveitamento - a.aproveitamento ||
+        a.nome.localeCompare(b.nome, "pt-BR")
+      );
+    });
+  }, [enriquecidos, fatorProjecao, rankPainel]);
+
+  const totalReceitaPainel = useMemo(
+    () => dadosPainelTecnicos.reduce((acc, t) => acc + t.lucro, 0),
+    [dadosPainelTecnicos],
+  );
 
   const atualizarPercentualAumento = (valor: string) => {
     setPercentualAumentoTexto(valor);
@@ -2262,6 +2314,167 @@ function KpiDesempenhoProjecaoToa({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div
+          className="mb-4 inline-flex rounded-lg border border-border bg-muted/40 p-1"
+          role="tablist"
+          aria-label="Seção inferior de desempenho"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={abaPrincipalAtiva === "painel"}
+            onClick={() => setAbaPrincipalAtiva("painel")}
+            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+              abaPrincipalAtiva === "painel"
+                ? "bg-white text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Painel de Técnicos
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={abaPrincipalAtiva === "detalhamento"}
+            onClick={() => setAbaPrincipalAtiva("detalhamento")}
+            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+              abaPrincipalAtiva === "detalhamento"
+                ? "bg-white text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Detalhamento TOA - OS
+          </button>
+        </div>
+
+        {abaPrincipalAtiva === "painel" ? (
+          <>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div
+                className="inline-flex rounded-lg border border-border bg-muted/40 p-1"
+                role="group"
+                aria-label="Ordenação do painel"
+              >
+                <button
+                  type="button"
+                  onClick={() => setRankPainel("nota")}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    rankPainel === "nota"
+                      ? "bg-white text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Rank nota
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRankPainel("financeiro")}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    rankPainel === "financeiro"
+                      ? "bg-white text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Rank financeiro
+                </button>
+              </div>
+
+              <div
+                className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 shadow-sm"
+                title="Soma da receita faturável dos técnicos no período"
+              >
+                <span className="text-xs text-gray-500">
+                  Total (Receita Gerada)
+                </span>
+                <span className="text-sm font-bold tabular-nums text-green-600">
+                  {formatReceita(totalReceitaPainel)}
+                </span>
+              </div>
+            </div>
+
+            <div className="relative max-h-[32rem] overflow-auto rounded-lg border border-gray-100">
+              <table className="w-full min-w-[48rem] text-sm">
+                <thead className="sticky top-0 z-10 bg-white shadow-sm">
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="bg-white px-3 py-2 font-semibold">idTOA</th>
+                    <th className="bg-white px-3 py-2 font-semibold">Nome</th>
+                    <th className="bg-white px-3 py-2 text-right font-semibold">
+                      Produtivas
+                    </th>
+                    <th className="bg-white px-3 py-2 text-right font-semibold">
+                      Improdutivas
+                    </th>
+                    <th className="bg-white px-3 py-2 text-right font-semibold">
+                      Aproveitamento
+                    </th>
+                    <th className="bg-white px-3 py-2 text-right font-semibold">
+                      Perda
+                    </th>
+                    <th className="bg-white px-3 py-2 text-right font-semibold">
+                      Lucro
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dadosPainelTecnicos.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-3 py-8 text-center text-muted-foreground"
+                      >
+                        Nenhum técnico no período selecionado.
+                      </td>
+                    </tr>
+                  ) : (
+                    dadosPainelTecnicos.map((row) => (
+                      <tr
+                        key={row.idToa}
+                        className="border-b border-border/60 last:border-b-0"
+                      >
+                        <td className="px-3 py-2 tabular-nums text-gray-700">
+                          {row.idToa}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-gray-900">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              abrirDetalheTecnico(row.idToa, row.nome)
+                            }
+                            className="text-left text-primary hover:underline"
+                          >
+                            {row.nome}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-green-700">
+                          {formatQuantidade(row.produtivas)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                          {formatQuantidade(row.improdutivas)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            row.aproveitamento >= 70
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {formatPct(row.aproveitamento)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                          {formatReceita(row.perda)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-medium text-green-600">
+                          {formatReceita(row.lucro)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <>
         <div className="mb-4 flex flex-wrap items-start gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
@@ -2628,6 +2841,8 @@ function KpiDesempenhoProjecaoToa({
                 </table>
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </div>
