@@ -59,6 +59,7 @@ const MESES = [
 
 const BAIRRO_NAO_INFORMADO = "Não Informado";
 const CIDADE_TODAS = "Todas";
+const TECNICO_TODOS = "Todos";
 
 type ModalSortKey = "produtivas" | "improdutivas" | "aproveitamento";
 type ModalSortConfig = { key: ModalSortKey; direction: "asc" | "desc" };
@@ -651,6 +652,7 @@ export function KpiDetalhamentoNotas() {
   const [paretoView, setParetoView] = useState<ParetoView>("Produtivas");
   const [buscaBairro, setBuscaBairro] = useState("");
   const [cidadeSelecionada, setCidadeSelecionada] = useState(CIDADE_TODAS);
+  const [tecnicoSelecionado, setTecnicoSelecionado] = useState(TECNICO_TODOS);
   const [bairroDetalhe, setBairroDetalhe] = useState<string | null>(null);
   const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
   const [anoModal, setAnoModal] = useState<number | null>(null);
@@ -658,7 +660,7 @@ export function KpiDetalhamentoNotas() {
   const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
   const [sortConfig, setSortConfig] = useState<ModalSortConfig | null>(null);
-  const [tecnicoSelecionado, setTecnicoSelecionado] = useState<string | null>(
+  const [tecnicoDetalheModal, setTecnicoDetalheModal] = useState<string | null>(
     null,
   );
   const [anoTecnicoModal, setAnoTecnicoModal] = useState<number | null>(null);
@@ -760,12 +762,39 @@ export function KpiDetalhamentoNotas() {
     }
   }, [cidadesDisponiveis, cidadeSelecionada]);
 
-  const rowsFiltrados = useMemo(() => {
-    if (cidadeSelecionada === CIDADE_TODAS) return rows;
-    return rows.filter(
-      (row) => normalizarCidade(row.cidade) === cidadeSelecionada,
-    );
+  const listaTecnicos = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      if (
+        cidadeSelecionada !== CIDADE_TODAS &&
+        normalizarCidade(row.cidade) !== cidadeSelecionada
+      ) {
+        continue;
+      }
+      const nome = nomeTecnicoDaLinha(row);
+      if (nome) set.add(nome);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows, cidadeSelecionada]);
+
+  useEffect(() => {
+    if (tecnicoSelecionado === TECNICO_TODOS) return;
+    if (!listaTecnicos.includes(tecnicoSelecionado)) {
+      setTecnicoSelecionado(TECNICO_TODOS);
+    }
+  }, [listaTecnicos, tecnicoSelecionado]);
+
+  const rowsFiltrados = useMemo(() => {
+    return rows.filter((row) => {
+      const filtroCidade =
+        cidadeSelecionada === CIDADE_TODAS ||
+        normalizarCidade(row.cidade) === cidadeSelecionada;
+      const filtroTecnico =
+        tecnicoSelecionado === TECNICO_TODOS ||
+        nomeTecnicoDaLinha(row) === tecnicoSelecionado;
+      return filtroCidade && filtroTecnico;
+    });
+  }, [rows, cidadeSelecionada, tecnicoSelecionado]);
 
   const anosDisponiveis = useMemo(() => {
     const set = new Set<number>();
@@ -815,18 +844,18 @@ export function KpiDetalhamentoNotas() {
     setMesModal(mes);
     setBuscaTecnicoModal("");
     setSortConfig(null);
-    setTecnicoSelecionado(null);
+    setTecnicoDetalheModal(null);
     // Sincroniza apenas na abertura/troca do bairro (não quando o filtro global muda com o modal aberto).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- herdar ano/mes no momento da abertura
   }, [bairroDetalhe]);
 
   useEffect(() => {
-    if (tecnicoSelecionado == null) return;
+    if (tecnicoDetalheModal == null) return;
     setAnoTecnicoModal(anoModal);
     setMesTecnicoModal(mesModal);
     setSortConfigTecnico(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- herdar período do modal de bairro na abertura
-  }, [tecnicoSelecionado]);
+  }, [tecnicoDetalheModal]);
 
   useEffect(() => {
     if (bairroDetalhe == null) {
@@ -859,7 +888,7 @@ export function KpiDetalhamentoNotas() {
   }, [bairroDetalhe, anoModal, mesModal]);
 
   useEffect(() => {
-    if (tecnicoSelecionado == null || bairroDetalhe == null) {
+    if (tecnicoDetalheModal == null || bairroDetalhe == null) {
       setRowsTecnicoModal([]);
       setLoadingTecnicoModal(false);
       return;
@@ -886,7 +915,7 @@ export function KpiDetalhamentoNotas() {
     return () => {
       cancelled = true;
     };
-  }, [tecnicoSelecionado, bairroDetalhe, anoTecnicoModal, mesTecnicoModal]);
+  }, [tecnicoDetalheModal, bairroDetalhe, anoTecnicoModal, mesTecnicoModal]);
 
   const rankingBairros = useMemo(
     () => agregarVolumeNotasPorBairro(rowsFiltrados),
@@ -1020,15 +1049,22 @@ export function KpiDetalhamentoNotas() {
           : ano !== null
             ? `Ano ${ano} · todos os meses`
             : "Período filtrado";
-    return cidadeSelecionada === CIDADE_TODAS
-      ? `${base} · Todas as cidades`
-      : `${base} · ${cidadeSelecionada}`;
-  }, [filtrosLimpos, ano, mes, cidadeSelecionada]);
+    const cidadePart =
+      cidadeSelecionada === CIDADE_TODAS
+        ? "Todas as cidades"
+        : cidadeSelecionada;
+    const tecnicoPart =
+      tecnicoSelecionado === TECNICO_TODOS
+        ? "Todos os técnicos"
+        : tecnicoSelecionado;
+    return `${base} · ${cidadePart} · ${tecnicoPart}`;
+  }, [filtrosLimpos, ano, mes, cidadeSelecionada, tecnicoSelecionado]);
 
   const limparFiltros = () => {
     setAno(null);
     setMes(null);
     setCidadeSelecionada(CIDADE_TODAS);
+    setTecnicoSelecionado(TECNICO_TODOS);
   };
 
   const dadosModalBairro = useMemo(() => {
@@ -1039,12 +1075,23 @@ export function KpiDetalhamentoNotas() {
         (row) => normalizarCidade(row.cidade) === cidadeSelecionada,
       );
     }
+    if (tecnicoSelecionado !== TECNICO_TODOS) {
+      base = base.filter(
+        (row) => nomeTecnicoDaLinha(row) === tecnicoSelecionado,
+      );
+    }
     return agregarDetalheTecnicosPorBairro(
       base,
       bairroDetalhe,
       dicionarioBaixa,
     );
-  }, [bairroDetalhe, rowsModal, cidadeSelecionada, dicionarioBaixa]);
+  }, [
+    bairroDetalhe,
+    rowsModal,
+    cidadeSelecionada,
+    tecnicoSelecionado,
+    dicionarioBaixa,
+  ]);
 
   const dadosModalBairroFiltrados = useMemo(() => {
     const termo = buscaTecnicoModal.trim().toLowerCase();
@@ -1105,11 +1152,11 @@ export function KpiDetalhamentoNotas() {
   }, [bairroDetalhe, cidadeSelecionada, rowsModal]);
 
   const dadosOSPorTecnico = useMemo(() => {
-    if (!tecnicoSelecionado || !bairroDetalhe) return [];
+    if (!tecnicoDetalheModal || !bairroDetalhe) return [];
     const bairroNorm = normalizarBairro(bairroDetalhe);
     const filtradas = rowsTecnicoModal.filter((row) => {
       if (normalizarBairro(row.bairro) !== bairroNorm) return false;
-      if (nomeTecnicoDaLinha(row) !== tecnicoSelecionado) return false;
+      if (nomeTecnicoDaLinha(row) !== tecnicoDetalheModal) return false;
       if (
         cidadeModalBairro &&
         normalizarCidade(row.cidade) !== cidadeModalBairro
@@ -1120,7 +1167,7 @@ export function KpiDetalhamentoNotas() {
     });
     return agregarTiposOsPorTecnico(filtradas);
   }, [
-    tecnicoSelecionado,
+    tecnicoDetalheModal,
     bairroDetalhe,
     rowsTecnicoModal,
     cidadeModalBairro,
@@ -1163,27 +1210,27 @@ export function KpiDetalhamentoNotas() {
   }, [bairroDetalhe, cidadeModalBairro]);
 
   const tituloModalTecnico = useMemo(() => {
-    if (!tecnicoSelecionado || !bairroDetalhe) return "";
+    if (!tecnicoDetalheModal || !bairroDetalhe) return "";
     const cidade = cidadeModalBairro || "—";
-    return `Detalhamento - ${tecnicoSelecionado} - ${cidade} - ${bairroDetalhe}`;
-  }, [tecnicoSelecionado, bairroDetalhe, cidadeModalBairro]);
+    return `Detalhamento - ${tecnicoDetalheModal} - ${cidade} - ${bairroDetalhe}`;
+  }, [tecnicoDetalheModal, bairroDetalhe, cidadeModalBairro]);
 
   useEffect(() => {
     if (!bairroDetalhe) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (tecnicoSelecionado) {
-        setTecnicoSelecionado(null);
+      if (tecnicoDetalheModal) {
+        setTecnicoDetalheModal(null);
         return;
       }
       setBairroDetalhe(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [bairroDetalhe, tecnicoSelecionado]);
+  }, [bairroDetalhe, tecnicoDetalheModal]);
 
   const fecharModalBairro = () => {
-    setTecnicoSelecionado(null);
+    setTecnicoDetalheModal(null);
     setBairroDetalhe(null);
   };
 
@@ -1201,7 +1248,7 @@ export function KpiDetalhamentoNotas() {
       setAnoModal(ano);
       setMesModal(mes);
       setBuscaTecnicoModal("");
-      setTecnicoSelecionado(null);
+      setTecnicoDetalheModal(null);
       setBairroDetalhe(bairro);
     }
   };
@@ -1312,6 +1359,31 @@ export function KpiDetalhamentoNotas() {
                 {cidadesDisponiveis.map((cidade) => (
                   <SelectItem key={cidade} value={cidade}>
                     {cidade}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="detalhe-notas-tecnico"
+              className="shrink-0 text-sm font-medium"
+            >
+              Técnico:
+            </Label>
+            <Select
+              value={tecnicoSelecionado}
+              onValueChange={setTecnicoSelecionado}
+            >
+              <SelectTrigger id="detalhe-notas-tecnico" className="w-[220px]">
+                <SelectValue placeholder={TECNICO_TODOS} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TECNICO_TODOS}>{TECNICO_TODOS}</SelectItem>
+                {listaTecnicos.map((nome) => (
+                  <SelectItem key={nome} value={nome}>
+                    {nome}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1888,7 +1960,7 @@ export function KpiDetalhamentoNotas() {
                           <td className="px-2 py-2 font-medium text-gray-900">
                             <button
                               type="button"
-                              onClick={() => setTecnicoSelecionado(tec.nome)}
+                              onClick={() => setTecnicoDetalheModal(tec.nome)}
                               className="cursor-pointer text-left hover:text-blue-600 hover:underline"
                             >
                               {tec.nome}
@@ -1926,13 +1998,13 @@ export function KpiDetalhamentoNotas() {
         </div>
       ) : null}
 
-      {tecnicoSelecionado && bairroDetalhe ? (
+      {tecnicoDetalheModal && bairroDetalhe ? (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-tecnico-titulo"
-          onClick={() => setTecnicoSelecionado(null)}
+          onClick={() => setTecnicoDetalheModal(null)}
         >
           <div
             className="flex max-h-[90vh] w-[90vw] max-w-5xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
@@ -2060,7 +2132,7 @@ export function KpiDetalhamentoNotas() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setTecnicoSelecionado(null)}
+                  onClick={() => setTecnicoDetalheModal(null)}
                 >
                   Voltar
                 </Button>
@@ -2069,7 +2141,7 @@ export function KpiDetalhamentoNotas() {
                   variant="ghost"
                   size="icon"
                   aria-label="Fechar detalhe do técnico"
-                  onClick={() => setTecnicoSelecionado(null)}
+                  onClick={() => setTecnicoDetalheModal(null)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
