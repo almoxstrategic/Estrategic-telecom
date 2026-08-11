@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ChevronDown,
+  ChevronUp,
   FilterX,
   MapPin,
   Search,
   ThumbsDown,
   ThumbsUp,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -33,7 +36,11 @@ import {
   filtrarToaOsContabilizaveis,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
+import { getSupabaseClient } from "@/lib/supabase";
 import { normalizeNumeroWo } from "@/lib/toa-store";
+
+const DESCRICAO_BAIXA_DESCONHECIDA = "Motivo Desconhecido";
+const TIPO_OS_NAO_INFORMADO = "Tipo não informado";
 
 const MESES = [
   { value: 1, label: "Janeiro" },
@@ -52,6 +59,9 @@ const MESES = [
 
 const BAIRRO_NAO_INFORMADO = "Não Informado";
 const CIDADE_TODAS = "Todas";
+
+type ModalSortKey = "produtivas" | "improdutivas" | "aproveitamento";
+type ModalSortConfig = { key: ModalSortKey; direction: "asc" | "desc" };
 
 export type TecnicoRankingItem = {
   nome: string;
@@ -112,6 +122,10 @@ function formatPct(valor: number, total: number): string {
   return `${((valor / total) * 100).toFixed(1)}%`;
 }
 
+function formatAproveitamento(pct: number): string {
+  return `${pct.toFixed(1)}%`;
+}
+
 function formatCardShare(valor: number, total: number): string {
   return `${formatQuantidade(valor)} de ${formatQuantidade(total)} = ${formatPct(valor, total)}`;
 }
@@ -152,6 +166,207 @@ function top5FromRecord(rec: Record<string, number>): TecnicoRankingItem[] {
         b.valor - a.valor || a.nome.localeCompare(b.nome, "pt-BR"),
     )
     .slice(0, 5);
+}
+
+function normalizeCodigoBaixa(
+  value: string | number | null | undefined,
+): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return String(n);
+  return raw;
+}
+
+function descricaoDoCodigoBaixa(
+  codigo: string,
+  dicionario: Record<string, string>,
+): string {
+  return (
+    dicionario[codigo] ||
+    dicionario[codigo.padStart(3, "0")] ||
+    DESCRICAO_BAIXA_DESCONHECIDA
+  );
+}
+
+function labelTipoOs(row: ToaImportacaoRow): string {
+  const tipo = String(row.tipo_os ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return tipo || TIPO_OS_NAO_INFORMADO;
+}
+
+function topNLabelsFromRecord(
+  rec: Record<string, number>,
+  n: number,
+  totalBase: number,
+): string[] {
+  return Object.entries(rec)
+    .map(([label, qtd]) => ({ label, qtd }))
+    .sort(
+      (a, b) =>
+        b.qtd - a.qtd || a.label.localeCompare(b.label, "pt-BR"),
+    )
+    .slice(0, n)
+    .map((item) => {
+      const pct =
+        totalBase > 0 ? (item.qtd / totalBase) * 100 : 0;
+      return `${item.label} (${pct.toFixed(1)}%)`;
+    });
+}
+
+async function fetchDicionarioCodigosBaixa(): Promise<Record<string, string>> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("dicionario_codigos_baixa")
+    .select("codigo, descricao");
+  if (error) throw error;
+
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) {
+    const codigo = normalizeCodigoBaixa(row.codigo);
+    const descricao = String(row.descricao ?? "").trim();
+    if (!codigo || !descricao) continue;
+    map[codigo] = descricao;
+  }
+  return map;
+}
+
+export type TecnicoDetalheBairro = {
+  nome: string;
+  produtivas: number;
+  improdutivas: number;
+  /** Percentual 0–100: produtivas / (produtivas + improdutivas). */
+  aproveitamento: number;
+  top3TipoOsProd: string[];
+  top3TipoOsImprod: string[];
+};
+
+/**
+ * Detalhe do bairro agrupado por técnico (WO única para volume;
+ * Top 3 Tipo O.S. a partir das linhas de O.S.).
+ */
+export function agregarDetalheTecnicosPorBairro(
+  rows: ToaImportacaoRow[],
+  bairroAlvo: string,
+  dicionario: Record<string, string> = {},
+): TecnicoDetalheBairro[] {
+  const bairroNorm = normalizarBairro(bairroAlvo);
+  const rowsBairro = rows.filter(
+    (row) => normalizarBairro(row.bairro) === bairroNorm,
+  );
+
+  const byWo = new Map<
+    string,
+    {
+      statusNota: "Produtiva" | "Improdutiva";
+      nomeTecnico: string;
+    }
+  >();
+
+  for (const row of rowsBairro) {
+    const numeroWo = normalizeNumeroWo(row.numero_wo);
+    if (!numeroWo) continue;
+
+    const statusNota: "Produtiva" | "Improdutiva" =
+      row.status_nota === "Produtiva" ? "Produtiva" : "Improdutiva";
+    const nomeTecnico = nomeTecnicoDaLinha(row);
+
+    const prev = byWo.get(numeroWo);
+    if (!prev) {
+      byWo.set(numeroWo, { statusNota, nomeTecnico });
+      continue;
+    }
+    if (statusNota === "Produtiva") prev.statusNota = "Produtiva";
+    if (
+      (prev.nomeTecnico === "Sem nome" || !prev.nomeTecnico) &&
+      nomeTecnico !== "Sem nome"
+    ) {
+      prev.nomeTecnico = nomeTecnico;
+    }
+  }
+
+  type Bucket = {
+    produtivas: number;
+    improdutivas: number;
+    tiposProd: Record<string, number>;
+    tiposImprod: Record<string, number>;
+  };
+
+  const byTecnico = new Map<string, Bucket>();
+
+  const ensureBucket = (nome: string): Bucket => {
+    const existing = byTecnico.get(nome);
+    if (existing) return existing;
+    const created: Bucket = {
+      produtivas: 0,
+      improdutivas: 0,
+      tiposProd: {},
+      tiposImprod: {},
+    };
+    byTecnico.set(nome, created);
+    return created;
+  };
+
+  for (const { statusNota, nomeTecnico } of byWo.values()) {
+    const bucket = ensureBucket(nomeTecnico);
+    if (statusNota === "Produtiva") bucket.produtivas += 1;
+    else bucket.improdutivas += 1;
+  }
+
+  for (const row of rowsBairro) {
+    const nomeTecnico = nomeTecnicoDaLinha(row);
+    const bucket = ensureBucket(nomeTecnico);
+
+    if (row.status_nota === "Produtiva") {
+      const tipo = labelTipoOs(row);
+      bucket.tiposProd[tipo] = (bucket.tiposProd[tipo] ?? 0) + 1;
+      continue;
+    }
+
+    const codigo = normalizeCodigoBaixa(row.cod_baixa);
+    if (!codigo) continue;
+    const label = `${codigo} - ${descricaoDoCodigoBaixa(codigo, dicionario)}`;
+    bucket.tiposImprod[label] = (bucket.tiposImprod[label] ?? 0) + 1;
+  }
+
+  return Array.from(byTecnico.entries())
+    .map(([nome, bucket]) => {
+      const total = bucket.produtivas + bucket.improdutivas;
+      const totalTiposProd = Object.values(bucket.tiposProd).reduce(
+        (acc, qtd) => acc + qtd,
+        0,
+      );
+      const totalTiposImprod = Object.values(bucket.tiposImprod).reduce(
+        (acc, qtd) => acc + qtd,
+        0,
+      );
+      return {
+        nome,
+        produtivas: bucket.produtivas,
+        improdutivas: bucket.improdutivas,
+        aproveitamento: total > 0 ? (bucket.produtivas / total) * 100 : 0,
+        // Percentual = qtd do tipo / total de O.S. produtivas (ou improdutivas) do técnico
+        top3TipoOsProd: topNLabelsFromRecord(
+          bucket.tiposProd,
+          3,
+          totalTiposProd,
+        ),
+        top3TipoOsImprod: topNLabelsFromRecord(
+          bucket.tiposImprod,
+          3,
+          totalTiposImprod,
+        ),
+      };
+    })
+    .filter((t) => t.produtivas > 0 || t.improdutivas > 0)
+    .sort(
+      (a, b) =>
+        b.produtivas + b.improdutivas - (a.produtivas + a.improdutivas) ||
+        b.produtivas - a.produtivas ||
+        a.nome.localeCompare(b.nome, "pt-BR"),
+    );
 }
 
 function BairroChartTooltip({
@@ -368,6 +583,16 @@ export function KpiDetalhamentoNotas() {
   const [paretoView, setParetoView] = useState<ParetoView>("Produtivas");
   const [buscaBairro, setBuscaBairro] = useState("");
   const [cidadeSelecionada, setCidadeSelecionada] = useState(CIDADE_TODAS);
+  const [bairroDetalhe, setBairroDetalhe] = useState<string | null>(null);
+  const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
+  const [anoModal, setAnoModal] = useState<number | null>(null);
+  const [mesModal, setMesModal] = useState<number | null>(null);
+  const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
+  const [loadingModal, setLoadingModal] = useState(false);
+  const [sortConfig, setSortConfig] = useState<ModalSortConfig | null>(null);
+  const [dicionarioBaixa, setDicionarioBaixa] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -378,6 +603,22 @@ export function KpiDetalhamentoNotas() {
         setCompetencias(comps);
       } catch {
         if (!cancelled) setCompetencias([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const map = await fetchDicionarioCodigosBaixa();
+        if (!cancelled) setDicionarioBaixa(map);
+      } catch (err) {
+        console.error("Erro ao carregar dicionário de códigos de baixa:", err);
+        if (!cancelled) setDicionarioBaixa({});
       }
     })();
     return () => {
@@ -466,6 +707,57 @@ export function KpiDetalhamentoNotas() {
     }
     return [...set].sort((a, b) => a - b);
   }, [competencias, ano]);
+
+  const mesesDisponiveisModal = useMemo(() => {
+    const set = new Set<number>();
+    for (const ym of competencias) {
+      const a = Math.floor(ym / 100);
+      const m = ym % 100;
+      if (anoModal !== null && a !== anoModal) continue;
+      if (m >= 1 && m <= 12) set.add(m);
+    }
+    return [...set].sort((a, b) => a - b);
+  }, [competencias, anoModal]);
+
+  useEffect(() => {
+    if (bairroDetalhe == null) return;
+    setAnoModal(ano);
+    setMesModal(mes);
+    setBuscaTecnicoModal("");
+    setSortConfig(null);
+    // Sincroniza apenas na abertura/troca do bairro (não quando o filtro global muda com o modal aberto).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- herdar ano/mes no momento da abertura
+  }, [bairroDetalhe]);
+
+  useEffect(() => {
+    if (bairroDetalhe == null) {
+      setRowsModal([]);
+      setLoadingModal(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setLoadingModal(true);
+      try {
+        const flat = await fetchToaImportacoes({
+          ano: anoModal,
+          mes: mesModal,
+          dia: null,
+        });
+        if (cancelled) return;
+        setRowsModal(filtrarToaOsContabilizaveis(flat));
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Erro ao carregar detalhe do bairro:", err);
+        setRowsModal([]);
+      } finally {
+        if (!cancelled) setLoadingModal(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bairroDetalhe, anoModal, mesModal]);
 
   const rankingBairros = useMemo(
     () => agregarVolumeNotasPorBairro(rowsFiltrados),
@@ -608,6 +900,113 @@ export function KpiDetalhamentoNotas() {
     setAno(null);
     setMes(null);
     setCidadeSelecionada(CIDADE_TODAS);
+  };
+
+  const dadosModalBairro = useMemo(() => {
+    if (!bairroDetalhe) return [];
+    let base = rowsModal;
+    if (cidadeSelecionada !== CIDADE_TODAS) {
+      base = base.filter(
+        (row) => normalizarCidade(row.cidade) === cidadeSelecionada,
+      );
+    }
+    return agregarDetalheTecnicosPorBairro(
+      base,
+      bairroDetalhe,
+      dicionarioBaixa,
+    );
+  }, [bairroDetalhe, rowsModal, cidadeSelecionada, dicionarioBaixa]);
+
+  const dadosModalBairroFiltrados = useMemo(() => {
+    const termo = buscaTecnicoModal.trim().toLowerCase();
+    if (!termo) return dadosModalBairro;
+    return dadosModalBairro.filter((t) =>
+      t.nome.toLowerCase().includes(termo),
+    );
+  }, [dadosModalBairro, buscaTecnicoModal]);
+
+  const dadosOrdenados = useMemo(() => {
+    if (!sortConfig) return dadosModalBairroFiltrados;
+    const { key, direction } = sortConfig;
+    return [...dadosModalBairroFiltrados].sort((a, b) => {
+      const diff = a[key] - b[key];
+      if (diff !== 0) return direction === "asc" ? diff : -diff;
+
+      // Desempate em Aproveitamento: maior volume de produtivas no topo (em desc)
+      if (key === "aproveitamento") {
+        const empateProd =
+          direction === "asc"
+            ? a.produtivas - b.produtivas
+            : b.produtivas - a.produtivas;
+        if (empateProd !== 0) return empateProd;
+      }
+
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [dadosModalBairroFiltrados, sortConfig]);
+
+  const handleSort = (key: ModalSortKey) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return {
+          key,
+          direction: prev.direction === "asc" ? "desc" : "asc",
+        };
+      }
+      return { key, direction: "desc" };
+    });
+  };
+
+  const cidadeModalBairro = useMemo(() => {
+    if (!bairroDetalhe) return "";
+    if (cidadeSelecionada !== CIDADE_TODAS) return cidadeSelecionada;
+
+    const counts = new Map<string, number>();
+    for (const row of rowsModal) {
+      if (normalizarBairro(row.bairro) !== bairroDetalhe) continue;
+      const cidade = normalizarCidade(row.cidade);
+      if (!cidade) continue;
+      counts.set(cidade, (counts.get(cidade) ?? 0) + 1);
+    }
+    const ordenado = [...counts.entries()].sort(
+      (a, b) =>
+        b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"),
+    );
+    return ordenado[0]?.[0] ?? "";
+  }, [bairroDetalhe, cidadeSelecionada, rowsModal]);
+
+  const tituloModalBairro = useMemo(() => {
+    if (!bairroDetalhe) return "";
+    return cidadeModalBairro
+      ? `${cidadeModalBairro} - ${bairroDetalhe}`
+      : bairroDetalhe;
+  }, [bairroDetalhe, cidadeModalBairro]);
+
+  useEffect(() => {
+    if (!bairroDetalhe) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBairroDetalhe(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [bairroDetalhe]);
+
+  const abrirDetalheBairro = (payload: unknown) => {
+    const data = payload as {
+      bairro?: string;
+      payload?: { bairro?: string };
+      activePayload?: Array<{ payload?: { bairro?: string } }>;
+    };
+    const bairro =
+      data?.payload?.bairro ??
+      data?.bairro ??
+      data?.activePayload?.[0]?.payload?.bairro;
+    if (typeof bairro === "string" && bairro.trim()) {
+      setAnoModal(ano);
+      setMesModal(mes);
+      setBuscaTecnicoModal("");
+      setBairroDetalhe(bairro);
+    }
   };
 
   return (
@@ -835,6 +1234,8 @@ export function KpiDetalhamentoNotas() {
                         fill="#16a34a"
                         radius={[0, 3, 3, 0]}
                         maxBarSize={22}
+                        cursor="pointer"
+                        onClick={abrirDetalheBairro}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -881,6 +1282,8 @@ export function KpiDetalhamentoNotas() {
                         fill="#ef4444"
                         radius={[0, 3, 3, 0]}
                         maxBarSize={22}
+                        cursor="pointer"
+                        onClick={abrirDetalheBairro}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1064,6 +1467,274 @@ export function KpiDetalhamentoNotas() {
           </div>
         </>
       )}
+
+      {bairroDetalhe ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-bairro-titulo"
+          onClick={() => setBairroDetalhe(null)}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="modal-bairro-titulo"
+                  className="text-lg font-bold text-foreground"
+                >
+                  {tituloModalBairro}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Detalhamento por técnico · clique fora ou Esc para fechar
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <div className="relative w-full max-w-xs">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="search"
+                      value={buscaTecnicoModal}
+                      onChange={(e) => setBuscaTecnicoModal(e.target.value)}
+                      placeholder="Buscar técnico..."
+                      aria-label="Buscar técnico"
+                      className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-bairro-ano"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Ano:
+                    </Label>
+                    <Select
+                      value={anoModal !== null ? String(anoModal) : "todos"}
+                      disabled={anosDisponiveis.length === 0}
+                      onValueChange={(v) => {
+                        if (v === "todos") {
+                          setAnoModal(null);
+                          setMesModal(null);
+                          return;
+                        }
+                        const novoAno = Number(v);
+                        const mesesDoAno = competencias
+                          .filter((ym) => Math.floor(ym / 100) === novoAno)
+                          .map((ym) => ym % 100)
+                          .sort((a, b) => a - b);
+                        setAnoModal(novoAno);
+                        setMesModal(mesesDoAno[mesesDoAno.length - 1] ?? null);
+                      }}
+                    >
+                      <SelectTrigger id="modal-bairro-ano" className="w-[120px]">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {anosDisponiveis.map((a) => (
+                          <SelectItem key={a} value={String(a)}>
+                            {a}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-bairro-mes"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Mês:
+                    </Label>
+                    <Select
+                      value={mesModal !== null ? String(mesModal) : "todos"}
+                      disabled={
+                        anoModal === null || mesesDisponiveisModal.length === 0
+                      }
+                      onValueChange={(v) => {
+                        if (v === "todos") {
+                          setMesModal(null);
+                          return;
+                        }
+                        setMesModal(Number(v));
+                      }}
+                    >
+                      <SelectTrigger id="modal-bairro-mes" className="w-[140px]">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {mesesDisponiveisModal.map((m) => (
+                          <SelectItem key={m} value={String(m)}>
+                            {mesLabel(m)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                aria-label="Fechar"
+                onClick={() => setBairroDetalhe(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
+              {loadingModal ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Carregando técnicos do bairro...
+                </p>
+              ) : dadosModalBairro.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Nenhum técnico encontrado para este bairro no filtro atual.
+                </p>
+              ) : dadosModalBairroFiltrados.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Nenhum técnico encontrado para “{buscaTecnicoModal.trim()}”.
+                </p>
+              ) : (
+                <div className="relative max-h-[min(70vh,32rem)] overflow-y-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[58rem] text-sm">
+                    <thead className="sticky top-0 z-10 bg-white shadow-sm">
+                      <tr className="border-b border-border text-left text-muted-foreground">
+                        <th className="bg-white px-2 py-2 font-semibold">
+                          Nome (Técnico)
+                        </th>
+                        <th className="bg-white px-2 py-2 text-right font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleSort("produtivas")}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-gray-50"
+                          >
+                            Produtivas
+                            {sortConfig?.key === "produtivas" ? (
+                              sortConfig.direction === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                        <th className="bg-white px-2 py-2 text-right font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleSort("improdutivas")}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-gray-50"
+                          >
+                            Improdutivas
+                            {sortConfig?.key === "improdutivas" ? (
+                              sortConfig.direction === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                        <th className="bg-white px-2 py-2 text-right font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleSort("aproveitamento")}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-gray-50"
+                          >
+                            Aproveitamento
+                            {sortConfig?.key === "aproveitamento" ? (
+                              sortConfig.direction === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                        <th className="bg-white px-2 py-2 font-semibold">
+                          Top 3 Tipo O.S Prod.
+                        </th>
+                        <th className="bg-white px-2 py-2 font-semibold">
+                          Top 3 Tipo O.S Improd.
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dadosOrdenados.map((tec) => (
+                        <tr
+                          key={tec.nome}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td className="px-2 py-2 font-medium text-gray-900">
+                            {tec.nome}
+                          </td>
+                          <td className="px-2 py-2 text-right tabular-nums text-green-700">
+                            {formatQuantidade(tec.produtivas)}
+                          </td>
+                          <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                            {formatQuantidade(tec.improdutivas)}
+                          </td>
+                          <td
+                            className={`px-2 py-2 text-right tabular-nums font-semibold ${
+                              tec.aproveitamento >= 70
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {formatAproveitamento(tec.aproveitamento)}
+                          </td>
+                          <td className="max-w-[14rem] px-2 py-2 text-xs text-gray-700">
+                            {tec.top3TipoOsProd.length > 0 ? (
+                              <ul className="space-y-0.5">
+                                {tec.top3TipoOsProd.map((item) => (
+                                  <li
+                                    key={item}
+                                    className="truncate"
+                                    title={item}
+                                  >
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="max-w-[16rem] px-2 py-2 text-xs text-gray-700">
+                            {tec.top3TipoOsImprod.length > 0 ? (
+                              <ul className="space-y-0.5">
+                                {tec.top3TipoOsImprod.map((item) => (
+                                  <li
+                                    key={item}
+                                    className="truncate"
+                                    title={item}
+                                  >
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
