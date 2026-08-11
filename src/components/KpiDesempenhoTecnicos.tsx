@@ -26,6 +26,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { FiltroCombobox } from "@/components/FiltroCombobox";
 import type { KpiTopTecnico } from "@/lib/logistica-types";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import type { PrecoOs, PrecosOsMap } from "@/lib/precos-os-service";
@@ -37,6 +38,7 @@ import {
 import { isTecnicoDemitido, type TecnicoProfile } from "@/lib/team-service";
 import { ATIVIDADES_TOA_CATALOGO } from "@/lib/toa-atividades-catalogo";
 import {
+  fetchToaImportacoes,
   filtrarAnaliticoPorDhBaixa,
   formatDhBaixaDisplay,
   parseDhBaixaAnoMes,
@@ -61,6 +63,7 @@ import {
   isStatusExecutada,
   normalizeTipoOs,
   normalizeToaLogin,
+  regroupFlatRowsToChamados,
   statusNotaToa,
   valorPrecoOs,
   valorReceitaFaturadaOs,
@@ -750,19 +753,17 @@ function KpiDesempenhoProjecaoToa({
   const [abaNotasToa, setAbaNotasToa] =
     useState<TipoDetalheNotas>("produtivas");
   const [buscaDetalheNotas, setBuscaDetalheNotas] = useState("");
-  const [filtroLocalAno, setFiltroLocalAno] = useState<number | null>(
-    filtroPeriodo.ano,
-  );
-  const [filtroLocalMes, setFiltroLocalMes] = useState<number | null>(
-    filtroPeriodo.mes,
-  );
-  const [filtroLocalDia, setFiltroLocalDia] = useState<number | null>(
-    filtroPeriodo.dia,
-  );
+  /** Período local do modal (independente do filtro global da página). */
+  const [anoModal, setAnoModal] = useState<number | null>(filtroPeriodo.ano);
+  const [mesModal, setMesModal] = useState<number | null>(filtroPeriodo.mes);
+  const [diaModal, setDiaModal] = useState<number | null>(filtroPeriodo.dia);
   const [buscaWoContrato, setBuscaWoContrato] = useState("");
-  const [filtroTipoOsModal, setFiltroTipoOsModal] = useState("todos");
-  const [filtroCodBaixaModal, setFiltroCodBaixaModal] = useState("todos");
-  const [filtroStatusModal, setFiltroStatusModal] = useState("todos");
+  const [filtroTipoOsModal, setFiltroTipoOsModal] = useState("Todos");
+  const [filtroCodBaixaModal, setFiltroCodBaixaModal] = useState("Todos");
+  const [filtroStatusModal, setFiltroStatusModal] = useState("Todos");
+  /** Base TOA própria do modal (não herda o recorte global da página). */
+  const [toaOsRowsModal, setToaOsRowsModal] = useState<ToaImportacaoRow[]>([]);
+  const [loadingToaModal, setLoadingToaModal] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: null,
     direction: "asc",
@@ -785,18 +786,61 @@ function KpiDesempenhoProjecaoToa({
   };
 
   const abrirDetalheTecnico = (login: string, nome: string) => {
-    setFiltroLocalAno(filtroPeriodo.ano);
-    setFiltroLocalMes(filtroPeriodo.mes);
-    setFiltroLocalDia(filtroPeriodo.dia);
-    setBuscaWoContrato("");
-    setFiltroTipoOsModal("todos");
-    setFiltroCodBaixaModal("todos");
-    setFiltroStatusModal("todos");
     setTecnicoSelecionado({
       login: normalizeToaLogin(login),
       nome,
     });
   };
+
+  useEffect(() => {
+    if (!tecnicoSelecionado) return;
+    setAnoModal(filtroPeriodo.ano);
+    setMesModal(filtroPeriodo.mes);
+    setDiaModal(filtroPeriodo.dia);
+    setBuscaWoContrato("");
+    setFiltroTipoOsModal("Todos");
+    setFiltroCodBaixaModal("Todos");
+    setFiltroStatusModal("Todos");
+    // Herda o período global apenas na abertura/troca do técnico.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tecnicoSelecionado]);
+
+  useEffect(() => {
+    if (!tecnicoSelecionado) {
+      setToaOsRowsModal([]);
+      setLoadingToaModal(false);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      setLoadingToaModal(true);
+      try {
+        const flat = await fetchToaImportacoes({
+          ano: anoModal,
+          mes: mesModal,
+          dia: diaModal,
+        });
+        if (cancelled) return;
+        const login = normalizeToaLogin(tecnicoSelecionado.login);
+        setToaOsRowsModal(
+          filtrarToaOsContabilizaveis(flat).filter(
+            (row) => normalizeToaLogin(row.login_tecnico) === login,
+          ),
+        );
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Erro ao carregar TOA do modal do técnico:", err);
+        setToaOsRowsModal([]);
+      } finally {
+        if (!cancelled) setLoadingToaModal(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tecnicoSelecionado, anoModal, mesModal, diaModal]);
 
   const abrirDetalheNotas = (tipo: TipoDetalheNotas) => {
     setBuscaDetalheNotas("");
@@ -813,11 +857,11 @@ function KpiDesempenhoProjecaoToa({
 
   const filtroLocalPeriodo = useMemo(
     () => ({
-      ano: filtroLocalAno,
-      mes: filtroLocalMes,
-      dia: filtroLocalDia,
+      ano: anoModal,
+      mes: mesModal,
+      dia: diaModal,
     }),
-    [filtroLocalAno, filtroLocalMes, filtroLocalDia],
+    [anoModal, mesModal, diaModal],
   );
 
   const periodoLabelLocal = useMemo(
@@ -1297,9 +1341,8 @@ function KpiDesempenhoProjecaoToa({
 
   const chamadosDoTecnicoBrutos = useMemo(() => {
     if (!tecnicoSelecionado) return [];
-    const login = normalizeToaLogin(tecnicoSelecionado.login);
-    return chamadosProcessados.filter((chamado) => chamado.login === login);
-  }, [tecnicoSelecionado, chamadosProcessados]);
+    return regroupFlatRowsToChamados(toaOsRowsModal);
+  }, [tecnicoSelecionado, toaOsRowsModal]);
 
   const anosDisponiveisModal = useMemo(() => {
     const anos = new Set<number>();
@@ -1307,44 +1350,67 @@ function KpiDesempenhoProjecaoToa({
       const ano = Number(chamado.data.split("-")[0]);
       if (ano) anos.add(ano);
     }
+    if (anoModal !== null) anos.add(anoModal);
     return [...anos].sort((a, b) => b - a);
-  }, [chamadosDoTecnicoBrutos]);
+  }, [chamadosDoTecnicoBrutos, anoModal]);
 
   const mesesDisponiveisModal = useMemo(() => {
-    if (filtroLocalAno === null) return [];
+    if (anoModal === null) return [];
     const meses = new Set<number>();
     for (const chamado of chamadosDoTecnicoBrutos) {
       const [ano, mes] = chamado.data.split("-").map(Number);
-      if (ano === filtroLocalAno && mes) meses.add(mes);
+      if (ano === anoModal && mes) meses.add(mes);
     }
+    if (mesModal !== null) meses.add(mesModal);
     return [...meses].sort((a, b) => a - b);
-  }, [chamadosDoTecnicoBrutos, filtroLocalAno]);
+  }, [chamadosDoTecnicoBrutos, anoModal, mesModal]);
 
   const osDoTecnico = useMemo(() => {
     if (!tecnicoSelecionado) return [];
+    // Isolamento: período estritamente local (anoModal/mesModal/diaModal).
     const chamadosFiltradosPeriodo = filtrarChamadosToa(
       chamadosDoTecnicoBrutos,
-      filtroLocalPeriodo,
+      {
+        ano: anoModal,
+        mes: mesModal,
+        dia: diaModal,
+      },
     );
     return flattenChamadosToa(chamadosFiltradosPeriodo).sort((a, b) => {
       const byDate = a.data.localeCompare(b.data);
       if (byDate !== 0) return byDate;
       return a.numeroWo.localeCompare(b.numeroWo, "pt-BR");
     });
-  }, [tecnicoSelecionado, chamadosDoTecnicoBrutos, filtroLocalPeriodo]);
+  }, [
+    tecnicoSelecionado,
+    chamadosDoTecnicoBrutos,
+    anoModal,
+    mesModal,
+    diaModal,
+  ]);
 
   const statusNotaPorWoTecnico = useMemo(() => {
     const map = new Map<string, "Produtiva" | "Improdutiva">();
     if (!tecnicoSelecionado) return map;
     const chamadosFiltradosPeriodo = filtrarChamadosToa(
       chamadosDoTecnicoBrutos,
-      filtroLocalPeriodo,
+      {
+        ano: anoModal,
+        mes: mesModal,
+        dia: diaModal,
+      },
     );
     for (const chamado of chamadosFiltradosPeriodo) {
       map.set(chamado.numeroWo, statusNotaToa(chamado.ordensDeServico));
     }
     return map;
-  }, [tecnicoSelecionado, chamadosDoTecnicoBrutos, filtroLocalPeriodo]);
+  }, [
+    tecnicoSelecionado,
+    chamadosDoTecnicoBrutos,
+    anoModal,
+    mesModal,
+    diaModal,
+  ]);
 
   const receitaPeriodoModal = useMemo(() => {
     return osDoTecnico.reduce((total, os) => {
@@ -1391,13 +1457,13 @@ function KpiDesempenhoProjecaoToa({
   const osDoTecnicoTabela = useMemo(() => {
     const termo = buscaWoContrato.trim().toLowerCase();
     const tipoFiltro =
-      filtroTipoOsModal === "todos"
+      filtroTipoOsModal === "Todos"
         ? null
         : normalizeTipoOs(filtroTipoOsModal);
     const codBaixaFiltro =
-      filtroCodBaixaModal === "todos" ? null : filtroCodBaixaModal;
+      filtroCodBaixaModal === "Todos" ? null : filtroCodBaixaModal;
     const statusFiltro =
-      filtroStatusModal === "todos" ? null : filtroStatusModal;
+      filtroStatusModal === "Todos" ? null : filtroStatusModal;
 
     return osDoTecnico.filter((os) => {
       if (tipoFiltro && normalizeTipoOs(os.tipoOs) !== tipoFiltro) {
@@ -2802,8 +2868,9 @@ function KpiDesempenhoProjecaoToa({
                   {periodoLabelLocal}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {formatQuantidade(osDoTecnico.length)} O.S. no período
-                  selecionado · Receita: {formatReceita(receitaPeriodoModal)}
+                  {loadingToaModal
+                    ? "Carregando O.S. do período selecionado..."
+                    : `${formatQuantidade(osDoTecnico.length)} O.S. no período selecionado · Receita: ${formatReceita(receitaPeriodoModal)}`}
                 </p>
               </div>
               <button
@@ -2820,19 +2887,19 @@ function KpiDesempenhoProjecaoToa({
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 Ano:
                 <select
-                  value={filtroLocalAno !== null ? String(filtroLocalAno) : "todos"}
+                  value={anoModal !== null ? String(anoModal) : "todos"}
                   onChange={(e) => {
                     const value = e.target.value;
                     if (value === "todos") {
-                      setFiltroLocalAno(null);
-                      setFiltroLocalMes(null);
-                      setFiltroLocalDia(null);
+                      setAnoModal(null);
+                      setMesModal(null);
+                      setDiaModal(null);
                       return;
                     }
                     const ano = Number(value);
-                    setFiltroLocalAno(ano);
-                    setFiltroLocalMes(null);
-                    setFiltroLocalDia(null);
+                    setAnoModal(ano);
+                    setMesModal(null);
+                    setDiaModal(null);
                   }}
                   className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none"
                 >
@@ -2848,17 +2915,17 @@ function KpiDesempenhoProjecaoToa({
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 Mês:
                 <select
-                  value={filtroLocalMes !== null ? String(filtroLocalMes) : "todos"}
-                  disabled={filtroLocalAno === null}
+                  value={mesModal !== null ? String(mesModal) : "todos"}
+                  disabled={anoModal === null}
                   onChange={(e) => {
                     const value = e.target.value;
                     if (value === "todos") {
-                      setFiltroLocalMes(null);
-                      setFiltroLocalDia(null);
+                      setMesModal(null);
+                      setDiaModal(null);
                       return;
                     }
-                    setFiltroLocalMes(Number(value));
-                    setFiltroLocalDia(null);
+                    setMesModal(Number(value));
+                    setDiaModal(null);
                   }}
                   className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none disabled:opacity-50"
                 >
@@ -2879,11 +2946,11 @@ function KpiDesempenhoProjecaoToa({
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 Dia:
                 <select
-                  value={filtroLocalDia !== null ? String(filtroLocalDia) : "todos"}
-                  disabled={filtroLocalAno === null || filtroLocalMes === null}
+                  value={diaModal !== null ? String(diaModal) : "todos"}
+                  disabled={anoModal === null || mesModal === null}
                   onChange={(e) => {
                     const value = e.target.value;
-                    setFiltroLocalDia(value === "todos" ? null : Number(value));
+                    setDiaModal(value === "todos" ? null : Number(value));
                   }}
                   className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none disabled:opacity-50"
                 >
@@ -2899,9 +2966,13 @@ function KpiDesempenhoProjecaoToa({
               <button
                 type="button"
                 onClick={() => {
-                  setFiltroLocalAno(null);
-                  setFiltroLocalMes(null);
-                  setFiltroLocalDia(null);
+                  setAnoModal(null);
+                  setMesModal(null);
+                  setDiaModal(null);
+                  setBuscaWoContrato("");
+                  setFiltroTipoOsModal("Todos");
+                  setFiltroCodBaixaModal("Todos");
+                  setFiltroStatusModal("Todos");
                 }}
                 className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
               >
@@ -2911,7 +2982,11 @@ function KpiDesempenhoProjecaoToa({
             </div>
 
             <div className="mb-6 h-64 w-full rounded-lg border border-gray-200 p-3">
-              {tendenciaPorData.length === 0 ? (
+              {loadingToaModal ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  Carregando tendência do período...
+                </div>
+              ) : tendenciaPorData.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   Nenhuma nota encontrada para este técnico no período.
                 </div>
@@ -2987,48 +3062,33 @@ function KpiDesempenhoProjecaoToa({
               />
               <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                 <span className="shrink-0">Tipo de OS:</span>
-                <select
+                <FiltroCombobox
+                  id="modal-tecnico-tipo-os"
                   value={filtroTipoOsModal}
-                  onChange={(e) => setFiltroTipoOsModal(e.target.value)}
-                  className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
-                >
-                  <option value="todos">Todos</option>
-                  {tiposOsModal.map((tipoOs) => (
-                    <option key={tipoOs} value={tipoOs}>
-                      {tipoOs}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFiltroTipoOsModal}
+                  options={tiposOsModal}
+                  placeholder="Todos"
+                />
               </label>
               <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                 <span className="shrink-0">Cód de Baixa:</span>
-                <select
+                <FiltroCombobox
+                  id="modal-tecnico-cod-baixa"
                   value={filtroCodBaixaModal}
-                  onChange={(e) => setFiltroCodBaixaModal(e.target.value)}
-                  className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
-                >
-                  <option value="todos">Todos</option>
-                  {codigosBaixaModal.map((codigo) => (
-                    <option key={codigo} value={codigo}>
-                      {codigo}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFiltroCodBaixaModal}
+                  options={codigosBaixaModal}
+                  placeholder="Todos"
+                />
               </label>
               <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                 <span className="shrink-0">Status:</span>
-                <select
+                <FiltroCombobox
+                  id="modal-tecnico-status"
                   value={filtroStatusModal}
-                  onChange={(e) => setFiltroStatusModal(e.target.value)}
-                  className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-2 py-2 text-sm text-foreground outline-none"
-                >
-                  <option value="todos">Todos</option>
-                  {statusOsModal.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFiltroStatusModal}
+                  options={statusOsModal}
+                  placeholder="Todos"
+                />
               </label>
             </div>
 
@@ -3050,7 +3110,16 @@ function KpiDesempenhoProjecaoToa({
                   </tr>
                 </thead>
                 <tbody>
-                  {osDoTecnicoTabela.length === 0 ? (
+                  {loadingToaModal ? (
+                    <tr>
+                      <td
+                        colSpan={11}
+                        className="px-3 py-8 text-center text-muted-foreground"
+                      >
+                        Carregando O.S. do período...
+                      </td>
+                    </tr>
+                  ) : osDoTecnicoTabela.length === 0 ? (
                     <tr>
                       <td
                         colSpan={11}
