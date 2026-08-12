@@ -619,7 +619,8 @@ export function AnaliseComportamento() {
     });
   }, [notasFiltradas]);
 
-  const notasImprodutivas = useMemo(() => {
+  /** Quebras do período (Ano/Mês/Técnico) — referencial do total geral. */
+  const notasImprodutivasGlobais = useMemo(() => {
     return rowsFiltradas.filter((row) => {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) return false;
@@ -627,7 +628,16 @@ export function AnaliseComportamento() {
     });
   }, [rowsFiltradas, dicionario]);
 
-  const totalQuebras = notasImprodutivas.length;
+  /** Base dos cards 1–4 e 6: com filtro de código, restringe; senão = globais. */
+  const notasAlvo = useMemo(() => {
+    if (!codigoFiltro) return notasImprodutivasGlobais;
+    return notasImprodutivasGlobais.filter(
+      (row) => normalizeCodigoBaixa(row.cod_baixa) === codigoFiltro,
+    );
+  }, [notasImprodutivasGlobais, codigoFiltro]);
+
+  const totalNotasGlobais = notasImprodutivasGlobais.length;
+  const totalNotasAlvo = notasAlvo.length;
 
   const rowsParaTop10 = useMemo(() => {
     if (!codigoFiltro) return rowsFiltradas;
@@ -639,7 +649,7 @@ export function AnaliseComportamento() {
   const porTurno = useMemo(() => {
     let manha = 0;
     let tarde = 0;
-    for (const row of notasImprodutivas) {
+    for (const row of notasAlvo) {
       const turno = turnoDaRow(row);
       if (turno === "Manhã") manha += 1;
       else if (turno === "Tarde") tarde += 1;
@@ -652,9 +662,10 @@ export function AnaliseComportamento() {
         { name: "Tarde", value: tarde, fill: PIE_COLORS.tarde },
       ].filter((p) => p.value > 0),
     };
-  }, [notasImprodutivas]);
+  }, [notasAlvo]);
 
   const turnoMaiorFadiga = useMemo(() => {
+    if (!notasAlvo.length) return null;
     if (porTurno.manha === 0 && porTurno.tarde === 0) return null;
     if (porTurno.tarde > porTurno.manha) {
       return { turno: "Tarde" as const, quebras: porTurno.tarde };
@@ -663,9 +674,13 @@ export function AnaliseComportamento() {
       return { turno: "Manhã" as const, quebras: porTurno.manha };
     }
     return { turno: "Empate" as const, quebras: porTurno.manha };
-  }, [porTurno]);
+  }, [notasAlvo.length, porTurno]);
 
   const janelasImprodutivas = useMemo(() => {
+    if (!notasAlvo.length) {
+      return { macro: null, micro: null };
+    }
+
     const vencedora = (counts: Map<string, number>) => {
       let melhor: string | null = null;
       let quantidade = 0;
@@ -686,20 +701,8 @@ export function AnaliseComportamento() {
       return melhor ? { janela: melhor, quantidade } : null;
     };
 
-    const turnoVencedor = turnoMaiorFadiga?.turno;
-    if (!turnoVencedor || turnoVencedor === "Empate") {
-      return { macro: null, micro: null };
-    }
-
-    const notasDoTurnoVencedor = notasImprodutivas.filter(
-      (row) => turnoDaRow(row) === turnoVencedor,
-    );
-    if (notasDoTurnoVencedor.length === 0) {
-      return { macro: null, micro: null };
-    }
-
     const countsMacro = new Map<string, number>();
-    for (const row of notasDoTurnoVencedor) {
+    for (const row of notasAlvo) {
       const macro = String(row.janela_servico_1 ?? "").trim();
       if (!macro) continue;
       countsMacro.set(macro, (countsMacro.get(macro) ?? 0) + 1);
@@ -710,7 +713,7 @@ export function AnaliseComportamento() {
     }
 
     const countsMicro = new Map<string, number>();
-    for (const row of notasDoTurnoVencedor) {
+    for (const row of notasAlvo) {
       const janelaMacro = String(row.janela_servico_1 ?? "").trim();
       if (janelaMacro !== macro.janela) continue;
       const micro = String(row.janela_servico_2 ?? "").trim();
@@ -722,20 +725,18 @@ export function AnaliseComportamento() {
       macro,
       micro: vencedora(countsMicro),
     };
-  }, [notasImprodutivas, turnoMaiorFadiga]);
+  }, [notasAlvo]);
 
   const janelaImprodutivaMacro = janelasImprodutivas.macro;
   const janelaImprodutivaMicro = janelasImprodutivas.micro;
 
   const codOfensor = useMemo(() => {
     const counts = new Map<string, number>();
-    let totalImprodutivas = 0;
+    const totalImprodutivas = notasImprodutivasGlobais.length;
 
-    for (const row of rowsFiltradas) {
+    for (const row of notasImprodutivasGlobais) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
-      totalImprodutivas += 1;
       counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
     }
 
@@ -757,7 +758,15 @@ export function AnaliseComportamento() {
     }
 
     if (!melhorCodigo || totalImprodutivas === 0) {
-      return { totalImprodutivas, counts, ofensor: null as null | { codigo: string; quantidade: number; pct: number } };
+      return {
+        totalImprodutivas,
+        counts,
+        ofensor: null as null | {
+          codigo: string;
+          quantidade: number;
+          pct: number;
+        },
+      };
     }
     return {
       totalImprodutivas,
@@ -768,29 +777,29 @@ export function AnaliseComportamento() {
         pct: (melhorQtd / totalImprodutivas) * 100,
       },
     };
-  }, [rowsFiltradas, dicionario]);
+  }, [notasImprodutivasGlobais]);
 
   const codigoOfensorVencedor = codOfensor.ofensor?.codigo ?? null;
   const codigoAlvo = codigoFiltro || codigoOfensorVencedor;
 
+  /** Card 5: ofensor global ou código filtrado vs total geral. */
   const cardCodigoExibido = useMemo(() => {
     if (!codigoFiltro) return codOfensor.ofensor;
-    if (codOfensor.totalImprodutivas === 0) return null;
-    const quantidade = codOfensor.counts.get(codigoFiltro) ?? 0;
+    if (totalNotasGlobais === 0) return null;
     return {
       codigo: codigoFiltro,
-      quantidade,
-      pct: (quantidade / codOfensor.totalImprodutivas) * 100,
+      quantidade: totalNotasAlvo,
+      pct: (totalNotasAlvo / totalNotasGlobais) * 100,
     };
-  }, [codigoFiltro, codOfensor]);
+  }, [codigoFiltro, codOfensor.ofensor, totalNotasAlvo, totalNotasGlobais]);
 
   const tipoOfensorMacro = useMemo(() => {
-    const counts = new Map<string, number>();
+    if (!notasAlvo.length) return null;
 
-    for (const row of rowsFiltradas) {
+    const counts = new Map<string, number>();
+    for (const row of notasAlvo) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
       const motivo =
         motivoQuebraDoCodigo(codigo, dicionario)?.trim() || "Não classificado";
       counts.set(motivo, (counts.get(motivo) ?? 0) + 1);
@@ -813,24 +822,39 @@ export function AnaliseComportamento() {
       }
     }
     return melhor ? { motivo: melhor, quantidade } : null;
-  }, [rowsFiltradas, dicionario]);
+  }, [notasAlvo, dicionario]);
 
+  /** Card 3: dia com mais ocorrências em notasAlvo. */
   const diaMaisCritico = useMemo(() => {
-    let best: DiaSemanaAgg | null = null;
-    for (const d of porDiaSemana) {
-      const volume = d.produtivas + d.improdutivas;
-      if (volume === 0) continue;
-      if (
-        !best ||
-        d.taxaReprovacao > best.taxaReprovacao ||
-        (d.taxaReprovacao === best.taxaReprovacao &&
-          d.improdutivas > best.improdutivas)
-      ) {
-        best = d;
+    if (!notasAlvo.length) return null;
+
+    const counts = new Map<number, number>();
+    for (const row of notasAlvo) {
+      const dow = diaDaSemanaFromIso(row.data_toa);
+      if (dow == null || dow === 0) continue;
+      counts.set(dow, (counts.get(dow) ?? 0) + 1);
+    }
+
+    let bestDow: number | null = null;
+    let bestQtd = 0;
+    for (const [dow, qtd] of counts) {
+      if (qtd > bestQtd || (qtd === bestQtd && bestDow != null && dow < bestDow)) {
+        bestDow = dow;
+        bestQtd = qtd;
+      } else if (bestDow == null && qtd > 0) {
+        bestDow = dow;
+        bestQtd = qtd;
       }
     }
-    return best;
-  }, [porDiaSemana]);
+    if (bestDow == null || bestQtd === 0) return null;
+
+    const meta = DIAS_UTEIS.find((d) => d.dow === bestDow);
+    return {
+      dia: meta?.label ?? "—",
+      quantidade: bestQtd,
+      pct: (bestQtd / totalNotasAlvo) * 100,
+    };
+  }, [notasAlvo, totalNotasAlvo]);
 
   const rankingUsoCodigo = useMemo((): RankingUsoCodigo[] => {
     if (!codigoAlvo) return [];
@@ -1253,10 +1277,14 @@ export function AnaliseComportamento() {
     setCodigoFiltro(null);
   };
 
-  const fracaoSobreTotal = (qtd: number) => {
-    const pct = totalQuebras > 0 ? (qtd / totalQuebras) * 100 : 0;
-    return `${formatQuantidade(qtd)} de ${formatQuantidade(totalQuebras)} (${formatPct(pct)})`;
+  const fracaoSobre = (qtd: number, total: number) => {
+    const pct = total > 0 ? (qtd / total) * 100 : 0;
+    return `${formatQuantidade(qtd)} de ${formatQuantidade(total)} (${formatPct(pct)})`;
   };
+
+  const fracaoSobreAlvo = (qtd: number) => fracaoSobre(qtd, totalNotasAlvo);
+  const fracaoSobreGlobais = (qtd: number) =>
+    fracaoSobre(qtd, totalNotasGlobais);
 
   useEffect(() => {
     if (!modalTop10Aberto) return;
@@ -1440,7 +1468,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMacro
-                    ? `maior volume de quebras - ${fracaoSobreTotal(janelaImprodutivaMacro.quantidade)}`
+                    ? `maior volume de quebras - ${fracaoSobreAlvo(janelaImprodutivaMacro.quantidade)}`
                     : "maior volume de quebras"}
                 </p>
               </div>
@@ -1461,7 +1489,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMicro
-                    ? `maior volume de quebras - ${fracaoSobreTotal(janelaImprodutivaMicro.quantidade)}`
+                    ? `maior volume de quebras - ${fracaoSobreAlvo(janelaImprodutivaMicro.quantidade)}`
                     : "maior volume de quebras"}
                 </p>
               </div>
@@ -1480,7 +1508,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {diaMaisCritico
-                    ? `${formatPct(diaMaisCritico.taxaReprovacao)} de reprovação - ${formatQuantidade(diaMaisCritico.improdutivas)} de ${formatQuantidade(totalQuebras)}`
+                    ? `${formatPct(diaMaisCritico.pct)} de reprovação - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(totalNotasAlvo)}`
                     : "Sem dados no período"}
                 </p>
               </div>
@@ -1503,7 +1531,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {turnoMaiorFadiga
-                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalQuebras)}`
+                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalNotasAlvo)}`
                     : "Sem horário de início-fim"}
                 </p>
               </div>
@@ -1524,7 +1552,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {cardCodigoExibido
-                    ? `recorrência - ${fracaoSobreTotal(cardCodigoExibido.quantidade)}`
+                    ? `recorrência - ${fracaoSobreGlobais(cardCodigoExibido.quantidade)}`
                     : "recorrência"}
                 </p>
               </div>
@@ -1543,7 +1571,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {tipoOfensorMacro
-                    ? `categoria com maior índice - ${fracaoSobreTotal(tipoOfensorMacro.quantidade)}`
+                    ? `categoria com maior índice - ${fracaoSobreAlvo(tipoOfensorMacro.quantidade)}`
                     : "categoria com maior índice"}
                 </p>
               </div>
