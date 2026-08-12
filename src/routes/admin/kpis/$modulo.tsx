@@ -9,6 +9,7 @@ import { KpiDesempenhoTecnicos } from "@/components/KpiDesempenhoTecnicos";
 import { KpiDetalhamentoNotas } from "@/components/KpiDetalhamentoNotas";
 import { KpiVolumeNotas } from "@/components/KpiVolumeNotas";
 import { MotivosQuebra } from "@/components/MotivosQuebra";
+import { UltimaImportacaoStamp } from "@/components/UltimaImportacaoStamp";
 import { MaterialCombobox } from "@/components/MaterialCombobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1356,6 +1357,9 @@ function KpisPage() {
                           : "Carregando faturamento do período…"
                 : "Acompanhamento do consumo de materiais e miscelâneas por técnico."}
             </p>
+            <div className="mt-1.5">
+              <UltimaImportacaoStamp />
+            </div>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
             ← Voltar ao painel

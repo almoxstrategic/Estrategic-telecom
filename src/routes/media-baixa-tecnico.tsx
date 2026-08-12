@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronsUpDown, Filter, TrendingUp, X } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { UltimaImportacaoStamp } from "@/components/UltimaImportacaoStamp";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -706,6 +707,9 @@ function MediaBaixaTecnicoPage() {
           <p className="mt-1 text-center text-sm text-gray-500 sm:text-left">
             (Esse modulo é um protótipo)
           </p>
+          <div className="mt-1.5 text-center sm:text-left">
+            <UltimaImportacaoStamp />
+          </div>
         </header>
 
         <div className="mb-6 flex flex-wrap items-end gap-4">

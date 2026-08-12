@@ -464,13 +464,6 @@ function agregarRankingJanelasMacro(params: {
   );
 }
 
-function notaNoDiaLabel(row: ToaImportacaoRow, diaLabel: string): boolean {
-  const dow = diaDaSemanaFromIso(row.data_toa);
-  if (dow == null || dow === 0) return false;
-  const meta = DIAS_UTEIS.find((d) => d.dow === dow);
-  return meta?.label === diaLabel;
-}
-
 function nomeTecnicoRow(row: ToaImportacaoRow): string {
   const nome = row.nome_tecnico?.trim();
   if (nome) return nome;
@@ -629,7 +622,7 @@ export function AnaliseComportamento() {
     useState<StatusContratoFiltro>("IMPRODUTIVO");
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
   const [modalDiaAberto, setModalDiaAberto] = useState(false);
-  const [diaFiltroModal, setDiaFiltroModal] = useState<string | null>(null);
+  const [diaFiltroModal, setDiaFiltroModal] = useState<string>("Seg");
   const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
   const [modalAno, setModalAno] = useState<number | null>(null);
   const [modalMes, setModalMes] = useState<number | null>(null);
@@ -651,9 +644,6 @@ export function AnaliseComportamento() {
     coluna: "produtivasGeral",
     direcao: "desc",
   });
-  const [filtroJanela, setFiltroJanela] = useState("Todos");
-  const [filtroDia, setFiltroDia] = useState("Todos");
-  const [filtroCodBaixa, setFiltroCodBaixa] = useState("Todos");
   const [buscaCodBaixa, setBuscaCodBaixa] = useState("");
   const [buscaTecnicoRank, setBuscaTecnicoRank] = useState("");
 
@@ -1098,7 +1088,7 @@ export function AnaliseComportamento() {
     return { ranking, macro, micro: vencedoraTaxa(bucketsMicro) };
   }, [statusFiltro, notasAlvo, notasFiltradas, dicionario, codigoFiltro]);
 
-  const rankingPorJanelaBase = analiseJanelasMacro.ranking;
+  const rankingPorJanela = analiseJanelasMacro.ranking;
   const janelaImprodutivaMacro = analiseJanelasMacro.macro;
   const janelaImprodutivaMicro = analiseJanelasMacro.micro;
 
@@ -1446,82 +1436,6 @@ export function AnaliseComportamento() {
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
-  /** Aba Janela: filtros locais (Dia recalcula a agregação macro; Janela/Código filtram linhas). */
-  const rankingPorJanelaFiltradoBase = useMemo((): JanelaImprodutivaAgg[] => {
-    if (filtroDia === "Todos") return rankingPorJanelaBase;
-    const notasAlvoDia = notasAlvo.filter((row) =>
-      notaNoDiaLabel(row, filtroDia),
-    );
-    const notasFiltradasDia = notasFiltradas.filter((row) =>
-      notaNoDiaLabel(row, filtroDia),
-    );
-    return agregarRankingJanelasMacro({
-      statusFiltro,
-      notasAlvo: notasAlvoDia,
-      notasFiltradas: notasFiltradasDia,
-      dicionario,
-      isQuebra: isQuebraCard,
-    });
-  }, [
-    rankingPorJanelaBase,
-    filtroDia,
-    notasAlvo,
-    notasFiltradas,
-    statusFiltro,
-    dicionario,
-    codigoFiltro,
-  ]);
-
-  const opcoesFiltroJanelaAba = useMemo(() => {
-    const set = new Set(rankingPorJanelaFiltradoBase.map((r) => r.janela));
-    return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [rankingPorJanelaFiltradoBase]);
-
-  const opcoesFiltroCodBaixaAba = useMemo(() => {
-    const set = new Set(
-      rankingPorJanelaFiltradoBase
-        .map((r) => r.codigoVencedor)
-        .filter((c) => c && c !== "—"),
-    );
-    return [...set].sort(
-      (a, b) => Number(a) - Number(b) || a.localeCompare(b, "pt-BR"),
-    );
-  }, [rankingPorJanelaFiltradoBase]);
-
-  const rankingPorJanela = useMemo(() => {
-    return rankingPorJanelaFiltradoBase.filter((row) => {
-      if (filtroJanela !== "Todos" && row.janela !== filtroJanela) return false;
-      if (filtroCodBaixa !== "Todos" && row.codigoVencedor !== filtroCodBaixa) {
-        return false;
-      }
-      return true;
-    });
-  }, [rankingPorJanelaFiltradoBase, filtroJanela, filtroCodBaixa]);
-
-  useEffect(() => {
-    setFiltroJanela("Todos");
-    setFiltroDia("Todos");
-    setFiltroCodBaixa("Todos");
-  }, [statusFiltro]);
-
-  useEffect(() => {
-    if (
-      filtroJanela !== "Todos" &&
-      !opcoesFiltroJanelaAba.includes(filtroJanela)
-    ) {
-      setFiltroJanela("Todos");
-    }
-  }, [filtroJanela, opcoesFiltroJanelaAba]);
-
-  useEffect(() => {
-    if (
-      filtroCodBaixa !== "Todos" &&
-      !opcoesFiltroCodBaixaAba.includes(filtroCodBaixa)
-    ) {
-      setFiltroCodBaixa("Todos");
-    }
-  }, [filtroCodBaixa, opcoesFiltroCodBaixaAba]);
-
   /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
   const todosCodigosBaixa = useMemo(
     () => agregarMotivosQuebra(notasAlvo, dicionario, statusFiltro),
@@ -1549,13 +1463,6 @@ export function AnaliseComportamento() {
 
   const fecharModalDia = () => {
     setModalDiaAberto(false);
-  };
-
-  const limparFiltrosModalDia = () => {
-    setDiaFiltroModal(null);
-    setBuscaTecnicoModal("");
-    setModalAno(ano);
-    setModalMes(mes);
   };
 
   useEffect(() => {
@@ -1605,14 +1512,13 @@ export function AnaliseComportamento() {
   );
 
   const diaDowModal = useMemo(() => {
-    if (!diaFiltroModal) return null;
-    return DIAS_UTEIS.find((d) => d.curto === diaFiltroModal)?.dow ?? null;
+    return DIAS_UTEIS.find((d) => d.curto === diaFiltroModal)?.dow ?? 1;
   }, [diaFiltroModal]);
 
-  const modoDiaEspecifico = diaDowModal != null;
+  const modoDiaEspecifico = true;
 
   const detalheTecnicosDia = useMemo((): TecnicoDiaDetalheAgg[] => {
-    if (!modalDiaAberto || !modoDiaEspecifico || diaDowModal == null) return [];
+    if (!modalDiaAberto) return [];
 
     const porTecnico = new Map<
       string,
@@ -1906,12 +1812,9 @@ export function AnaliseComportamento() {
   };
 
   const tituloModalDia = useMemo(() => {
-    if (modoDiaEspecifico && diaFiltroModal) {
-      const dia = DIAS_UTEIS.find((d) => d.curto === diaFiltroModal);
-      return `Detalhamento - Improdutiva · ${dia?.label ?? diaFiltroModal}`;
-    }
-    return "Detalhamento - Improdutiva · Matriz da semana";
-  }, [modoDiaEspecifico, diaFiltroModal]);
+    const dia = DIAS_UTEIS.find((d) => d.curto === diaFiltroModal);
+    return `Detalhamento - Improdutiva · ${dia?.label ?? diaFiltroModal}`;
+  }, [diaFiltroModal]);
 
   const filtrosLimpos = ano === null && mes === null;
   const visaoEquipe = tecnicoFiltro === TECNICO_TODOS;
@@ -2951,108 +2854,6 @@ export function AnaliseComportamento() {
 
             {abaAtiva === "janela" && (
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <Label
-                        htmlFor="aba-janela-filtro-janela"
-                        className="shrink-0 text-xs font-medium text-muted-foreground"
-                      >
-                        Janela:
-                      </Label>
-                      <Select
-                        value={filtroJanela}
-                        onValueChange={setFiltroJanela}
-                      >
-                        <SelectTrigger
-                          id="aba-janela-filtro-janela"
-                          className="h-8 w-[140px] text-xs"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Todos">Todos</SelectItem>
-                          {opcoesFiltroJanelaAba.map((j) => (
-                            <SelectItem key={j} value={j}>
-                              {formatarJanelaHorario(j)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Label
-                        htmlFor="aba-janela-filtro-dia"
-                        className="shrink-0 text-xs font-medium text-muted-foreground"
-                      >
-                        Dia:
-                      </Label>
-                      <Select value={filtroDia} onValueChange={setFiltroDia}>
-                        <SelectTrigger
-                          id="aba-janela-filtro-dia"
-                          className="h-8 w-[130px] text-xs"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Todos">Todos</SelectItem>
-                          {DIAS_UTEIS.map((d) => (
-                            <SelectItem key={d.dow} value={d.label}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Label
-                        htmlFor="aba-janela-filtro-codigo"
-                        className="shrink-0 text-xs font-medium text-muted-foreground"
-                      >
-                        Cód Baixa:
-                      </Label>
-                      <Select
-                        value={filtroCodBaixa}
-                        onValueChange={setFiltroCodBaixa}
-                      >
-                        <SelectTrigger
-                          id="aba-janela-filtro-codigo"
-                          className="h-8 w-[110px] text-xs"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Todos">Todos</SelectItem>
-                          {opcoesFiltroCodBaixaAba.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-muted-foreground"
-                    disabled={
-                      filtroJanela === "Todos" &&
-                      filtroDia === "Todos" &&
-                      filtroCodBaixa === "Todos"
-                    }
-                    onClick={() => {
-                      setFiltroJanela("Todos");
-                      setFiltroDia("Todos");
-                      setFiltroCodBaixa("Todos");
-                    }}
-                  >
-                    <FilterX className="h-4 w-4" />
-                    Limpar filtros
-                  </Button>
-                </div>
-
                 {rankingPorJanela.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     {isModoImprodutivo
@@ -3332,16 +3133,13 @@ export function AnaliseComportamento() {
                       Dia:
                     </Label>
                     <Select
-                      value={diaFiltroModal ?? "todos"}
-                      onValueChange={(v) =>
-                        setDiaFiltroModal(v === "todos" ? null : v)
-                      }
+                      value={diaFiltroModal}
+                      onValueChange={setDiaFiltroModal}
                     >
                       <SelectTrigger id="modal-dia-semana" className="w-[120px]">
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue placeholder="Dia" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
                         {DIAS_UTEIS.map((d) => (
                           <SelectItem key={d.dow} value={d.curto}>
                             {d.curto}
@@ -3350,17 +3148,6 @@ export function AnaliseComportamento() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={limparFiltrosModalDia}
-                  >
-                    <FilterX className="h-4 w-4" />
-                    Limpar Filtros
-                  </Button>
                 </div>
               </div>
               <button

@@ -17,6 +17,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { AppHeader } from "@/components/AppHeader";
+import { UltimaImportacaoStamp } from "@/components/UltimaImportacaoStamp";
 import { celularToWhatsAppUrl } from "@/lib/auth-identificacao";
 import { fetchEngajamentoEvidencias, fetchHistoricoLancamentos } from "@/lib/evidencias-service";
 import { fetchPendenciasEvidencias, incrementNumeroCobrancas } from "@/lib/logistica-service";
@@ -761,6 +762,9 @@ ${listaDeWOsFormatada}
               WOs com SLA negativo (status 3) para auditar se o gargalo é do técnico ou da
               operadora.
             </p>
+            <div className="mt-1.5">
+              <UltimaImportacaoStamp />
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button

@@ -3,6 +3,7 @@ import { useEffect, useId, useState, type ChangeEvent, type DragEvent } from "re
 import { FileSpreadsheet, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { UltimaImportacaoStamp } from "@/components/UltimaImportacaoStamp";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-store";
 import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
@@ -474,6 +475,9 @@ function ImportacaoPage() {
               importações seguem o fluxo atual. Admin, Gerente e COP têm o mesmo
               mapeamento de colunas e as mesmas permissões neste módulo.
             </p>
+            <div className="mt-1.5">
+              <UltimaImportacaoStamp />
+            </div>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">
             ← Voltar ao painel
