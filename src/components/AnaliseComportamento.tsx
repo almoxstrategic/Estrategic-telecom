@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
   Brain,
   CalendarDays,
   Clock,
@@ -36,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FiltroCombobox } from "@/components/FiltroCombobox";
+import { Top10CodigosBaixaChart } from "@/components/Top10CodigosBaixaChart";
 import {
   fetchCompetenciasToa,
   fetchToaImportacoes,
@@ -415,6 +417,7 @@ export function AnaliseComportamento() {
   const [modalMes, setModalMes] = useState<number | null>(null);
   const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
+  const [modalTop10Aberto, setModalTop10Aberto] = useState(false);
   const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
     coluna: "produtivas",
     direcao: "desc",
@@ -623,6 +626,15 @@ export function AnaliseComportamento() {
       return statusContratoDoCodigo(codigo, dicionario) === "IMPRODUTIVO";
     });
   }, [rowsFiltradas, dicionario]);
+
+  const totalQuebras = notasImprodutivas.length;
+
+  const rowsParaTop10 = useMemo(() => {
+    if (!codigoFiltro) return rowsFiltradas;
+    return rowsFiltradas.filter(
+      (row) => normalizeCodigoBaixa(row.cod_baixa) === codigoFiltro,
+    );
+  }, [rowsFiltradas, codigoFiltro]);
 
   const porTurno = useMemo(() => {
     let manha = 0;
@@ -1241,6 +1253,20 @@ export function AnaliseComportamento() {
     setCodigoFiltro(null);
   };
 
+  const fracaoSobreTotal = (qtd: number) => {
+    const pct = totalQuebras > 0 ? (qtd / totalQuebras) * 100 : 0;
+    return `${formatQuantidade(qtd)} de ${formatQuantidade(totalQuebras)} (${formatPct(pct)})`;
+  };
+
+  useEffect(() => {
+    if (!modalTop10Aberto) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModalTop10Aberto(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modalTop10Aberto]);
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
@@ -1413,7 +1439,9 @@ export function AnaliseComportamento() {
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
-                  maior volume de quebras
+                  {janelaImprodutivaMacro
+                    ? `maior volume de quebras - ${fracaoSobreTotal(janelaImprodutivaMacro.quantidade)}`
+                    : "maior volume de quebras"}
                 </p>
               </div>
             </div>
@@ -1432,7 +1460,9 @@ export function AnaliseComportamento() {
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
-                  maior volume de quebras
+                  {janelaImprodutivaMicro
+                    ? `maior volume de quebras - ${fracaoSobreTotal(janelaImprodutivaMicro.quantidade)}`
+                    : "maior volume de quebras"}
                 </p>
               </div>
             </div>
@@ -1450,7 +1480,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {diaMaisCritico
-                    ? `${formatPct(diaMaisCritico.taxaReprovacao)} de reprovação`
+                    ? `${formatPct(diaMaisCritico.taxaReprovacao)} de reprovação - ${formatQuantidade(diaMaisCritico.improdutivas)} de ${formatQuantidade(totalQuebras)}`
                     : "Sem dados no período"}
                 </p>
               </div>
@@ -1473,7 +1503,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {turnoMaiorFadiga
-                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras`
+                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalQuebras)}`
                     : "Sem horário de início-fim"}
                 </p>
               </div>
@@ -1492,7 +1522,11 @@ export function AnaliseComportamento() {
                   : "—"}
               </div>
               <div className="mt-auto">
-                <p className="mt-1 text-xs text-muted-foreground">recorrência</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {cardCodigoExibido
+                    ? `recorrência - ${fracaoSobreTotal(cardCodigoExibido.quantidade)}`
+                    : "recorrência"}
+                </p>
               </div>
             </div>
 
@@ -1508,7 +1542,9 @@ export function AnaliseComportamento() {
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
-                  categoria com maior índice
+                  {tipoOfensorMacro
+                    ? `categoria com maior índice - ${fracaoSobreTotal(tipoOfensorMacro.quantidade)}`
+                    : "categoria com maior índice"}
                 </p>
               </div>
             </div>
@@ -1633,21 +1669,35 @@ export function AnaliseComportamento() {
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
+            <div className="mb-4 flex w-full items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-bold text-foreground">
+                {visaoEquipe ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    {codigoAlvo
+                      ? `Ranking de Uso: ${codigoAlvo}`
+                      : "Ranking de Uso"}
+                  </>
+                ) : (
+                  <>
+                    <UserRound className="h-4 w-4 text-primary" />
+                    Raio-X de Quebras do Técnico
+                  </>
+                )}
+              </h2>
               {visaoEquipe ? (
-                <>
-                  <AlertTriangle className="h-4 w-4 text-orange-600" />
-                  {codigoAlvo
-                    ? `Ranking de Uso: ${codigoAlvo}`
-                    : "Ranking de Uso"}
-                </>
-              ) : (
-                <>
-                  <UserRound className="h-4 w-4 text-primary" />
-                  Raio-X de Quebras do Técnico
-                </>
-              )}
-            </h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => setModalTop10Aberto(true)}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Top 10 Cód. Quebras
+                </Button>
+              ) : null}
+            </div>
 
             {visaoEquipe ? (
               !codigoAlvo ? (
@@ -2176,6 +2226,53 @@ export function AnaliseComportamento() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalTop10Aberto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-top10-titulo"
+          onClick={() => setModalTop10Aberto(false)}
+        >
+          <div
+            className="flex max-h-[90vh] w-[95vw] max-w-4xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div>
+                <h2
+                  id="modal-top10-titulo"
+                  className="text-lg font-bold text-foreground"
+                >
+                  Top 10 Cód. Quebras
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Contexto atual dos filtros · Esc ou fora para fechar
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalTop10Aberto(false)}
+                className="rounded-md p-1 text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
+              <Top10CodigosBaixaChart
+                rows={rowsParaTop10}
+                dicionario={dicionario}
+                statusNota="IMPRODUTIVO"
+                titulo="Top 10 Motivos de Quebra"
+                emptyMessage="Nenhuma O.S. improdutiva no contexto filtrado."
+                chartHeightClassName="h-96"
+              />
             </div>
           </div>
         </div>

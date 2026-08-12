@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -7,15 +6,6 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Top10CodigosBaixaChart } from "@/components/Top10CodigosBaixaChart";
 import {
   fetchCompetenciasToa,
   fetchToaImportacoes,
@@ -39,6 +30,7 @@ import {
   statusContratoDoCodigo,
   type DicionarioCodigosBaixaMap,
 } from "@/lib/dicionario-codigos-baixa";
+import { useEffect, useMemo, useState } from "react";
 
 const MESES = [
   { value: 1, label: "Janeiro" },
@@ -76,24 +68,6 @@ export type MotivoQuebraMacroAgg = {
 type TecnicoQuebraAgg = {
   nome: string;
   quantidade: number;
-};
-
-type ChartMotivoPoint = {
-  codigo: string;
-  descricao: string;
-  motivoQuebra: string;
-  labelCompleta: string;
-  quantidade: number;
-};
-
-type MotivoChartTooltipProps = {
-  active?: boolean;
-  label?: string | number;
-  corQuantidade?: string;
-  payload?: Array<{
-    value?: number | string;
-    payload?: ChartMotivoPoint;
-  }>;
 };
 
 function mesLabel(mes: number): string {
@@ -186,35 +160,6 @@ export function agregarMotivosQuebraMacro(
     );
 }
 
-function MotivoChartTooltip({
-  active,
-  payload,
-  label,
-  corQuantidade = "text-red-600",
-}: MotivoChartTooltipProps) {
-  if (!active || !payload?.length) return null;
-  const entry = payload[0]!;
-  const data = entry.payload;
-  const valor = Number(entry.value) || 0;
-  const codigo = String(label ?? data?.codigo ?? "—");
-  const descricao = data?.descricao || DESCRICAO_DESCONHECIDA;
-  const tipo = data?.motivoQuebra || MOTIVO_MACRO_NAO_CLASSIFICADO;
-
-  return (
-    <div className="max-w-sm rounded-md border border-gray-200 bg-white p-3 shadow-md">
-      <p className="text-sm font-bold text-gray-900">
-        Cód. Baixa {codigo} - {descricao} - TIPO: {tipo}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Quantidade:{" "}
-        <span className={`font-semibold tabular-nums ${corQuantidade}`}>
-          {formatQuantidade(valor)}
-        </span>
-      </p>
-    </div>
-  );
-}
-
 export function MotivosQuebra() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -230,7 +175,6 @@ export function MotivosQuebra() {
 
   const isImprodutivo = statusNota === "IMPRODUTIVO";
   const corTexto = isImprodutivo ? "text-red-600" : "text-green-600";
-  const corBarra = isImprodutivo ? "#ef4444" : "#16a34a";
   const IconeStatus = isImprodutivo ? XCircle : CheckCircle2;
   const tituloCardTotal = isImprodutivo
     ? "Total de Quebras (O.S)"
@@ -369,21 +313,6 @@ export function MotivosQuebra() {
     if (macros.length === 0) return null;
     return macros[0]!;
   }, [rows, dicionario, statusNota]);
-
-  const chartTop10 = useMemo(
-    (): ChartMotivoPoint[] =>
-      [...porMotivo]
-        .sort((a, b) => b.quantidade - a.quantidade)
-        .slice(0, 10)
-        .map((m) => ({
-          codigo: m.codigo,
-          descricao: m.descricao,
-          motivoQuebra: m.motivoQuebra,
-          labelCompleta: m.labelCompleta,
-          quantidade: m.quantidade,
-        })),
-    [porMotivo],
-  );
 
   const motivoDetalhe = useMemo(() => {
     if (!codigoDetalhe) return null;
@@ -644,59 +573,14 @@ export function MotivosQuebra() {
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
-              <AlertTriangle className={`h-4 w-4 ${corTexto}`} />
-              {tituloTop10}
-            </h2>
-            {chartTop10.length === 0 ? (
-              <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                {emptyChartMsg}
-              </p>
-            ) : (
-              <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartTop10}
-                    layout="vertical"
-                    margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      allowDecimals={false}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="codigo"
-                      width={72}
-                      tick={{ fontSize: 11 }}
-                      reversed={false}
-                    />
-                    <Tooltip
-                      content={
-                        <MotivoChartTooltip corQuantidade={corTexto} />
-                      }
-                      cursor={{ fill: "#f3f4f6" }}
-                    />
-                    <Bar
-                      dataKey="quantidade"
-                      fill={corBarra}
-                      radius={[0, 3, 3, 0]}
-                      maxBarSize={22}
-                      className="cursor-pointer"
-                      onClick={(data) => {
-                        const payload = (data?.payload ?? data) as
-                          | ChartMotivoPoint
-                          | undefined;
-                        const codigo = payload?.codigo;
-                        if (codigo) setCodigoDetalhe(codigo);
-                      }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <Top10CodigosBaixaChart
+              rows={rows}
+              dicionario={dicionario}
+              statusNota={statusNota}
+              titulo={tituloTop10}
+              emptyMessage={emptyChartMsg}
+              onCodigoClick={setCodigoDetalhe}
+            />
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
