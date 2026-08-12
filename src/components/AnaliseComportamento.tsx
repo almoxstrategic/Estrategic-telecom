@@ -5,10 +5,12 @@ import {
   CalendarDays,
   Clock,
   FilterX,
+  Search,
   Sunrise,
   Sunset,
   Target,
   UserRound,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -116,6 +118,44 @@ type RaioXQuebra = {
   numeroWo: string;
 };
 
+type Top3TipoOsItem = {
+  nome: string;
+  percentual: number;
+};
+
+type TecnicoDiaDetalheAgg = {
+  nome: string;
+  produtivas: number;
+  improdutivas: number;
+  aproveitamento: number;
+  top3Prod: Top3TipoOsItem[];
+  top3Improd: Top3TipoOsItem[];
+};
+
+type OrdemDirecao = "asc" | "desc";
+
+type OrdemDiaState = {
+  coluna: "produtivas" | "improdutivas" | "aproveitamento";
+  direcao: OrdemDirecao;
+};
+
+type OrdemMatrizState = {
+  coluna: "produtivasTotal" | "aprovGeral" | number;
+  direcao: OrdemDirecao;
+};
+
+type DiaCelulaSemana = {
+  aproveitamento: number | null;
+  piorJanela: string | null;
+};
+
+type TecnicoSemanaMatrizAgg = {
+  nome: string;
+  produtivasTotal: number;
+  aproveitamentoGeral: number;
+  porDia: Record<number, DiaCelulaSemana>;
+};
+
 function mesLabel(mes: number): string {
   return MESES.find((m) => m.value === mes)?.label ?? String(mes);
 }
@@ -187,6 +227,13 @@ function classificarTurno(hora: number): Turno {
   return hora <= 12 ? "Manhã" : "Tarde";
 }
 
+/** Turno da O.S. a partir do horário de início em inicio_fim. */
+function turnoDaRow(row: ToaImportacaoRow): Turno | null {
+  const hora = extrairHoraInicio(row.inicio_fim);
+  if (hora == null) return null;
+  return classificarTurno(hora);
+}
+
 function formatHoraDeInicioFim(inicioFim: string | null | undefined): string {
   const s = String(inicioFim ?? "").trim();
   if (!s) return "—";
@@ -200,6 +247,78 @@ function nomeTecnicoRow(row: ToaImportacaoRow): string {
   if (nome) return nome;
   const login = normalizeToaLogin(row.login_tecnico);
   return login || "—";
+}
+
+function top3TipoOsLabels(notas: ToaImportacaoRow[]): Top3TipoOsItem[] {
+  const counts = new Map<string, number>();
+  for (const nota of notas) {
+    const tipo = String(nota.tipo_os ?? "").trim() || "—";
+    counts.set(tipo, (counts.get(tipo) ?? 0) + 1);
+  }
+  const total = [...counts.values()].reduce((acc, n) => acc + n, 0);
+  if (total === 0) return [];
+  return [...counts.entries()]
+    .sort(
+      (a, b) =>
+        b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"),
+    )
+    .slice(0, 3)
+    .map(([tipo, qtd]) => ({
+      nome: tipo,
+      percentual: (qtd / total) * 100,
+    }));
+}
+
+function setaOrdenacao(
+  ativa: boolean,
+  direcao: OrdemDirecao,
+): string {
+  if (!ativa) return "";
+  return direcao === "asc" ? " ↑" : " ↓";
+}
+
+function valorOrdenacaoComNulos(
+  valor: number | null | undefined,
+  direcao: OrdemDirecao,
+): number {
+  if (valor == null || !Number.isFinite(valor)) {
+    return direcao === "desc"
+      ? Number.NEGATIVE_INFINITY
+      : Number.POSITIVE_INFINITY;
+  }
+  return valor;
+}
+
+function piorJanelaImprodutiva(
+  notas: ToaImportacaoRow[],
+  dicionario: DicionarioCodigosBaixaMap,
+): string | null {
+  const counts = new Map<string, number>();
+  for (const row of notas) {
+    const codigo = normalizeCodigoBaixa(row.cod_baixa);
+    if (!codigo) continue;
+    if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+    const janela = String(row.janela_servico_1 ?? "").trim();
+    if (!janela) continue;
+    counts.set(janela, (counts.get(janela) ?? 0) + 1);
+  }
+  let melhor: string | null = null;
+  let qtdMax = 0;
+  for (const [janela, qtd] of counts) {
+    if (
+      qtd > qtdMax ||
+      (qtd === qtdMax &&
+        melhor != null &&
+        janela.localeCompare(melhor, "pt-BR") < 0)
+    ) {
+      melhor = janela;
+      qtdMax = qtd;
+    } else if (melhor == null && qtd > 0) {
+      melhor = janela;
+      qtdMax = qtd;
+    }
+  }
+  return melhor;
 }
 
 /** 1 nota (WO) por chave — status_nota da visita. */
@@ -237,6 +356,17 @@ export function AnaliseComportamento() {
   const [mes, setMes] = useState<number | null>(null);
   const [tecnicoFiltro, setTecnicoFiltro] = useState<string>(TECNICO_TODOS);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
+  const [modalDiaAberto, setModalDiaAberto] = useState(false);
+  const [diaFiltroModal, setDiaFiltroModal] = useState<string | null>(null);
+  const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
+  const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
+    coluna: "aproveitamento",
+    direcao: "desc",
+  });
+  const [ordemMatriz, setOrdemMatriz] = useState<OrdemMatrizState>({
+    coluna: "aprovGeral",
+    direcao: "desc",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -394,14 +524,21 @@ export function AnaliseComportamento() {
     });
   }, [notasFiltradas]);
 
+  const notasImprodutivas = useMemo(() => {
+    return rowsFiltradas.filter((row) => {
+      const codigo = normalizeCodigoBaixa(row.cod_baixa);
+      if (!codigo) return false;
+      return statusContratoDoCodigo(codigo, dicionario) === "IMPRODUTIVO";
+    });
+  }, [rowsFiltradas, dicionario]);
+
   const porTurno = useMemo(() => {
     let manha = 0;
     let tarde = 0;
-    for (const row of quebrasOs) {
-      const hora = extrairHoraInicio(row.inicio_fim);
-      if (hora == null) continue;
-      if (classificarTurno(hora) === "Manhã") manha += 1;
-      else tarde += 1;
+    for (const row of notasImprodutivas) {
+      const turno = turnoDaRow(row);
+      if (turno === "Manhã") manha += 1;
+      else if (turno === "Tarde") tarde += 1;
     }
     return {
       manha,
@@ -411,37 +548,80 @@ export function AnaliseComportamento() {
         { name: "Tarde", value: tarde, fill: PIE_COLORS.tarde },
       ].filter((p) => p.value > 0),
     };
-  }, [quebrasOs]);
+  }, [notasImprodutivas]);
 
-  const janelaImprodutiva = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of rowsFiltradas) {
-      const codigo = normalizeCodigoBaixa(row.cod_baixa);
-      if (!codigo) continue;
-      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
-      const janela = String(row.janela_servico_1 ?? "").trim();
-      if (!janela) continue;
-      counts.set(janela, (counts.get(janela) ?? 0) + 1);
+  const turnoMaiorFadiga = useMemo(() => {
+    if (porTurno.manha === 0 && porTurno.tarde === 0) return null;
+    if (porTurno.tarde > porTurno.manha) {
+      return { turno: "Tarde" as const, quebras: porTurno.tarde };
     }
+    if (porTurno.manha > porTurno.tarde) {
+      return { turno: "Manhã" as const, quebras: porTurno.manha };
+    }
+    return { turno: "Empate" as const, quebras: porTurno.manha };
+  }, [porTurno]);
 
-    let vencedora: string | null = null;
-    let quantidade = 0;
-    for (const [janela, qtd] of counts) {
-      if (
-        qtd > quantidade ||
-        (qtd === quantidade &&
-          vencedora != null &&
-          janela.localeCompare(vencedora, "pt-BR") < 0)
-      ) {
-        vencedora = janela;
-        quantidade = qtd;
-      } else if (vencedora == null && qtd > 0) {
-        vencedora = janela;
-        quantidade = qtd;
+  const janelasImprodutivas = useMemo(() => {
+    const vencedora = (counts: Map<string, number>) => {
+      let melhor: string | null = null;
+      let quantidade = 0;
+      for (const [janela, qtd] of counts) {
+        if (
+          qtd > quantidade ||
+          (qtd === quantidade &&
+            melhor != null &&
+            janela.localeCompare(melhor, "pt-BR") < 0)
+        ) {
+          melhor = janela;
+          quantidade = qtd;
+        } else if (melhor == null && qtd > 0) {
+          melhor = janela;
+          quantidade = qtd;
+        }
       }
+      return melhor ? { janela: melhor, quantidade } : null;
+    };
+
+    const turnoVencedor = turnoMaiorFadiga?.turno;
+    if (!turnoVencedor || turnoVencedor === "Empate") {
+      return { macro: null, micro: null };
     }
-    return vencedora ? { janela: vencedora, quantidade } : null;
-  }, [rowsFiltradas, dicionario]);
+
+    const notasDoTurnoVencedor = notasImprodutivas.filter(
+      (row) => turnoDaRow(row) === turnoVencedor,
+    );
+    if (notasDoTurnoVencedor.length === 0) {
+      return { macro: null, micro: null };
+    }
+
+    const countsMacro = new Map<string, number>();
+    for (const row of notasDoTurnoVencedor) {
+      const macro = String(row.janela_servico_1 ?? "").trim();
+      if (!macro) continue;
+      countsMacro.set(macro, (countsMacro.get(macro) ?? 0) + 1);
+    }
+    const macro = vencedora(countsMacro);
+    if (!macro) {
+      return { macro: null, micro: null };
+    }
+
+    const countsMicro = new Map<string, number>();
+    for (const row of notasDoTurnoVencedor) {
+      const janelaMacro = String(row.janela_servico_1 ?? "").trim();
+      if (janelaMacro !== macro.janela) continue;
+      const micro = String(row.janela_servico_2 ?? "").trim();
+      if (!micro) continue;
+      countsMicro.set(micro, (countsMicro.get(micro) ?? 0) + 1);
+    }
+
+    return {
+      macro,
+      micro: vencedora(countsMicro),
+    };
+  }, [notasImprodutivas, turnoMaiorFadiga]);
+
+  const janelaImprodutivaMacro = janelasImprodutivas.macro;
+  const janelaImprodutivaMicro = janelasImprodutivas.micro;
 
   const codOfensor = useMemo(() => {
     const counts = new Map<string, number>();
@@ -527,17 +707,6 @@ export function AnaliseComportamento() {
     }
     return best;
   }, [porDiaSemana]);
-
-  const turnoMaiorFadiga = useMemo(() => {
-    if (porTurno.manha === 0 && porTurno.tarde === 0) return null;
-    if (porTurno.tarde > porTurno.manha) {
-      return { turno: "Tarde" as const, quebras: porTurno.tarde };
-    }
-    if (porTurno.manha > porTurno.tarde) {
-      return { turno: "Manhã" as const, quebras: porTurno.manha };
-    }
-    return { turno: "Empate" as const, quebras: porTurno.manha };
-  }, [porTurno]);
 
   const rankingSuspeito = useMemo((): RankingComportamento[] => {
     type Acc = {
@@ -669,6 +838,224 @@ export function AnaliseComportamento() {
       })
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario]);
+
+  const abrirModalDia = (diaCurto: string) => {
+    setDiaFiltroModal(diaCurto);
+    setBuscaTecnicoModal("");
+    setModalDiaAberto(true);
+  };
+
+  const fecharModalDia = () => {
+    setModalDiaAberto(false);
+  };
+
+  const limparFiltrosModalDia = () => {
+    setDiaFiltroModal(null);
+    setBuscaTecnicoModal("");
+  };
+
+  useEffect(() => {
+    if (!modalDiaAberto) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") fecharModalDia();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modalDiaAberto]);
+
+  const notasBaseModal = useMemo(
+    () => dedupeNotasPorWo(rows),
+    [rows],
+  );
+
+  const diaDowModal = useMemo(() => {
+    if (!diaFiltroModal) return null;
+    return DIAS_UTEIS.find((d) => d.curto === diaFiltroModal)?.dow ?? null;
+  }, [diaFiltroModal]);
+
+  const modoDiaEspecifico = diaDowModal != null;
+
+  const detalheTecnicosDia = useMemo((): TecnicoDiaDetalheAgg[] => {
+    if (!modalDiaAberto || !modoDiaEspecifico || diaDowModal == null) return [];
+
+    const porTecnico = new Map<
+      string,
+      { prod: ToaImportacaoRow[]; improd: ToaImportacaoRow[] }
+    >();
+
+    for (const nota of notasBaseModal) {
+      const dow = diaDaSemanaFromIso(nota.data_toa);
+      if (dow !== diaDowModal) continue;
+      const nome = nomeTecnicoRow(nota);
+      if (!nome || nome === "—") continue;
+      let acc = porTecnico.get(nome);
+      if (!acc) {
+        acc = { prod: [], improd: [] };
+        porTecnico.set(nome, acc);
+      }
+      if (nota.status_nota === "Produtiva") acc.prod.push(nota);
+      else acc.improd.push(nota);
+    }
+
+    const busca = buscaTecnicoModal.trim().toLowerCase();
+    return [...porTecnico.entries()]
+      .filter(([nome]) => !busca || nome.toLowerCase().includes(busca))
+      .map(([nome, acc]) => {
+        const produtivas = acc.prod.length;
+        const improdutivas = acc.improd.length;
+        const total = produtivas + improdutivas;
+        return {
+          nome,
+          produtivas,
+          improdutivas,
+          aproveitamento: total > 0 ? (produtivas / total) * 100 : 0,
+          top3Prod: top3TipoOsLabels(acc.prod),
+          top3Improd: top3TipoOsLabels(acc.improd),
+        };
+      });
+  }, [
+    modalDiaAberto,
+    modoDiaEspecifico,
+    diaDowModal,
+    notasBaseModal,
+    buscaTecnicoModal,
+  ]);
+
+  const detalheTecnicosDiaOrdenado = useMemo(() => {
+    const fator = ordemDia.direcao === "asc" ? 1 : -1;
+    return [...detalheTecnicosDia].sort((a, b) => {
+      const va = a[ordemDia.coluna];
+      const vb = b[ordemDia.coluna];
+      if (va !== vb) return (va - vb) * fator;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [detalheTecnicosDia, ordemDia]);
+
+  const matrizTecnicosSemana = useMemo((): TecnicoSemanaMatrizAgg[] => {
+    if (!modalDiaAberto || modoDiaEspecifico) return [];
+
+    type Acc = {
+      prod: number;
+      improd: number;
+      porDia: Map<
+        number,
+        { prod: number; improd: number; notasDia: ToaImportacaoRow[] }
+      >;
+    };
+    const porTecnico = new Map<string, Acc>();
+
+    for (const nota of notasBaseModal) {
+      const dow = diaDaSemanaFromIso(nota.data_toa);
+      if (dow == null || dow === 0) continue;
+      const nome = nomeTecnicoRow(nota);
+      if (!nome || nome === "—") continue;
+      let acc = porTecnico.get(nome);
+      if (!acc) {
+        acc = { prod: 0, improd: 0, porDia: new Map() };
+        porTecnico.set(nome, acc);
+      }
+      let diaAcc = acc.porDia.get(dow);
+      if (!diaAcc) {
+        diaAcc = { prod: 0, improd: 0, notasDia: [] };
+        acc.porDia.set(dow, diaAcc);
+      }
+      diaAcc.notasDia.push(nota);
+      if (nota.status_nota === "Produtiva") {
+        acc.prod += 1;
+        diaAcc.prod += 1;
+      } else {
+        acc.improd += 1;
+        diaAcc.improd += 1;
+      }
+    }
+
+    const busca = buscaTecnicoModal.trim().toLowerCase();
+    return [...porTecnico.entries()]
+      .filter(([nome]) => !busca || nome.toLowerCase().includes(busca))
+      .map(([nome, acc]) => {
+        const total = acc.prod + acc.improd;
+        const porDia: Record<number, DiaCelulaSemana> = {};
+        for (const d of DIAS_UTEIS) {
+          const diaAcc = acc.porDia.get(d.dow);
+          if (!diaAcc || diaAcc.prod + diaAcc.improd === 0) {
+            porDia[d.dow] = { aproveitamento: null, piorJanela: null };
+            continue;
+          }
+          const totalDia = diaAcc.prod + diaAcc.improd;
+          porDia[d.dow] = {
+            aproveitamento: (diaAcc.prod / totalDia) * 100,
+            piorJanela: piorJanelaImprodutiva(diaAcc.notasDia, dicionario),
+          };
+        }
+        return {
+          nome,
+          produtivasTotal: acc.prod,
+          aproveitamentoGeral: total > 0 ? (acc.prod / total) * 100 : 0,
+          porDia,
+        };
+      });
+  }, [
+    modalDiaAberto,
+    modoDiaEspecifico,
+    notasBaseModal,
+    buscaTecnicoModal,
+    dicionario,
+  ]);
+
+  const matrizTecnicosSemanaOrdenada = useMemo(() => {
+    const fator = ordemMatriz.direcao === "asc" ? 1 : -1;
+    return [...matrizTecnicosSemana].sort((a, b) => {
+      let va: number;
+      let vb: number;
+      if (ordemMatriz.coluna === "produtivasTotal") {
+        va = a.produtivasTotal;
+        vb = b.produtivasTotal;
+      } else if (ordemMatriz.coluna === "aprovGeral") {
+        va = a.aproveitamentoGeral;
+        vb = b.aproveitamentoGeral;
+      } else {
+        const dow = ordemMatriz.coluna;
+        va = valorOrdenacaoComNulos(
+          a.porDia[dow]?.aproveitamento,
+          ordemMatriz.direcao,
+        );
+        vb = valorOrdenacaoComNulos(
+          b.porDia[dow]?.aproveitamento,
+          ordemMatriz.direcao,
+        );
+      }
+      if (va !== vb) return (va - vb) * fator;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [matrizTecnicosSemana, ordemMatriz]);
+
+  const alternarOrdemDia = (
+    coluna: OrdemDiaState["coluna"],
+  ) => {
+    setOrdemDia((prev) =>
+      prev.coluna === coluna
+        ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
+        : { coluna, direcao: "desc" },
+    );
+  };
+
+  const alternarOrdemMatriz = (
+    coluna: OrdemMatrizState["coluna"],
+  ) => {
+    setOrdemMatriz((prev) =>
+      prev.coluna === coluna
+        ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
+        : { coluna, direcao: "desc" },
+    );
+  };
+
+  const tituloModalDia = useMemo(() => {
+    if (modoDiaEspecifico && diaFiltroModal) {
+      const dia = DIAS_UTEIS.find((d) => d.curto === diaFiltroModal);
+      return `Detalhamento · ${dia?.label ?? diaFiltroModal}`;
+    }
+    return "Detalhamento · Matriz da semana";
+  }, [modoDiaEspecifico, diaFiltroModal]);
 
   const filtrosLimpos = ano === null && mes === null;
   const visaoEquipe = tecnicoFiltro === TECNICO_TODOS;
@@ -832,16 +1219,33 @@ export function AnaliseComportamento() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-3 xl:grid-cols-6">
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Janela Improdutiva
+                  Janela Improdutiva (Macro)
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
-                {janelaImprodutiva?.janela ?? "—"}
+                {janelaImprodutivaMacro?.janela ?? "—"}
+              </div>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs text-muted-foreground">
+                  maior volume de quebras
+                </p>
+              </div>
+            </div>
+
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Janela Improdutiva (Micro)
+                </span>
+              </div>
+              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+                {janelaImprodutivaMicro?.janela ?? "—"}
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -976,12 +1380,26 @@ export function AnaliseComportamento() {
                         name="Produtiva"
                         fill="#16a34a"
                         radius={[3, 3, 0, 0]}
+                        className="cursor-pointer"
+                        onClick={(data) => {
+                          const payload = (data?.payload ?? data) as
+                            | DiaSemanaAgg
+                            | undefined;
+                          if (payload?.diaCurto) abrirModalDia(payload.diaCurto);
+                        }}
                       />
                       <Bar
                         dataKey="improdutivas"
                         name="Improdutiva"
                         fill="#dc2626"
                         radius={[3, 3, 0, 0]}
+                        className="cursor-pointer"
+                        onClick={(data) => {
+                          const payload = (data?.payload ?? data) as
+                            | DiaSemanaAgg
+                            | undefined;
+                          if (payload?.diaCurto) abrirModalDia(payload.diaCurto);
+                        }}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1173,6 +1591,372 @@ export function AnaliseComportamento() {
             )}
           </div>
         </>
+      )}
+
+      {modalDiaAberto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-dia-semana-titulo"
+          onClick={fecharModalDia}
+        >
+          <div
+            className="flex max-h-[90vh] w-[95vw] max-w-6xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="modal-dia-semana-titulo"
+                  className="text-lg font-bold text-foreground"
+                >
+                  {tituloModalDia}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Clique em um dia no gráfico · Esc ou fora para fechar
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">
+                  <div className="relative w-full max-w-xs">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="search"
+                      value={buscaTecnicoModal}
+                      onChange={(e) => setBuscaTecnicoModal(e.target.value)}
+                      placeholder="Buscar técnico..."
+                      aria-label="Buscar técnico"
+                      className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-dia-ano"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Ano:
+                    </Label>
+                    <Select
+                      value={ano !== null ? String(ano) : "todos"}
+                      disabled={anosDisponiveis.length === 0}
+                      onValueChange={(v) => {
+                        if (v === "todos") {
+                          setAno(null);
+                          setMes(null);
+                          return;
+                        }
+                        const novoAno = Number(v);
+                        const mesesDoAno = competencias
+                          .filter((ym) => Math.floor(ym / 100) === novoAno)
+                          .map((ym) => ym % 100)
+                          .sort((a, b) => a - b);
+                        setAno(novoAno);
+                        setMes(mesesDoAno[mesesDoAno.length - 1] ?? null);
+                      }}
+                    >
+                      <SelectTrigger id="modal-dia-ano" className="w-[120px]">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {anosDisponiveis.map((a) => (
+                          <SelectItem key={a} value={String(a)}>
+                            {a}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-dia-mes"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Mês:
+                    </Label>
+                    <Select
+                      value={mes !== null ? String(mes) : "todos"}
+                      disabled={ano === null || mesesDisponiveis.length === 0}
+                      onValueChange={(v) => {
+                        if (v === "todos") {
+                          setMes(null);
+                          return;
+                        }
+                        setMes(Number(v));
+                      }}
+                    >
+                      <SelectTrigger id="modal-dia-mes" className="w-[140px]">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {mesesDisponiveis.map((m) => (
+                          <SelectItem key={m} value={String(m)}>
+                            {mesLabel(m)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="modal-dia-semana"
+                      className="shrink-0 text-sm font-medium"
+                    >
+                      Dia:
+                    </Label>
+                    <Select
+                      value={diaFiltroModal ?? "todos"}
+                      onValueChange={(v) =>
+                        setDiaFiltroModal(v === "todos" ? null : v)
+                      }
+                    >
+                      <SelectTrigger id="modal-dia-semana" className="w-[120px]">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {DIAS_UTEIS.map((d) => (
+                          <SelectItem key={d.dow} value={d.curto}>
+                            {d.curto}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={limparFiltrosModalDia}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar Filtros
+                  </Button>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={fecharModalDia}
+                className="rounded-md p-1 text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
+              {modoDiaEspecifico ? (
+                detalheTecnicosDia.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Nenhum técnico com notas neste dia no período.
+                  </p>
+                ) : (
+                  <div className="relative overflow-x-auto rounded-lg border border-gray-100">
+                    <table className="w-full min-w-[56rem] text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-muted-foreground">
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Nome (Técnico)
+                          </th>
+                          <th
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() => alternarOrdemDia("produtivas")}
+                          >
+                            Produtivas
+                            {setaOrdenacao(
+                              ordemDia.coluna === "produtivas",
+                              ordemDia.direcao,
+                            )}
+                          </th>
+                          <th
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() => alternarOrdemDia("improdutivas")}
+                          >
+                            Improdutivas
+                            {setaOrdenacao(
+                              ordemDia.coluna === "improdutivas",
+                              ordemDia.direcao,
+                            )}
+                          </th>
+                          <th
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() => alternarOrdemDia("aproveitamento")}
+                          >
+                            Aproveitamento
+                            {setaOrdenacao(
+                              ordemDia.coluna === "aproveitamento",
+                              ordemDia.direcao,
+                            )}
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Top 3 Tipo O.S Prod.
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Top 3 Tipo O.S Improd.
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detalheTecnicosDiaOrdenado.map((tec) => (
+                          <tr
+                            key={tec.nome}
+                            className="border-b border-border/60 last:border-b-0"
+                          >
+                            <td className="px-3 py-2 font-medium text-gray-900">
+                              {tec.nome}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                              {formatQuantidade(tec.produtivas)}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                              {formatQuantidade(tec.improdutivas)}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+                              {formatPct(tec.aproveitamento)}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-700">
+                              {tec.top3Prod.length > 0 ? (
+                                tec.top3Prod.map((os, idx) => (
+                                  <div key={`${tec.nome}-prod-${idx}`} className="mb-1 last:mb-0">
+                                    {os.nome} ({os.percentual.toLocaleString("pt-BR", {
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 1,
+                                    })}
+                                    %)
+                                  </div>
+                                ))
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-700">
+                              {tec.top3Improd.length > 0 ? (
+                                tec.top3Improd.map((os, idx) => (
+                                  <div key={`${tec.nome}-improd-${idx}`} className="mb-1 last:mb-0">
+                                    {os.nome} ({os.percentual.toLocaleString("pt-BR", {
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 1,
+                                    })}
+                                    %)
+                                  </div>
+                                ))
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : matrizTecnicosSemanaOrdenada.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Nenhum técnico com notas no período.
+                </p>
+              ) : (
+                <div className="relative overflow-x-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[64rem] text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-muted-foreground">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          Técnico
+                        </th>
+                        <th
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          onClick={() => alternarOrdemMatriz("produtivasTotal")}
+                        >
+                          Produtivas (Total)
+                          {setaOrdenacao(
+                            ordemMatriz.coluna === "produtivasTotal",
+                            ordemMatriz.direcao,
+                          )}
+                        </th>
+                        <th
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          onClick={() => alternarOrdemMatriz("aprovGeral")}
+                        >
+                          Aprov. Geral
+                          {setaOrdenacao(
+                            ordemMatriz.coluna === "aprovGeral",
+                            ordemMatriz.direcao,
+                          )}
+                        </th>
+                        {DIAS_UTEIS.map((d) => (
+                          <th
+                            key={d.dow}
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() => alternarOrdemMatriz(d.dow)}
+                          >
+                            {d.curto}.
+                            {setaOrdenacao(
+                              ordemMatriz.coluna === d.dow,
+                              ordemMatriz.direcao,
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matrizTecnicosSemanaOrdenada.map((tec) => (
+                        <tr
+                          key={tec.nome}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {tec.nome}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                            {formatQuantidade(tec.produtivasTotal)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+                            {formatPct(tec.aproveitamentoGeral)}
+                          </td>
+                          {DIAS_UTEIS.map((d) => {
+                            const cel = tec.porDia[d.dow];
+                            if (
+                              !cel ||
+                              cel.aproveitamento == null
+                            ) {
+                              return (
+                                <td
+                                  key={d.dow}
+                                  className="px-3 py-2 text-center text-muted-foreground"
+                                >
+                                  -
+                                </td>
+                              );
+                            }
+                            return (
+                              <td
+                                key={d.dow}
+                                className="px-3 py-2 text-center tabular-nums"
+                              >
+                                <span className="font-medium text-gray-900">
+                                  {Math.round(cel.aproveitamento)}%
+                                </span>
+                                {cel.piorJanela ? (
+                                  <span className="mt-0.5 block text-[11px] leading-tight text-red-600/80">
+                                    ({cel.piorJanela})
+                                  </span>
+                                ) : null}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
