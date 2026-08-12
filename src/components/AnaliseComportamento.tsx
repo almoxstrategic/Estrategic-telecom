@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   BarChart3,
   Brain,
   CalendarDays,
@@ -1790,6 +1791,12 @@ export function AnaliseComportamento() {
                         content={({ active, payload }) => {
                           if (!active || !payload?.[0]) return null;
                           const item = payload[0].payload as DiaSemanaAgg;
+                          const totalDia =
+                            item.produtivas + item.improdutivas;
+                          const taxaAproveitamento =
+                            totalDia > 0
+                              ? (item.produtivas / totalDia) * 100
+                              : 0;
                           return (
                             <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-md">
                               <p className="font-bold">{item.dia}</p>
@@ -1800,9 +1807,17 @@ export function AnaliseComportamento() {
                                 Improdutivas:{" "}
                                 {formatQuantidade(item.improdutivas)}
                               </p>
-                              <p className="text-gray-700">
-                                Reprovação: {formatPct(item.taxaReprovacao)}
-                              </p>
+                              {isModoImprodutivo ? (
+                                <p className="text-red-600">
+                                  Reprovação:{" "}
+                                  {formatPct(item.taxaReprovacao)}
+                                </p>
+                              ) : (
+                                <p className="text-green-600">
+                                  Aproveitamento:{" "}
+                                  {formatPct(taxaAproveitamento)}
+                                </p>
+                              )}
                             </div>
                           );
                         }}
@@ -1918,18 +1933,32 @@ export function AnaliseComportamento() {
                   );
                 })}
               </div>
-              {visaoEquipe ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 gap-1.5"
-                  onClick={() => setModalTop10Aberto(true)}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  {tituloTop10}
-                </Button>
-              ) : null}
+              <div className="flex shrink-0 items-center gap-2">
+                {!visaoEquipe ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    onClick={() => setTecnicoFiltro(TECNICO_TODOS)}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Voltar
+                  </Button>
+                ) : null}
+                {visaoEquipe ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setModalTop10Aberto(true)}
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    {tituloTop10}
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
             {abaAtiva === "ranking" && (
