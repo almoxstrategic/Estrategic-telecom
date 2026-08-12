@@ -10,7 +10,6 @@ import {
   Sunrise,
   Sunset,
   Target,
-  UserRound,
   X,
 } from "lucide-react";
 import {
@@ -38,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { FiltroCombobox } from "@/components/FiltroCombobox";
 import { Top10CodigosBaixaChart } from "@/components/Top10CodigosBaixaChart";
+import { agregarMotivosQuebra } from "@/components/MotivosQuebra";
 import {
   fetchCompetenciasToa,
   fetchToaImportacoes,
@@ -110,6 +110,24 @@ type RankingUsoCodigo = {
   totalQuebras: number;
   representaPct: number;
   porDia: Record<number, RankingUsoCodigoDia>;
+};
+
+type AbaPainelInferior = "ranking" | "janela" | "todos-codigos";
+
+const ABAS_PAINEL_INFERIOR: ReadonlyArray<{
+  id: AbaPainelInferior;
+  label: string;
+}> = [
+  { id: "ranking", label: "Ranking de Uso" },
+  { id: "janela", label: "Janela Improdutiva" },
+  { id: "todos-codigos", label: "Todos os códigos de baixa" },
+];
+
+type JanelaImprodutivaAgg = {
+  janela: string;
+  codigo: string;
+  quantidadeJanela: number;
+  representaPct: number;
 };
 
 type RaioXQuebra = {
@@ -418,6 +436,7 @@ export function AnaliseComportamento() {
   const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
   const [modalTop10Aberto, setModalTop10Aberto] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState<AbaPainelInferior>("ranking");
   const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
     coluna: "produtivas",
     direcao: "desc",
@@ -998,6 +1017,75 @@ export function AnaliseComportamento() {
       })
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario]);
+
+  /** Aba Janela Improdutiva: pior código por horário macro + peso da janela. */
+  const rankingPorJanela = useMemo((): JanelaImprodutivaAgg[] => {
+    if (!notasAlvo.length) return [];
+
+    const totaisJanela = new Map<string, number>();
+    const codigosPorJanela = new Map<string, Map<string, number>>();
+
+    for (const row of notasAlvo) {
+      const janela = String(row.janela_servico_1 ?? "").trim();
+      if (!janela) continue;
+      const codigo = normalizeCodigoBaixa(row.cod_baixa);
+      if (!codigo) continue;
+
+      totaisJanela.set(janela, (totaisJanela.get(janela) ?? 0) + 1);
+      let counts = codigosPorJanela.get(janela);
+      if (!counts) {
+        counts = new Map();
+        codigosPorJanela.set(janela, counts);
+      }
+      counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
+    }
+
+    const resultado: JanelaImprodutivaAgg[] = [];
+    for (const [janela, quantidadeJanela] of totaisJanela) {
+      const counts = codigosPorJanela.get(janela);
+      if (!counts || counts.size === 0) continue;
+
+      let melhorCodigo: string | null = null;
+      let melhorQtd = 0;
+      for (const [codigo, qtd] of counts) {
+        if (
+          qtd > melhorQtd ||
+          (qtd === melhorQtd &&
+            melhorCodigo != null &&
+            Number(codigo) - Number(melhorCodigo) < 0)
+        ) {
+          melhorCodigo = codigo;
+          melhorQtd = qtd;
+        } else if (melhorCodigo == null && qtd > 0) {
+          melhorCodigo = codigo;
+          melhorQtd = qtd;
+        }
+      }
+      if (!melhorCodigo) continue;
+
+      resultado.push({
+        janela,
+        codigo: melhorCodigo,
+        quantidadeJanela,
+        representaPct:
+          totalNotasAlvo > 0
+            ? (quantidadeJanela / totalNotasAlvo) * 100
+            : 0,
+      });
+    }
+
+    return resultado.sort(
+      (a, b) =>
+        b.quantidadeJanela - a.quantidadeJanela ||
+        a.janela.localeCompare(b.janela, "pt-BR"),
+    );
+  }, [notasAlvo, totalNotasAlvo]);
+
+  /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
+  const todosCodigosBaixa = useMemo(
+    () => agregarMotivosQuebra(notasAlvo, dicionario, "IMPRODUTIVO"),
+    [notasAlvo, dicionario],
+  );
 
   const abrirModalDia = (diaCurto: string) => {
     setDiaFiltroModal(diaCurto);
@@ -1697,22 +1785,37 @@ export function AnaliseComportamento() {
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex w-full items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 font-bold text-foreground">
-                {visaoEquipe ? (
-                  <>
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    {codigoAlvo
-                      ? `Ranking de Uso: ${codigoAlvo}`
-                      : "Ranking de Uso"}
-                  </>
-                ) : (
-                  <>
-                    <UserRound className="h-4 w-4 text-primary" />
-                    Raio-X de Quebras do Técnico
-                  </>
-                )}
-              </h2>
+            <div className="mb-4 flex w-full flex-wrap items-end justify-between gap-3">
+              <div
+                className="flex flex-wrap items-center gap-4 border-b border-border"
+                role="tablist"
+                aria-label="Visões do painel inferior"
+              >
+                {ABAS_PAINEL_INFERIOR.map((aba) => {
+                  const ativa = abaAtiva === aba.id;
+                  return (
+                    <button
+                      key={aba.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={ativa}
+                      onClick={() => setAbaAtiva(aba.id)}
+                      className={
+                        ativa
+                          ? "-mb-px border-b-2 border-primary pb-2 text-sm font-semibold text-foreground"
+                          : "-mb-px border-b-2 border-transparent pb-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                      }
+                    >
+                      {aba.label}
+                      {aba.id === "ranking" &&
+                      visaoEquipe &&
+                      codigoAlvo
+                        ? `: ${codigoAlvo}`
+                        : null}
+                    </button>
+                  );
+                })}
+              </div>
               {visaoEquipe ? (
                 <Button
                   type="button"
@@ -1727,160 +1830,258 @@ export function AnaliseComportamento() {
               ) : null}
             </div>
 
-            {visaoEquipe ? (
-              !codigoAlvo ? (
+            {abaAtiva === "ranking" && (
+              <>
+                {visaoEquipe ? (
+                  !codigoAlvo ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      Nenhuma quebra improdutiva no período para montar o ranking.
+                    </p>
+                  ) : rankingUsoCodigo.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      Nenhum técnico usou o código {codigoAlvo} no período.
+                    </p>
+                  ) : (
+                    <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
+                      <table className="w-full min-w-[64rem] text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-left text-muted-foreground">
+                            <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
+                              #
+                            </th>
+                            <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                              Técnico
+                            </th>
+                            <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
+                              Cód. {codigoAlvo}
+                            </th>
+                            <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
+                              Quebras (Total)
+                            </th>
+                            <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
+                              Representa
+                            </th>
+                            {DIAS_UTEIS.map((d) => (
+                              <th
+                                key={d.dow}
+                                className="sticky top-0 z-10 min-w-[110px] bg-white px-3 py-2 text-center font-semibold shadow-sm"
+                              >
+                                {d.curto}.
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rankingUsoCodigo.map((row, idx) => (
+                            <tr
+                              key={row.login}
+                              className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
+                              onClick={() => setTecnicoFiltro(row.nome)}
+                              title="Abrir raio-X deste técnico"
+                            >
+                              <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
+                                {idx + 1}
+                              </td>
+                              <td className="px-3 py-2 font-medium text-primary">
+                                {row.nome}
+                              </td>
+                              <td className="px-3 py-2 text-center font-semibold tabular-nums text-red-600">
+                                {formatQuantidade(row.usosCodigo)}
+                              </td>
+                              <td className="px-3 py-2 text-center tabular-nums text-gray-900">
+                                {formatQuantidade(row.totalQuebras)}
+                              </td>
+                              <td className="px-3 py-2 text-center text-sm font-medium tabular-nums text-gray-700">
+                                {formatPct(row.representaPct)}
+                              </td>
+                              {DIAS_UTEIS.map((d) => {
+                                const cel = row.porDia[d.dow];
+                                const usoNoDia = cel?.pct != null;
+                                return (
+                                  <td
+                                    key={d.dow}
+                                    className="min-w-[110px] p-2 text-center align-middle tabular-nums"
+                                  >
+                                    {usoNoDia ? (
+                                      <div className="flex flex-col items-center justify-center">
+                                        <span className="text-sm font-medium text-gray-800">
+                                          {Math.round(cel!.pct!)}%
+                                        </span>
+                                        <span className="mt-1 whitespace-nowrap text-xs text-red-500">
+                                          (
+                                          {cel!.janela
+                                            ? formatarJanelaHorario(cel!.janela)
+                                            : "—"}
+                                          )
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div className="text-center text-gray-400">
+                                        -
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : raioXTecnico.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Nenhuma nota improdutiva para {tecnicoFiltro} no período.
+                  </p>
+                ) : (
+                  <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
+                    <table className="w-full min-w-[36rem] text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-muted-foreground">
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Data
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Hora
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Cód. Baixa
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Motivo
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Bairro
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            WO
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {raioXTecnico.map((row) => (
+                          <tr
+                            key={row.key}
+                            className="border-b border-border/60 last:border-b-0"
+                          >
+                            <td className="px-3 py-2 tabular-nums text-gray-900">
+                              {formatDataBr(row.data)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums text-gray-700">
+                              {row.hora}
+                            </td>
+                            <td className="px-3 py-2 font-semibold tabular-nums text-red-600">
+                              {row.codBaixa}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {row.descricao}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {row.bairro}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                              {row.numeroWo}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {abaAtiva === "janela" &&
+              (rankingPorJanela.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhuma quebra improdutiva no período para montar o ranking.
-                </p>
-              ) : rankingUsoCodigo.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhum técnico usou o código {codigoAlvo} no período.
+                  Nenhuma janela improdutiva no período filtrado.
                 </p>
               ) : (
-                <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[64rem] text-sm">
+                <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[36rem] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
-                          #
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          Horário (macro)
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Técnico
+                          Cód. Improdutivo
                         </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
-                          Cód. {codigoAlvo}
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
-                          Quebras (Total)
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
                           Representa
                         </th>
-                        {DIAS_UTEIS.map((d) => (
-                          <th
-                            key={d.dow}
-                            className="sticky top-0 z-10 min-w-[110px] bg-white px-3 py-2 text-center font-semibold shadow-sm"
-                          >
-                            {d.curto}.
-                          </th>
-                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {rankingUsoCodigo.map((row, idx) => (
+                      {rankingPorJanela.map((row) => (
                         <tr
-                          key={row.login}
-                          className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
-                          onClick={() => setTecnicoFiltro(row.nome)}
-                          title="Abrir raio-X deste técnico"
+                          key={row.janela}
+                          className="border-b border-border/60 last:border-b-0"
                         >
-                          <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
-                            {idx + 1}
+                          <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
+                            {formatarJanelaHorario(row.janela)}
                           </td>
-                          <td className="px-3 py-2 font-medium text-primary">
-                            {row.nome}
+                          <td className="px-3 py-2 font-semibold tabular-nums text-red-600">
+                            {row.codigo}
                           </td>
-                          <td className="px-3 py-2 text-center font-semibold tabular-nums text-red-600">
-                            {formatQuantidade(row.usosCodigo)}
-                          </td>
-                          <td className="px-3 py-2 text-center tabular-nums text-gray-900">
-                            {formatQuantidade(row.totalQuebras)}
-                          </td>
-                          <td className="px-3 py-2 text-center text-sm font-medium tabular-nums text-gray-700">
+                          <td className="px-3 py-2 text-right text-sm font-medium tabular-nums text-gray-700">
                             {formatPct(row.representaPct)}
                           </td>
-                          {DIAS_UTEIS.map((d) => {
-                            const cel = row.porDia[d.dow];
-                            const usoNoDia = cel?.pct != null;
-                            return (
-                              <td
-                                key={d.dow}
-                                className="min-w-[110px] p-2 text-center align-middle tabular-nums"
-                              >
-                                {usoNoDia ? (
-                                  <div className="flex flex-col items-center justify-center">
-                                    <span className="text-sm font-medium text-gray-800">
-                                      {Math.round(cel!.pct!)}%
-                                    </span>
-                                    <span className="mt-1 whitespace-nowrap text-xs text-red-500">
-                                      (
-                                      {cel!.janela
-                                        ? formatarJanelaHorario(cel!.janela)
-                                        : "—"}
-                                      )
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div className="text-center text-gray-400">
-                                    -
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          })}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )
-            ) : raioXTecnico.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Nenhuma nota improdutiva para {tecnicoFiltro} no período.
-              </p>
-            ) : (
-              <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                <table className="w-full min-w-[36rem] text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-muted-foreground">
-                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                        Data
-                      </th>
-                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                        Hora
-                      </th>
-                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                        Cód. Baixa
-                      </th>
-                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                        Motivo
-                      </th>
-                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                        Bairro
-                      </th>
-                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                        WO
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {raioXTecnico.map((row) => (
-                      <tr
-                        key={row.key}
-                        className="border-b border-border/60 last:border-b-0"
-                      >
-                        <td className="px-3 py-2 tabular-nums text-gray-900">
-                          {formatDataBr(row.data)}
-                        </td>
-                        <td className="px-3 py-2 tabular-nums text-gray-700">
-                          {row.hora}
-                        </td>
-                        <td className="px-3 py-2 font-semibold tabular-nums text-red-600">
-                          {row.codBaixa}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">
-                          {row.descricao}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">{row.bairro}</td>
-                        <td className="px-3 py-2 tabular-nums text-muted-foreground">
-                          {row.numeroWo}
-                        </td>
+              ))}
+
+            {abaAtiva === "todos-codigos" &&
+              (todosCodigosBaixa.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhum código de baixa improdutivo no período selecionado.
+                </p>
+              ) : (
+                <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[40rem] text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-muted-foreground">
+                        <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                          Cód. Baixa
+                        </th>
+                        <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                          Motivo / Descrição
+                        </th>
+                        <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                          Tipo de quebra
+                        </th>
+                        <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
+                          Quantidade
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {todosCodigosBaixa.map((row) => (
+                        <tr
+                          key={row.codigo}
+                          className="border-b border-border/60 last:border-b-0 hover:bg-gray-50"
+                        >
+                          <td className="px-2 py-2 font-medium tabular-nums text-gray-900">
+                            {row.codigo}
+                          </td>
+                          <td className="px-2 py-2 text-gray-700">
+                            {row.descricao}
+                          </td>
+                          <td className="px-2 py-2 text-gray-700">
+                            {row.motivoQuebra}
+                          </td>
+                          <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                            {formatQuantidade(row.quantidade)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
           </div>
         </>
       )}
