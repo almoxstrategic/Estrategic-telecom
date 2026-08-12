@@ -1670,7 +1670,7 @@ export function AnaliseComportamento() {
           onClick={fecharModalDia}
         >
           <div
-            className="flex max-h-[90vh] w-[95vw] max-w-6xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            className="flex max-h-[90vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -1935,7 +1935,7 @@ export function AnaliseComportamento() {
                 </p>
               ) : (
                 <div className="relative overflow-x-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[64rem] text-sm">
+                  <table className="w-full min-w-[72rem] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-muted-foreground">
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
@@ -1964,7 +1964,7 @@ export function AnaliseComportamento() {
                         {DIAS_UTEIS.map((d) => (
                           <th
                             key={d.dow}
-                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            className="sticky top-0 z-10 min-w-[110px] cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
                             onClick={() => alternarOrdemMatriz(d.dow)}
                           >
                             {d.curto}.
@@ -2000,7 +2000,7 @@ export function AnaliseComportamento() {
                               return (
                                 <td
                                   key={d.dow}
-                                  className="px-3 py-2 text-center text-muted-foreground"
+                                  className="min-w-[110px] px-3 py-2 text-center align-middle text-muted-foreground"
                                 >
                                   -
                                 </td>
@@ -2009,16 +2009,18 @@ export function AnaliseComportamento() {
                             return (
                               <td
                                 key={d.dow}
-                                className="px-3 py-2 text-center tabular-nums"
+                                className="min-w-[110px] px-3 py-2 text-center align-middle tabular-nums"
                               >
-                                <span className="font-medium text-gray-900">
-                                  {Math.round(cel.aproveitamento)}%
-                                </span>
-                                {cel.piorJanela ? (
-                                  <span className="mt-0.5 block text-[11px] leading-tight text-red-600/80">
-                                    ({formatarJanelaHorario(cel.piorJanela)})
+                                <div className="flex flex-col items-center justify-center">
+                                  <span className="text-sm font-medium text-gray-800">
+                                    {Math.round(cel.aproveitamento)}%
                                   </span>
-                                ) : null}
+                                  {cel.piorJanela ? (
+                                    <span className="mt-1 whitespace-nowrap text-xs text-red-500">
+                                      ({formatarJanelaHorario(cel.piorJanela)})
+                                    </span>
+                                  ) : null}
+                                </div>
                               </td>
                             );
                           })}
