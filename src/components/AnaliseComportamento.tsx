@@ -1370,7 +1370,7 @@ export function AnaliseComportamento() {
               value={codigoFiltro ? codigoFiltroLabel : ""}
               onChange={(v) => setCodigoFiltro(parseCodigoFromOpcao(v))}
               options={opcoesCodigoBaixa}
-              placeholder="Digite código ou tipo da OS"
+              placeholder="Digite o código de baixa"
               todosValue="Todos"
               className="min-w-0 flex-1"
             />
@@ -1663,19 +1663,19 @@ export function AnaliseComportamento() {
                   <table className="w-full min-w-[64rem] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
                           #
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
                           Técnico
                         </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
                           Cód. {codigoAlvo}
                         </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
                           Quebras (Total)
                         </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-center font-semibold shadow-sm">
                           Representa
                         </th>
                         {DIAS_UTEIS.map((d) => (
@@ -1696,19 +1696,19 @@ export function AnaliseComportamento() {
                           onClick={() => setTecnicoFiltro(row.nome)}
                           title="Abrir raio-X deste técnico"
                         >
-                          <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                          <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
                             {idx + 1}
                           </td>
                           <td className="px-3 py-2 font-medium text-primary">
                             {row.nome}
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-red-600">
+                          <td className="px-3 py-2 text-center font-semibold tabular-nums text-red-600">
                             {formatQuantidade(row.usosCodigo)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+                          <td className="px-3 py-2 text-center tabular-nums text-gray-900">
                             {formatQuantidade(row.totalQuebras)}
                           </td>
-                          <td className="px-3 py-2 text-right text-sm font-medium tabular-nums text-gray-700">
+                          <td className="px-3 py-2 text-center text-sm font-medium tabular-nums text-gray-700">
                             {formatPct(row.representaPct)}
                           </td>
                           {DIAS_UTEIS.map((d) => {
