@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, FilterX, XCircle } from "lucide-react";
+import { AlertTriangle, FilterX, PieChart, X, XCircle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -52,17 +52,30 @@ const MESES = [
 ] as const;
 
 const DESCRICAO_DESCONHECIDA = "Motivo Desconhecido";
+const MOTIVO_MACRO_NAO_CLASSIFICADO = "Não classificado";
 
 export type MotivoQuebraAgg = {
   codigo: string;
   descricao: string;
+  motivoQuebra: string;
   quantidade: number;
   labelCompleta: string;
+};
+
+export type MotivoQuebraMacroAgg = {
+  motivo: string;
+  quantidade: number;
+};
+
+type TecnicoQuebraAgg = {
+  nome: string;
+  quantidade: number;
 };
 
 type ChartMotivoPoint = {
   codigo: string;
   descricao: string;
+  motivoQuebra: string;
   labelCompleta: string;
   quantidade: number;
 };
@@ -97,9 +110,19 @@ function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
   return true;
 }
 
+function motivoMacroDoCodigo(
+  codigo: string,
+  dicionario: DicionarioCodigosBaixaMap | Record<string, string>,
+): string {
+  if (!codigo) return MOTIVO_MACRO_NAO_CLASSIFICADO;
+  const entry = dicionario[codigo] ?? dicionario[codigo.padStart(3, "0")];
+  if (!entry || typeof entry === "string") return MOTIVO_MACRO_NAO_CLASSIFICADO;
+  return entry.motivo_quebra?.trim() || MOTIVO_MACRO_NAO_CLASSIFICADO;
+}
+
 /**
  * Volumetria de códigos de baixa em O.S. improdutivas (notas falhas).
- * Cruza com dicionario_codigos_baixa para descrição textual.
+ * Cruza com dicionario_codigos_baixa para descrição e motivo_quebra.
  */
 export function agregarMotivosQuebra(
   rows: ToaImportacaoRow[],
@@ -119,9 +142,11 @@ export function agregarMotivosQuebra(
   return [...counts.entries()]
     .map(([codigo, quantidade]) => {
       const descricao = descricaoDoCodigoBaixa(codigo, dicionario);
+      const motivoQuebra = motivoMacroDoCodigo(codigo, dicionario);
       return {
         codigo,
         descricao,
+        motivoQuebra,
         quantidade,
         labelCompleta: `${codigo} - ${descricao}`,
       };
@@ -131,6 +156,32 @@ export function agregarMotivosQuebra(
         b.quantidade - a.quantidade ||
         Number(a.codigo) - Number(b.codigo) ||
         a.codigo.localeCompare(b.codigo, "pt-BR"),
+    );
+}
+
+/** Agrupa O.S. improdutivas pela categoria macro (COMERCIAL / TÉCNICO). */
+export function agregarMotivosQuebraMacro(
+  rows: ToaImportacaoRow[],
+  dicionario: DicionarioCodigosBaixaMap | Record<string, string> = {},
+): MotivoQuebraMacroAgg[] {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    if (row.status_nota !== "Improdutiva") continue;
+    if (!isLinhaOsImprodutiva(row)) continue;
+
+    const codigo = normalizeCodigoBaixa(row.cod_baixa);
+    if (!codigo) continue;
+    const motivo = motivoMacroDoCodigo(codigo, dicionario);
+    counts.set(motivo, (counts.get(motivo) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([motivo, quantidade]) => ({ motivo, quantidade }))
+    .sort(
+      (a, b) =>
+        b.quantidade - a.quantidade ||
+        a.motivo.localeCompare(b.motivo, "pt-BR"),
     );
 }
 
@@ -145,11 +196,12 @@ function MotivoChartTooltip({
   const valor = Number(entry.value) || 0;
   const codigo = String(label ?? data?.codigo ?? "—");
   const descricao = data?.descricao || DESCRICAO_DESCONHECIDA;
+  const tipo = data?.motivoQuebra || MOTIVO_MACRO_NAO_CLASSIFICADO;
 
   return (
     <div className="max-w-sm rounded-md border border-gray-200 bg-white p-3 shadow-md">
       <p className="text-sm font-bold text-gray-900">
-        Cód. Baixa {codigo} - {descricao}
+        Cód. Baixa {codigo} - {descricao} - TIPO: {tipo}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         Quantidade:{" "}
@@ -170,6 +222,7 @@ export function MotivosQuebra() {
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
+  const [codigoDetalhe, setCodigoDetalhe] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,6 +286,10 @@ export function MotivosQuebra() {
     };
   }, [ano, mes]);
 
+  useEffect(() => {
+    setCodigoDetalhe(null);
+  }, [ano, mes]);
+
   const anosDisponiveis = useMemo(() => {
     const set = new Set<number>();
     for (const ym of competencias) {
@@ -268,6 +325,12 @@ export function MotivosQuebra() {
     return porMotivo[0]!;
   }, [porMotivo]);
 
+  const motivoMacroVencedor = useMemo(() => {
+    const macros = agregarMotivosQuebraMacro(rows, dicionario);
+    if (macros.length === 0) return null;
+    return macros[0]!;
+  }, [rows, dicionario]);
+
   const chartTop10 = useMemo(
     (): ChartMotivoPoint[] =>
       [...porMotivo]
@@ -276,11 +339,43 @@ export function MotivosQuebra() {
         .map((m) => ({
           codigo: m.codigo,
           descricao: m.descricao,
+          motivoQuebra: m.motivoQuebra,
           labelCompleta: m.labelCompleta,
           quantidade: m.quantidade,
         })),
     [porMotivo],
   );
+
+  const motivoDetalhe = useMemo(() => {
+    if (!codigoDetalhe) return null;
+    return porMotivo.find((m) => m.codigo === codigoDetalhe) ?? null;
+  }, [codigoDetalhe, porMotivo]);
+
+  const tecnicosPorCodigo = useMemo((): TecnicoQuebraAgg[] => {
+    if (!codigoDetalhe) return [];
+    const counts = new Map<string, number>();
+
+    for (const row of rows) {
+      if (row.status_nota !== "Improdutiva") continue;
+      if (!isLinhaOsImprodutiva(row)) continue;
+      const codigo = normalizeCodigoBaixa(row.cod_baixa);
+      if (codigo !== codigoDetalhe) continue;
+
+      const nome =
+        row.nome_tecnico?.trim() ||
+        row.login_tecnico?.trim() ||
+        "—";
+      counts.set(nome, (counts.get(nome) ?? 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([nome, quantidade]) => ({ nome, quantidade }))
+      .sort(
+        (a, b) =>
+          b.quantidade - a.quantidade ||
+          a.nome.localeCompare(b.nome, "pt-BR"),
+      );
+  }, [codigoDetalhe, rows]);
 
   const filtrosLimpos = ano === null && mes === null;
 
@@ -292,6 +387,21 @@ export function MotivosQuebra() {
     if (ano !== null) return `Ano ${ano} · todos os meses`;
     return "Período filtrado";
   }, [filtrosLimpos, ano, mes]);
+
+  const periodoModalLabel = useMemo(() => {
+    if (ano !== null && mes !== null) {
+      return `${mesLabel(mes)} ${ano}`;
+    }
+    if (ano !== null) {
+      return `Todos os meses - ${ano}`;
+    }
+    if (mes !== null) {
+      return `${mesLabel(mes)} · todos os anos`;
+    }
+    return "Histórico completo";
+  }, [ano, mes]);
+
+  const totalOcorrenciasCodigo = motivoDetalhe?.quantidade ?? 0;
 
   const limparFiltros = () => {
     setAno(null);
@@ -407,7 +517,7 @@ export function MotivosQuebra() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 shrink-0 text-red-600" />
@@ -439,6 +549,25 @@ export function MotivosQuebra() {
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 ocorrências do código de baixa
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <PieChart className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Motivo de quebra
+                </span>
+              </div>
+              <div className="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-lg">
+                {motivoMacroVencedor && motivoMacroVencedor.quantidade > 0
+                  ? motivoMacroVencedor.motivo
+                  : "—"}
+              </div>
+              <div className="mt-1 text-3xl font-bold text-red-600">
+                {formatQuantidade(motivoMacroVencedor?.quantidade ?? 0)}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                categoria com maior índice de quebra
               </p>
             </div>
           </div>
@@ -482,6 +611,14 @@ export function MotivosQuebra() {
                       fill="#ef4444"
                       radius={[0, 3, 3, 0]}
                       maxBarSize={22}
+                      className="cursor-pointer"
+                      onClick={(data) => {
+                        const payload = (data?.payload ?? data) as
+                          | ChartMotivoPoint
+                          | undefined;
+                        const codigo = payload?.codigo;
+                        if (codigo) setCodigoDetalhe(codigo);
+                      }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -500,7 +637,7 @@ export function MotivosQuebra() {
               </p>
             ) : (
               <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                <table className="w-full min-w-[32rem] text-sm">
+                <table className="w-full min-w-[40rem] text-sm">
                   <thead>
                     <tr className="border-b border-border text-left text-muted-foreground">
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
@@ -508,6 +645,9 @@ export function MotivosQuebra() {
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
                         Motivo / Descrição
+                      </th>
+                      <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                        Tipo de quebra
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
                         Quantidade
@@ -526,6 +666,9 @@ export function MotivosQuebra() {
                         <td className="px-2 py-2 text-gray-700">
                           {row.descricao}
                         </td>
+                        <td className="px-2 py-2 text-gray-700">
+                          {row.motivoQuebra}
+                        </td>
                         <td className="px-2 py-2 text-right tabular-nums text-red-600">
                           {formatQuantidade(row.quantidade)}
                         </td>
@@ -537,6 +680,94 @@ export function MotivosQuebra() {
             )}
           </div>
         </>
+      )}
+
+      {codigoDetalhe !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-codigo-quebra-titulo"
+          onClick={() => setCodigoDetalhe(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3
+                  id="modal-codigo-quebra-titulo"
+                  className="text-lg font-bold text-gray-900"
+                >
+                  Cód. Baixa {codigoDetalhe}
+                  {motivoDetalhe ? ` - ${motivoDetalhe.descricao}` : ""}
+                </h3>
+                <p className="mt-1 text-sm uppercase text-gray-500">
+                  {motivoDetalhe
+                    ? `TIPO: ${motivoDetalhe.motivoQuebra} · ${formatQuantidade(motivoDetalhe.quantidade)} ocorrência(s) - ${periodoModalLabel}`
+                    : `Quebras por técnico · ${periodoModalLabel}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCodigoDetalhe(null)}
+                className="rounded-md p-1 text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {tecnicosPorCodigo.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhum técnico encontrado para este código no período.
+              </p>
+            ) : (
+              <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                        Nome do Técnico
+                      </th>
+                      <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                        Quantidade de Quebras
+                      </th>
+                      <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                        Representa
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tecnicosPorCodigo.map((tec) => {
+                      const pct =
+                        totalOcorrenciasCodigo > 0
+                          ? (tec.quantidade / totalOcorrenciasCodigo) * 100
+                          : 0;
+                      return (
+                        <tr
+                          key={tec.nome}
+                          className="border-b border-border/60 last:border-b-0"
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {tec.nome}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                            {formatQuantidade(tec.quantidade)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                            {pct.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
