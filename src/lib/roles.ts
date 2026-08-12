@@ -98,11 +98,19 @@ export function canImportToa(role: string | null | undefined): boolean {
   );
 }
 
-/** Demais abas de Importação (Miscelâneas / Serializados / Analítico). */
+/** Demais abas de Importação (Miscelâneas / Serializados / Analítico).
+ * Mesmo acesso do painel: admin, gerente e COP — sem divergência de payload/colunas. */
 export function canAccessImportacaoAbasCompletas(
   role: string | null | undefined,
 ): boolean {
-  return hasPainelFullAccess(role);
+  return canAccessAdminPanel(role);
+}
+
+/** Importação de dados do painel (TOA + Analítico): admin, gerente e COP. */
+export function canImportPainelDados(
+  role: string | null | undefined,
+): boolean {
+  return canAccessAdminPanel(role);
 }
 
 export function isTecnicoCampoRole(role: string | null | undefined): boolean {

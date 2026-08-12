@@ -27,6 +27,7 @@ import {
 } from "@/lib/faturamento-service";
 import {
   canAccessImportacaoAbasCompletas,
+  canImportPainelDados,
   canImportToa,
 } from "@/lib/roles";
 import {
@@ -230,13 +231,13 @@ function ImportacaoPage() {
   useEffect(() => {
     if (abasCompletas) return;
     if (tab === "toa") return;
-    toast.error("Acesso negado. O perfil COP só pode usar a aba TOA.");
+    toast.error("Acesso negado a esta aba de importação.");
     void navigate({ search: { tab: "toa" }, replace: true });
   }, [abasCompletas, tab, navigate]);
 
   const selecionarAba = (next: ImportacaoTab) => {
     if (!abasCompletas && next !== "toa") {
-      toast.error("Acesso negado. O perfil COP só pode usar a aba TOA.");
+      toast.error("Acesso negado a esta aba de importação.");
       void navigate({ search: { tab: "toa" }, replace: true });
       return;
     }
@@ -393,7 +394,7 @@ function ImportacaoPage() {
   };
 
   const handleToa = async (file: File) => {
-    if (!canImportToa(user?.role)) {
+    if (!canImportToa(user?.role) && !canImportPainelDados(user?.role)) {
       toast.error("Sem permissão para importar TOA.");
       return;
     }
@@ -433,8 +434,8 @@ function ImportacaoPage() {
   };
 
   const handleAnalitico = async (file: File) => {
-    if (!abasCompletas) {
-      toast.error("Acesso negado. O perfil COP não importa Analítico.");
+    if (!canImportPainelDados(user?.role)) {
+      toast.error("Sem permissão para importar Analítico.");
       return;
     }
     setBusyAnalitico(true);
@@ -469,9 +470,9 @@ function ImportacaoPage() {
               Importação de Dados
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {abasCompletas
-                ? "TOA e Analítico são gravados no Supabase (overwrite por mês). Demais importações seguem o fluxo atual."
-                : "Perfil COP: importação liberada apenas na aba TOA (upload e processamento no Supabase)."}
+              TOA e Analítico são gravados no Supabase (overwrite por mês). Demais
+              importações seguem o fluxo atual. Admin, Gerente e COP têm o mesmo
+              mapeamento de colunas e as mesmas permissões neste módulo.
             </p>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">

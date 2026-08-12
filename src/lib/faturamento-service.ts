@@ -10,8 +10,11 @@ import {
   diaPertenceASemana,
   type KpiSemanaFiltro,
 } from "./kpi-semana";
-import { getCachedUser } from "./auth-session";
-import { canImportToa } from "./roles";
+import { getCachedUser, waitForAuth } from "./auth-session";
+import { canImportPainelDados, canImportToa } from "./roles";
+
+/** Versão do mapeamento TOA (cidade / janela_servico). Bumpe ao alterar colunas. */
+export const TOA_IMPORT_SCHEMA_VERSION = "2026-08-12-cidade-janela-v1";
 
 /** Último mês inclusivo do gabarito Analítico (jun/2026). */
 export const FATURAMENTO_HISTORICO_ATE = 202606;
@@ -576,6 +579,13 @@ export async function replaceAnaliticoHistoricoMes(
   dataBase: number,
   rows: AnaliticoHistoricoRow[],
 ): Promise<number> {
+  await waitForAuth();
+  const role = getCachedUser()?.role;
+  if (!canImportPainelDados(role)) {
+    throw new Error(
+      "Sem permissão para importar Analítico. Papéis permitidos: ADMIN, GERENTE, COP.",
+    );
+  }
   const supabase = getSupabaseClient();
   const { error: delError } = await supabase
     .from("analitico_historico")
@@ -744,8 +754,9 @@ export function groupChamadosByCompetencia(
 export async function replaceToaImportacoes(
   chamados: ToaChamadoProcessado[],
 ): Promise<{ competencias: number[]; totalOs: number; totalNotas: number }> {
+  await waitForAuth();
   const role = getCachedUser()?.role;
-  if (!canImportToa(role)) {
+  if (!canImportToa(role) && !canImportPainelDados(role)) {
     throw new Error(
       "Sem permissão para importar TOA. Papéis permitidos: ADMIN, GERENTE, COP.",
     );
@@ -760,6 +771,25 @@ export async function replaceToaImportacoes(
     return { competencias: [], totalOs: 0, totalNotas: 0 };
   }
 
+  // Sanity: o payload SEMPRE inclui as colunas novas (evita bundle antigo em cache).
+  const amostra = flat[0]!;
+  if (
+    !("cidade" in amostra) ||
+    !("janela_servico_1" in amostra) ||
+    !("janela_servico_2" in amostra)
+  ) {
+    throw new Error(
+      `Mapeamento TOA desatualizado (esperado ${TOA_IMPORT_SCHEMA_VERSION}). ` +
+        "Atualize a página com Ctrl+F5 e importe novamente.",
+    );
+  }
+
+  if (typeof console !== "undefined") {
+    console.info(
+      `[toa-import] schema=${TOA_IMPORT_SCHEMA_VERSION} role=${role ?? "?"} rows=${flat.length}`,
+    );
+  }
+
   const supabase = getSupabaseClient();
   const { error: delError } = await supabase
     .from("toa_importacoes")
@@ -770,8 +800,32 @@ export async function replaceToaImportacoes(
   const chunkSize = 200;
   for (let i = 0; i < flat.length; i += chunkSize) {
     const chunk = flat.slice(i, i + chunkSize);
-    const { error } = await supabase.from("toa_importacoes").insert(chunk);
+    // .select() força o PostgREST a validar/devolver as colunas novas
+    const { data: inserted, error } = await supabase
+      .from("toa_importacoes")
+      .insert(chunk)
+      .select("id, cidade, janela_servico_1, janela_servico_2");
     if (error) throw error;
+
+    if (inserted && inserted.length > 0) {
+      const esperavaCidade = chunk.some((r) => String(r.cidade ?? "").trim());
+      const gravouCidade = inserted.some((r) =>
+        String(r.cidade ?? "").trim(),
+      );
+      const esperavaJanela = chunk.some((r) =>
+        String(r.janela_servico_1 ?? "").trim(),
+      );
+      const gravouJanela = inserted.some((r) =>
+        String(r.janela_servico_1 ?? "").trim(),
+      );
+      if ((esperavaCidade && !gravouCidade) || (esperavaJanela && !gravouJanela)) {
+        throw new Error(
+          "Importação incompleta: Cidade/Janela de Serviço não foram persistidas. " +
+            "Atualize a página (Ctrl+F5) e tente novamente. " +
+            `schema=${TOA_IMPORT_SCHEMA_VERSION}`,
+        );
+      }
+    }
   }
 
   const totalNotas = new Set(flat.map((r) => r.numero_wo)).size;

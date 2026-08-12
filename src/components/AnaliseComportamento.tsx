@@ -637,6 +637,8 @@ export function AnaliseComportamento() {
   const [loadingModal, setLoadingModal] = useState(false);
   const [modalTop10Aberto, setModalTop10Aberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<AbaPainelInferior>("rank-geral");
+  const [abaOrigemRaioX, setAbaOrigemRaioX] =
+    useState<AbaPainelInferior | null>(null);
   const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
     coluna: "produtivas",
     direcao: "desc",
@@ -1937,6 +1939,15 @@ export function AnaliseComportamento() {
     setAbaAtiva("rank-geral");
     setBuscaCodBaixa("");
     setBuscaTecnicoRank("");
+    setAbaOrigemRaioX(null);
+  };
+
+  const voltarDoRaioX = () => {
+    setTecnicoFiltro(TECNICO_TODOS);
+    if (abaOrigemRaioX) {
+      setAbaAtiva(abaOrigemRaioX);
+      setAbaOrigemRaioX(null);
+    }
   };
 
   const isModoImprodutivo = statusFiltro === "IMPRODUTIVO";
@@ -2147,16 +2158,18 @@ export function AnaliseComportamento() {
             />
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-auto gap-1.5"
-            onClick={limparFiltros}
-          >
-            <FilterX className="h-4 w-4" />
-            Limpar Filtros
-          </Button>
+          {visaoEquipe ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto gap-1.5"
+              onClick={limparFiltros}
+            >
+              <FilterX className="h-4 w-4" />
+              Limpar Filtros
+            </Button>
+          ) : null}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{periodoDescricao}</p>
       </div>
@@ -2498,13 +2511,13 @@ export function AnaliseComportamento() {
                     variant="ghost"
                     size="sm"
                     className="gap-1.5 text-muted-foreground"
-                    onClick={() => setTecnicoFiltro(TECNICO_TODOS)}
+                    onClick={voltarDoRaioX}
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Voltar
                   </Button>
                 ) : null}
-                {abaAtiva === "ranking" ? (
+                {abaAtiva === "ranking" && visaoEquipe ? (
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex min-w-[12rem] items-center gap-2">
                       <Label
@@ -2686,6 +2699,7 @@ export function AnaliseComportamento() {
                           key={tec.nome}
                           className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
                           onClick={() => {
+                            setAbaOrigemRaioX("rank-geral");
                             setTecnicoFiltro(tec.nome);
                             setAbaAtiva("ranking");
                           }}
@@ -2797,7 +2811,10 @@ export function AnaliseComportamento() {
                             <tr
                               key={row.login}
                               className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
-                              onClick={() => setTecnicoFiltro(row.nome)}
+                              onClick={() => {
+                                setAbaOrigemRaioX("ranking");
+                                setTecnicoFiltro(row.nome);
+                              }}
                               title="Abrir raio-X deste técnico"
                             >
                               <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
