@@ -359,12 +359,16 @@ export function AnaliseComportamento() {
   const [modalDiaAberto, setModalDiaAberto] = useState(false);
   const [diaFiltroModal, setDiaFiltroModal] = useState<string | null>(null);
   const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
+  const [modalAno, setModalAno] = useState<number | null>(null);
+  const [modalMes, setModalMes] = useState<number | null>(null);
+  const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
+  const [loadingModal, setLoadingModal] = useState(false);
   const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
-    coluna: "aproveitamento",
+    coluna: "produtivas",
     direcao: "desc",
   });
   const [ordemMatriz, setOrdemMatriz] = useState<OrdemMatrizState>({
-    coluna: "aprovGeral",
+    coluna: "produtivasTotal",
     direcao: "desc",
   });
 
@@ -452,6 +456,17 @@ export function AnaliseComportamento() {
     }
     return [...set].sort((a, b) => a - b);
   }, [competencias, ano]);
+
+  const mesesDisponiveisModal = useMemo(() => {
+    const set = new Set<number>();
+    for (const ym of competencias) {
+      const a = Math.floor(ym / 100);
+      const m = ym % 100;
+      if (modalAno !== null && a !== modalAno) continue;
+      if (m >= 1 && m <= 12) set.add(m);
+    }
+    return [...set].sort((a, b) => a - b);
+  }, [competencias, modalAno]);
 
   const tecnicosDisponiveis = useMemo(() => {
     const map = new Map<string, string>();
@@ -842,6 +857,8 @@ export function AnaliseComportamento() {
   const abrirModalDia = (diaCurto: string) => {
     setDiaFiltroModal(diaCurto);
     setBuscaTecnicoModal("");
+    setModalAno(ano);
+    setModalMes(mes);
     setModalDiaAberto(true);
   };
 
@@ -852,7 +869,41 @@ export function AnaliseComportamento() {
   const limparFiltrosModalDia = () => {
     setDiaFiltroModal(null);
     setBuscaTecnicoModal("");
+    setModalAno(ano);
+    setModalMes(mes);
   };
+
+  useEffect(() => {
+    if (!modalDiaAberto) return;
+    setModalAno(ano);
+    setModalMes(mes);
+  }, [modalDiaAberto, ano, mes]);
+
+  useEffect(() => {
+    if (!modalDiaAberto) return;
+    let cancelled = false;
+    void (async () => {
+      setLoadingModal(true);
+      try {
+        const flat = await fetchToaImportacoes({
+          ano: modalAno,
+          mes: modalMes,
+          dia: null,
+        });
+        if (cancelled) return;
+        setRowsModal(filtrarToaOsContabilizaveis(flat));
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Erro ao carregar TOA do modal de dia:", err);
+        setRowsModal([]);
+      } finally {
+        if (!cancelled) setLoadingModal(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modalDiaAberto, modalAno, modalMes]);
 
   useEffect(() => {
     if (!modalDiaAberto) return;
@@ -864,8 +915,8 @@ export function AnaliseComportamento() {
   }, [modalDiaAberto]);
 
   const notasBaseModal = useMemo(
-    () => dedupeNotasPorWo(rows),
-    [rows],
+    () => dedupeNotasPorWo(rowsModal),
+    [rowsModal],
   );
 
   const diaDowModal = useMemo(() => {
@@ -1637,12 +1688,12 @@ export function AnaliseComportamento() {
                       Ano:
                     </Label>
                     <Select
-                      value={ano !== null ? String(ano) : "todos"}
+                      value={modalAno !== null ? String(modalAno) : "todos"}
                       disabled={anosDisponiveis.length === 0}
                       onValueChange={(v) => {
                         if (v === "todos") {
-                          setAno(null);
-                          setMes(null);
+                          setModalAno(null);
+                          setModalMes(null);
                           return;
                         }
                         const novoAno = Number(v);
@@ -1650,8 +1701,8 @@ export function AnaliseComportamento() {
                           .filter((ym) => Math.floor(ym / 100) === novoAno)
                           .map((ym) => ym % 100)
                           .sort((a, b) => a - b);
-                        setAno(novoAno);
-                        setMes(mesesDoAno[mesesDoAno.length - 1] ?? null);
+                        setModalAno(novoAno);
+                        setModalMes(mesesDoAno[mesesDoAno.length - 1] ?? null);
                       }}
                     >
                       <SelectTrigger id="modal-dia-ano" className="w-[120px]">
@@ -1676,14 +1727,16 @@ export function AnaliseComportamento() {
                       Mês:
                     </Label>
                     <Select
-                      value={mes !== null ? String(mes) : "todos"}
-                      disabled={ano === null || mesesDisponiveis.length === 0}
+                      value={modalMes !== null ? String(modalMes) : "todos"}
+                      disabled={
+                        modalAno === null || mesesDisponiveisModal.length === 0
+                      }
                       onValueChange={(v) => {
                         if (v === "todos") {
-                          setMes(null);
+                          setModalMes(null);
                           return;
                         }
-                        setMes(Number(v));
+                        setModalMes(Number(v));
                       }}
                     >
                       <SelectTrigger id="modal-dia-mes" className="w-[140px]">
@@ -1691,7 +1744,7 @@ export function AnaliseComportamento() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos">Todos</SelectItem>
-                        {mesesDisponiveis.map((m) => (
+                        {mesesDisponiveisModal.map((m) => (
                           <SelectItem key={m} value={String(m)}>
                             {mesLabel(m)}
                           </SelectItem>
@@ -1750,7 +1803,11 @@ export function AnaliseComportamento() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-              {modoDiaEspecifico ? (
+              {loadingModal ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Carregando detalhamento...
+                </p>
+              ) : modoDiaEspecifico ? (
                 detalheTecnicosDia.length === 0 ? (
                   <p className="py-10 text-center text-sm text-muted-foreground">
                     Nenhum técnico com notas neste dia no período.
