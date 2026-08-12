@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, FilterX, PieChart, X, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FilterX,
+  PieChart,
+  X,
+  XCircle,
+} from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -29,12 +36,9 @@ import {
   descricaoDoCodigoBaixa,
   fetchDicionarioCodigosBaixa,
   normalizeCodigoBaixa,
+  statusContratoDoCodigo,
   type DicionarioCodigosBaixaMap,
 } from "@/lib/dicionario-codigos-baixa";
-import {
-  isCodBaixaProdutivo,
-  isStatusExecutada,
-} from "@/lib/toa-store";
 
 const MESES = [
   { value: 1, label: "Janeiro" },
@@ -53,6 +57,8 @@ const MESES = [
 
 const DESCRICAO_DESCONHECIDA = "Motivo Desconhecido";
 const MOTIVO_MACRO_NAO_CLASSIFICADO = "Não classificado";
+
+export type StatusContratoFiltro = "IMPRODUTIVO" | "PRODUTIVO";
 
 export type MotivoQuebraAgg = {
   codigo: string;
@@ -83,6 +89,7 @@ type ChartMotivoPoint = {
 type MotivoChartTooltipProps = {
   active?: boolean;
   label?: string | number;
+  corQuantidade?: string;
   payload?: Array<{
     value?: number | string;
     payload?: ChartMotivoPoint;
@@ -97,19 +104,6 @@ function formatQuantidade(n: number): string {
   return n.toLocaleString("pt-BR");
 }
 
-/** O.S. improdutiva: não é (Executada + Cód Baixa produtivo). */
-function isLinhaOsImprodutiva(row: ToaImportacaoRow): boolean {
-  const cod =
-    row.cod_baixa != null && Number.isFinite(Number(row.cod_baixa))
-      ? Number(row.cod_baixa)
-      : 0;
-  if (cod <= 0) return false;
-  if (isStatusExecutada(row.status_os || "") && isCodBaixaProdutivo(cod)) {
-    return false;
-  }
-  return true;
-}
-
 function motivoMacroDoCodigo(
   codigo: string,
   dicionario: DicionarioCodigosBaixaMap | Record<string, string>,
@@ -120,22 +114,30 @@ function motivoMacroDoCodigo(
   return entry.motivo_quebra?.trim() || MOTIVO_MACRO_NAO_CLASSIFICADO;
 }
 
+function matchStatusContrato(
+  codigo: string,
+  dicionario: DicionarioCodigosBaixaMap,
+  statusNota: StatusContratoFiltro,
+): boolean {
+  const status = statusContratoDoCodigo(codigo, dicionario);
+  return status === statusNota;
+}
+
 /**
- * Volumetria de códigos de baixa em O.S. improdutivas (notas falhas).
- * Cruza com dicionario_codigos_baixa para descrição e motivo_quebra.
+ * Volumetria de códigos de baixa filtrados por status_contrato do dicionário
+ * (PRODUTIVO / IMPRODUTIVO).
  */
 export function agregarMotivosQuebra(
   rows: ToaImportacaoRow[],
-  dicionario: DicionarioCodigosBaixaMap | Record<string, string> = {},
+  dicionario: DicionarioCodigosBaixaMap = {},
+  statusNota: StatusContratoFiltro = "IMPRODUTIVO",
 ): MotivoQuebraAgg[] {
   const counts = new Map<string, number>();
 
   for (const row of rows) {
-    if (row.status_nota !== "Improdutiva") continue;
-    if (!isLinhaOsImprodutiva(row)) continue;
-
     const codigo = normalizeCodigoBaixa(row.cod_baixa);
     if (!codigo) continue;
+    if (!matchStatusContrato(codigo, dicionario, statusNota)) continue;
     counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
   }
 
@@ -159,19 +161,18 @@ export function agregarMotivosQuebra(
     );
 }
 
-/** Agrupa O.S. improdutivas pela categoria macro (COMERCIAL / TÉCNICO). */
+/** Agrupa O.S. pela categoria macro (COMERCIAL / TÉCNICO / PRODUTIVO). */
 export function agregarMotivosQuebraMacro(
   rows: ToaImportacaoRow[],
-  dicionario: DicionarioCodigosBaixaMap | Record<string, string> = {},
+  dicionario: DicionarioCodigosBaixaMap = {},
+  statusNota: StatusContratoFiltro = "IMPRODUTIVO",
 ): MotivoQuebraMacroAgg[] {
   const counts = new Map<string, number>();
 
   for (const row of rows) {
-    if (row.status_nota !== "Improdutiva") continue;
-    if (!isLinhaOsImprodutiva(row)) continue;
-
     const codigo = normalizeCodigoBaixa(row.cod_baixa);
     if (!codigo) continue;
+    if (!matchStatusContrato(codigo, dicionario, statusNota)) continue;
     const motivo = motivoMacroDoCodigo(codigo, dicionario);
     counts.set(motivo, (counts.get(motivo) ?? 0) + 1);
   }
@@ -189,6 +190,7 @@ function MotivoChartTooltip({
   active,
   payload,
   label,
+  corQuantidade = "text-red-600",
 }: MotivoChartTooltipProps) {
   if (!active || !payload?.length) return null;
   const entry = payload[0]!;
@@ -205,7 +207,7 @@ function MotivoChartTooltip({
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         Quantidade:{" "}
-        <span className="font-semibold tabular-nums text-red-600">
+        <span className={`font-semibold tabular-nums ${corQuantidade}`}>
           {formatQuantidade(valor)}
         </span>
       </p>
@@ -222,7 +224,44 @@ export function MotivosQuebra() {
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
+  const [statusNota, setStatusNota] =
+    useState<StatusContratoFiltro>("IMPRODUTIVO");
   const [codigoDetalhe, setCodigoDetalhe] = useState<string | null>(null);
+
+  const isImprodutivo = statusNota === "IMPRODUTIVO";
+  const corTexto = isImprodutivo ? "text-red-600" : "text-green-600";
+  const corBarra = isImprodutivo ? "#ef4444" : "#16a34a";
+  const IconeStatus = isImprodutivo ? XCircle : CheckCircle2;
+  const tituloCardTotal = isImprodutivo
+    ? "Total de Quebras (O.S)"
+    : "Total de Notas (O.S)";
+  const subtituloCardTotal = isImprodutivo
+    ? "O.S. improdutivas no período"
+    : "O.S. produtivas no período";
+  const tituloCardOfensor = isImprodutivo
+    ? "Principal Ofensor"
+    : "Principal Código";
+  const tituloCardMacro = isImprodutivo
+    ? "Motivo de quebra"
+    : "Categoria da baixa";
+  const subtituloCardMacro = isImprodutivo
+    ? "categoria com maior índice de quebra"
+    : "categoria com maior volume de baixas";
+  const tituloTop10 = isImprodutivo
+    ? "Top 10 Motivos de Quebra"
+    : "Top 10 Códigos Produtivos";
+  const emptyChartMsg = isImprodutivo
+    ? "Nenhuma O.S. improdutiva no período."
+    : "Nenhuma O.S. produtiva no período.";
+  const emptyTableMsg = isImprodutivo
+    ? "Nenhum código de baixa improdutivo no período selecionado."
+    : "Nenhum código de baixa produtivo no período selecionado.";
+  const tituloColunaTipo = isImprodutivo
+    ? "Tipo de quebra"
+    : "Categoria da baixa";
+  const tituloColunaQtdTecnicos = isImprodutivo
+    ? "Quantidade de Quebras"
+    : "Quantidade de Baixas/Notas";
 
   useEffect(() => {
     let cancelled = false;
@@ -288,7 +327,7 @@ export function MotivosQuebra() {
 
   useEffect(() => {
     setCodigoDetalhe(null);
-  }, [ano, mes]);
+  }, [ano, mes, statusNota]);
 
   const anosDisponiveis = useMemo(() => {
     const set = new Set<number>();
@@ -311,8 +350,8 @@ export function MotivosQuebra() {
   }, [competencias, ano]);
 
   const porMotivo = useMemo(
-    () => agregarMotivosQuebra(rows, dicionario),
-    [rows, dicionario],
+    () => agregarMotivosQuebra(rows, dicionario, statusNota),
+    [rows, dicionario, statusNota],
   );
 
   const totalQuebras = useMemo(
@@ -326,10 +365,10 @@ export function MotivosQuebra() {
   }, [porMotivo]);
 
   const motivoMacroVencedor = useMemo(() => {
-    const macros = agregarMotivosQuebraMacro(rows, dicionario);
+    const macros = agregarMotivosQuebraMacro(rows, dicionario, statusNota);
     if (macros.length === 0) return null;
     return macros[0]!;
-  }, [rows, dicionario]);
+  }, [rows, dicionario, statusNota]);
 
   const chartTop10 = useMemo(
     (): ChartMotivoPoint[] =>
@@ -356,10 +395,9 @@ export function MotivosQuebra() {
     const counts = new Map<string, number>();
 
     for (const row of rows) {
-      if (row.status_nota !== "Improdutiva") continue;
-      if (!isLinhaOsImprodutiva(row)) continue;
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (codigo !== codigoDetalhe) continue;
+      if (!matchStatusContrato(codigo, dicionario, statusNota)) continue;
 
       const nome =
         row.nome_tecnico?.trim() ||
@@ -375,7 +413,7 @@ export function MotivosQuebra() {
           b.quantidade - a.quantidade ||
           a.nome.localeCompare(b.nome, "pt-BR"),
       );
-  }, [codigoDetalhe, rows]);
+  }, [codigoDetalhe, rows, dicionario, statusNota]);
 
   const filtrosLimpos = ano === null && mes === null;
 
@@ -406,6 +444,7 @@ export function MotivosQuebra() {
   const limparFiltros = () => {
     setAno(null);
     setMes(null);
+    setStatusNota("IMPRODUTIVO");
   };
 
   return (
@@ -415,13 +454,36 @@ export function MotivosQuebra() {
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
             <span className="text-sm font-bold text-foreground">
-              Filtro de período
+              Filtros
             </span>
             {filtrosLimpos && (
               <Badge variant="secondary" className="text-xs">
                 Histórico geral
               </Badge>
             )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="motivos-quebra-status"
+              className="shrink-0 text-sm font-medium"
+            >
+              Status da nota:
+            </Label>
+            <Select
+              value={statusNota}
+              onValueChange={(v) =>
+                setStatusNota(v as StatusContratoFiltro)
+              }
+            >
+              <SelectTrigger id="motivos-quebra-status" className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IMPRODUTIVO">Improdutiva</SelectItem>
+                <SelectItem value="PRODUTIVO">Produtiva</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">
@@ -520,28 +582,28 @@ export function MotivosQuebra() {
           <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
-                <XCircle className="h-5 w-5 shrink-0 text-red-600" />
+                <IconeStatus className={`h-5 w-5 shrink-0 ${corTexto}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de Quebras (O.S)
+                  {tituloCardTotal}
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-lg">
                 Quantidade de O.S
               </div>
               <div className="mt-auto">
-                <div className="mt-1 text-3xl font-bold text-red-600">
+                <div className={`mt-1 text-3xl font-bold ${corTexto}`}>
                   {formatQuantidade(totalQuebras)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  O.S. improdutivas no período
+                  {subtituloCardTotal}
                 </p>
               </div>
             </div>
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                <AlertTriangle className={`h-5 w-5 shrink-0 ${corTexto}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Principal Ofensor
+                  {tituloCardOfensor}
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-lg">
@@ -550,7 +612,7 @@ export function MotivosQuebra() {
                   : "—"}
               </div>
               <div className="mt-auto">
-                <div className="mt-1 text-3xl font-bold text-red-600">
+                <div className={`mt-1 text-3xl font-bold ${corTexto}`}>
                   {formatQuantidade(principalOfensor?.quantidade ?? 0)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -560,9 +622,9 @@ export function MotivosQuebra() {
             </div>
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
-                <PieChart className="h-5 w-5 shrink-0 text-red-600" />
+                <PieChart className={`h-5 w-5 shrink-0 ${corTexto}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Motivo de quebra
+                  {tituloCardMacro}
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-lg">
@@ -571,11 +633,11 @@ export function MotivosQuebra() {
                   : "—"}
               </div>
               <div className="mt-auto">
-                <div className="mt-1 text-3xl font-bold text-red-600">
+                <div className={`mt-1 text-3xl font-bold ${corTexto}`}>
                   {formatQuantidade(motivoMacroVencedor?.quantidade ?? 0)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  categoria com maior índice de quebra
+                  {subtituloCardMacro}
                 </p>
               </div>
             </div>
@@ -583,12 +645,12 @@ export function MotivosQuebra() {
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              Top 10 Motivos de Quebra
+              <AlertTriangle className={`h-4 w-4 ${corTexto}`} />
+              {tituloTop10}
             </h2>
             {chartTop10.length === 0 ? (
               <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                Nenhuma O.S. improdutiva no período.
+                {emptyChartMsg}
               </p>
             ) : (
               <div className="h-80 w-full">
@@ -612,12 +674,14 @@ export function MotivosQuebra() {
                       reversed={false}
                     />
                     <Tooltip
-                      content={<MotivoChartTooltip />}
+                      content={
+                        <MotivoChartTooltip corQuantidade={corTexto} />
+                      }
                       cursor={{ fill: "#f3f4f6" }}
                     />
                     <Bar
                       dataKey="quantidade"
-                      fill="#ef4444"
+                      fill={corBarra}
                       radius={[0, 3, 3, 0]}
                       maxBarSize={22}
                       className="cursor-pointer"
@@ -637,12 +701,12 @@ export function MotivosQuebra() {
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
-              <XCircle className="h-4 w-4 text-primary" />
+              <IconeStatus className="h-4 w-4 text-primary" />
               Todos os códigos de baixa
             </h2>
             {porMotivo.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Nenhum código de baixa improdutivo no período selecionado.
+                {emptyTableMsg}
               </p>
             ) : (
               <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
@@ -656,7 +720,7 @@ export function MotivosQuebra() {
                         Motivo / Descrição
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
-                        Tipo de quebra
+                        {tituloColunaTipo}
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
                         Quantidade
@@ -678,7 +742,9 @@ export function MotivosQuebra() {
                         <td className="px-2 py-2 text-gray-700">
                           {row.motivoQuebra}
                         </td>
-                        <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                        <td
+                          className={`px-2 py-2 text-right tabular-nums ${corTexto}`}
+                        >
                           {formatQuantidade(row.quantidade)}
                         </td>
                       </tr>
@@ -715,7 +781,7 @@ export function MotivosQuebra() {
                 <p className="mt-1 text-sm uppercase text-gray-500">
                   {motivoDetalhe
                     ? `TIPO: ${motivoDetalhe.motivoQuebra} · ${formatQuantidade(motivoDetalhe.quantidade)} ocorrência(s) - ${periodoModalLabel}`
-                    : `Quebras por técnico · ${periodoModalLabel}`}
+                    : `${isImprodutivo ? "Quebras" : "Baixas/Notas"} por técnico · ${periodoModalLabel}`}
                 </p>
               </div>
               <button
@@ -741,7 +807,7 @@ export function MotivosQuebra() {
                         Nome do Técnico
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                        Quantidade de Quebras
+                        {tituloColunaQtdTecnicos}
                       </th>
                       <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
                         Representa
@@ -762,7 +828,9 @@ export function MotivosQuebra() {
                           <td className="px-3 py-2 font-medium text-gray-900">
                             {tec.nome}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                          <td
+                            className={`px-3 py-2 text-right tabular-nums ${corTexto}`}
+                          >
                             {formatQuantidade(tec.quantidade)}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-gray-500">

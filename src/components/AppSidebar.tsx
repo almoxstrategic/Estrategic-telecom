@@ -312,7 +312,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                           }`}
                         >
                           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                          Motivos de Quebra
+                          Análise de Códigos de Baixa
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"

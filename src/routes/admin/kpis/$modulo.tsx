@@ -163,7 +163,7 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
               : params.modulo === "detalhamento-notas"
                 ? "Detalhamento de notas — Estrategic Field"
                 : params.modulo === "motivos-quebra"
-                    ? "Motivos de Quebra — Estrategic Field"
+                    ? "Análise de Códigos de Baixa — Estrategic Field"
                     : params.modulo === "analise-comportamento"
                       ? "Análise de Comportamento — Estrategic Field"
                       : params.modulo === "estimativa-volume"
@@ -1031,7 +1031,7 @@ function KpisPage() {
                   isMotivosQuebra ? "text-green-700" : "text-gray-500"
                 }`}
               />
-              Motivos de Quebra
+              Análise de Códigos de Baixa
             </Link>
             <Link
               to="/admin/kpis/$modulo"
@@ -1100,7 +1100,7 @@ function KpisPage() {
                 : isAnaliseComportamento
                 ? "Análise de Comportamento"
                 : isMotivosQuebra
-                ? "Motivos de Quebra"
+                ? "Análise de Códigos de Baixa"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
                   : "Volume de Notas por período"}
@@ -1315,7 +1315,7 @@ function KpisPage() {
                 : isAnaliseComportamento
                 ? "Análise de Comportamento"
                 : isMotivosQuebra
-                ? "Motivos de Quebra"
+                ? "Análise de Códigos de Baixa"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
                   : isVolumeNotas
@@ -1330,7 +1330,7 @@ function KpisPage() {
                 : isAnaliseComportamento
                 ? "Identifique padrões de fadiga, tendências de quebra por dia da semana e fuga de complexidade operacional."
                 : isMotivosQuebra
-                ? "Análise de volumetria dos códigos de baixa das notas improdutivas."
+                ? "Volumetria dos códigos de baixa TOA — improdutivas (quebras) e produtivas."
                 : isDetalhamentoNotas
                 ? "Análise geográfica: volume de notas produtivas e improdutivas por bairro."
                 : isVolumeNotas
