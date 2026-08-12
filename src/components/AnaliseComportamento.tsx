@@ -1604,6 +1604,7 @@ export function AnaliseComportamento() {
     setTecnicoFiltro(TECNICO_TODOS);
     setCodigoFiltro(null);
     setStatusFiltro("IMPRODUTIVO");
+    setAbaAtiva("rank-geral");
   };
 
   const isModoImprodutivo = statusFiltro === "IMPRODUTIVO";
@@ -2139,7 +2140,7 @@ export function AnaliseComportamento() {
                   );
                 })}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-4">
                 {!visaoEquipe ? (
                   <Button
                     type="button"
@@ -2152,6 +2153,31 @@ export function AnaliseComportamento() {
                     Voltar
                   </Button>
                 ) : null}
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="analise-comp-status-painel"
+                    className="shrink-0 text-sm font-medium"
+                  >
+                    Status:
+                  </Label>
+                  <Select
+                    value={statusFiltro}
+                    onValueChange={(v) =>
+                      setStatusFiltro(v as StatusContratoFiltro)
+                    }
+                  >
+                    <SelectTrigger
+                      id="analise-comp-status-painel"
+                      className="w-[150px]"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IMPRODUTIVO">Improdutiva</SelectItem>
+                      <SelectItem value="PRODUTIVO">Produtiva</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {visaoEquipe ? (
                   <Button
                     type="button"
@@ -2176,12 +2202,12 @@ export function AnaliseComportamento() {
                 <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
                   <table className="w-full min-w-[80rem] text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-left font-semibold shadow-sm">
                           Técnico
                         </th>
                         <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
                           onClick={() =>
                             alternarOrdemRankGeral("produtivasGeral")
                           }
@@ -2193,7 +2219,7 @@ export function AnaliseComportamento() {
                           )}
                         </th>
                         <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
                           onClick={() =>
                             alternarOrdemRankGeral("quebrasGeral")
                           }
@@ -2205,7 +2231,7 @@ export function AnaliseComportamento() {
                           )}
                         </th>
                         <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
                           onClick={() =>
                             alternarOrdemRankGeral("aproveitamento")
                           }
@@ -2217,7 +2243,7 @@ export function AnaliseComportamento() {
                           )}
                         </th>
                         <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
                           onClick={() =>
                             alternarOrdemRankGeral("reprovacao")
                           }
@@ -2254,19 +2280,19 @@ export function AnaliseComportamento() {
                           }}
                           title="Abrir raio-X deste técnico"
                         >
-                          <td className="px-3 py-2 font-medium text-primary">
+                          <td className="px-3 py-2 text-left font-medium text-primary">
                             {tec.nome}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-green-600">
                             {formatQuantidade(tec.produtivasGeral)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-red-600">
                             {formatQuantidade(tec.quebrasGeral)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-green-600">
                             {formatPct(tec.aproveitamento)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-red-600">
                             {formatPct(tec.reprovacao)}
                           </td>
                           {DIAS_UTEIS.map((d) => {
