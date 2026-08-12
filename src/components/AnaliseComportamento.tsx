@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FiltroCombobox } from "@/components/FiltroCombobox";
 import {
   fetchCompetenciasToa,
   fetchToaImportacoes,
@@ -80,7 +81,6 @@ const DIAS_UTEIS = [
   { dow: 6, label: "Sábado", curto: "Sáb" },
 ] as const;
 
-const CODIGOS_FUGA = new Set(["101", "106"]);
 const TECNICO_TODOS = "Todos";
 const DESCRICAO_DESCONHECIDA = "Motivo Desconhecido";
 const PIE_COLORS = { manha: "#f59e0b", tarde: "#dc2626" };
@@ -96,16 +96,17 @@ type DiaSemanaAgg = {
   taxaReprovacao: number;
 };
 
-type RankingComportamento = {
+type RankingUsoCodigoDia = {
+  pct: number | null;
+  janela: string | null;
+};
+
+type RankingUsoCodigo = {
   login: string;
   nome: string;
+  usosCodigo: number;
   totalQuebras: number;
-  fugaQuebras: number;
-  fugaPct: number;
-  quebrasSegunda: number;
-  quebrasSexta: number;
-  taxaQuebraSegunda: number;
-  taxaQuebraSexta: number;
+  porDia: Record<number, RankingUsoCodigoDia>;
 };
 
 type RaioXQuebra = {
@@ -334,6 +335,42 @@ function piorJanelaImprodutiva(
   return melhor;
 }
 
+function piorJanelaDasNotas(notas: ToaImportacaoRow[]): string | null {
+  const counts = new Map<string, number>();
+  for (const row of notas) {
+    const janela =
+      String(row.janela_servico_1 ?? "").trim() ||
+      String(row.janela_servico_2 ?? "").trim();
+    if (!janela) continue;
+    counts.set(janela, (counts.get(janela) ?? 0) + 1);
+  }
+  let melhor: string | null = null;
+  let qtdMax = 0;
+  for (const [janela, qtd] of counts) {
+    if (
+      qtd > qtdMax ||
+      (qtd === qtdMax &&
+        melhor != null &&
+        janela.localeCompare(melhor, "pt-BR") < 0)
+    ) {
+      melhor = janela;
+      qtdMax = qtd;
+    } else if (melhor == null && qtd > 0) {
+      melhor = janela;
+      qtdMax = qtd;
+    }
+  }
+  return melhor;
+}
+
+function parseCodigoFromOpcao(label: string): string | null {
+  const s = label.trim();
+  if (!s || s === "Todos") return null;
+  const match = s.match(/^(\d+)/);
+  if (match) return match[1]!;
+  return normalizeCodigoBaixa(s) || null;
+}
+
 /** 1 nota (WO) por chave — status_nota da visita. */
 function dedupeNotasPorWo(rows: ToaImportacaoRow[]): ToaImportacaoRow[] {
   const map = new Map<string, ToaImportacaoRow>();
@@ -368,6 +405,7 @@ export function AnaliseComportamento() {
   const [ano, setAno] = useState<number | null>(null);
   const [mes, setMes] = useState<number | null>(null);
   const [tecnicoFiltro, setTecnicoFiltro] = useState<string>(TECNICO_TODOS);
+  const [codigoFiltro, setCodigoFiltro] = useState<string | null>(null);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
   const [modalDiaAberto, setModalDiaAberto] = useState(false);
   const [diaFiltroModal, setDiaFiltroModal] = useState<string | null>(null);
@@ -490,6 +528,31 @@ export function AnaliseComportamento() {
     }
     return [...map.keys()].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows]);
+
+  const opcoesCodigoBaixa = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      const codigo = normalizeCodigoBaixa(row.cod_baixa);
+      if (!codigo) continue;
+      if (map.has(codigo)) continue;
+      const desc = descricaoDoCodigoBaixa(codigo, dicionario);
+      map.set(codigo, `${codigo} - ${desc}`);
+    }
+    return [...map.entries()]
+      .sort(
+        (a, b) =>
+          Number(a[0]) - Number(b[0]) || a[0].localeCompare(b[0], "pt-BR"),
+      )
+      .map(([, label]) => label);
+  }, [rows, dicionario]);
+
+  const codigoFiltroLabel = useMemo(() => {
+    if (!codigoFiltro) return "Todos";
+    return (
+      opcoesCodigoBaixa.find((opt) => parseCodigoFromOpcao(opt) === codigoFiltro) ??
+      `${codigoFiltro} - ${descricaoDoCodigoBaixa(codigoFiltro, dicionario)}`
+    );
+  }, [codigoFiltro, opcoesCodigoBaixa, dicionario]);
 
   useEffect(() => {
     if (tecnicoFiltro === TECNICO_TODOS) return;
@@ -680,13 +743,33 @@ export function AnaliseComportamento() {
       }
     }
 
-    if (!melhorCodigo || totalImprodutivas === 0) return null;
+    if (!melhorCodigo || totalImprodutivas === 0) {
+      return { totalImprodutivas, counts, ofensor: null as null | { codigo: string; quantidade: number; pct: number } };
+    }
     return {
-      codigo: melhorCodigo,
-      quantidade: melhorQtd,
-      pct: (melhorQtd / totalImprodutivas) * 100,
+      totalImprodutivas,
+      counts,
+      ofensor: {
+        codigo: melhorCodigo,
+        quantidade: melhorQtd,
+        pct: (melhorQtd / totalImprodutivas) * 100,
+      },
     };
   }, [rowsFiltradas, dicionario]);
+
+  const codigoOfensorVencedor = codOfensor.ofensor?.codigo ?? null;
+  const codigoAlvo = codigoFiltro || codigoOfensorVencedor;
+
+  const cardCodigoExibido = useMemo(() => {
+    if (!codigoFiltro) return codOfensor.ofensor;
+    if (codOfensor.totalImprodutivas === 0) return null;
+    const quantidade = codOfensor.counts.get(codigoFiltro) ?? 0;
+    return {
+      codigo: codigoFiltro,
+      quantidade,
+      pct: (quantidade / codOfensor.totalImprodutivas) * 100,
+    };
+  }, [codigoFiltro, codOfensor]);
 
   const tipoOfensorMacro = useMemo(() => {
     const counts = new Map<string, number>();
@@ -736,18 +819,20 @@ export function AnaliseComportamento() {
     return best;
   }, [porDiaSemana]);
 
-  const rankingSuspeito = useMemo((): RankingComportamento[] => {
+  const rankingUsoCodigo = useMemo((): RankingUsoCodigo[] => {
+    if (!codigoAlvo) return [];
+
+    type DiaAcc = {
+      usosCodigo: number;
+      totalQuebras: number;
+      notasCodigo: ToaImportacaoRow[];
+    };
     type Acc = {
       login: string;
       nome: string;
+      usosCodigo: number;
       totalQuebras: number;
-      fugaQuebras: number;
-      notasSegunda: number;
-      improdSegunda: number;
-      notasSexta: number;
-      improdSexta: number;
-      quebrasSegunda: number;
-      quebrasSexta: number;
+      porDia: Map<number, DiaAcc>;
     };
     const byTech = new Map<string, Acc>();
 
@@ -759,14 +844,9 @@ export function AnaliseComportamento() {
         acc = {
           login,
           nome,
+          usosCodigo: 0,
           totalQuebras: 0,
-          fugaQuebras: 0,
-          notasSegunda: 0,
-          improdSegunda: 0,
-          notasSexta: 0,
-          improdSexta: 0,
-          quebrasSegunda: 0,
-          quebrasSexta: 0,
+          porDia: new Map(),
         };
         byTech.set(login, acc);
       } else if (nome !== "—" && (acc.nome === "—" || acc.nome === login)) {
@@ -775,57 +855,68 @@ export function AnaliseComportamento() {
       return acc;
     };
 
-    for (const row of rowsFiltradas) {
-      if (row.status_nota !== "Improdutiva" || !isLinhaOsImprodutiva(row)) {
-        continue;
+    const ensureDia = (acc: Acc, dow: number): DiaAcc => {
+      let dia = acc.porDia.get(dow);
+      if (!dia) {
+        dia = { usosCodigo: 0, totalQuebras: 0, notasCodigo: [] };
+        acc.porDia.set(dow, dia);
       }
+      return dia;
+    };
+
+    for (const row of rowsFiltradas) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
+      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+
       const acc = ensure(row);
       acc.totalQuebras += 1;
-      if (CODIGOS_FUGA.has(codigo)) acc.fugaQuebras += 1;
       const dow = diaDaSemanaFromIso(row.data_toa);
-      if (dow === 1) acc.quebrasSegunda += 1;
-      if (dow === 5) acc.quebrasSexta += 1;
-    }
+      if (dow != null && dow !== 0) {
+        ensureDia(acc, dow).totalQuebras += 1;
+      }
 
-    for (const nota of dedupeNotasPorWo(rowsFiltradas)) {
-      const dow = diaDaSemanaFromIso(nota.data_toa);
-      if (dow !== 1 && dow !== 5) continue;
-      const acc = ensure(nota);
-      if (dow === 1) {
-        acc.notasSegunda += 1;
-        if (nota.status_nota === "Improdutiva") acc.improdSegunda += 1;
-      } else {
-        acc.notasSexta += 1;
-        if (nota.status_nota === "Improdutiva") acc.improdSexta += 1;
+      if (codigo !== codigoAlvo) continue;
+      acc.usosCodigo += 1;
+      if (dow != null && dow !== 0) {
+        const dia = ensureDia(acc, dow);
+        dia.usosCodigo += 1;
+        dia.notasCodigo.push(row);
       }
     }
 
     return [...byTech.values()]
-      .filter((a) => a.totalQuebras > 0)
-      .map((a) => ({
-        login: a.login,
-        nome: a.nome,
-        totalQuebras: a.totalQuebras,
-        fugaQuebras: a.fugaQuebras,
-        fugaPct:
-          a.totalQuebras > 0 ? (a.fugaQuebras / a.totalQuebras) * 100 : 0,
-        quebrasSegunda: a.quebrasSegunda,
-        quebrasSexta: a.quebrasSexta,
-        taxaQuebraSegunda:
-          a.notasSegunda > 0 ? (a.improdSegunda / a.notasSegunda) * 100 : 0,
-        taxaQuebraSexta:
-          a.notasSexta > 0 ? (a.improdSexta / a.notasSexta) * 100 : 0,
-      }))
+      .filter((a) => a.usosCodigo > 0)
+      .map((a) => {
+        const porDia: Record<number, RankingUsoCodigoDia> = {};
+        for (const d of DIAS_UTEIS) {
+          const dia = a.porDia.get(d.dow);
+          if (!dia || dia.usosCodigo === 0) {
+            porDia[d.dow] = { pct: null, janela: null };
+            continue;
+          }
+          porDia[d.dow] = {
+            pct:
+              dia.totalQuebras > 0
+                ? (dia.usosCodigo / dia.totalQuebras) * 100
+                : 0,
+            janela: piorJanelaDasNotas(dia.notasCodigo),
+          };
+        }
+        return {
+          login: a.login,
+          nome: a.nome,
+          usosCodigo: a.usosCodigo,
+          totalQuebras: a.totalQuebras,
+          porDia,
+        };
+      })
       .sort(
         (a, b) =>
-          b.fugaPct - a.fugaPct ||
-          b.fugaQuebras - a.fugaQuebras ||
+          b.usosCodigo - a.usosCodigo ||
           a.nome.localeCompare(b.nome, "pt-BR"),
-      )
-      .slice(0, 10);
-  }, [rowsFiltradas]);
+      );
+  }, [rowsFiltradas, dicionario, codigoAlvo]);
 
   const raioXTecnico = useMemo((): RaioXQuebra[] => {
     if (tecnicoFiltro === TECNICO_TODOS) return [];
@@ -1142,6 +1233,7 @@ export function AnaliseComportamento() {
     setAno(null);
     setMes(null);
     setTecnicoFiltro(TECNICO_TODOS);
+    setCodigoFiltro(null);
   };
 
   return (
@@ -1261,6 +1353,24 @@ export function AnaliseComportamento() {
             </Select>
           </div>
 
+          <div className="flex min-w-[16rem] flex-1 items-center gap-2 sm:max-w-sm">
+            <Label
+              htmlFor="analise-comp-codigo"
+              className="shrink-0 text-sm font-medium"
+            >
+              Código:
+            </Label>
+            <FiltroCombobox
+              id="analise-comp-codigo"
+              value={codigoFiltro ? codigoFiltroLabel : ""}
+              onChange={(v) => setCodigoFiltro(parseCodigoFromOpcao(v))}
+              options={opcoesCodigoBaixa}
+              placeholder="Digite código ou tipo da OS"
+              todosValue="Todos"
+              className="min-w-0 flex-1"
+            />
+          </div>
+
           <Button
             type="button"
             variant="outline"
@@ -1368,12 +1478,12 @@ export function AnaliseComportamento() {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Cód. Ofensor
+                  {codigoFiltro ? "Código Analisado" : "Cód. Ofensor"}
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
-                {codOfensor
-                  ? `Cód. ${codOfensor.codigo} - ${formatPct(codOfensor.pct)}`
+                {cardCodigoExibido
+                  ? `Cód. ${cardCodigoExibido.codigo} - ${formatPct(cardCodigoExibido.pct)}`
                   : "—"}
               </div>
               <div className="mt-auto">
@@ -1522,7 +1632,9 @@ export function AnaliseComportamento() {
               {visaoEquipe ? (
                 <>
                   <AlertTriangle className="h-4 w-4 text-orange-600" />
-                  Ranking de Comportamento Suspeito
+                  {codigoAlvo
+                    ? `Ranking de Uso: ${codigoAlvo}`
+                    : "Ranking de Uso"}
                 </>
               ) : (
                 <>
@@ -1533,13 +1645,17 @@ export function AnaliseComportamento() {
             </h2>
 
             {visaoEquipe ? (
-              rankingSuspeito.length === 0 ? (
+              !codigoAlvo ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhum técnico com quebras (cód. 101/106) no período.
+                  Nenhuma quebra improdutiva no período para montar o ranking.
+                </p>
+              ) : rankingUsoCodigo.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhum técnico usou o código {codigoAlvo} no período.
                 </p>
               ) : (
-                <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[40rem] text-sm">
+                <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[64rem] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-muted-foreground">
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
@@ -1549,21 +1665,23 @@ export function AnaliseComportamento() {
                           Técnico
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                          Fuga (101/106)
+                          Cód. {codigoAlvo}
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                          Quebras
+                          Quebras (Total)
                         </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                          Taxa Seg.
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                          Taxa Sex.
-                        </th>
+                        {DIAS_UTEIS.map((d) => (
+                          <th
+                            key={d.dow}
+                            className="sticky top-0 z-10 min-w-[110px] bg-white px-3 py-2 text-center font-semibold shadow-sm"
+                          >
+                            {d.curto}.
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {rankingSuspeito.map((row, idx) => (
+                      {rankingUsoCodigo.map((row, idx) => (
                         <tr
                           key={row.login}
                           className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
@@ -1576,24 +1694,41 @@ export function AnaliseComportamento() {
                           <td className="px-3 py-2 font-medium text-primary">
                             {row.nome}
                           </td>
-                          <td
-                            className={`px-3 py-2 text-right font-semibold tabular-nums ${
-                              row.fugaPct > 40
-                                ? "text-orange-700"
-                                : "text-gray-900"
-                            }`}
-                          >
-                            {formatPct(row.fugaPct)}
+                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-red-600">
+                            {formatQuantidade(row.usosCodigo)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                          <td className="px-3 py-2 text-right tabular-nums text-gray-900">
                             {formatQuantidade(row.totalQuebras)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-700">
-                            {formatPct(row.taxaQuebraSegunda)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-700">
-                            {formatPct(row.taxaQuebraSexta)}
-                          </td>
+                          {DIAS_UTEIS.map((d) => {
+                            const cel = row.porDia[d.dow];
+                            const usoNoDia = cel?.pct != null;
+                            return (
+                              <td
+                                key={d.dow}
+                                className="min-w-[110px] p-2 text-center align-middle tabular-nums"
+                              >
+                                {usoNoDia ? (
+                                  <div className="flex flex-col items-center justify-center">
+                                    <span className="text-sm font-medium text-gray-800">
+                                      {Math.round(cel!.pct!)}%
+                                    </span>
+                                    <span className="mt-1 whitespace-nowrap text-xs text-red-500">
+                                      (
+                                      {cel!.janela
+                                        ? formatarJanelaHorario(cel!.janela)
+                                        : "—"}
+                                      )
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-gray-400">
+                                    -
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>

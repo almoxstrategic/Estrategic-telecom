@@ -98,7 +98,7 @@ export function FiltroCombobox({
               />
             </div>
           </div>
-          <ul role="listbox" className="max-h-64 overflow-y-auto py-1">
+          <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
             <li>
               <button
                 type="button"
