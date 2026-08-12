@@ -303,10 +303,10 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         </Link>
                         <Link
                           to="/admin/kpis/$modulo"
-                          params={{ modulo: "motivos-quebra" }}
+                          params={{ modulo: "codigos-baixa" }}
                           onClick={onNavigate}
                           className={`flex items-center gap-2 rounded-md p-2 text-sm text-gray-600 transition-colors hover:bg-green-50 hover:text-green-600 ${
-                            pathname.includes("/motivos-quebra")
+                            pathname.includes("/codigos-baixa")
                               ? "bg-green-50 font-medium text-green-700"
                               : ""
                           }`}

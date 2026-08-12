@@ -120,7 +120,7 @@ const KPI_MODULOS = [
   "desempenho-tecnico",
   "volume-notas",
   "detalhamento-notas",
-  "motivos-quebra",
+  "codigos-baixa",
   "analise-comportamento",
   "estimativa-volume",
 ] as const;
@@ -130,6 +130,7 @@ type KpiModulo = (typeof KPI_MODULOS)[number];
 const KPI_MODULO_ALIASES: Record<string, KpiModulo> = {
   "resumo-geral": KPI_MODULO_DEFAULT,
   "nota-por-tecnico": "detalhamento-notas",
+  "motivos-quebra": "codigos-baixa",
 };
 
 function isKpiModulo(value: string): value is KpiModulo {
@@ -162,7 +163,7 @@ export const Route = createFileRoute("/admin/kpis/$modulo")({
               ? "Volume de Notas por período — Estrategic Field"
               : params.modulo === "detalhamento-notas"
                 ? "Detalhamento de notas — Estrategic Field"
-                : params.modulo === "motivos-quebra"
+                : params.modulo === "codigos-baixa"
                     ? "Análise de Códigos de Baixa — Estrategic Field"
                     : params.modulo === "analise-comportamento"
                       ? "Análise de Comportamento — Estrategic Field"
@@ -441,14 +442,14 @@ function KpisPage() {
   const isDesempenho = kpiModulo === "desempenho-tecnico";
   const isVolumeNotas = kpiModulo === "volume-notas";
   const isDetalhamentoNotas = kpiModulo === "detalhamento-notas";
-  const isMotivosQuebra = kpiModulo === "motivos-quebra";
+  const isCodigosBaixa = kpiModulo === "codigos-baixa";
   const isAnaliseComportamento = kpiModulo === "analise-comportamento";
   const isEstimativaVolume = kpiModulo === "estimativa-volume";
   const isBaixaConsumoMiscelanea = kpiModulo === "baixa-consumo-miscelanea";
   const usaFiltroProprio =
     isVolumeNotas ||
     isDetalhamentoNotas ||
-    isMotivosQuebra ||
+    isCodigosBaixa ||
     isAnaliseComportamento ||
     isEstimativaVolume;
 
@@ -1018,9 +1019,9 @@ function KpisPage() {
             </Link>
             <Link
               to="/admin/kpis/$modulo"
-              params={{ modulo: "motivos-quebra" }}
+              params={{ modulo: "codigos-baixa" }}
               className={`mt-1 flex w-full items-center gap-2 rounded-lg p-3 text-left font-medium transition-colors ${
-                isMotivosQuebra
+                isCodigosBaixa
                   ? "bg-green-50 text-green-700"
                   : "cursor-pointer text-gray-600 hover:bg-gray-100"
               }`}
@@ -1028,7 +1029,7 @@ function KpisPage() {
             >
               <AlertTriangle
                 className={`h-5 w-5 shrink-0 ${
-                  isMotivosQuebra ? "text-green-700" : "text-gray-500"
+                  isCodigosBaixa ? "text-green-700" : "text-gray-500"
                 }`}
               />
               Análise de Códigos de Baixa
@@ -1087,7 +1088,7 @@ function KpisPage() {
               <Target className="h-4 w-4 shrink-0 text-primary" />
             ) : isAnaliseComportamento ? (
               <Brain className="h-4 w-4 shrink-0 text-primary" />
-            ) : isMotivosQuebra ? (
+            ) : isCodigosBaixa ? (
               <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
             ) : isDetalhamentoNotas ? (
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
@@ -1099,7 +1100,7 @@ function KpisPage() {
                 ? "Estimativa - Volume de Nota"
                 : isAnaliseComportamento
                 ? "Análise de Comportamento"
-                : isMotivosQuebra
+                : isCodigosBaixa
                 ? "Análise de Códigos de Baixa"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
@@ -1314,7 +1315,7 @@ function KpisPage() {
                 ? "Estimativa - Volume de Nota"
                 : isAnaliseComportamento
                 ? "Análise de Comportamento"
-                : isMotivosQuebra
+                : isCodigosBaixa
                 ? "Análise de Códigos de Baixa"
                 : isDetalhamentoNotas
                   ? "Detalhamento de notas"
@@ -1329,7 +1330,7 @@ function KpisPage() {
                 ? "Projeção de fechamento do mês baseada no ritmo (média diária) atual."
                 : isAnaliseComportamento
                 ? "Identifique padrões de fadiga, tendências de quebra por dia da semana e fuga de complexidade operacional."
-                : isMotivosQuebra
+                : isCodigosBaixa
                 ? "Volumetria dos códigos de baixa TOA — improdutivas (quebras) e produtivas."
                 : isDetalhamentoNotas
                 ? "Análise geográfica: volume de notas produtivas e improdutivas por bairro."
@@ -1365,7 +1366,7 @@ function KpisPage() {
           <EstimativaVolume />
         ) : isAnaliseComportamento ? (
           <AnaliseComportamento />
-        ) : isMotivosQuebra ? (
+        ) : isCodigosBaixa ? (
           <MotivosQuebra />
         ) : isDetalhamentoNotas ? (
           <KpiDetalhamentoNotas />

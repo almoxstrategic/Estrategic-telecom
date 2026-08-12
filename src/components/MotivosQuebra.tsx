@@ -731,7 +731,16 @@ export function MotivosQuebra() {
                     {porMotivo.map((row) => (
                       <tr
                         key={row.codigo}
-                        className="border-b border-border/60 last:border-b-0"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setCodigoDetalhe(row.codigo)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setCodigoDetalhe(row.codigo);
+                          }
+                        }}
+                        className="cursor-pointer border-b border-border/60 transition-colors last:border-b-0 hover:bg-gray-50"
                       >
                         <td className="px-2 py-2 font-medium tabular-nums text-gray-900">
                           {row.codigo}
