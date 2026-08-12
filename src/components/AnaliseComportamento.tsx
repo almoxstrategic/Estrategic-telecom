@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -134,6 +135,9 @@ const ABAS_PAINEL_INFERIOR: ReadonlyArray<{
 
 type JanelaImprodutivaAgg = {
   janela: string;
+  dia: string;
+  diaDow: number;
+  turno: Turno;
   codigoVencedor: string;
   descricaoVencedor: string;
   tipoVencedor: string;
@@ -527,6 +531,11 @@ export function AnaliseComportamento() {
     coluna: "produtivasGeral",
     direcao: "desc",
   });
+  const [filtroJanela, setFiltroJanela] = useState("Todos");
+  const [filtroDia, setFiltroDia] = useState("Todos");
+  const [filtroCodBaixa, setFiltroCodBaixa] = useState("Todos");
+  const [buscaCodBaixa, setBuscaCodBaixa] = useState("");
+  const [buscaTecnicoRank, setBuscaTecnicoRank] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -1336,29 +1345,60 @@ export function AnaliseComportamento() {
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
-  /** Aba Janela: combinações janela×código (sem filtro de Código). */
-  const rankingPorJanela = useMemo((): JanelaImprodutivaAgg[] => {
-    const totalPorJanela = new Map<string, number>();
+  /** Aba Janela: chave Horário + Dia + Turno + Código (sem filtro global de Código). */
+  const rankingPorJanelaBase = useMemo((): JanelaImprodutivaAgg[] => {
+    type Bucket = { quebras: number; total: number };
+    const totalPorContexto = new Map<string, Bucket>();
     const counts = new Map<
       string,
-      { janela: string; codigo: string; quantidade: number }
+      {
+        janela: string;
+        diaDow: number;
+        dia: string;
+        turno: Turno;
+        codigo: string;
+        quantidade: number;
+      }
     >();
     let totalStatus = 0;
 
     for (const row of rowsFiltradas) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-      const janela = janelaMacroDaHora(horaBaixaDaRow(row));
-      totalPorJanela.set(janela, (totalPorJanela.get(janela) ?? 0) + 1);
+      const dow = diaDaSemanaFromIso(row.data_toa);
+      if (dow == null || dow === 0) continue;
+      const diaMeta = DIAS_UTEIS.find((d) => d.dow === dow);
+      if (!diaMeta) continue;
+
+      const hora = horaBaixaDaRow(row);
+      const janela = janelaMacroDaHora(hora);
+      const turno = turnoDaRow(row);
+      const chaveContexto = `${janela}|${dow}|${turno}`;
+
+      let bucket = totalPorContexto.get(chaveContexto);
+      if (!bucket) {
+        bucket = { quebras: 0, total: 0 };
+        totalPorContexto.set(chaveContexto, bucket);
+      }
+      bucket.total += 1;
 
       if (statusContratoDoCodigo(codigo, dicionario) !== statusFiltro) continue;
+      bucket.quebras += 1;
       totalStatus += 1;
-      const chave = `${janela}|${codigo}`;
+
+      const chave = `${chaveContexto}|${codigo}`;
       const atual = counts.get(chave);
       if (atual) {
         atual.quantidade += 1;
       } else {
-        counts.set(chave, { janela, codigo, quantidade: 1 });
+        counts.set(chave, {
+          janela,
+          diaDow: dow,
+          dia: diaMeta.label,
+          turno,
+          codigo,
+          quantidade: 1,
+        });
       }
     }
 
@@ -1367,11 +1407,15 @@ export function AnaliseComportamento() {
     const isImprodutivo = statusFiltro === "IMPRODUTIVO";
 
     const resultado = [...counts.values()].map((item) => {
+      const chaveContexto = `${item.janela}|${item.diaDow}|${item.turno}`;
       const denom = isImprodutivo
-        ? (totalPorJanela.get(item.janela) ?? 0)
+        ? (totalPorContexto.get(chaveContexto)?.total ?? 0)
         : totalStatus;
       return {
         janela: item.janela,
+        dia: item.dia,
+        diaDow: item.diaDow,
+        turno: item.turno,
         codigoVencedor: item.codigo,
         descricaoVencedor: descricaoDoCodigoBaixa(item.codigo, dicionario),
         tipoVencedor:
@@ -1388,22 +1432,84 @@ export function AnaliseComportamento() {
           b.representaPct - a.representaPct ||
           b.quantidadeJanela - a.quantidadeJanela ||
           a.janela.localeCompare(b.janela, "pt-BR") ||
+          a.diaDow - b.diaDow ||
+          a.turno.localeCompare(b.turno, "pt-BR") ||
           Number(a.codigoVencedor) - Number(b.codigoVencedor)
         );
       }
       return (
         b.quantidadeJanela - a.quantidadeJanela ||
         a.janela.localeCompare(b.janela, "pt-BR") ||
+        a.diaDow - b.diaDow ||
+        a.turno.localeCompare(b.turno, "pt-BR") ||
         Number(a.codigoVencedor) - Number(b.codigoVencedor)
       );
     });
   }, [rowsFiltradas, dicionario, statusFiltro]);
+
+  const opcoesFiltroJanelaAba = useMemo(() => {
+    const set = new Set(rankingPorJanelaBase.map((r) => r.janela));
+    return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [rankingPorJanelaBase]);
+
+  const opcoesFiltroCodBaixaAba = useMemo(() => {
+    const set = new Set(rankingPorJanelaBase.map((r) => r.codigoVencedor));
+    return [...set].sort(
+      (a, b) => Number(a) - Number(b) || a.localeCompare(b, "pt-BR"),
+    );
+  }, [rankingPorJanelaBase]);
+
+  const rankingPorJanela = useMemo(() => {
+    return rankingPorJanelaBase.filter((row) => {
+      if (filtroJanela !== "Todos" && row.janela !== filtroJanela) return false;
+      if (filtroDia !== "Todos" && row.dia !== filtroDia) return false;
+      if (filtroCodBaixa !== "Todos" && row.codigoVencedor !== filtroCodBaixa) {
+        return false;
+      }
+      return true;
+    });
+  }, [rankingPorJanelaBase, filtroJanela, filtroDia, filtroCodBaixa]);
+
+  useEffect(() => {
+    setFiltroJanela("Todos");
+    setFiltroDia("Todos");
+    setFiltroCodBaixa("Todos");
+  }, [statusFiltro]);
+
+  useEffect(() => {
+    if (
+      filtroJanela !== "Todos" &&
+      !opcoesFiltroJanelaAba.includes(filtroJanela)
+    ) {
+      setFiltroJanela("Todos");
+    }
+  }, [filtroJanela, opcoesFiltroJanelaAba]);
+
+  useEffect(() => {
+    if (
+      filtroCodBaixa !== "Todos" &&
+      !opcoesFiltroCodBaixaAba.includes(filtroCodBaixa)
+    ) {
+      setFiltroCodBaixa("Todos");
+    }
+  }, [filtroCodBaixa, opcoesFiltroCodBaixaAba]);
 
   /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
   const todosCodigosBaixa = useMemo(
     () => agregarMotivosQuebra(notasAlvo, dicionario, statusFiltro),
     [notasAlvo, dicionario, statusFiltro],
   );
+
+  const todosCodigosBaixaFiltrados = useMemo(() => {
+    const q = buscaCodBaixa.trim().toLowerCase();
+    if (!q) return todosCodigosBaixa;
+    return todosCodigosBaixa.filter(
+      (row) =>
+        row.codigo.toLowerCase().includes(q) ||
+        row.descricao.toLowerCase().includes(q) ||
+        row.motivoQuebra.toLowerCase().includes(q),
+    );
+  }, [todosCodigosBaixa, buscaCodBaixa]);
 
   const abrirModalDia = (diaCurto: string) => {
     setDiaFiltroModal(diaCurto);
@@ -1735,6 +1841,14 @@ export function AnaliseComportamento() {
     });
   }, [rankGeralMatriz, ordemRankGeral]);
 
+  const rankGeralMatrizFiltrada = useMemo(() => {
+    const q = buscaTecnicoRank.trim().toLowerCase();
+    if (!q) return rankGeralMatrizOrdenada;
+    return rankGeralMatrizOrdenada.filter((tec) =>
+      tec.nome.toLowerCase().includes(q),
+    );
+  }, [rankGeralMatrizOrdenada, buscaTecnicoRank]);
+
   const alternarOrdemDia = (
     coluna: OrdemDiaState["coluna"],
   ) => {
@@ -1795,6 +1909,8 @@ export function AnaliseComportamento() {
     setCodigoFiltro(null);
     setStatusFiltro("IMPRODUTIVO");
     setAbaAtiva("rank-geral");
+    setBuscaCodBaixa("");
+    setBuscaTecnicoRank("");
   };
 
   const isModoImprodutivo = statusFiltro === "IMPRODUTIVO";
@@ -2362,6 +2478,40 @@ export function AnaliseComportamento() {
                     Voltar
                   </Button>
                 ) : null}
+                {abaAtiva === "ranking" ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex min-w-[12rem] items-center gap-2">
+                      <Label
+                        htmlFor="analise-comp-codigo-painel"
+                        className="shrink-0 text-sm font-medium"
+                      >
+                        Código:
+                      </Label>
+                      <FiltroCombobox
+                        id="analise-comp-codigo-painel"
+                        value={codigoFiltro ? codigoFiltroLabel : ""}
+                        onChange={(v) =>
+                          setCodigoFiltro(parseCodigoFromOpcao(v))
+                        }
+                        options={opcoesCodigoBaixa}
+                        placeholder="Digite o código"
+                        todosValue="Todos"
+                        className="w-[200px]"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-muted-foreground"
+                      disabled={!codigoFiltro}
+                      onClick={() => setCodigoFiltro(null)}
+                    >
+                      <X className="h-4 w-4" />
+                      Limpar filtro
+                    </Button>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <Label
                     htmlFor="analise-comp-status-painel"
@@ -2402,84 +2552,110 @@ export function AnaliseComportamento() {
               </div>
             </div>
 
-            {abaAtiva === "rank-geral" &&
-              (rankGeralMatrizOrdenada.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhum técnico com notas no período.
-                </p>
-              ) : (
-                <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[80rem] text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-left font-semibold shadow-sm">
-                          Técnico
-                        </th>
-                        <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                          onClick={() =>
-                            alternarOrdemRankGeral("produtivasGeral")
-                          }
-                        >
-                          Produtivas (Geral)
-                          {setaOrdenacao(
-                            ordemRankGeral.coluna === "produtivasGeral",
-                            ordemRankGeral.direcao,
-                          )}
-                        </th>
-                        <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                          onClick={() =>
-                            alternarOrdemRankGeral("quebrasGeral")
-                          }
-                        >
-                          Quebras (Geral)
-                          {setaOrdenacao(
-                            ordemRankGeral.coluna === "quebrasGeral",
-                            ordemRankGeral.direcao,
-                          )}
-                        </th>
-                        <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                          onClick={() =>
-                            alternarOrdemRankGeral("aproveitamento")
-                          }
-                        >
-                          Aproveit.
-                          {setaOrdenacao(
-                            ordemRankGeral.coluna === "aproveitamento",
-                            ordemRankGeral.direcao,
-                          )}
-                        </th>
-                        <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                          onClick={() =>
-                            alternarOrdemRankGeral("reprovacao")
-                          }
-                        >
-                          Reprovação
-                          {setaOrdenacao(
-                            ordemRankGeral.coluna === "reprovacao",
-                            ordemRankGeral.direcao,
-                          )}
-                        </th>
-                        {DIAS_UTEIS.map((d) => (
+            {abaAtiva === "rank-geral" && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative min-w-[16rem] flex-1 sm:max-w-xs">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={buscaTecnicoRank}
+                      onChange={(e) => setBuscaTecnicoRank(e.target.value)}
+                      placeholder="Buscar técnico..."
+                      className="h-8 pl-8 text-sm"
+                      aria-label="Buscar técnico no Rank Geral"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    disabled={!buscaTecnicoRank.trim()}
+                    onClick={() => setBuscaTecnicoRank("")}
+                  >
+                    <X className="h-4 w-4" />
+                    Limpar
+                  </Button>
+                </div>
+                {rankGeralMatrizFiltrada.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    {buscaTecnicoRank.trim()
+                      ? "Nenhum técnico encontrado para a busca."
+                      : "Nenhum técnico com notas no período."}
+                  </p>
+                ) : (
+                  <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
+                    <table className="w-full min-w-[80rem] text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground">
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 text-left font-semibold shadow-sm">
+                            Técnico
+                          </th>
                           <th
-                            key={d.dow}
-                            className="sticky top-0 z-10 min-w-[110px] cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() => alternarOrdemRankGeral(d.dow)}
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() =>
+                              alternarOrdemRankGeral("produtivasGeral")
+                            }
                           >
-                            {d.curto}.
+                            Produtivas (Geral)
                             {setaOrdenacao(
-                              ordemRankGeral.coluna === d.dow,
+                              ordemRankGeral.coluna === "produtivasGeral",
                               ordemRankGeral.direcao,
                             )}
                           </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankGeralMatrizOrdenada.map((tec) => (
+                          <th
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() =>
+                              alternarOrdemRankGeral("quebrasGeral")
+                            }
+                          >
+                            Quebras (Geral)
+                            {setaOrdenacao(
+                              ordemRankGeral.coluna === "quebrasGeral",
+                              ordemRankGeral.direcao,
+                            )}
+                          </th>
+                          <th
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() =>
+                              alternarOrdemRankGeral("aproveitamento")
+                            }
+                          >
+                            Aproveit.
+                            {setaOrdenacao(
+                              ordemRankGeral.coluna === "aproveitamento",
+                              ordemRankGeral.direcao,
+                            )}
+                          </th>
+                          <th
+                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() =>
+                              alternarOrdemRankGeral("reprovacao")
+                            }
+                          >
+                            Reprovação
+                            {setaOrdenacao(
+                              ordemRankGeral.coluna === "reprovacao",
+                              ordemRankGeral.direcao,
+                            )}
+                          </th>
+                          {DIAS_UTEIS.map((d) => (
+                            <th
+                              key={d.dow}
+                              className="sticky top-0 z-10 min-w-[110px] cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                              onClick={() => alternarOrdemRankGeral(d.dow)}
+                            >
+                              {d.curto}.
+                              {setaOrdenacao(
+                                ordemRankGeral.coluna === d.dow,
+                                ordemRankGeral.direcao,
+                              )}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rankGeralMatrizFiltrada.map((tec) => (
                         <tr
                           key={tec.nome}
                           className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
@@ -2545,7 +2721,9 @@ export function AnaliseComportamento() {
                     </tbody>
                   </table>
                 </div>
-              ))}
+                )}
+              </div>
+            )}
 
             {abaAtiva === "ranking" && (
               <>
@@ -2621,10 +2799,16 @@ export function AnaliseComportamento() {
                                   >
                                     {usoNoDia ? (
                                       <div className="flex flex-col items-center justify-center">
-                                        <span className="text-sm font-medium text-gray-800">
+                                        <span
+                                          className={`text-sm font-medium ${
+                                            isModoImprodutivo
+                                              ? "text-red-600"
+                                              : "text-green-600"
+                                          }`}
+                                        >
                                           {Math.round(cel!.pct!)}%
                                         </span>
-                                        <span className="mt-1 whitespace-nowrap text-xs text-red-500">
+                                        <span className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
                                           (
                                           {cel!.janela
                                             ? formatarJanelaHorario(cel!.janela)
@@ -2722,115 +2906,272 @@ export function AnaliseComportamento() {
               </>
             )}
 
-            {abaAtiva === "janela" &&
-              (rankingPorJanela.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  {isModoImprodutivo
-                    ? "Nenhuma janela improdutiva no período filtrado."
-                    : "Nenhuma janela produtiva no período filtrado."}
-                </p>
-              ) : (
-                <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[48rem] text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Horário (macro)
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Cód. Baixa
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Motivo / Descrição
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          {labelColunaTipo}
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                          {isModoImprodutivo ? "% de Reprovação" : "Representa"}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankingPorJanela.map((row) => (
-                        <tr
-                          key={`${row.janela}|${row.codigoVencedor}`}
-                          className="border-b border-border/60 last:border-b-0"
+            {abaAtiva === "janela" && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <Label
+                        htmlFor="aba-janela-filtro-janela"
+                        className="shrink-0 text-xs font-medium text-muted-foreground"
+                      >
+                        Janela:
+                      </Label>
+                      <Select
+                        value={filtroJanela}
+                        onValueChange={setFiltroJanela}
+                      >
+                        <SelectTrigger
+                          id="aba-janela-filtro-janela"
+                          className="h-8 w-[140px] text-xs"
                         >
-                          <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
-                            {formatarJanelaHorario(row.janela)}
-                          </td>
-                          <td className={`px-3 py-2 font-medium tabular-nums ${corDestaque}`}>
-                            {row.codigoVencedor}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.descricaoVencedor}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.tipoVencedor}
-                          </td>
-                          <td className="px-3 py-2 text-right text-sm font-medium tabular-nums text-gray-700">
-                            {formatPct(row.representaPct)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Todos">Todos</SelectItem>
+                          {opcoesFiltroJanelaAba.map((j) => (
+                            <SelectItem key={j} value={j}>
+                              {formatarJanelaHorario(j)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Label
+                        htmlFor="aba-janela-filtro-dia"
+                        className="shrink-0 text-xs font-medium text-muted-foreground"
+                      >
+                        Dia:
+                      </Label>
+                      <Select value={filtroDia} onValueChange={setFiltroDia}>
+                        <SelectTrigger
+                          id="aba-janela-filtro-dia"
+                          className="h-8 w-[130px] text-xs"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Todos">Todos</SelectItem>
+                          {DIAS_UTEIS.map((d) => (
+                            <SelectItem key={d.dow} value={d.label}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Label
+                        htmlFor="aba-janela-filtro-codigo"
+                        className="shrink-0 text-xs font-medium text-muted-foreground"
+                      >
+                        Cód Baixa:
+                      </Label>
+                      <Select
+                        value={filtroCodBaixa}
+                        onValueChange={setFiltroCodBaixa}
+                      >
+                        <SelectTrigger
+                          id="aba-janela-filtro-codigo"
+                          className="h-8 w-[110px] text-xs"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Todos">Todos</SelectItem>
+                          {opcoesFiltroCodBaixaAba.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    disabled={
+                      filtroJanela === "Todos" &&
+                      filtroDia === "Todos" &&
+                      filtroCodBaixa === "Todos"
+                    }
+                    onClick={() => {
+                      setFiltroJanela("Todos");
+                      setFiltroDia("Todos");
+                      setFiltroCodBaixa("Todos");
+                    }}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar filtros
+                  </Button>
                 </div>
-              ))}
 
-            {abaAtiva === "todos-codigos" &&
-              (todosCodigosBaixa.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  {isModoImprodutivo
-                    ? "Nenhum código de baixa improdutivo no período selecionado."
-                    : "Nenhum código de baixa produtivo no período selecionado."}
-                </p>
-              ) : (
-                <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[40rem] text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
-                          Cód. Baixa
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
-                          Motivo / Descrição
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
-                          {labelColunaTipo}
-                        </th>
-                        <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
-                          Quantidade
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {todosCodigosBaixa.map((row) => (
-                        <tr
-                          key={row.codigo}
-                          className="border-b border-border/60 last:border-b-0 hover:bg-gray-50"
-                        >
-                          <td className="px-2 py-2 font-medium tabular-nums text-gray-900">
-                            {row.codigo}
-                          </td>
-                          <td className="px-2 py-2 text-gray-700">
-                            {row.descricao}
-                          </td>
-                          <td className="px-2 py-2 text-gray-700">
-                            {row.motivoQuebra}
-                          </td>
-                          <td
-                            className={`px-2 py-2 text-right tabular-nums ${corDestaque}`}
-                          >
-                            {formatQuantidade(row.quantidade)}
-                          </td>
+                {rankingPorJanela.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    {isModoImprodutivo
+                      ? "Nenhuma janela improdutiva no período filtrado."
+                      : "Nenhuma janela produtiva no período filtrado."}
+                  </p>
+                ) : (
+                  <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
+                    <table className="w-full min-w-[56rem] text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-muted-foreground">
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Horário (macro)
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Dia
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Turno
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Cód. Baixa
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            Motivo / Descrição
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                            {labelColunaTipo}
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                            {isModoImprodutivo
+                              ? "% de Reprovação"
+                              : "Representa"}
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {rankingPorJanela.map((row) => (
+                          <tr
+                            key={`${row.janela}|${row.diaDow}|${row.turno}|${row.codigoVencedor}`}
+                            className="border-b border-border/60 last:border-b-0"
+                          >
+                            <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
+                              {formatarJanelaHorario(row.janela)}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {row.dia}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {row.turno}
+                            </td>
+                            <td
+                              className={`px-3 py-2 font-medium tabular-nums ${corDestaque}`}
+                            >
+                              {row.codigoVencedor}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {row.descricaoVencedor}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {row.tipoVencedor}
+                            </td>
+                            <td
+                              className={`px-3 py-2 text-right text-sm tabular-nums font-medium ${
+                                isModoImprodutivo
+                                  ? "text-red-600"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {formatPct(row.representaPct)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {abaAtiva === "todos-codigos" && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative min-w-[16rem] flex-1 sm:max-w-md">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={buscaCodBaixa}
+                      onChange={(e) => setBuscaCodBaixa(e.target.value)}
+                      placeholder="Buscar código ou motivo..."
+                      className="h-8 pl-8 text-sm"
+                      aria-label="Buscar código ou motivo de baixa"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    disabled={!buscaCodBaixa.trim()}
+                    onClick={() => setBuscaCodBaixa("")}
+                  >
+                    <X className="h-4 w-4" />
+                    Limpar
+                  </Button>
                 </div>
-              ))}
+                {todosCodigosBaixa.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    {isModoImprodutivo
+                      ? "Nenhum código de baixa improdutivo no período selecionado."
+                      : "Nenhum código de baixa produtivo no período selecionado."}
+                  </p>
+                ) : todosCodigosBaixaFiltrados.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Nenhum código encontrado para a busca.
+                  </p>
+                ) : (
+                  <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
+                    <table className="w-full min-w-[40rem] text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-muted-foreground">
+                          <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                            Cód. Baixa
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                            Motivo / Descrição
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
+                            {labelColunaTipo}
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
+                            Quantidade
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {todosCodigosBaixaFiltrados.map((row) => (
+                          <tr
+                            key={row.codigo}
+                            className="border-b border-border/60 last:border-b-0 hover:bg-gray-50"
+                          >
+                            <td className="px-2 py-2 font-medium tabular-nums text-gray-900">
+                              {row.codigo}
+                            </td>
+                            <td className="px-2 py-2 text-gray-700">
+                              {row.descricao}
+                            </td>
+                            <td className="px-2 py-2 text-gray-700">
+                              {row.motivoQuebra}
+                            </td>
+                            <td
+                              className={`px-2 py-2 text-right tabular-nums ${corDestaque}`}
+                            >
+                              {formatQuantidade(row.quantidade)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
