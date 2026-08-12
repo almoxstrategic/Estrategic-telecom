@@ -75,10 +75,65 @@ type NotaVolumeAgg = {
 type ChartPoint = {
   chave: string;
   label: string;
+  /** Abreviação do dia da semana (visão diária). */
+  diaSemana?: string;
   produtivas: number;
   improdutivas: number;
   total: number;
 };
+
+const DIAS_SEMANA_CURTO = [
+  "Dom",
+  "Seg",
+  "Ter",
+  "Qua",
+  "Qui",
+  "Sex",
+  "Sáb",
+] as const;
+
+function diaSemanaCurto(ano: number, mes: number, dia: number): string {
+  const d = new Date(ano, mes - 1, dia);
+  return DIAS_SEMANA_CURTO[d.getDay()] ?? "";
+}
+
+type CustomXAxisTickProps = {
+  x?: number;
+  y?: number;
+  index?: number;
+  payload?: { value?: string | number };
+};
+
+/** Rótulo do eixo X em 2 linhas: dia (01) + dia da semana (Seg). */
+function CustomXAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+  diaSemana,
+}: CustomXAxisTickProps & { diaSemana?: string }) {
+  const dia = String(payload?.value ?? "").padStart(2, "0");
+  const semana = diaSemana ?? "";
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={20}
+        textAnchor="middle"
+        fill="#666"
+        fontSize={13}
+      >
+        <tspan x={0} dy={0} fontWeight={600}>
+          {dia}
+        </tspan>
+        <tspan x={0} dy={18} fill="#6b7280" fontSize={12}>
+          {semana}
+        </tspan>
+      </text>
+    </g>
+  );
+}
 
 function mesLabel(mes: number): string {
   return MESES.find((m) => m.value === mes)?.label ?? String(mes);
@@ -238,14 +293,18 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
       else bucket.improdutivas += 1;
       byDay.set(dia, bucket);
     }
-    const dias = [...byDay.keys()].sort((a, b) => a - b);
+    const anoComp = Math.floor(unica / 100);
+    const mesComp = unica % 100;
+    const ultimoDia = new Date(anoComp, mesComp, 0).getDate();
+    const dias = Array.from({ length: ultimoDia }, (_, i) => i + 1);
     return {
       modo: "dia",
       data: dias.map((dia) => {
-        const b = byDay.get(dia)!;
+        const b = byDay.get(dia) ?? { produtivas: 0, improdutivas: 0 };
         return {
           chave: String(dia),
           label: String(dia).padStart(2, "0"),
+          diaSemana: diaSemanaCurto(anoComp, mesComp, dia),
           produtivas: b.produtivas,
           improdutivas: b.improdutivas,
           total: b.produtivas + b.improdutivas,
@@ -401,6 +460,26 @@ export function KpiVolumeNotas() {
     () => montarSerieChart(notasFiltradas),
     [notasFiltradas],
   );
+
+  /** Clique na barra do mês → filtra Ano + Mês e entra na visão diária. */
+  const aplicarDrillDownMes = (point: ChartPoint | undefined) => {
+    if (serie.modo !== "mes" || !point) return;
+    const ym = Number(point.chave);
+    if (!Number.isFinite(ym) || ym < 200001) return;
+    const novoAno = Math.floor(ym / 100);
+    const novoMes = ym % 100;
+    if (novoMes < 1 || novoMes > 12) return;
+    setAno(novoAno);
+    setMesesSelecionados([novoMes]);
+  };
+
+  const handleBarClick = (data: { payload?: ChartPoint } | ChartPoint) => {
+    const point =
+      data && typeof data === "object" && "payload" in data
+        ? data.payload
+        : (data as ChartPoint | undefined);
+    aplicarDrillDownMes(point);
+  };
 
   const filtrosLimpos = ano === null && mesesSelecionados.length === 0;
 
@@ -640,17 +719,35 @@ export function KpiVolumeNotas() {
                 Nenhuma nota no período selecionado.
               </p>
             ) : (
-              <div className="h-[360px] w-full">
+              <div className={`h-[450px] w-full ${serie.modo === "mes" ? "cursor-pointer" : ""}`}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={serie.data}
-                    margin={{ top: 8, right: 12, left: 0, bottom: 8 }}
+                    margin={{
+                      top: 8,
+                      right: 12,
+                      left: 0,
+                      bottom: serie.modo === "dia" ? 48 : 8,
+                    }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis
                       dataKey="label"
-                      tick={{ fontSize: 11 }}
-                      interval={serie.modo === "dia" ? 1 : 0}
+                      interval={serie.modo === "dia" ? 0 : "preserveEnd"}
+                      tickMargin={serie.modo === "dia" ? 12 : 4}
+                      tick={
+                        serie.modo === "dia"
+                          ? (props: CustomXAxisTickProps) => {
+                              const point = serie.data[props.index ?? 0];
+                              return (
+                                <CustomXAxisTick
+                                  {...props}
+                                  diaSemana={point?.diaSemana}
+                                />
+                              );
+                            }
+                          : { fontSize: 11 }
+                      }
                       angle={
                         serie.modo === "mes" && serie.data.length > 6 ? -30 : 0
                       }
@@ -660,7 +757,11 @@ export function KpiVolumeNotas() {
                           : "middle"
                       }
                       height={
-                        serie.modo === "mes" && serie.data.length > 6 ? 70 : 30
+                        serie.modo === "dia"
+                          ? 70
+                          : serie.data.length > 6
+                            ? 70
+                            : 30
                       }
                     />
                     <YAxis
@@ -673,9 +774,14 @@ export function KpiVolumeNotas() {
                         formatQuantidade(value),
                         name === "produtivas" ? "Produtivas" : "Improdutivas",
                       ]}
-                      labelFormatter={(label) =>
-                        serie.modo === "dia" ? `Dia ${label}` : String(label)
-                      }
+                      labelFormatter={(label) => {
+                        if (serie.modo !== "dia") return String(label);
+                        const point = serie.data.find((p) => p.label === label);
+                        const semana = point?.diaSemana
+                          ? ` (${point.diaSemana})`
+                          : "";
+                        return `Dia ${label}${semana}`;
+                      }}
                     />
                     <Legend
                       formatter={(value) =>
@@ -689,6 +795,8 @@ export function KpiVolumeNotas() {
                         fill="#16a34a"
                         radius={[3, 3, 0, 0]}
                         maxBarSize={36}
+                        cursor={serie.modo === "mes" ? "pointer" : "default"}
+                        onClick={handleBarClick}
                       />
                     )}
                     {mostrarImprodutivas && (
@@ -698,6 +806,8 @@ export function KpiVolumeNotas() {
                         fill="#ef4444"
                         radius={[3, 3, 0, 0]}
                         maxBarSize={36}
+                        cursor={serie.modo === "mes" ? "pointer" : "default"}
+                        onClick={handleBarClick}
                       />
                     )}
                   </BarChart>
