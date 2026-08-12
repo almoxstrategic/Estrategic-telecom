@@ -125,7 +125,9 @@ const ABAS_PAINEL_INFERIOR: ReadonlyArray<{
 
 type JanelaImprodutivaAgg = {
   janela: string;
-  codigo: string;
+  codigoVencedor: string;
+  descricaoVencedor: string;
+  tipoVencedor: string;
   quantidadeJanela: number;
   representaPct: number;
 };
@@ -1065,7 +1067,11 @@ export function AnaliseComportamento() {
 
       resultado.push({
         janela,
-        codigo: melhorCodigo,
+        codigoVencedor: melhorCodigo,
+        descricaoVencedor: descricaoDoCodigoBaixa(melhorCodigo, dicionario),
+        tipoVencedor:
+          motivoQuebraDoCodigo(melhorCodigo, dicionario)?.trim() ||
+          "Não classificado",
         quantidadeJanela,
         representaPct:
           totalNotasAlvo > 0
@@ -1079,7 +1085,7 @@ export function AnaliseComportamento() {
         b.quantidadeJanela - a.quantidadeJanela ||
         a.janela.localeCompare(b.janela, "pt-BR"),
     );
-  }, [notasAlvo, totalNotasAlvo]);
+  }, [notasAlvo, totalNotasAlvo, dicionario]);
 
   /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
   const todosCodigosBaixa = useMemo(
@@ -1998,14 +2004,20 @@ export function AnaliseComportamento() {
                 </p>
               ) : (
                 <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[36rem] text-sm">
+                  <table className="w-full min-w-[48rem] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-muted-foreground">
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
                           Horário (macro)
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Cód. Improdutivo
+                          Cód. Baixa
+                        </th>
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          Motivo / Descrição
+                        </th>
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          Tipo de quebra
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
                           Representa
@@ -2021,8 +2033,14 @@ export function AnaliseComportamento() {
                           <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
                             {formatarJanelaHorario(row.janela)}
                           </td>
-                          <td className="px-3 py-2 font-semibold tabular-nums text-red-600">
-                            {row.codigo}
+                          <td className="px-3 py-2 font-medium tabular-nums text-red-600">
+                            {row.codigoVencedor}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {row.descricaoVencedor}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {row.tipoVencedor}
                           </td>
                           <td className="px-3 py-2 text-right text-sm font-medium tabular-nums text-gray-700">
                             {formatPct(row.representaPct)}
