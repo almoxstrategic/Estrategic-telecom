@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { FiltroCombobox } from "@/components/FiltroCombobox";
 import { Top10CodigosBaixaChart } from "@/components/Top10CodigosBaixaChart";
-import { agregarMotivosQuebra } from "@/components/MotivosQuebra";
+import { agregarMotivosQuebra, type StatusContratoFiltro } from "@/components/MotivosQuebra";
 import {
   fetchCompetenciasToa,
   fetchToaImportacoes,
@@ -85,7 +85,10 @@ const DIAS_UTEIS = [
 
 const TECNICO_TODOS = "Todos";
 const DESCRICAO_DESCONHECIDA = "Motivo Desconhecido";
-const PIE_COLORS = { manha: "#f59e0b", tarde: "#dc2626" };
+const PIE_COLORS = {
+  improdutivo: { manha: "#f59e0b", tarde: "#dc2626" },
+  produtivo: { manha: "#4ade80", tarde: "#16a34a" },
+} as const;
 
 type Turno = "Manhã" | "Tarde";
 
@@ -429,6 +432,8 @@ export function AnaliseComportamento() {
   const [mes, setMes] = useState<number | null>(null);
   const [tecnicoFiltro, setTecnicoFiltro] = useState<string>(TECNICO_TODOS);
   const [codigoFiltro, setCodigoFiltro] = useState<string | null>(null);
+  const [statusFiltro, setStatusFiltro] =
+    useState<StatusContratoFiltro>("IMPRODUTIVO");
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
   const [modalDiaAberto, setModalDiaAberto] = useState(false);
   const [diaFiltroModal, setDiaFiltroModal] = useState<string | null>(null);
@@ -559,7 +564,7 @@ export function AnaliseComportamento() {
     for (const row of rows) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+      if (statusContratoDoCodigo(codigo, dicionario) !== statusFiltro) continue;
       if (map.has(codigo)) continue;
       const desc = descricaoDoCodigoBaixa(codigo, dicionario);
       map.set(codigo, `${codigo} - ${desc}`);
@@ -570,7 +575,7 @@ export function AnaliseComportamento() {
           Number(a[0]) - Number(b[0]) || a[0].localeCompare(b[0], "pt-BR"),
       )
       .map(([, label]) => label);
-  }, [rows, dicionario]);
+  }, [rows, dicionario, statusFiltro]);
 
   const codigoFiltroLabel = useMemo(() => {
     if (!codigoFiltro) return "Todos";
@@ -586,6 +591,14 @@ export function AnaliseComportamento() {
       setTecnicoFiltro(TECNICO_TODOS);
     }
   }, [tecnicosDisponiveis, tecnicoFiltro]);
+
+  useEffect(() => {
+    if (!codigoFiltro) return;
+    const statusDoCodigo = statusContratoDoCodigo(codigoFiltro, dicionario);
+    if (statusDoCodigo !== statusFiltro) {
+      setCodigoFiltro(null);
+    }
+  }, [statusFiltro, codigoFiltro, dicionario]);
 
   const rowsFiltradas = useMemo(() => {
     if (tecnicoFiltro === TECNICO_TODOS) return rows;
@@ -641,24 +654,24 @@ export function AnaliseComportamento() {
     });
   }, [notasFiltradas]);
 
-  /** Quebras do período (Ano/Mês/Técnico) — referencial do total geral. */
-  const notasImprodutivasGlobais = useMemo(() => {
+  /** Notas do período (Ano/Mês/Técnico) no status selecionado — total geral. */
+  const notasStatusGlobais = useMemo(() => {
     return rowsFiltradas.filter((row) => {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) return false;
-      return statusContratoDoCodigo(codigo, dicionario) === "IMPRODUTIVO";
+      return statusContratoDoCodigo(codigo, dicionario) === statusFiltro;
     });
-  }, [rowsFiltradas, dicionario]);
+  }, [rowsFiltradas, dicionario, statusFiltro]);
 
   /** Base dos cards 1–4 e 6: com filtro de código, restringe; senão = globais. */
   const notasAlvo = useMemo(() => {
-    if (!codigoFiltro) return notasImprodutivasGlobais;
-    return notasImprodutivasGlobais.filter(
+    if (!codigoFiltro) return notasStatusGlobais;
+    return notasStatusGlobais.filter(
       (row) => normalizeCodigoBaixa(row.cod_baixa) === codigoFiltro,
     );
-  }, [notasImprodutivasGlobais, codigoFiltro]);
+  }, [notasStatusGlobais, codigoFiltro]);
 
-  const totalNotasGlobais = notasImprodutivasGlobais.length;
+  const totalNotasGlobais = notasStatusGlobais.length;
   const totalNotasAlvo = notasAlvo.length;
 
   const rowsParaTop10 = useMemo(() => {
@@ -676,15 +689,19 @@ export function AnaliseComportamento() {
       if (turno === "Manhã") manha += 1;
       else if (turno === "Tarde") tarde += 1;
     }
+    const cores =
+      statusFiltro === "IMPRODUTIVO"
+        ? PIE_COLORS.improdutivo
+        : PIE_COLORS.produtivo;
     return {
       manha,
       tarde,
       chart: [
-        { name: "Manhã", value: manha, fill: PIE_COLORS.manha },
-        { name: "Tarde", value: tarde, fill: PIE_COLORS.tarde },
+        { name: "Manhã", value: manha, fill: cores.manha },
+        { name: "Tarde", value: tarde, fill: cores.tarde },
       ].filter((p) => p.value > 0),
     };
-  }, [notasAlvo]);
+  }, [notasAlvo, statusFiltro]);
 
   const turnoMaiorFadiga = useMemo(() => {
     if (!notasAlvo.length) return null;
@@ -754,9 +771,9 @@ export function AnaliseComportamento() {
 
   const codOfensor = useMemo(() => {
     const counts = new Map<string, number>();
-    const totalImprodutivas = notasImprodutivasGlobais.length;
+    const totalImprodutivas = notasStatusGlobais.length;
 
-    for (const row of notasImprodutivasGlobais) {
+    for (const row of notasStatusGlobais) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
       counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
@@ -799,7 +816,7 @@ export function AnaliseComportamento() {
         pct: (melhorQtd / totalImprodutivas) * 100,
       },
     };
-  }, [notasImprodutivasGlobais]);
+  }, [notasStatusGlobais]);
 
   const codigoOfensorVencedor = codOfensor.ofensor?.codigo ?? null;
   const codigoAlvo = codigoFiltro || codigoOfensorVencedor;
@@ -926,7 +943,7 @@ export function AnaliseComportamento() {
     for (const row of rowsFiltradas) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+      if (statusContratoDoCodigo(codigo, dicionario) !== statusFiltro) continue;
 
       const acc = ensure(row);
       acc.totalQuebras += 1;
@@ -979,26 +996,35 @@ export function AnaliseComportamento() {
           b.usosCodigo - a.usosCodigo ||
           a.nome.localeCompare(b.nome, "pt-BR"),
       );
-  }, [rowsFiltradas, dicionario, codigoAlvo]);
+  }, [rowsFiltradas, dicionario, codigoAlvo, statusFiltro]);
 
   const raioXTecnico = useMemo((): RaioXQuebra[] => {
     if (tecnicoFiltro === TECNICO_TODOS) return [];
 
-    const notasImprod = dedupeNotasPorWo(rowsFiltradas).filter(
-      (n) => n.status_nota === "Improdutiva",
+    const statusNotaAlvo =
+      statusFiltro === "IMPRODUTIVO" ? "Improdutiva" : "Produtiva";
+
+    const notasStatus = dedupeNotasPorWo(rowsFiltradas).filter(
+      (n) => n.status_nota === statusNotaAlvo,
     );
 
     const linhas: RaioXQuebra[] = [];
-    for (const nota of notasImprod) {
-      const osImprod = rowsFiltradas.filter(
+    for (const nota of notasStatus) {
+      const osDoStatus = rowsFiltradas.filter(
         (r) =>
           String(r.numero_wo ?? "").trim() ===
             String(nota.numero_wo ?? "").trim() &&
-          r.status_nota === "Improdutiva" &&
-          isLinhaOsImprodutiva(r),
+          r.status_nota === statusNotaAlvo &&
+          (statusFiltro === "IMPRODUTIVO" ? isLinhaOsImprodutiva(r) : true),
       );
-      const principal = osImprod[0] ?? nota;
+      const principal = osDoStatus[0] ?? nota;
       const codigo = normalizeCodigoBaixa(principal.cod_baixa);
+      if (
+        codigo &&
+        statusContratoDoCodigo(codigo, dicionario) !== statusFiltro
+      ) {
+        continue;
+      }
       linhas.push({
         key: `${nota.numero_wo}|${nota.data_toa}|${codigo}`,
         data: String(nota.data_toa ?? "").slice(0, 10),
@@ -1019,7 +1045,7 @@ export function AnaliseComportamento() {
         return b.hora.localeCompare(a.hora);
       })
       .slice(0, 50);
-  }, [tecnicoFiltro, rowsFiltradas, dicionario]);
+  }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
   /** Aba Janela Improdutiva: pior código por horário macro + peso da janela. */
   const rankingPorJanela = useMemo((): JanelaImprodutivaAgg[] => {
@@ -1090,8 +1116,8 @@ export function AnaliseComportamento() {
 
   /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
   const todosCodigosBaixa = useMemo(
-    () => agregarMotivosQuebra(notasAlvo, dicionario, "IMPRODUTIVO"),
-    [notasAlvo, dicionario],
+    () => agregarMotivosQuebra(notasAlvo, dicionario, statusFiltro),
+    [notasAlvo, dicionario, statusFiltro],
   );
 
   const abrirModalDia = (diaCurto: string) => {
@@ -1370,7 +1396,33 @@ export function AnaliseComportamento() {
     setMes(null);
     setTecnicoFiltro(TECNICO_TODOS);
     setCodigoFiltro(null);
+    setStatusFiltro("IMPRODUTIVO");
   };
+
+  const isModoImprodutivo = statusFiltro === "IMPRODUTIVO";
+  const corDestaque = isModoImprodutivo ? "text-red-600" : "text-green-600";
+  const tituloTop10 = isModoImprodutivo
+    ? "Top 10 Cód. Quebras"
+    : "Top 10 Cód. Produtivos";
+  const tituloAbaTodosCodigos = isModoImprodutivo
+    ? "Todos os códigos de baixa (quebras)"
+    : "Todos os códigos de baixa (produtivos)";
+  const tituloCardCodigo = codigoFiltro
+    ? "Código Analisado"
+    : isModoImprodutivo
+      ? "Cód. Ofensor"
+      : "Cód. mais Produtivo";
+  const labelVolumeCurto = isModoImprodutivo ? "quebras" : "produção";
+  const labelVolumeTurno = isModoImprodutivo ? "quebras" : "notas";
+  const labelDiaPct = isModoImprodutivo ? "reprovação" : "aprovação";
+  const labelColunaTipo = isModoImprodutivo
+    ? "Tipo de quebra"
+    : "Tipo de nota";
+  const abasPainelInferior = ABAS_PAINEL_INFERIOR.map((aba) =>
+    aba.id === "todos-codigos"
+      ? { ...aba, label: tituloAbaTodosCodigos }
+      : aba,
+  );
 
   const fracaoSobre = (qtd: number, total: number) => {
     const pct = total > 0 ? (qtd / total) * 100 : 0;
@@ -1409,6 +1461,29 @@ export function AnaliseComportamento() {
                 Drill-down
               </Badge>
             )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="analise-comp-status"
+              className="shrink-0 text-sm font-medium"
+            >
+              Status:
+            </Label>
+            <Select
+              value={statusFiltro}
+              onValueChange={(v) =>
+                setStatusFiltro(v as StatusContratoFiltro)
+              }
+            >
+              <SelectTrigger id="analise-comp-status" className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IMPRODUTIVO">Improdutiva</SelectItem>
+                <SelectItem value="PRODUTIVO">Produtiva</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1550,12 +1625,16 @@ export function AnaliseComportamento() {
           <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-3 xl:grid-cols-6">
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 shrink-0 text-red-600" />
+                <Clock className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Janela Improdutiva (Macro)
+                  {isModoImprodutivo
+                    ? "Janela Improdutiva (Macro)"
+                    : "Janela Produtiva (Macro)"}
                 </span>
               </div>
-              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
                 {janelaImprodutivaMacro
                   ? formatarJanelaHorario(janelaImprodutivaMacro.janela)
                   : "—"}
@@ -1563,20 +1642,24 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMacro
-                    ? `maior volume de quebras - ${fracaoSobreAlvo(janelaImprodutivaMacro.quantidade)}`
-                    : "maior volume de quebras"}
+                    ? `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMacro.quantidade)}`
+                    : `maior volume de ${labelVolumeCurto}`}
                 </p>
               </div>
             </div>
 
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 shrink-0 text-red-600" />
+                <Clock className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Janela Improdutiva (Micro)
+                  {isModoImprodutivo
+                    ? "Janela Improdutiva (Micro)"
+                    : "Janela Produtiva (Micro)"}
                 </span>
               </div>
-              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
                 {janelaImprodutivaMicro
                   ? formatarJanelaHorario(janelaImprodutivaMicro.janela)
                   : "—"}
@@ -1584,26 +1667,28 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMicro
-                    ? `maior volume de quebras - ${fracaoSobreAlvo(janelaImprodutivaMicro.quantidade)}`
-                    : "maior volume de quebras"}
+                    ? `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMicro.quantidade)}`
+                    : `maior volume de ${labelVolumeCurto}`}
                 </p>
               </div>
             </div>
 
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 shrink-0 text-red-600" />
+                <CalendarDays className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
                   Dia
                 </span>
               </div>
-              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
                 {diaMaisCritico?.dia ?? "—"}
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {diaMaisCritico
-                    ? `${formatPct(diaMaisCritico.pct)} de reprovação - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(totalNotasAlvo)}`
+                    ? `${formatPct(diaMaisCritico.pct)} de ${labelDiaPct} - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(totalNotasAlvo)}`
                     : "Sem dados no período"}
                 </p>
               </div>
@@ -1612,21 +1697,23 @@ export function AnaliseComportamento() {
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 {turnoMaiorFadiga?.turno === "Manhã" ? (
-                  <Sunrise className="h-5 w-5 shrink-0 text-red-600" />
+                  <Sunrise className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 ) : (
-                  <Sunset className="h-5 w-5 shrink-0 text-red-600" />
+                  <Sunset className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 )}
                 <span className="text-sm font-medium text-muted-foreground">
                   Turno
                 </span>
               </div>
-              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
                 {turnoMaiorFadiga?.turno ?? "—"}
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {turnoMaiorFadiga
-                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalNotasAlvo)}`
+                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalNotasAlvo)}`
                     : "Sem horário de início-fim"}
                 </p>
               </div>
@@ -1634,12 +1721,14 @@ export function AnaliseComportamento() {
 
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                <AlertTriangle className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  {codigoFiltro ? "Código Analisado" : "Cód. Ofensor"}
+                  {tituloCardCodigo}
                 </span>
               </div>
-              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
                 {cardCodigoExibido
                   ? `Cód. ${cardCodigoExibido.codigo} - ${formatPct(cardCodigoExibido.pct)}`
                   : "—"}
@@ -1655,12 +1744,14 @@ export function AnaliseComportamento() {
 
             <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 shrink-0 text-red-600" />
+                <Target className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
                   Tipo
                 </span>
               </div>
-              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
                 {tipoOfensorMacro?.motivo ?? "—"}
               </div>
               <div className="mt-auto">
@@ -1752,11 +1843,15 @@ export function AnaliseComportamento() {
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 font-bold text-foreground">
                 <Clock className="h-4 w-4 text-primary" />
-                Distribuição de Quebras por Turno
+                {isModoImprodutivo
+                  ? "Distribuição de Quebras por Turno"
+                  : "Distribuição de Produção por Turno"}
               </h2>
               {porTurno.chart.length === 0 ? (
                 <p className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-                  Sem quebras com horário Início-Fim no período.
+                  {isModoImprodutivo
+                    ? "Sem quebras com horário Início-Fim no período."
+                    : "Sem notas produtivas com horário Início-Fim no período."}
                 </p>
               ) : (
                 <div className="h-72 w-full">
@@ -1780,7 +1875,7 @@ export function AnaliseComportamento() {
                       <Tooltip
                         formatter={(value) => [
                           formatQuantidade(Number(value) || 0),
-                          "Quebras",
+                          isModoImprodutivo ? "Quebras" : "Notas",
                         ]}
                       />
                       <Legend />
@@ -1798,7 +1893,7 @@ export function AnaliseComportamento() {
                 role="tablist"
                 aria-label="Visões do painel inferior"
               >
-                {ABAS_PAINEL_INFERIOR.map((aba) => {
+                {abasPainelInferior.map((aba) => {
                   const ativa = abaAtiva === aba.id;
                   return (
                     <button
@@ -1832,7 +1927,7 @@ export function AnaliseComportamento() {
                   onClick={() => setModalTop10Aberto(true)}
                 >
                   <BarChart3 className="h-4 w-4" />
-                  Top 10 Cód. Quebras
+                  {tituloTop10}
                 </Button>
               ) : null}
             </div>
@@ -1892,7 +1987,7 @@ export function AnaliseComportamento() {
                               <td className="px-3 py-2 font-medium text-primary">
                                 {row.nome}
                               </td>
-                              <td className="px-3 py-2 text-center font-semibold tabular-nums text-red-600">
+                              <td className={`px-3 py-2 text-center font-semibold tabular-nums ${corDestaque}`}>
                                 {formatQuantidade(row.usosCodigo)}
                               </td>
                               <td className="px-3 py-2 text-center tabular-nums text-gray-900">
@@ -1977,7 +2072,7 @@ export function AnaliseComportamento() {
                             <td className="px-3 py-2 tabular-nums text-gray-700">
                               {row.hora}
                             </td>
-                            <td className="px-3 py-2 font-semibold tabular-nums text-red-600">
+                            <td className={`px-3 py-2 font-semibold tabular-nums ${corDestaque}`}>
                               {row.codBaixa}
                             </td>
                             <td className="px-3 py-2 text-gray-700">
@@ -2018,7 +2113,7 @@ export function AnaliseComportamento() {
                           Motivo / Descrição
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Tipo de quebra
+                          {labelColunaTipo}
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
                           Representa
@@ -2034,7 +2129,7 @@ export function AnaliseComportamento() {
                           <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
                             {formatarJanelaHorario(row.janela)}
                           </td>
-                          <td className="px-3 py-2 font-medium tabular-nums text-red-600">
+                          <td className={`px-3 py-2 font-medium tabular-nums ${corDestaque}`}>
                             {row.codigoVencedor}
                           </td>
                           <td className="px-3 py-2 text-gray-700">
@@ -2056,7 +2151,9 @@ export function AnaliseComportamento() {
             {abaAtiva === "todos-codigos" &&
               (todosCodigosBaixa.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhum código de baixa improdutivo no período selecionado.
+                  {isModoImprodutivo
+                    ? "Nenhum código de baixa improdutivo no período selecionado."
+                    : "Nenhum código de baixa produtivo no período selecionado."}
                 </p>
               ) : (
                 <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
@@ -2070,7 +2167,7 @@ export function AnaliseComportamento() {
                           Motivo / Descrição
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-2 py-2 font-semibold shadow-sm">
-                          Tipo de quebra
+                          {labelColunaTipo}
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-2 py-2 text-right font-semibold shadow-sm">
                           Quantidade
@@ -2092,7 +2189,9 @@ export function AnaliseComportamento() {
                           <td className="px-2 py-2 text-gray-700">
                             {row.motivoQuebra}
                           </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                          <td
+                            className={`px-2 py-2 text-right tabular-nums ${corDestaque}`}
+                          >
                             {formatQuantidade(row.quantidade)}
                           </td>
                         </tr>
@@ -2497,7 +2596,7 @@ export function AnaliseComportamento() {
                   id="modal-top10-titulo"
                   className="text-lg font-bold text-foreground"
                 >
-                  Top 10 Cód. Quebras
+                  {tituloTop10}
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Contexto atual dos filtros · Esc ou fora para fechar
@@ -2516,9 +2615,17 @@ export function AnaliseComportamento() {
               <Top10CodigosBaixaChart
                 rows={rowsParaTop10}
                 dicionario={dicionario}
-                statusNota="IMPRODUTIVO"
-                titulo="Top 10 Motivos de Quebra"
-                emptyMessage="Nenhuma O.S. improdutiva no contexto filtrado."
+                statusNota={statusFiltro}
+                titulo={
+                  isModoImprodutivo
+                    ? "Top 10 Motivos de Quebra"
+                    : "Top 10 Códigos Produtivos"
+                }
+                emptyMessage={
+                  isModoImprodutivo
+                    ? "Nenhuma O.S. improdutiva no contexto filtrado."
+                    : "Nenhuma O.S. produtiva no contexto filtrado."
+                }
                 chartHeightClassName="h-96"
               />
             </div>
