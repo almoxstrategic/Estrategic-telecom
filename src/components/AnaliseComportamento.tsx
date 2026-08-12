@@ -106,6 +106,7 @@ type RankingUsoCodigo = {
   nome: string;
   usosCodigo: number;
   totalQuebras: number;
+  representaPct: number;
   porDia: Record<number, RankingUsoCodigoDia>;
 };
 
@@ -908,6 +909,10 @@ export function AnaliseComportamento() {
           nome: a.nome,
           usosCodigo: a.usosCodigo,
           totalQuebras: a.totalQuebras,
+          representaPct:
+            a.totalQuebras > 0
+              ? (a.usosCodigo / a.totalQuebras) * 100
+              : 0,
           porDia,
         };
       })
@@ -1670,6 +1675,9 @@ export function AnaliseComportamento() {
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
                           Quebras (Total)
                         </th>
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                          Representa
+                        </th>
                         {DIAS_UTEIS.map((d) => (
                           <th
                             key={d.dow}
@@ -1699,6 +1707,9 @@ export function AnaliseComportamento() {
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-gray-900">
                             {formatQuantidade(row.totalQuebras)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-sm font-medium tabular-nums text-gray-700">
+                            {formatPct(row.representaPct)}
                           </td>
                           {DIAS_UTEIS.map((d) => {
                             const cel = row.porDia[d.dow];
