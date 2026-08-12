@@ -7,6 +7,7 @@ import {
   FilterX,
   Sunrise,
   Sunset,
+  Target,
   UserRound,
 } from "lucide-react";
 import {
@@ -41,7 +42,9 @@ import {
 import {
   descricaoDoCodigoBaixa,
   fetchDicionarioCodigosBaixa,
+  motivoQuebraDoCodigo,
   normalizeCodigoBaixa,
+  statusContratoDoCodigo,
   type DicionarioCodigosBaixaMap,
 } from "@/lib/dicionario-codigos-baixa";
 import {
@@ -410,18 +413,103 @@ export function AnaliseComportamento() {
     };
   }, [quebrasOs]);
 
-  const fugaComplexidade = useMemo(() => {
-    let totalQuebras = 0;
-    let fuga = 0;
-    for (const row of quebrasOs) {
+  const janelaImprodutiva = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rowsFiltradas) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-      totalQuebras += 1;
-      if (CODIGOS_FUGA.has(codigo)) fuga += 1;
+      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+      const janela = String(row.janela_servico_1 ?? "").trim();
+      if (!janela) continue;
+      counts.set(janela, (counts.get(janela) ?? 0) + 1);
     }
-    const pct = totalQuebras > 0 ? (fuga / totalQuebras) * 100 : 0;
-    return { totalQuebras, fuga, pct };
-  }, [quebrasOs]);
+
+    let vencedora: string | null = null;
+    let quantidade = 0;
+    for (const [janela, qtd] of counts) {
+      if (
+        qtd > quantidade ||
+        (qtd === quantidade &&
+          vencedora != null &&
+          janela.localeCompare(vencedora, "pt-BR") < 0)
+      ) {
+        vencedora = janela;
+        quantidade = qtd;
+      } else if (vencedora == null && qtd > 0) {
+        vencedora = janela;
+        quantidade = qtd;
+      }
+    }
+    return vencedora ? { janela: vencedora, quantidade } : null;
+  }, [rowsFiltradas, dicionario]);
+
+  const codOfensor = useMemo(() => {
+    const counts = new Map<string, number>();
+    let totalImprodutivas = 0;
+
+    for (const row of rowsFiltradas) {
+      const codigo = normalizeCodigoBaixa(row.cod_baixa);
+      if (!codigo) continue;
+      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+      totalImprodutivas += 1;
+      counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
+    }
+
+    let melhorCodigo: string | null = null;
+    let melhorQtd = 0;
+    for (const [codigo, qtd] of counts) {
+      if (
+        qtd > melhorQtd ||
+        (qtd === melhorQtd &&
+          melhorCodigo != null &&
+          Number(codigo) - Number(melhorCodigo) < 0)
+      ) {
+        melhorCodigo = codigo;
+        melhorQtd = qtd;
+      } else if (melhorCodigo == null && qtd > 0) {
+        melhorCodigo = codigo;
+        melhorQtd = qtd;
+      }
+    }
+
+    if (!melhorCodigo || totalImprodutivas === 0) return null;
+    return {
+      codigo: melhorCodigo,
+      quantidade: melhorQtd,
+      pct: (melhorQtd / totalImprodutivas) * 100,
+    };
+  }, [rowsFiltradas, dicionario]);
+
+  const tipoOfensorMacro = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const row of rowsFiltradas) {
+      const codigo = normalizeCodigoBaixa(row.cod_baixa);
+      if (!codigo) continue;
+      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+      const motivo =
+        motivoQuebraDoCodigo(codigo, dicionario)?.trim() || "Não classificado";
+      counts.set(motivo, (counts.get(motivo) ?? 0) + 1);
+    }
+
+    let melhor: string | null = null;
+    let quantidade = 0;
+    for (const [motivo, qtd] of counts) {
+      if (
+        qtd > quantidade ||
+        (qtd === quantidade &&
+          melhor != null &&
+          motivo.localeCompare(melhor, "pt-BR") < 0)
+      ) {
+        melhor = motivo;
+        quantidade = qtd;
+      } else if (melhor == null && qtd > 0) {
+        melhor = motivo;
+        quantidade = qtd;
+      }
+    }
+    return melhor ? { motivo: melhor, quantidade } : null;
+  }, [rowsFiltradas, dicionario]);
 
   const diaMaisCritico = useMemo(() => {
     let best: DiaSemanaAgg | null = null;
@@ -584,7 +672,6 @@ export function AnaliseComportamento() {
 
   const filtrosLimpos = ano === null && mes === null;
   const visaoEquipe = tecnicoFiltro === TECNICO_TODOS;
-  const alertaFuga = fugaComplexidade.pct > 40;
 
   const periodoDescricao = useMemo(() => {
     const base =
@@ -745,83 +832,98 @@ export function AnaliseComportamento() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3 xl:grid-cols-5">
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Janela Improdutiva
+                </span>
+              </div>
+              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+                {janelaImprodutiva?.janela ?? "—"}
+              </div>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs text-muted-foreground">
+                  maior volume de quebras
+                </p>
+              </div>
+            </div>
+
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Dia mais crítico
+                  Dia
                 </span>
               </div>
-              <div className="mt-3 text-2xl font-bold text-gray-900">
+              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
                 {diaMaisCritico?.dia ?? "—"}
               </div>
-              <p className="mt-1 text-sm tabular-nums text-red-600">
-                {diaMaisCritico
-                  ? `${formatPct(diaMaisCritico.taxaReprovacao)} de reprovação`
-                  : "Sem dados no período"}
-              </p>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  {diaMaisCritico
+                    ? `${formatPct(diaMaisCritico.taxaReprovacao)} de reprovação`
+                    : "Sem dados no período"}
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 {turnoMaiorFadiga?.turno === "Manhã" ? (
-                  <Sunrise className="h-5 w-5 shrink-0 text-amber-600" />
+                  <Sunrise className="h-5 w-5 shrink-0 text-red-600" />
                 ) : (
-                  <Sunset className="h-5 w-5 shrink-0 text-orange-600" />
+                  <Sunset className="h-5 w-5 shrink-0 text-red-600" />
                 )}
                 <span className="text-sm font-medium text-muted-foreground">
-                  Turno de maior fadiga
+                  Turno
                 </span>
               </div>
-              <div className="mt-3 text-2xl font-bold text-gray-900">
+              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
                 {turnoMaiorFadiga?.turno ?? "—"}
               </div>
-              <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-                {turnoMaiorFadiga
-                  ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras`
-                  : "Sem horário de início-fim"}
-              </p>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  {turnoMaiorFadiga
+                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} quebras`
+                    : "Sem horário de início-fim"}
+                </p>
+              </div>
             </div>
 
-            <div
-              className={`rounded-xl border p-5 shadow-sm ${
-                alertaFuga
-                  ? "border-orange-300 bg-orange-50"
-                  : "border-gray-200 bg-white"
-              }`}
-            >
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <AlertTriangle
-                  className={`h-5 w-5 shrink-0 ${
-                    alertaFuga ? "text-orange-700" : "text-red-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm font-medium ${
-                    alertaFuga ? "text-orange-800" : "text-muted-foreground"
-                  }`}
-                >
-                  Alerta de Fuga (Cód. 106 e 101)
+                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Cód. Ofensor
                 </span>
               </div>
-              <div
-                className={`mt-3 text-3xl font-bold tabular-nums ${
-                  alertaFuga ? "text-orange-700" : "text-gray-900"
-                }`}
-              >
-                {formatPct(fugaComplexidade.pct)}
+              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+                {codOfensor
+                  ? `Cód. ${codOfensor.codigo} - ${formatPct(codOfensor.pct)}`
+                  : "—"}
               </div>
-              <p
-                className={`mt-1 text-xs ${
-                  alertaFuga ? "text-orange-800/80" : "text-muted-foreground"
-                }`}
-              >
-                {formatQuantidade(fugaComplexidade.fuga)} de{" "}
-                {formatQuantidade(fugaComplexidade.totalQuebras)} quebras ·
-                Cliente Ausente / Endereço não localizado
-                {alertaFuga ? " · acima de 40%" : ""}
-              </p>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs text-muted-foreground">recorrência</p>
+              </div>
+            </div>
+
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 shrink-0 text-red-600" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Tipo
+                </span>
+              </div>
+              <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
+                {tipoOfensorMacro?.motivo ?? "—"}
+              </div>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs text-muted-foreground">
+                  categoria com maior índice
+                </p>
+              </div>
             </div>
           </div>
 
