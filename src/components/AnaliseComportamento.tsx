@@ -1615,6 +1615,9 @@ export function AnaliseComportamento() {
   const tituloAbaTodosCodigos = isModoImprodutivo
     ? "Todos os códigos de baixa (quebras)"
     : "Todos os códigos de baixa (produtivos)";
+  const tituloAbaJanela = isModoImprodutivo
+    ? "Janela Improdutiva"
+    : "Janela Produtiva";
   const tituloCardCodigo = codigoFiltro
     ? "Código Analisado"
     : isModoImprodutivo
@@ -1626,11 +1629,15 @@ export function AnaliseComportamento() {
   const labelColunaTipo = isModoImprodutivo
     ? "Tipo de quebra"
     : "Tipo de nota";
-  const abasPainelInferior = ABAS_PAINEL_INFERIOR.map((aba) =>
-    aba.id === "todos-codigos"
-      ? { ...aba, label: tituloAbaTodosCodigos }
-      : aba,
-  );
+  const abasPainelInferior = ABAS_PAINEL_INFERIOR.map((aba) => {
+    if (aba.id === "todos-codigos") {
+      return { ...aba, label: tituloAbaTodosCodigos };
+    }
+    if (aba.id === "janela") {
+      return { ...aba, label: tituloAbaJanela };
+    }
+    return aba;
+  });
 
   const fracaoSobre = (qtd: number, total: number) => {
     const pct = total > 0 ? (qtd / total) * 100 : 0;
@@ -2516,7 +2523,9 @@ export function AnaliseComportamento() {
             {abaAtiva === "janela" &&
               (rankingPorJanela.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhuma janela improdutiva no período filtrado.
+                  {isModoImprodutivo
+                    ? "Nenhuma janela improdutiva no período filtrado."
+                    : "Nenhuma janela produtiva no período filtrado."}
                 </p>
               ) : (
                 <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
