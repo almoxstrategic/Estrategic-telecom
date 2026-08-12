@@ -139,10 +139,12 @@ type JanelaImprodutivaAgg = {
 type RaioXQuebra = {
   key: string;
   data: string;
+  dia: string;
   hora: string;
   codBaixa: string;
   descricao: string;
   bairro: string;
+  contrato: string;
   numeroWo: string;
 };
 
@@ -1067,15 +1069,26 @@ export function AnaliseComportamento() {
       ) {
         continue;
       }
+      const dataIso = String(nota.data_toa ?? "").slice(0, 10);
+      const dow = diaDaSemanaFromIso(dataIso);
+      const diaLabel =
+        dow == null
+          ? "—"
+          : DIAS_UTEIS.find((d) => d.dow === dow)?.label ??
+            (dow === 0 ? "Domingo" : "—");
+
       linhas.push({
         key: `${nota.numero_wo}|${nota.data_toa}|${codigo}`,
-        data: String(nota.data_toa ?? "").slice(0, 10),
+        data: dataIso,
+        dia: diaLabel,
         hora: formatHoraDeInicioFim(nota.inicio_fim || principal.inicio_fim),
         codBaixa: codigo || "—",
         descricao: codigo
           ? descricaoDoCodigoBaixa(codigo, dicionario)
           : DESCRICAO_DESCONHECIDA,
         bairro: (nota.bairro || principal.bairro || "").trim() || "—",
+        contrato:
+          String(nota.contrato || principal.contrato || "").trim() || "—",
         numeroWo: String(nota.numero_wo ?? "").trim() || "—",
       });
     }
@@ -2105,26 +2118,32 @@ export function AnaliseComportamento() {
                     Nenhuma nota improdutiva para {tecnicoFiltro} no período.
                   </p>
                 ) : (
-                  <div className="relative max-h-96 overflow-y-auto rounded-lg border border-gray-100">
-                    <table className="w-full min-w-[36rem] text-sm">
+                  <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
+                    <table className="w-full min-w-[56rem] text-sm">
                       <thead>
                         <tr className="border-b border-border text-left text-muted-foreground">
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          <th className="sticky top-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-semibold shadow-sm">
                             Data
                           </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          <th className="sticky top-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-semibold shadow-sm">
+                            Dia
+                          </th>
+                          <th className="sticky top-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-semibold shadow-sm">
                             Hora
                           </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          <th className="sticky top-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-semibold shadow-sm">
                             Cód. Baixa
                           </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          <th className="sticky top-0 z-10 min-w-[10rem] bg-white px-3 py-2 font-semibold shadow-sm">
                             Motivo
                           </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          <th className="sticky top-0 z-10 min-w-[8rem] bg-white px-3 py-2 font-semibold shadow-sm">
                             Bairro
                           </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          <th className="sticky top-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-semibold shadow-sm">
+                            Contrato
+                          </th>
+                          <th className="sticky top-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-semibold shadow-sm">
                             WO
                           </th>
                         </tr>
@@ -2135,13 +2154,18 @@ export function AnaliseComportamento() {
                             key={row.key}
                             className="border-b border-border/60 last:border-b-0"
                           >
-                            <td className="px-3 py-2 tabular-nums text-gray-900">
+                            <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-900">
                               {formatDataBr(row.data)}
                             </td>
-                            <td className="px-3 py-2 tabular-nums text-gray-700">
+                            <td className="whitespace-nowrap px-3 py-2 text-gray-700">
+                              {row.dia}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-700">
                               {row.hora}
                             </td>
-                            <td className={`px-3 py-2 font-semibold tabular-nums ${corDestaque}`}>
+                            <td
+                              className={`whitespace-nowrap px-3 py-2 font-semibold tabular-nums ${corDestaque}`}
+                            >
                               {row.codBaixa}
                             </td>
                             <td className="px-3 py-2 text-gray-700">
@@ -2150,7 +2174,10 @@ export function AnaliseComportamento() {
                             <td className="px-3 py-2 text-gray-700">
                               {row.bairro}
                             </td>
-                            <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                            <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-700">
+                              {row.contrato}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
                               {row.numeroWo}
                             </td>
                           </tr>
