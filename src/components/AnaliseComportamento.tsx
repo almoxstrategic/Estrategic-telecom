@@ -238,36 +238,71 @@ function diaDaSemanaFromIso(iso: string): number | null {
 }
 
 /**
- * Extrai hora de início de "Inicio-Fim" (ex.: "08:30 - 12:10", "14:00").
+ * Extrai a hora real da baixa a partir de "Inicio-Fim".
+ * Preferência: horário de FIM (conclusão/baixa); fallback: início.
  * Retorna hora 0–23 ou null.
  */
-function extrairHoraInicio(inicioFim: string | null | undefined): number | null {
+function extrairHoraBaixa(inicioFim: string | null | undefined): number | null {
   const s = String(inicioFim ?? "").trim();
   if (!s) return null;
-  const match = s.match(/(\d{1,2})[:hH](\d{2})/);
-  if (!match) return null;
-  const hora = Number(match[1]);
+  const matches = [...s.matchAll(/(\d{1,2})[:hH](\d{2})/g)];
+  if (matches.length === 0) return null;
+  const escolhido = matches[matches.length - 1]!;
+  const hora = Number(escolhido[1]);
   if (!Number.isFinite(hora) || hora < 0 || hora > 23) return null;
   return hora;
 }
 
-function classificarTurno(hora: number): Turno {
-  return hora <= 12 ? "Manhã" : "Tarde";
+/**
+ * Hora da baixa para classificação de turno/janela.
+ * Fonte da verdade: fim de inicio_fim. Fallback raro: início numérico da
+ * janela SLA (só se inicio_fim estiver vazio) para não orphanar a nota.
+ */
+function horaBaixaDaRow(row: ToaImportacaoRow): number {
+  const real = extrairHoraBaixa(row.inicio_fim);
+  if (real != null) return real;
+  const sla = String(row.janela_servico_1 ?? "").trim().match(/(\d{1,2})/);
+  if (sla) {
+    const h = Number(sla[1]);
+    if (Number.isFinite(h) && h >= 0 && h <= 23) return h;
+  }
+  return 12;
 }
 
-/** Turno da O.S. a partir do horário de início em inicio_fim. */
-function turnoDaRow(row: ToaImportacaoRow): Turno | null {
-  const hora = extrairHoraInicio(row.inicio_fim);
-  if (hora == null) return null;
-  return classificarTurno(hora);
+/** Manhã: 00:00–11:59 | Tarde: 12:00–23:59 */
+function classificarTurno(hora: number): Turno {
+  return hora < 12 ? "Manhã" : "Tarde";
+}
+
+function padHoraFaixa(h: number): string {
+  return String(h).padStart(2, "0");
+}
+
+/** Blocos de 4h alinhados ao turno (00-04…08-12 | 12-16…20-24). */
+function janelaMacroDaHora(hora: number): string {
+  const inicio = Math.floor(hora / 4) * 4;
+  const fim = inicio + 4;
+  return `${padHoraFaixa(inicio)} - ${padHoraFaixa(fim)}`;
+}
+
+/** Blocos de 1h dentro da macro (ex.: 08-09, 14-15). */
+function janelaMicroDaHora(hora: number): string {
+  const fim = hora + 1;
+  return `${padHoraFaixa(hora)} - ${padHoraFaixa(fim)}`;
+}
+
+/** Turno da O.S. a partir da hora real da baixa. */
+function turnoDaRow(row: ToaImportacaoRow): Turno {
+  return classificarTurno(horaBaixaDaRow(row));
 }
 
 function formatHoraDeInicioFim(inicioFim: string | null | undefined): string {
   const s = String(inicioFim ?? "").trim();
   if (!s) return "—";
-  const match = s.match(/(\d{1,2})[:hH](\d{2})/);
-  if (!match) return s.slice(0, 16) || "—";
-  return `${String(match[1]).padStart(2, "0")}:${match[2]}`;
+  const matches = [...s.matchAll(/(\d{1,2})[:hH](\d{2})/g)];
+  if (matches.length === 0) return s.slice(0, 16) || "—";
+  const escolhido = matches[matches.length - 1]!;
+  return `${String(escolhido[1]).padStart(2, "0")}:${escolhido[2]}`;
 }
 
 /** Formata janelas "15 - 18" / "14:45 - 15:45" → "15h - 18h" / "14:45h - 15:45h". */
@@ -339,8 +374,7 @@ function piorJanelaImprodutiva(
     const codigo = normalizeCodigoBaixa(row.cod_baixa);
     if (!codigo) continue;
     if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
-    const janela = String(row.janela_servico_1 ?? "").trim();
-    if (!janela) continue;
+    const janela = janelaMacroDaHora(horaBaixaDaRow(row));
     counts.set(janela, (counts.get(janela) ?? 0) + 1);
   }
   let melhor: string | null = null;
@@ -365,10 +399,7 @@ function piorJanelaImprodutiva(
 function piorJanelaDasNotas(notas: ToaImportacaoRow[]): string | null {
   const counts = new Map<string, number>();
   for (const row of notas) {
-    const janela =
-      String(row.janela_servico_1 ?? "").trim() ||
-      String(row.janela_servico_2 ?? "").trim();
-    if (!janela) continue;
+    const janela = janelaMacroDaHora(horaBaixaDaRow(row));
     counts.set(janela, (counts.get(janela) ?? 0) + 1);
   }
   let melhor: string | null = null;
@@ -686,9 +717,8 @@ export function AnaliseComportamento() {
     let manha = 0;
     let tarde = 0;
     for (const row of notasAlvo) {
-      const turno = turnoDaRow(row);
-      if (turno === "Manhã") manha += 1;
-      else if (turno === "Tarde") tarde += 1;
+      if (turnoDaRow(row) === "Manhã") manha += 1;
+      else tarde += 1;
     }
     const cores =
       statusFiltro === "IMPRODUTIVO"
@@ -706,7 +736,6 @@ export function AnaliseComportamento() {
 
   const turnoMaiorFadiga = useMemo(() => {
     if (!notasAlvo.length) return null;
-    if (porTurno.manha === 0 && porTurno.tarde === 0) return null;
     if (porTurno.tarde > porTurno.manha) {
       return { turno: "Tarde" as const, quebras: porTurno.tarde };
     }
@@ -716,6 +745,10 @@ export function AnaliseComportamento() {
     return { turno: "Empate" as const, quebras: porTurno.manha };
   }, [notasAlvo.length, porTurno]);
 
+  /**
+   * Cascata Turno → Macro → Micro a partir da hora real da baixa.
+   * Macro/Micro são subconjuntos do turno vencedor (ou de todos se Empate).
+   */
   const janelasImprodutivas = useMemo(() => {
     if (!notasAlvo.length) {
       return { macro: null, micro: null };
@@ -741,10 +774,19 @@ export function AnaliseComportamento() {
       return melhor ? { janela: melhor, quantidade } : null;
     };
 
+    const turnoVencedor = turnoMaiorFadiga?.turno;
+    const notasDoEscopo =
+      !turnoVencedor || turnoVencedor === "Empate"
+        ? notasAlvo
+        : notasAlvo.filter((row) => turnoDaRow(row) === turnoVencedor);
+
+    if (notasDoEscopo.length === 0) {
+      return { macro: null, micro: null };
+    }
+
     const countsMacro = new Map<string, number>();
-    for (const row of notasAlvo) {
-      const macro = String(row.janela_servico_1 ?? "").trim();
-      if (!macro) continue;
+    for (const row of notasDoEscopo) {
+      const macro = janelaMacroDaHora(horaBaixaDaRow(row));
       countsMacro.set(macro, (countsMacro.get(macro) ?? 0) + 1);
     }
     const macro = vencedora(countsMacro);
@@ -753,11 +795,10 @@ export function AnaliseComportamento() {
     }
 
     const countsMicro = new Map<string, number>();
-    for (const row of notasAlvo) {
-      const janelaMacro = String(row.janela_servico_1 ?? "").trim();
-      if (janelaMacro !== macro.janela) continue;
-      const micro = String(row.janela_servico_2 ?? "").trim();
-      if (!micro) continue;
+    for (const row of notasDoEscopo) {
+      const hora = horaBaixaDaRow(row);
+      if (janelaMacroDaHora(hora) !== macro.janela) continue;
+      const micro = janelaMicroDaHora(hora);
       countsMicro.set(micro, (countsMicro.get(micro) ?? 0) + 1);
     }
 
@@ -765,7 +806,7 @@ export function AnaliseComportamento() {
       macro,
       micro: vencedora(countsMicro),
     };
-  }, [notasAlvo]);
+  }, [notasAlvo, turnoMaiorFadiga]);
 
   const janelaImprodutivaMacro = janelasImprodutivas.macro;
   const janelaImprodutivaMicro = janelasImprodutivas.micro;
@@ -1048,7 +1089,7 @@ export function AnaliseComportamento() {
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
-  /** Aba Janela Improdutiva: pior código por horário macro + peso da janela. */
+  /** Aba Janela: pior código por bloco horário (hora real) + peso da janela. */
   const rankingPorJanela = useMemo((): JanelaImprodutivaAgg[] => {
     if (!notasAlvo.length) return [];
 
@@ -1056,8 +1097,7 @@ export function AnaliseComportamento() {
     const codigosPorJanela = new Map<string, Map<string, number>>();
 
     for (const row of notasAlvo) {
-      const janela = String(row.janela_servico_1 ?? "").trim();
-      if (!janela) continue;
+      const janela = janelaMacroDaHora(horaBaixaDaRow(row));
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
 
@@ -1865,8 +1905,8 @@ export function AnaliseComportamento() {
               {porTurno.chart.length === 0 ? (
                 <p className="flex h-72 items-center justify-center text-sm text-muted-foreground">
                   {isModoImprodutivo
-                    ? "Sem quebras com horário Início-Fim no período."
-                    : "Sem notas produtivas com horário Início-Fim no período."}
+                    ? "Sem quebras no período filtrado."
+                    : "Sem notas produtivas no período filtrado."}
                 </p>
               ) : (
                 <div className="h-72 w-full">
