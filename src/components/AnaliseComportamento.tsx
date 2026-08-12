@@ -1143,71 +1143,49 @@ export function AnaliseComportamento() {
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
-  /** Aba Janela: pior código por bloco horário (hora real) + peso da janela. */
+  /** Aba Janela: todas as combinações janela×código (sem filtro de Código). */
   const rankingPorJanela = useMemo((): JanelaImprodutivaAgg[] => {
-    if (!notasAlvo.length) return [];
+    if (!notasStatusGlobais.length) return [];
 
-    const totaisJanela = new Map<string, number>();
-    const codigosPorJanela = new Map<string, Map<string, number>>();
+    const counts = new Map<
+      string,
+      { janela: string; codigo: string; quantidade: number }
+    >();
 
-    for (const row of notasAlvo) {
-      const janela = janelaMacroDaHora(horaBaixaDaRow(row));
+    for (const row of notasStatusGlobais) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
-
-      totaisJanela.set(janela, (totaisJanela.get(janela) ?? 0) + 1);
-      let counts = codigosPorJanela.get(janela);
-      if (!counts) {
-        counts = new Map();
-        codigosPorJanela.set(janela, counts);
+      const janela = janelaMacroDaHora(horaBaixaDaRow(row));
+      const chave = `${janela}|${codigo}`;
+      const atual = counts.get(chave);
+      if (atual) {
+        atual.quantidade += 1;
+      } else {
+        counts.set(chave, { janela, codigo, quantidade: 1 });
       }
-      counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
     }
 
-    const resultado: JanelaImprodutivaAgg[] = [];
-    for (const [janela, quantidadeJanela] of totaisJanela) {
-      const counts = codigosPorJanela.get(janela);
-      if (!counts || counts.size === 0) continue;
+    const totalBase = notasStatusGlobais.length;
 
-      let melhorCodigo: string | null = null;
-      let melhorQtd = 0;
-      for (const [codigo, qtd] of counts) {
-        if (
-          qtd > melhorQtd ||
-          (qtd === melhorQtd &&
-            melhorCodigo != null &&
-            Number(codigo) - Number(melhorCodigo) < 0)
-        ) {
-          melhorCodigo = codigo;
-          melhorQtd = qtd;
-        } else if (melhorCodigo == null && qtd > 0) {
-          melhorCodigo = codigo;
-          melhorQtd = qtd;
-        }
-      }
-      if (!melhorCodigo) continue;
-
-      resultado.push({
-        janela,
-        codigoVencedor: melhorCodigo,
-        descricaoVencedor: descricaoDoCodigoBaixa(melhorCodigo, dicionario),
+    return [...counts.values()]
+      .map((item) => ({
+        janela: item.janela,
+        codigoVencedor: item.codigo,
+        descricaoVencedor: descricaoDoCodigoBaixa(item.codigo, dicionario),
         tipoVencedor:
-          motivoQuebraDoCodigo(melhorCodigo, dicionario)?.trim() ||
+          motivoQuebraDoCodigo(item.codigo, dicionario)?.trim() ||
           "Não classificado",
-        quantidadeJanela,
+        quantidadeJanela: item.quantidade,
         representaPct:
-          totalNotasAlvo > 0
-            ? (quantidadeJanela / totalNotasAlvo) * 100
-            : 0,
-      });
-    }
-
-    return resultado.sort(
-      (a, b) =>
-        b.quantidadeJanela - a.quantidadeJanela ||
-        a.janela.localeCompare(b.janela, "pt-BR"),
-    );
-  }, [notasAlvo, totalNotasAlvo, dicionario]);
+          totalBase > 0 ? (item.quantidade / totalBase) * 100 : 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.quantidadeJanela - a.quantidadeJanela ||
+          a.janela.localeCompare(b.janela, "pt-BR") ||
+          Number(a.codigoVencedor) - Number(b.codigoVencedor),
+      );
+  }, [notasStatusGlobais, dicionario]);
 
   /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
   const todosCodigosBaixa = useMemo(
@@ -2552,7 +2530,7 @@ export function AnaliseComportamento() {
                     <tbody>
                       {rankingPorJanela.map((row) => (
                         <tr
-                          key={row.janela}
+                          key={`${row.janela}|${row.codigoVencedor}`}
                           className="border-b border-border/60 last:border-b-0"
                         >
                           <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
