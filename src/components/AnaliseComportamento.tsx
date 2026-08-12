@@ -2286,13 +2286,13 @@ export function AnaliseComportamento() {
                           <td className="px-3 py-2 text-center tabular-nums text-green-600">
                             {formatQuantidade(tec.produtivasGeral)}
                           </td>
-                          <td className="px-3 py-2 text-center tabular-nums text-red-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-gray-900">
                             {formatQuantidade(tec.quebrasGeral)}
                           </td>
-                          <td className="px-3 py-2 text-center tabular-nums text-green-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-gray-900">
                             {formatPct(tec.aproveitamento)}
                           </td>
-                          <td className="px-3 py-2 text-center tabular-nums text-red-600">
+                          <td className="px-3 py-2 text-center tabular-nums text-gray-900">
                             {formatPct(tec.reprovacao)}
                           </td>
                           {DIAS_UTEIS.map((d) => {
