@@ -517,22 +517,27 @@ export function MotivosQuebra() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Total de Quebras
+                  Total de Quebras (O.S)
                 </span>
               </div>
-              <div className="mt-3 text-3xl font-bold text-red-600">
-                {formatQuantidade(totalQuebras)}
+              <div className="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-lg">
+                Quantidade de O.S
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                O.S. improdutivas no período
-              </p>
+              <div className="mt-auto">
+                <div className="mt-1 text-3xl font-bold text-red-600">
+                  {formatQuantidade(totalQuebras)}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  O.S. improdutivas no período
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
@@ -544,14 +549,16 @@ export function MotivosQuebra() {
                   ? `Cód. ${principalOfensor.labelCompleta}`
                   : "—"}
               </div>
-              <div className="mt-1 text-3xl font-bold text-red-600">
-                {formatQuantidade(principalOfensor?.quantidade ?? 0)}
+              <div className="mt-auto">
+                <div className="mt-1 text-3xl font-bold text-red-600">
+                  {formatQuantidade(principalOfensor?.quantidade ?? 0)}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ocorrências do código de baixa
+                </p>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                ocorrências do código de baixa
-              </p>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5">
               <div className="flex items-center gap-2">
                 <PieChart className="h-5 w-5 shrink-0 text-red-600" />
                 <span className="text-sm font-medium text-muted-foreground">
@@ -563,12 +570,14 @@ export function MotivosQuebra() {
                   ? motivoMacroVencedor.motivo
                   : "—"}
               </div>
-              <div className="mt-1 text-3xl font-bold text-red-600">
-                {formatQuantidade(motivoMacroVencedor?.quantidade ?? 0)}
+              <div className="mt-auto">
+                <div className="mt-1 text-3xl font-bold text-red-600">
+                  {formatQuantidade(motivoMacroVencedor?.quantidade ?? 0)}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  categoria com maior índice de quebra
+                </p>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                categoria com maior índice de quebra
-              </p>
             </div>
           </div>
 
