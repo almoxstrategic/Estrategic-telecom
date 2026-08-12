@@ -777,27 +777,100 @@ export function AnaliseComportamento() {
     };
   }, [notasAlvo, statusFiltro]);
 
+  const isQuebraCard = (nota: ToaImportacaoRow): boolean => {
+    if (nota.status_nota !== "Improdutiva") return false;
+    if (!codigoFiltro) return true;
+    return normalizeCodigoBaixa(nota.cod_baixa) === codigoFiltro;
+  };
+
+  /** Card 4: volume (produtivo) ou taxa de reprovação (improdutivo). */
   const turnoMaiorFadiga = useMemo(() => {
-    if (!notasAlvo.length) return null;
-    if (porTurno.tarde > porTurno.manha) {
-      return { turno: "Tarde" as const, quebras: porTurno.tarde };
+    if (statusFiltro === "PRODUTIVO") {
+      if (!notasAlvo.length) return null;
+      if (porTurno.tarde > porTurno.manha) {
+        return {
+          turno: "Tarde" as const,
+          quebras: porTurno.tarde,
+          totalBucket: porTurno.tarde,
+          taxa: 100,
+        };
+      }
+      if (porTurno.manha > porTurno.tarde) {
+        return {
+          turno: "Manhã" as const,
+          quebras: porTurno.manha,
+          totalBucket: porTurno.manha,
+          taxa: 100,
+        };
+      }
+      return {
+        turno: "Empate" as const,
+        quebras: porTurno.manha,
+        totalBucket: porTurno.manha,
+        taxa: 100,
+      };
     }
-    if (porTurno.manha > porTurno.tarde) {
-      return { turno: "Manhã" as const, quebras: porTurno.manha };
+
+    if (!notasFiltradas.length) return null;
+
+    let manhaQ = 0;
+    let manhaT = 0;
+    let tardeQ = 0;
+    let tardeT = 0;
+    for (const nota of notasFiltradas) {
+      const turno = turnoDaRow(nota);
+      if (turno === "Manhã") {
+        manhaT += 1;
+        if (isQuebraCard(nota)) manhaQ += 1;
+      } else {
+        tardeT += 1;
+        if (isQuebraCard(nota)) tardeQ += 1;
+      }
     }
-    return { turno: "Empate" as const, quebras: porTurno.manha };
-  }, [notasAlvo.length, porTurno]);
+    if (manhaT === 0 && tardeT === 0) return null;
+
+    const taxaM = manhaT > 0 ? (manhaQ / manhaT) * 100 : 0;
+    const taxaT = tardeT > 0 ? (tardeQ / tardeT) * 100 : 0;
+
+    if (taxaT > taxaM || (taxaT === taxaM && tardeQ > manhaQ)) {
+      return {
+        turno: "Tarde" as const,
+        quebras: tardeQ,
+        totalBucket: tardeT,
+        taxa: taxaT,
+      };
+    }
+    if (taxaM > taxaT || (taxaM === taxaT && manhaQ > tardeQ)) {
+      return {
+        turno: "Manhã" as const,
+        quebras: manhaQ,
+        totalBucket: manhaT,
+        taxa: taxaM,
+      };
+    }
+    return {
+      turno: "Empate" as const,
+      quebras: manhaQ,
+      totalBucket: manhaT,
+      taxa: taxaM,
+    };
+  }, [statusFiltro, notasAlvo.length, porTurno, notasFiltradas, codigoFiltro]);
+
+  type JanelaCardAgg = {
+    janela: string;
+    quantidade: number;
+    totalBucket: number;
+    taxa: number;
+  };
 
   /**
-   * Cascata Turno → Macro → Micro a partir da hora real da baixa.
-   * Macro/Micro são subconjuntos do turno vencedor (ou de todos se Empate).
+   * Cards 1–2: cascata Turno → Macro → Micro.
+   * Produtivo = volume; Improdutivo = taxa de reprovação na base mestre.
    */
   const janelasImprodutivas = useMemo(() => {
-    if (!notasAlvo.length) {
-      return { macro: null, micro: null };
-    }
-
-    const vencedora = (counts: Map<string, number>) => {
+    const vencedoraVolume = (
+      counts: Map<string, number>,
+    ): JanelaCardAgg | null => {
       let melhor: string | null = null;
       let quantidade = 0;
       for (const [janela, qtd] of counts) {
@@ -814,42 +887,107 @@ export function AnaliseComportamento() {
           quantidade = qtd;
         }
       }
-      return melhor ? { janela: melhor, quantidade } : null;
+      return melhor
+        ? { janela: melhor, quantidade, totalBucket: quantidade, taxa: 100 }
+        : null;
     };
+
+    const vencedoraTaxa = (
+      buckets: Map<string, { quebras: number; total: number }>,
+    ): JanelaCardAgg | null => {
+      let melhor: JanelaCardAgg | null = null;
+      for (const [janela, b] of buckets) {
+        if (b.total === 0) continue;
+        const taxa = (b.quebras / b.total) * 100;
+        const cand: JanelaCardAgg = {
+          janela,
+          quantidade: b.quebras,
+          totalBucket: b.total,
+          taxa,
+        };
+        if (
+          !melhor ||
+          cand.taxa > melhor.taxa ||
+          (cand.taxa === melhor.taxa &&
+            cand.quantidade > melhor.quantidade) ||
+          (cand.taxa === melhor.taxa &&
+            cand.quantidade === melhor.quantidade &&
+            cand.janela.localeCompare(melhor.janela, "pt-BR") < 0)
+        ) {
+          melhor = cand;
+        }
+      }
+      return melhor;
+    };
+
+    if (statusFiltro === "PRODUTIVO") {
+      if (!notasAlvo.length) return { macro: null, micro: null };
+
+      const turnoVencedor = turnoMaiorFadiga?.turno;
+      const notasDoEscopo =
+        !turnoVencedor || turnoVencedor === "Empate"
+          ? notasAlvo
+          : notasAlvo.filter((row) => turnoDaRow(row) === turnoVencedor);
+      if (notasDoEscopo.length === 0) return { macro: null, micro: null };
+
+      const countsMacro = new Map<string, number>();
+      for (const row of notasDoEscopo) {
+        const macro = janelaMacroDaHora(horaBaixaDaRow(row));
+        countsMacro.set(macro, (countsMacro.get(macro) ?? 0) + 1);
+      }
+      const macro = vencedoraVolume(countsMacro);
+      if (!macro) return { macro: null, micro: null };
+
+      const countsMicro = new Map<string, number>();
+      for (const row of notasDoEscopo) {
+        const hora = horaBaixaDaRow(row);
+        if (janelaMacroDaHora(hora) !== macro.janela) continue;
+        const micro = janelaMicroDaHora(hora);
+        countsMicro.set(micro, (countsMicro.get(micro) ?? 0) + 1);
+      }
+      return { macro, micro: vencedoraVolume(countsMicro) };
+    }
+
+    if (!notasFiltradas.length) return { macro: null, micro: null };
 
     const turnoVencedor = turnoMaiorFadiga?.turno;
-    const notasDoEscopo =
-      !turnoVencedor || turnoVencedor === "Empate"
-        ? notasAlvo
-        : notasAlvo.filter((row) => turnoDaRow(row) === turnoVencedor);
+    const noEscopoTurno = (nota: ToaImportacaoRow) => {
+      if (!turnoVencedor || turnoVencedor === "Empate") return true;
+      return turnoDaRow(nota) === turnoVencedor;
+    };
 
-    if (notasDoEscopo.length === 0) {
-      return { macro: null, micro: null };
+    const bucketsMacro = new Map<string, { quebras: number; total: number }>();
+    for (const nota of notasFiltradas) {
+      if (!noEscopoTurno(nota)) continue;
+      const macro = janelaMacroDaHora(horaBaixaDaRow(nota));
+      let b = bucketsMacro.get(macro);
+      if (!b) {
+        b = { quebras: 0, total: 0 };
+        bucketsMacro.set(macro, b);
+      }
+      b.total += 1;
+      if (isQuebraCard(nota)) b.quebras += 1;
     }
+    const macro = vencedoraTaxa(bucketsMacro);
+    if (!macro) return { macro: null, micro: null };
 
-    const countsMacro = new Map<string, number>();
-    for (const row of notasDoEscopo) {
-      const macro = janelaMacroDaHora(horaBaixaDaRow(row));
-      countsMacro.set(macro, (countsMacro.get(macro) ?? 0) + 1);
-    }
-    const macro = vencedora(countsMacro);
-    if (!macro) {
-      return { macro: null, micro: null };
-    }
-
-    const countsMicro = new Map<string, number>();
-    for (const row of notasDoEscopo) {
-      const hora = horaBaixaDaRow(row);
+    const bucketsMicro = new Map<string, { quebras: number; total: number }>();
+    for (const nota of notasFiltradas) {
+      if (!noEscopoTurno(nota)) continue;
+      const hora = horaBaixaDaRow(nota);
       if (janelaMacroDaHora(hora) !== macro.janela) continue;
       const micro = janelaMicroDaHora(hora);
-      countsMicro.set(micro, (countsMicro.get(micro) ?? 0) + 1);
+      let b = bucketsMicro.get(micro);
+      if (!b) {
+        b = { quebras: 0, total: 0 };
+        bucketsMicro.set(micro, b);
+      }
+      b.total += 1;
+      if (isQuebraCard(nota)) b.quebras += 1;
     }
 
-    return {
-      macro,
-      micro: vencedora(countsMicro),
-    };
-  }, [notasAlvo, turnoMaiorFadiga]);
+    return { macro, micro: vencedoraTaxa(bucketsMicro) };
+  }, [statusFiltro, notasAlvo, notasFiltradas, turnoMaiorFadiga, codigoFiltro]);
 
   const janelaImprodutivaMacro = janelasImprodutivas.macro;
   const janelaImprodutivaMicro = janelasImprodutivas.micro;
@@ -948,37 +1086,92 @@ export function AnaliseComportamento() {
     return melhor ? { motivo: melhor, quantidade } : null;
   }, [notasAlvo, dicionario]);
 
-  /** Card 3: dia com mais ocorrências em notasAlvo. */
+  /** Card 3: volume (produtivo) ou taxa de reprovação do dia (improdutivo). */
   const diaMaisCritico = useMemo(() => {
-    if (!notasAlvo.length) return null;
+    if (statusFiltro === "PRODUTIVO") {
+      if (!notasAlvo.length) return null;
+      const counts = new Map<number, number>();
+      for (const row of notasAlvo) {
+        const dow = diaDaSemanaFromIso(row.data_toa);
+        if (dow == null || dow === 0) continue;
+        counts.set(dow, (counts.get(dow) ?? 0) + 1);
+      }
+      let bestDow: number | null = null;
+      let bestQtd = 0;
+      for (const [dow, qtd] of counts) {
+        if (
+          qtd > bestQtd ||
+          (qtd === bestQtd && bestDow != null && dow < bestDow)
+        ) {
+          bestDow = dow;
+          bestQtd = qtd;
+        } else if (bestDow == null && qtd > 0) {
+          bestDow = dow;
+          bestQtd = qtd;
+        }
+      }
+      if (bestDow == null || bestQtd === 0) return null;
+      const meta = DIAS_UTEIS.find((d) => d.dow === bestDow);
+      return {
+        dia: meta?.label ?? "—",
+        quantidade: bestQtd,
+        totalBucket: totalNotasAlvo,
+        pct: totalNotasAlvo > 0 ? (bestQtd / totalNotasAlvo) * 100 : 0,
+      };
+    }
 
-    const counts = new Map<number, number>();
-    for (const row of notasAlvo) {
-      const dow = diaDaSemanaFromIso(row.data_toa);
+    const buckets = new Map<
+      number,
+      { quebras: number; total: number }
+    >();
+    for (const nota of notasFiltradas) {
+      const dow = diaDaSemanaFromIso(nota.data_toa);
       if (dow == null || dow === 0) continue;
-      counts.set(dow, (counts.get(dow) ?? 0) + 1);
+      let b = buckets.get(dow);
+      if (!b) {
+        b = { quebras: 0, total: 0 };
+        buckets.set(dow, b);
+      }
+      b.total += 1;
+      if (isQuebraCard(nota)) b.quebras += 1;
     }
 
     let bestDow: number | null = null;
-    let bestQtd = 0;
-    for (const [dow, qtd] of counts) {
-      if (qtd > bestQtd || (qtd === bestQtd && bestDow != null && dow < bestDow)) {
+    let bestQuebras = 0;
+    let bestTotal = 0;
+    let bestTaxa = -1;
+    for (const [dow, b] of buckets) {
+      if (b.total === 0) continue;
+      const taxa = (b.quebras / b.total) * 100;
+      if (
+        taxa > bestTaxa ||
+        (taxa === bestTaxa && b.quebras > bestQuebras) ||
+        (taxa === bestTaxa &&
+          b.quebras === bestQuebras &&
+          bestDow != null &&
+          dow < bestDow)
+      ) {
         bestDow = dow;
-        bestQtd = qtd;
-      } else if (bestDow == null && qtd > 0) {
-        bestDow = dow;
-        bestQtd = qtd;
+        bestQuebras = b.quebras;
+        bestTotal = b.total;
+        bestTaxa = taxa;
       }
     }
-    if (bestDow == null || bestQtd === 0) return null;
-
+    if (bestDow == null || bestTaxa < 0) return null;
     const meta = DIAS_UTEIS.find((d) => d.dow === bestDow);
     return {
       dia: meta?.label ?? "—",
-      quantidade: bestQtd,
-      pct: (bestQtd / totalNotasAlvo) * 100,
+      quantidade: bestQuebras,
+      totalBucket: bestTotal,
+      pct: bestTaxa,
     };
-  }, [notasAlvo, totalNotasAlvo]);
+  }, [
+    statusFiltro,
+    notasAlvo,
+    totalNotasAlvo,
+    notasFiltradas,
+    codigoFiltro,
+  ]);
 
   const rankingUsoCodigo = useMemo((): RankingUsoCodigo[] => {
     if (!codigoAlvo) return [];
@@ -1143,19 +1336,23 @@ export function AnaliseComportamento() {
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
-  /** Aba Janela: todas as combinações janela×código (sem filtro de Código). */
+  /** Aba Janela: combinações janela×código (sem filtro de Código). */
   const rankingPorJanela = useMemo((): JanelaImprodutivaAgg[] => {
-    if (!notasStatusGlobais.length) return [];
-
+    const totalPorJanela = new Map<string, number>();
     const counts = new Map<
       string,
       { janela: string; codigo: string; quantidade: number }
     >();
+    let totalStatus = 0;
 
-    for (const row of notasStatusGlobais) {
+    for (const row of rowsFiltradas) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
       const janela = janelaMacroDaHora(horaBaixaDaRow(row));
+      totalPorJanela.set(janela, (totalPorJanela.get(janela) ?? 0) + 1);
+
+      if (statusContratoDoCodigo(codigo, dicionario) !== statusFiltro) continue;
+      totalStatus += 1;
       const chave = `${janela}|${codigo}`;
       const atual = counts.get(chave);
       if (atual) {
@@ -1165,10 +1362,15 @@ export function AnaliseComportamento() {
       }
     }
 
-    const totalBase = notasStatusGlobais.length;
+    if (counts.size === 0) return [];
 
-    return [...counts.values()]
-      .map((item) => ({
+    const isImprodutivo = statusFiltro === "IMPRODUTIVO";
+
+    const resultado = [...counts.values()].map((item) => {
+      const denom = isImprodutivo
+        ? (totalPorJanela.get(item.janela) ?? 0)
+        : totalStatus;
+      return {
         janela: item.janela,
         codigoVencedor: item.codigo,
         descricaoVencedor: descricaoDoCodigoBaixa(item.codigo, dicionario),
@@ -1176,16 +1378,26 @@ export function AnaliseComportamento() {
           motivoQuebraDoCodigo(item.codigo, dicionario)?.trim() ||
           "Não classificado",
         quantidadeJanela: item.quantidade,
-        representaPct:
-          totalBase > 0 ? (item.quantidade / totalBase) * 100 : 0,
-      }))
-      .sort(
-        (a, b) =>
+        representaPct: denom > 0 ? (item.quantidade / denom) * 100 : 0,
+      };
+    });
+
+    return resultado.sort((a, b) => {
+      if (isImprodutivo) {
+        return (
+          b.representaPct - a.representaPct ||
           b.quantidadeJanela - a.quantidadeJanela ||
           a.janela.localeCompare(b.janela, "pt-BR") ||
-          Number(a.codigoVencedor) - Number(b.codigoVencedor),
+          Number(a.codigoVencedor) - Number(b.codigoVencedor)
+        );
+      }
+      return (
+        b.quantidadeJanela - a.quantidadeJanela ||
+        a.janela.localeCompare(b.janela, "pt-BR") ||
+        Number(a.codigoVencedor) - Number(b.codigoVencedor)
       );
-  }, [notasStatusGlobais, dicionario]);
+    });
+  }, [rowsFiltradas, dicionario, statusFiltro]);
 
   /** Aba Todos os códigos: volumetria improdutiva (espelha /codigos-baixa). */
   const todosCodigosBaixa = useMemo(
@@ -1835,8 +2047,12 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMacro
-                    ? `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMacro.quantidade)}`
-                    : `maior volume de ${labelVolumeCurto}`}
+                    ? isModoImprodutivo
+                      ? `maior índice de quebras - ${formatQuantidade(janelaImprodutivaMacro.quantidade)} de ${formatQuantidade(janelaImprodutivaMacro.totalBucket)} (${formatPct(janelaImprodutivaMacro.taxa)})`
+                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMacro.quantidade)}`
+                    : isModoImprodutivo
+                      ? "maior índice de quebras"
+                      : `maior volume de ${labelVolumeCurto}`}
                 </p>
               </div>
             </div>
@@ -1860,8 +2076,12 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMicro
-                    ? `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMicro.quantidade)}`
-                    : `maior volume de ${labelVolumeCurto}`}
+                    ? isModoImprodutivo
+                      ? `maior índice de quebras - ${formatQuantidade(janelaImprodutivaMicro.quantidade)} de ${formatQuantidade(janelaImprodutivaMicro.totalBucket)} (${formatPct(janelaImprodutivaMicro.taxa)})`
+                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMicro.quantidade)}`
+                    : isModoImprodutivo
+                      ? "maior índice de quebras"
+                      : `maior volume de ${labelVolumeCurto}`}
                 </p>
               </div>
             </div>
@@ -1881,7 +2101,9 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {diaMaisCritico
-                    ? `${formatPct(diaMaisCritico.pct)} de ${labelDiaPct} - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(totalNotasAlvo)}`
+                    ? isModoImprodutivo
+                      ? `${formatPct(diaMaisCritico.pct)} de reprovação - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(diaMaisCritico.totalBucket)}`
+                      : `${formatPct(diaMaisCritico.pct)} de ${labelDiaPct} - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(totalNotasAlvo)}`
                     : "Sem dados no período"}
                 </p>
               </div>
@@ -1906,7 +2128,9 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {turnoMaiorFadiga
-                    ? `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalNotasAlvo)}`
+                    ? isModoImprodutivo
+                      ? `${formatPct(turnoMaiorFadiga.taxa)} de reprovação - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(turnoMaiorFadiga.totalBucket)}`
+                      : `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalNotasAlvo)}`
                     : "Sem horário de início-fim"}
                 </p>
               </div>
@@ -2523,7 +2747,7 @@ export function AnaliseComportamento() {
                           {labelColunaTipo}
                         </th>
                         <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
-                          Representa
+                          {isModoImprodutivo ? "% de Reprovação" : "Representa"}
                         </th>
                       </tr>
                     </thead>
