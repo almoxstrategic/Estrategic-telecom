@@ -559,6 +559,7 @@ export function AnaliseComportamento() {
     for (const row of rows) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
+      if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
       if (map.has(codigo)) continue;
       const desc = descricaoDoCodigoBaixa(codigo, dicionario);
       map.set(codigo, `${codigo} - ${desc}`);
