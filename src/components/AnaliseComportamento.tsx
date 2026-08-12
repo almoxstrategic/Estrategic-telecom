@@ -135,13 +135,13 @@ const ABAS_PAINEL_INFERIOR: ReadonlyArray<{
 
 type JanelaImprodutivaAgg = {
   janela: string;
-  dia: string;
-  diaDow: number;
-  turno: Turno;
   codigoVencedor: string;
   descricaoVencedor: string;
   tipoVencedor: string;
+  /** Quebras (improdutivo) ou notas do status (produtivo) na janela. */
   quantidadeJanela: number;
+  /** Denominador: total de notas na janela (improd.) ou total alvo (prod.). */
+  totalBucket: number;
   representaPct: number;
 };
 
@@ -351,6 +351,124 @@ function formatarJanelaHorario(
   return partes
     .map((parte) => (parte.endsWith("h") || parte.endsWith("H") ? parte : `${parte}h`))
     .join(" - ");
+}
+
+function codigoDominanteNoMap(codigos: Map<string, number>): string {
+  let melhor = "";
+  let melhorQtd = 0;
+  for (const [codigo, qtd] of codigos) {
+    if (
+      qtd > melhorQtd ||
+      (qtd === melhorQtd &&
+        (melhor === "" ||
+          Number(codigo) - Number(melhor) < 0 ||
+          (Number(codigo) === Number(melhor) &&
+            codigo.localeCompare(melhor, "pt-BR") < 0)))
+    ) {
+      melhor = codigo;
+      melhorQtd = qtd;
+    }
+  }
+  return melhor || "—";
+}
+
+/**
+ * Ranking consolidado por janela MACRO (4h), mesma matemática do card Macro:
+ * - PRODUTIVO: volume da janela / total de notas produtivas (alvo)
+ * - IMPRODUTIVO: quebras da janela / total de notas da janela
+ * Ordenado do maior percentual para o menor.
+ */
+function agregarRankingJanelasMacro(params: {
+  statusFiltro: StatusContratoFiltro;
+  notasAlvo: ToaImportacaoRow[];
+  notasFiltradas: ToaImportacaoRow[];
+  dicionario: DicionarioCodigosBaixaMap;
+  isQuebra: (nota: ToaImportacaoRow) => boolean;
+}): JanelaImprodutivaAgg[] {
+  const { statusFiltro, notasAlvo, notasFiltradas, dicionario, isQuebra } =
+    params;
+  const isImprodutivo = statusFiltro === "IMPRODUTIVO";
+
+  type Bucket = {
+    quantidade: number;
+    total: number;
+    codigos: Map<string, number>;
+  };
+  const buckets = new Map<string, Bucket>();
+
+  if (isImprodutivo) {
+    for (const nota of notasFiltradas) {
+      const janela = janelaMacroDaHora(horaBaixaDaRow(nota));
+      let b = buckets.get(janela);
+      if (!b) {
+        b = { quantidade: 0, total: 0, codigos: new Map() };
+        buckets.set(janela, b);
+      }
+      b.total += 1;
+      if (!isQuebra(nota)) continue;
+      b.quantidade += 1;
+      const codigo = normalizeCodigoBaixa(nota.cod_baixa);
+      if (codigo) b.codigos.set(codigo, (b.codigos.get(codigo) ?? 0) + 1);
+    }
+  } else {
+    const totalAlvo = notasAlvo.length;
+    if (totalAlvo === 0) return [];
+    for (const nota of notasAlvo) {
+      const janela = janelaMacroDaHora(horaBaixaDaRow(nota));
+      let b = buckets.get(janela);
+      if (!b) {
+        b = { quantidade: 0, total: totalAlvo, codigos: new Map() };
+        buckets.set(janela, b);
+      }
+      b.quantidade += 1;
+      const codigo = normalizeCodigoBaixa(nota.cod_baixa);
+      if (codigo) b.codigos.set(codigo, (b.codigos.get(codigo) ?? 0) + 1);
+    }
+  }
+
+  const resultado: JanelaImprodutivaAgg[] = [];
+  for (const [janela, b] of buckets) {
+    if (isImprodutivo && b.total === 0) continue;
+    if (!isImprodutivo && b.quantidade === 0) continue;
+    const codigoVencedor = codigoDominanteNoMap(b.codigos);
+    const representaPct = isImprodutivo
+      ? b.total > 0
+        ? (b.quantidade / b.total) * 100
+        : 0
+      : b.total > 0
+        ? (b.quantidade / b.total) * 100
+        : 0;
+    resultado.push({
+      janela,
+      codigoVencedor,
+      descricaoVencedor:
+        codigoVencedor === "—"
+          ? "—"
+          : descricaoDoCodigoBaixa(codigoVencedor, dicionario),
+      tipoVencedor:
+        codigoVencedor === "—"
+          ? "—"
+          : motivoQuebraDoCodigo(codigoVencedor, dicionario)?.trim() ||
+            "Não classificado",
+      quantidadeJanela: b.quantidade,
+      totalBucket: b.total,
+      representaPct,
+    });
+  }
+
+  return resultado.sort(
+    (a, b) =>
+      b.representaPct - a.representaPct ||
+      b.quantidadeJanela - a.quantidadeJanela ||
+      a.janela.localeCompare(b.janela, "pt-BR"),
+  );
+}
+
+function notaNoDiaLabel(row: ToaImportacaoRow, diaLabel: string): boolean {
+  const dow = diaDaSemanaFromIso(row.data_toa);
+  if (dow == null || dow === 0) return false;
+  const meta = DIAS_UTEIS.find((d) => d.dow === dow);
+  return meta?.label === diaLabel;
 }
 
 function nomeTecnicoRow(row: ToaImportacaoRow): string {
@@ -873,10 +991,31 @@ export function AnaliseComportamento() {
   };
 
   /**
-   * Cards 1–2: cascata Turno → Macro → Micro.
-   * Produtivo = volume; Improdutivo = taxa de reprovação na base mestre.
+   * Ranking + cards Macro/Micro: mesma base matemática.
+   * Macro = 1ª linha do ranking por janela 4h (sem fragmentar por dia/turno/código).
+   * Micro = melhor 1h dentro da macro vencedora.
    */
-  const janelasImprodutivas = useMemo(() => {
+  const analiseJanelasMacro = useMemo(() => {
+    const ranking = agregarRankingJanelasMacro({
+      statusFiltro,
+      notasAlvo,
+      notasFiltradas,
+      dicionario,
+      isQuebra: isQuebraCard,
+    });
+
+    const topo = ranking[0];
+    const macro: JanelaCardAgg | null = topo
+      ? {
+          janela: topo.janela,
+          quantidade: topo.quantidadeJanela,
+          totalBucket: topo.totalBucket,
+          taxa: topo.representaPct,
+        }
+      : null;
+
+    if (!macro) return { ranking, macro: null, micro: null };
+
     const vencedoraVolume = (
       counts: Map<string, number>,
     ): JanelaCardAgg | null => {
@@ -930,59 +1069,18 @@ export function AnaliseComportamento() {
     };
 
     if (statusFiltro === "PRODUTIVO") {
-      if (!notasAlvo.length) return { macro: null, micro: null };
-
-      const turnoVencedor = turnoMaiorFadiga?.turno;
-      const notasDoEscopo =
-        !turnoVencedor || turnoVencedor === "Empate"
-          ? notasAlvo
-          : notasAlvo.filter((row) => turnoDaRow(row) === turnoVencedor);
-      if (notasDoEscopo.length === 0) return { macro: null, micro: null };
-
-      const countsMacro = new Map<string, number>();
-      for (const row of notasDoEscopo) {
-        const macro = janelaMacroDaHora(horaBaixaDaRow(row));
-        countsMacro.set(macro, (countsMacro.get(macro) ?? 0) + 1);
-      }
-      const macro = vencedoraVolume(countsMacro);
-      if (!macro) return { macro: null, micro: null };
-
       const countsMicro = new Map<string, number>();
-      for (const row of notasDoEscopo) {
+      for (const row of notasAlvo) {
         const hora = horaBaixaDaRow(row);
         if (janelaMacroDaHora(hora) !== macro.janela) continue;
         const micro = janelaMicroDaHora(hora);
         countsMicro.set(micro, (countsMicro.get(micro) ?? 0) + 1);
       }
-      return { macro, micro: vencedoraVolume(countsMicro) };
+      return { ranking, macro, micro: vencedoraVolume(countsMicro) };
     }
-
-    if (!notasFiltradas.length) return { macro: null, micro: null };
-
-    const turnoVencedor = turnoMaiorFadiga?.turno;
-    const noEscopoTurno = (nota: ToaImportacaoRow) => {
-      if (!turnoVencedor || turnoVencedor === "Empate") return true;
-      return turnoDaRow(nota) === turnoVencedor;
-    };
-
-    const bucketsMacro = new Map<string, { quebras: number; total: number }>();
-    for (const nota of notasFiltradas) {
-      if (!noEscopoTurno(nota)) continue;
-      const macro = janelaMacroDaHora(horaBaixaDaRow(nota));
-      let b = bucketsMacro.get(macro);
-      if (!b) {
-        b = { quebras: 0, total: 0 };
-        bucketsMacro.set(macro, b);
-      }
-      b.total += 1;
-      if (isQuebraCard(nota)) b.quebras += 1;
-    }
-    const macro = vencedoraTaxa(bucketsMacro);
-    if (!macro) return { macro: null, micro: null };
 
     const bucketsMicro = new Map<string, { quebras: number; total: number }>();
     for (const nota of notasFiltradas) {
-      if (!noEscopoTurno(nota)) continue;
       const hora = horaBaixaDaRow(nota);
       if (janelaMacroDaHora(hora) !== macro.janela) continue;
       const micro = janelaMicroDaHora(hora);
@@ -995,11 +1093,12 @@ export function AnaliseComportamento() {
       if (isQuebraCard(nota)) b.quebras += 1;
     }
 
-    return { macro, micro: vencedoraTaxa(bucketsMicro) };
-  }, [statusFiltro, notasAlvo, notasFiltradas, turnoMaiorFadiga, codigoFiltro]);
+    return { ranking, macro, micro: vencedoraTaxa(bucketsMicro) };
+  }, [statusFiltro, notasAlvo, notasFiltradas, dicionario, codigoFiltro]);
 
-  const janelaImprodutivaMacro = janelasImprodutivas.macro;
-  const janelaImprodutivaMicro = janelasImprodutivas.micro;
+  const rankingPorJanelaBase = analiseJanelasMacro.ranking;
+  const janelaImprodutivaMacro = analiseJanelasMacro.macro;
+  const janelaImprodutivaMicro = analiseJanelasMacro.micro;
 
   const codOfensor = useMemo(() => {
     const counts = new Map<string, number>();
@@ -1345,130 +1444,57 @@ export function AnaliseComportamento() {
       .slice(0, 50);
   }, [tecnicoFiltro, rowsFiltradas, dicionario, statusFiltro]);
 
-  /** Aba Janela: chave Horário + Dia + Turno + Código (sem filtro global de Código). */
-  const rankingPorJanelaBase = useMemo((): JanelaImprodutivaAgg[] => {
-    type Bucket = { quebras: number; total: number };
-    const totalPorContexto = new Map<string, Bucket>();
-    const counts = new Map<
-      string,
-      {
-        janela: string;
-        diaDow: number;
-        dia: string;
-        turno: Turno;
-        codigo: string;
-        quantidade: number;
-      }
-    >();
-    let totalStatus = 0;
-
-    for (const row of rowsFiltradas) {
-      const codigo = normalizeCodigoBaixa(row.cod_baixa);
-      if (!codigo) continue;
-      const dow = diaDaSemanaFromIso(row.data_toa);
-      if (dow == null || dow === 0) continue;
-      const diaMeta = DIAS_UTEIS.find((d) => d.dow === dow);
-      if (!diaMeta) continue;
-
-      const hora = horaBaixaDaRow(row);
-      const janela = janelaMacroDaHora(hora);
-      const turno = turnoDaRow(row);
-      const chaveContexto = `${janela}|${dow}|${turno}`;
-
-      let bucket = totalPorContexto.get(chaveContexto);
-      if (!bucket) {
-        bucket = { quebras: 0, total: 0 };
-        totalPorContexto.set(chaveContexto, bucket);
-      }
-      bucket.total += 1;
-
-      if (statusContratoDoCodigo(codigo, dicionario) !== statusFiltro) continue;
-      bucket.quebras += 1;
-      totalStatus += 1;
-
-      const chave = `${chaveContexto}|${codigo}`;
-      const atual = counts.get(chave);
-      if (atual) {
-        atual.quantidade += 1;
-      } else {
-        counts.set(chave, {
-          janela,
-          diaDow: dow,
-          dia: diaMeta.label,
-          turno,
-          codigo,
-          quantidade: 1,
-        });
-      }
-    }
-
-    if (counts.size === 0) return [];
-
-    const isImprodutivo = statusFiltro === "IMPRODUTIVO";
-
-    const resultado = [...counts.values()].map((item) => {
-      const chaveContexto = `${item.janela}|${item.diaDow}|${item.turno}`;
-      const denom = isImprodutivo
-        ? (totalPorContexto.get(chaveContexto)?.total ?? 0)
-        : totalStatus;
-      return {
-        janela: item.janela,
-        dia: item.dia,
-        diaDow: item.diaDow,
-        turno: item.turno,
-        codigoVencedor: item.codigo,
-        descricaoVencedor: descricaoDoCodigoBaixa(item.codigo, dicionario),
-        tipoVencedor:
-          motivoQuebraDoCodigo(item.codigo, dicionario)?.trim() ||
-          "Não classificado",
-        quantidadeJanela: item.quantidade,
-        representaPct: denom > 0 ? (item.quantidade / denom) * 100 : 0,
-      };
+  /** Aba Janela: filtros locais (Dia recalcula a agregação macro; Janela/Código filtram linhas). */
+  const rankingPorJanelaFiltradoBase = useMemo((): JanelaImprodutivaAgg[] => {
+    if (filtroDia === "Todos") return rankingPorJanelaBase;
+    const notasAlvoDia = notasAlvo.filter((row) =>
+      notaNoDiaLabel(row, filtroDia),
+    );
+    const notasFiltradasDia = notasFiltradas.filter((row) =>
+      notaNoDiaLabel(row, filtroDia),
+    );
+    return agregarRankingJanelasMacro({
+      statusFiltro,
+      notasAlvo: notasAlvoDia,
+      notasFiltradas: notasFiltradasDia,
+      dicionario,
+      isQuebra: isQuebraCard,
     });
-
-    return resultado.sort((a, b) => {
-      if (isImprodutivo) {
-        return (
-          b.representaPct - a.representaPct ||
-          b.quantidadeJanela - a.quantidadeJanela ||
-          a.janela.localeCompare(b.janela, "pt-BR") ||
-          a.diaDow - b.diaDow ||
-          a.turno.localeCompare(b.turno, "pt-BR") ||
-          Number(a.codigoVencedor) - Number(b.codigoVencedor)
-        );
-      }
-      return (
-        b.quantidadeJanela - a.quantidadeJanela ||
-        a.janela.localeCompare(b.janela, "pt-BR") ||
-        a.diaDow - b.diaDow ||
-        a.turno.localeCompare(b.turno, "pt-BR") ||
-        Number(a.codigoVencedor) - Number(b.codigoVencedor)
-      );
-    });
-  }, [rowsFiltradas, dicionario, statusFiltro]);
+  }, [
+    rankingPorJanelaBase,
+    filtroDia,
+    notasAlvo,
+    notasFiltradas,
+    statusFiltro,
+    dicionario,
+    codigoFiltro,
+  ]);
 
   const opcoesFiltroJanelaAba = useMemo(() => {
-    const set = new Set(rankingPorJanelaBase.map((r) => r.janela));
+    const set = new Set(rankingPorJanelaFiltradoBase.map((r) => r.janela));
     return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [rankingPorJanelaBase]);
+  }, [rankingPorJanelaFiltradoBase]);
 
   const opcoesFiltroCodBaixaAba = useMemo(() => {
-    const set = new Set(rankingPorJanelaBase.map((r) => r.codigoVencedor));
+    const set = new Set(
+      rankingPorJanelaFiltradoBase
+        .map((r) => r.codigoVencedor)
+        .filter((c) => c && c !== "—"),
+    );
     return [...set].sort(
       (a, b) => Number(a) - Number(b) || a.localeCompare(b, "pt-BR"),
     );
-  }, [rankingPorJanelaBase]);
+  }, [rankingPorJanelaFiltradoBase]);
 
   const rankingPorJanela = useMemo(() => {
-    return rankingPorJanelaBase.filter((row) => {
+    return rankingPorJanelaFiltradoBase.filter((row) => {
       if (filtroJanela !== "Todos" && row.janela !== filtroJanela) return false;
-      if (filtroDia !== "Todos" && row.dia !== filtroDia) return false;
       if (filtroCodBaixa !== "Todos" && row.codigoVencedor !== filtroCodBaixa) {
         return false;
       }
       return true;
     });
-  }, [rankingPorJanelaBase, filtroJanela, filtroDia, filtroCodBaixa]);
+  }, [rankingPorJanelaFiltradoBase, filtroJanela, filtroCodBaixa]);
 
   useEffect(() => {
     setFiltroJanela("Todos");
@@ -3018,17 +3044,11 @@ export function AnaliseComportamento() {
                   </p>
                 ) : (
                   <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
-                    <table className="w-full min-w-[56rem] text-sm">
+                    <table className="w-full min-w-[48rem] text-sm">
                       <thead>
                         <tr className="border-b border-border text-left text-muted-foreground">
                           <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
                             Horário (macro)
-                          </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                            Dia
-                          </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                            Turno
                           </th>
                           <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
                             Cód. Baixa
@@ -3040,6 +3060,9 @@ export function AnaliseComportamento() {
                             {labelColunaTipo}
                           </th>
                           <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
+                            Quantidade
+                          </th>
+                          <th className="sticky top-0 z-10 bg-white px-3 py-2 text-right font-semibold shadow-sm">
                             {isModoImprodutivo
                               ? "% de Reprovação"
                               : "Representa"}
@@ -3049,17 +3072,11 @@ export function AnaliseComportamento() {
                       <tbody>
                         {rankingPorJanela.map((row) => (
                           <tr
-                            key={`${row.janela}|${row.diaDow}|${row.turno}|${row.codigoVencedor}`}
+                            key={row.janela}
                             className="border-b border-border/60 last:border-b-0"
                           >
                             <td className="px-3 py-2 font-medium tabular-nums text-gray-900">
                               {formatarJanelaHorario(row.janela)}
-                            </td>
-                            <td className="px-3 py-2 text-gray-700">
-                              {row.dia}
-                            </td>
-                            <td className="px-3 py-2 text-gray-700">
-                              {row.turno}
                             </td>
                             <td
                               className={`px-3 py-2 font-medium tabular-nums ${corDestaque}`}
@@ -3071,6 +3088,11 @@ export function AnaliseComportamento() {
                             </td>
                             <td className="px-3 py-2 text-gray-700">
                               {row.tipoVencedor}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+                              {isModoImprodutivo
+                                ? `${formatQuantidade(row.quantidadeJanela)} / ${formatQuantidade(row.totalBucket)}`
+                                : formatQuantidade(row.quantidadeJanela)}
                             </td>
                             <td
                               className={`px-3 py-2 text-right text-sm tabular-nums font-medium ${
