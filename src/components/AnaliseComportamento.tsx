@@ -116,12 +116,17 @@ type RankingUsoCodigo = {
   porDia: Record<number, RankingUsoCodigoDia>;
 };
 
-type AbaPainelInferior = "ranking" | "janela" | "todos-codigos";
+type AbaPainelInferior =
+  | "rank-geral"
+  | "ranking"
+  | "janela"
+  | "todos-codigos";
 
 const ABAS_PAINEL_INFERIOR: ReadonlyArray<{
   id: AbaPainelInferior;
   label: string;
 }> = [
+  { id: "rank-geral", label: "Rank Geral" },
   { id: "ranking", label: "Ranking de Uso" },
   { id: "janela", label: "Janela Improdutiva" },
   { id: "todos-codigos", label: "Todos os códigos de baixa" },
@@ -174,9 +179,24 @@ type OrdemMatrizState = {
   direcao: OrdemDirecao;
 };
 
+type OrdemRankGeralState = {
+  coluna:
+    | "produtivasGeral"
+    | "quebrasGeral"
+    | "aproveitamento"
+    | "reprovacao"
+    | number;
+  direcao: OrdemDirecao;
+};
+
 type DiaCelulaSemana = {
   aproveitamento: number | null;
   piorJanela: string | null;
+};
+
+type DiaCelulaRankGeral = {
+  pct: number | null;
+  janela: string | null;
 };
 
 type TecnicoSemanaMatrizAgg = {
@@ -184,6 +204,15 @@ type TecnicoSemanaMatrizAgg = {
   produtivasTotal: number;
   aproveitamentoGeral: number;
   porDia: Record<number, DiaCelulaSemana>;
+};
+
+type RankGeralTecnicoAgg = {
+  nome: string;
+  produtivasGeral: number;
+  quebrasGeral: number;
+  aproveitamento: number;
+  reprovacao: number;
+  porDia: Record<number, DiaCelulaRankGeral>;
 };
 
 function mesLabel(mes: number): string {
@@ -367,15 +396,16 @@ function valorOrdenacaoComNulos(
   return valor;
 }
 
-function piorJanelaImprodutiva(
+function janelaDominantePorStatus(
   notas: ToaImportacaoRow[],
   dicionario: DicionarioCodigosBaixaMap,
+  status: StatusContratoFiltro,
 ): string | null {
   const counts = new Map<string, number>();
   for (const row of notas) {
     const codigo = normalizeCodigoBaixa(row.cod_baixa);
     if (!codigo) continue;
-    if (statusContratoDoCodigo(codigo, dicionario) !== "IMPRODUTIVO") continue;
+    if (statusContratoDoCodigo(codigo, dicionario) !== status) continue;
     const janela = janelaMacroDaHora(horaBaixaDaRow(row));
     counts.set(janela, (counts.get(janela) ?? 0) + 1);
   }
@@ -396,6 +426,13 @@ function piorJanelaImprodutiva(
     }
   }
   return melhor;
+}
+
+function piorJanelaImprodutiva(
+  notas: ToaImportacaoRow[],
+  dicionario: DicionarioCodigosBaixaMap,
+): string | null {
+  return janelaDominantePorStatus(notas, dicionario, "IMPRODUTIVO");
 }
 
 function piorJanelaDasNotas(notas: ToaImportacaoRow[]): string | null {
@@ -477,13 +514,17 @@ export function AnaliseComportamento() {
   const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
   const [modalTop10Aberto, setModalTop10Aberto] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState<AbaPainelInferior>("ranking");
+  const [abaAtiva, setAbaAtiva] = useState<AbaPainelInferior>("rank-geral");
   const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
     coluna: "produtivas",
     direcao: "desc",
   });
   const [ordemMatriz, setOrdemMatriz] = useState<OrdemMatrizState>({
     coluna: "produtivasTotal",
+    direcao: "desc",
+  });
+  const [ordemRankGeral, setOrdemRankGeral] = useState<OrdemRankGeralState>({
+    coluna: "produtivasGeral",
     direcao: "desc",
   });
 
@@ -1400,6 +1441,110 @@ export function AnaliseComportamento() {
     });
   }, [matrizTecnicosSemana, ordemMatriz]);
 
+  /** Rank Geral: volumetria cruzada + dias reativos ao Status. */
+  const rankGeralMatriz = useMemo((): RankGeralTecnicoAgg[] => {
+    type Acc = {
+      prod: number;
+      improd: number;
+      porDia: Map<
+        number,
+        { prod: number; improd: number; notasDia: ToaImportacaoRow[] }
+      >;
+    };
+    const porTecnico = new Map<string, Acc>();
+
+    for (const nota of notasFiltradas) {
+      const nome = nomeTecnicoRow(nota);
+      if (!nome || nome === "—") continue;
+      let acc = porTecnico.get(nome);
+      if (!acc) {
+        acc = { prod: 0, improd: 0, porDia: new Map() };
+        porTecnico.set(nome, acc);
+      }
+
+      if (nota.status_nota === "Produtiva") acc.prod += 1;
+      else acc.improd += 1;
+
+      const dow = diaDaSemanaFromIso(nota.data_toa);
+      if (dow == null || dow === 0) continue;
+
+      let diaAcc = acc.porDia.get(dow);
+      if (!diaAcc) {
+        diaAcc = { prod: 0, improd: 0, notasDia: [] };
+        acc.porDia.set(dow, diaAcc);
+      }
+      diaAcc.notasDia.push(nota);
+      if (nota.status_nota === "Produtiva") diaAcc.prod += 1;
+      else diaAcc.improd += 1;
+    }
+
+    const isImprod = statusFiltro === "IMPRODUTIVO";
+
+    return [...porTecnico.entries()].map(([nome, acc]) => {
+      const total = acc.prod + acc.improd;
+      const porDia: Record<number, DiaCelulaRankGeral> = {};
+      for (const d of DIAS_UTEIS) {
+        const diaAcc = acc.porDia.get(d.dow);
+        if (!diaAcc || diaAcc.prod + diaAcc.improd === 0) {
+          porDia[d.dow] = { pct: null, janela: null };
+          continue;
+        }
+        const totalDia = diaAcc.prod + diaAcc.improd;
+        porDia[d.dow] = {
+          pct: isImprod
+            ? (diaAcc.improd / totalDia) * 100
+            : (diaAcc.prod / totalDia) * 100,
+          janela: janelaDominantePorStatus(
+            diaAcc.notasDia,
+            dicionario,
+            statusFiltro,
+          ),
+        };
+      }
+      return {
+        nome,
+        produtivasGeral: acc.prod,
+        quebrasGeral: acc.improd,
+        aproveitamento: total > 0 ? (acc.prod / total) * 100 : 0,
+        reprovacao: total > 0 ? (acc.improd / total) * 100 : 0,
+        porDia,
+      };
+    });
+  }, [notasFiltradas, dicionario, statusFiltro]);
+
+  const rankGeralMatrizOrdenada = useMemo(() => {
+    const fator = ordemRankGeral.direcao === "asc" ? 1 : -1;
+    return [...rankGeralMatriz].sort((a, b) => {
+      let va: number;
+      let vb: number;
+      if (ordemRankGeral.coluna === "produtivasGeral") {
+        va = a.produtivasGeral;
+        vb = b.produtivasGeral;
+      } else if (ordemRankGeral.coluna === "quebrasGeral") {
+        va = a.quebrasGeral;
+        vb = b.quebrasGeral;
+      } else if (ordemRankGeral.coluna === "aproveitamento") {
+        va = a.aproveitamento;
+        vb = b.aproveitamento;
+      } else if (ordemRankGeral.coluna === "reprovacao") {
+        va = a.reprovacao;
+        vb = b.reprovacao;
+      } else {
+        const dow = ordemRankGeral.coluna;
+        va = valorOrdenacaoComNulos(
+          a.porDia[dow]?.pct,
+          ordemRankGeral.direcao,
+        );
+        vb = valorOrdenacaoComNulos(
+          b.porDia[dow]?.pct,
+          ordemRankGeral.direcao,
+        );
+      }
+      if (va !== vb) return (va - vb) * fator;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [rankGeralMatriz, ordemRankGeral]);
+
   const alternarOrdemDia = (
     coluna: OrdemDiaState["coluna"],
   ) => {
@@ -1414,6 +1559,14 @@ export function AnaliseComportamento() {
     coluna: OrdemMatrizState["coluna"],
   ) => {
     setOrdemMatriz((prev) =>
+      prev.coluna === coluna
+        ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
+        : { coluna, direcao: "desc" },
+    );
+  };
+
+  const alternarOrdemRankGeral = (coluna: OrdemRankGeralState["coluna"]) => {
+    setOrdemRankGeral((prev) =>
       prev.coluna === coluna
         ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
         : { coluna, direcao: "desc" },
@@ -2013,6 +2166,151 @@ export function AnaliseComportamento() {
                 ) : null}
               </div>
             </div>
+
+            {abaAtiva === "rank-geral" &&
+              (rankGeralMatrizOrdenada.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhum técnico com notas no período.
+                </p>
+              ) : (
+                <div className="relative max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-100">
+                  <table className="w-full min-w-[80rem] text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-muted-foreground">
+                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
+                          Técnico
+                        </th>
+                        <th
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          onClick={() =>
+                            alternarOrdemRankGeral("produtivasGeral")
+                          }
+                        >
+                          Produtivas (Geral)
+                          {setaOrdenacao(
+                            ordemRankGeral.coluna === "produtivasGeral",
+                            ordemRankGeral.direcao,
+                          )}
+                        </th>
+                        <th
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          onClick={() =>
+                            alternarOrdemRankGeral("quebrasGeral")
+                          }
+                        >
+                          Quebras (Geral)
+                          {setaOrdenacao(
+                            ordemRankGeral.coluna === "quebrasGeral",
+                            ordemRankGeral.direcao,
+                          )}
+                        </th>
+                        <th
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          onClick={() =>
+                            alternarOrdemRankGeral("aproveitamento")
+                          }
+                        >
+                          Aproveit.
+                          {setaOrdenacao(
+                            ordemRankGeral.coluna === "aproveitamento",
+                            ordemRankGeral.direcao,
+                          )}
+                        </th>
+                        <th
+                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
+                          onClick={() =>
+                            alternarOrdemRankGeral("reprovacao")
+                          }
+                        >
+                          Reprovação
+                          {setaOrdenacao(
+                            ordemRankGeral.coluna === "reprovacao",
+                            ordemRankGeral.direcao,
+                          )}
+                        </th>
+                        {DIAS_UTEIS.map((d) => (
+                          <th
+                            key={d.dow}
+                            className="sticky top-0 z-10 min-w-[110px] cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
+                            onClick={() => alternarOrdemRankGeral(d.dow)}
+                          >
+                            {d.curto}.
+                            {setaOrdenacao(
+                              ordemRankGeral.coluna === d.dow,
+                              ordemRankGeral.direcao,
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rankGeralMatrizOrdenada.map((tec) => (
+                        <tr
+                          key={tec.nome}
+                          className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/50"
+                          onClick={() => {
+                            setTecnicoFiltro(tec.nome);
+                            setAbaAtiva("ranking");
+                          }}
+                          title="Abrir raio-X deste técnico"
+                        >
+                          <td className="px-3 py-2 font-medium text-primary">
+                            {tec.nome}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                            {formatQuantidade(tec.produtivasGeral)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                            {formatQuantidade(tec.quebrasGeral)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                            {formatPct(tec.aproveitamento)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-red-600">
+                            {formatPct(tec.reprovacao)}
+                          </td>
+                          {DIAS_UTEIS.map((d) => {
+                            const cel = tec.porDia[d.dow];
+                            if (!cel || cel.pct == null) {
+                              return (
+                                <td
+                                  key={d.dow}
+                                  className="min-w-[110px] p-2 text-center align-middle text-muted-foreground"
+                                >
+                                  -
+                                </td>
+                              );
+                            }
+                            return (
+                              <td
+                                key={d.dow}
+                                className="min-w-[110px] p-2 text-center align-middle tabular-nums"
+                              >
+                                <div className="flex flex-col items-center justify-center">
+                                  <span
+                                    className={`text-sm font-medium ${
+                                      isModoImprodutivo
+                                        ? "text-red-600"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    {Math.round(cel.pct)}%
+                                  </span>
+                                  {cel.janela ? (
+                                    <span className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
+                                      ({formatarJanelaHorario(cel.janela)})
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
 
             {abaAtiva === "ranking" && (
               <>
