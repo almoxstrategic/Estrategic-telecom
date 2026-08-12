@@ -242,6 +242,19 @@ function formatHoraDeInicioFim(inicioFim: string | null | undefined): string {
   return `${String(match[1]).padStart(2, "0")}:${match[2]}`;
 }
 
+/** Formata janelas "15 - 18" / "14:45 - 15:45" → "15h - 18h" / "14:45h - 15:45h". */
+function formatarJanelaHorario(
+  janela: string | null | undefined,
+): string {
+  const s = String(janela ?? "").trim();
+  if (!s) return "—";
+  const partes = s.split(/\s*-\s*/).map((p) => p.trim()).filter(Boolean);
+  if (partes.length === 0) return "—";
+  return partes
+    .map((parte) => (parte.endsWith("h") || parte.endsWith("H") ? parte : `${parte}h`))
+    .join(" - ");
+}
+
 function nomeTecnicoRow(row: ToaImportacaoRow): string {
   const nome = row.nome_tecnico?.trim();
   if (nome) return nome;
@@ -1103,9 +1116,9 @@ export function AnaliseComportamento() {
   const tituloModalDia = useMemo(() => {
     if (modoDiaEspecifico && diaFiltroModal) {
       const dia = DIAS_UTEIS.find((d) => d.curto === diaFiltroModal);
-      return `Detalhamento · ${dia?.label ?? diaFiltroModal}`;
+      return `Detalhamento - Improdutiva · ${dia?.label ?? diaFiltroModal}`;
     }
-    return "Detalhamento · Matriz da semana";
+    return "Detalhamento - Improdutiva · Matriz da semana";
   }, [modoDiaEspecifico, diaFiltroModal]);
 
   const filtrosLimpos = ano === null && mes === null;
@@ -1279,7 +1292,9 @@ export function AnaliseComportamento() {
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
-                {janelaImprodutivaMacro?.janela ?? "—"}
+                {janelaImprodutivaMacro
+                  ? formatarJanelaHorario(janelaImprodutivaMacro.janela)
+                  : "—"}
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1296,7 +1311,9 @@ export function AnaliseComportamento() {
                 </span>
               </div>
               <div className="mt-3 text-base font-bold leading-snug text-red-600 sm:text-lg">
-                {janelaImprodutivaMicro?.janela ?? "—"}
+                {janelaImprodutivaMicro
+                  ? formatarJanelaHorario(janelaImprodutivaMicro.janela)
+                  : "—"}
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1999,7 +2016,7 @@ export function AnaliseComportamento() {
                                 </span>
                                 {cel.piorJanela ? (
                                   <span className="mt-0.5 block text-[11px] leading-tight text-red-600/80">
-                                    ({cel.piorJanela})
+                                    ({formatarJanelaHorario(cel.piorJanela)})
                                   </span>
                                 ) : null}
                               </td>
