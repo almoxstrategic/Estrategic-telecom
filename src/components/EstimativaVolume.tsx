@@ -10,6 +10,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  FiltroTipoAtividade,
+  filtrarPorTiposAtividade,
+} from "@/components/FiltroTipoAtividade";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -24,6 +28,7 @@ import {
   filtrarToaOsContabilizaveis,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
+import { extrairTiposAtividadeUnicos } from "@/lib/filtro-tipo-atividade";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import {
   fetchPrecosOs,
@@ -139,6 +144,9 @@ export function EstimativaVolume() {
   const [mes, setMes] = useState<number | null>(null);
   const [aumento, setAumento] = useState<number>(0);
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
+  const [tiposAtividadeFiltro, setTiposAtividadeFiltro] = useState<string[]>(
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -222,9 +230,25 @@ export function EstimativaVolume() {
     return [...set].sort((a, b) => a - b);
   }, [competencias, ano]);
 
+  const tiposAtividadeOpcoes = useMemo(
+    () => extrairTiposAtividadeUnicos(rows.map((row) => row.tipo_atividade)),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(
+    () =>
+      filtrarPorTiposAtividade(
+        rows,
+        tiposAtividadeOpcoes,
+        tiposAtividadeFiltro,
+        (row) => row.tipo_atividade,
+      ),
+    [rows, tiposAtividadeOpcoes, tiposAtividadeFiltro],
+  );
+
   const estimativa = useMemo(() => {
-    const kpis = agregarKpisToaFlat(rows);
-    const diasTrabalhados = datasUnicas(rows).size;
+    const kpis = agregarKpisToaFlat(rowsFiltradas);
+    const diasTrabalhados = datasUnicas(rowsFiltradas).size;
     const diasUteis =
       ano != null && mes != null ? contarDiasUteisMes(ano, mes) : 0;
 
@@ -246,7 +270,7 @@ export function EstimativaVolume() {
 
     const projecaoProdutiva = Math.round(prod.projecao);
     const receitaAtual = agregarChamadosToa(
-      regroupFlatRowsToChamados(rows),
+      regroupFlatRowsToChamados(rowsFiltradas),
       precosOs,
     ).receitaFaturadaTotal;
     const ticketMedio =
@@ -269,7 +293,7 @@ export function EstimativaVolume() {
       ticketMedio,
       valorEstimado,
     };
-  }, [rows, ano, mes, precosOs, aumento]);
+  }, [rowsFiltradas, ano, mes, precosOs, aumento]);
 
   const porTecnico = useMemo<TecnicoEstimativa[]>(() => {
     const diasUteis = estimativa.diasUteis;
@@ -282,7 +306,7 @@ export function EstimativaVolume() {
       }
     >();
 
-    for (const row of rows) {
+    for (const row of rowsFiltradas) {
       const login = normalizeToaLogin(row.login_tecnico);
       if (!login) continue;
       const bucket = porLogin.get(login) ?? {
@@ -346,7 +370,7 @@ export function EstimativaVolume() {
         b.estimativaProdutivas - a.estimativaProdutivas ||
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
-  }, [rows, estimativa.diasUteis]);
+  }, [rowsFiltradas, estimativa.diasUteis]);
 
   const chartData = useMemo(
     () => [
@@ -420,6 +444,14 @@ export function EstimativaVolume() {
             </SelectContent>
           </Select>
         </div>
+        <FiltroTipoAtividade
+          id="estimativa-tipo-atividade"
+          opcoesDisponiveis={tiposAtividadeOpcoes}
+          valoresSelecionados={tiposAtividadeFiltro}
+          onChange={setTiposAtividadeFiltro}
+          className="flex flex-col items-start gap-1.5"
+          labelClassName="text-xs text-muted-foreground"
+        />
         <div className="space-y-1.5">
           <Label
             htmlFor="estimativa-aumento"
@@ -464,6 +496,11 @@ export function EstimativaVolume() {
         <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
           Nenhum dado TOA para {mesLabel(mes!)}/{ano}. Importe a planilha em
           Administração → Importação.
+        </p>
+      ) : rowsFiltradas.length === 0 ? (
+        <p className="rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+          Nenhum tipo de atividade selecionado. Ajuste o filtro Tipo de
+          Atividade para visualizar a estimativa.
         </p>
       ) : (
         <>

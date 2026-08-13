@@ -27,7 +27,12 @@ import {
   YAxis,
 } from "recharts";
 import { FiltroCombobox } from "@/components/FiltroCombobox";
+import {
+  FiltroTipoAtividade,
+  filtrarPorTiposAtividade,
+} from "@/components/FiltroTipoAtividade";
 import type { KpiTopTecnico } from "@/lib/logistica-types";
+import { extrairTiposAtividadeUnicos } from "@/lib/filtro-tipo-atividade";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import type { PrecoOs, PrecosOsMap } from "@/lib/precos-os-service";
 import {
@@ -767,6 +772,9 @@ function KpiDesempenhoProjecaoToa({
   const [diaModal, setDiaModal] = useState<number | null>(filtroPeriodo.dia);
   const [buscaWoContrato, setBuscaWoContrato] = useState("");
   const [filtroTipoOsModal, setFiltroTipoOsModal] = useState("Todos");
+  const [tiposAtividadeFiltro, setTiposAtividadeFiltro] = useState<string[]>(
+    [],
+  );
   const [filtroCodBaixaModal, setFiltroCodBaixaModal] = useState("Todos");
   const [filtroStatusModal, setFiltroStatusModal] = useState("Todos");
   /** Base TOA própria do modal (não herda o recorte global da página). */
@@ -883,22 +891,41 @@ function KpiDesempenhoProjecaoToa({
    * Contagem de Nota = WO única (não Contrato).
    * Cancelado/suspenso ficam no banco, mas fora do KPI.
    */
-  const chamadosToaPeriodo = useMemo(
+  const tiposAtividadeOpcoes = useMemo(
     () =>
-      dedupeChamadosPorNumeroWo(
-        filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
-      ).filter((c) => isStatusAtividadeContabilizavel(c.statusAtividade)),
-    [chamadosProcessados, filtroPeriodo],
+      extrairTiposAtividadeUnicos(toaOsRows.map((row) => row.tipo_atividade)),
+    [toaOsRows],
   );
 
+  const chamadosToaPeriodo = useMemo(() => {
+    const base = dedupeChamadosPorNumeroWo(
+      filtrarChamadosToa(chamadosProcessados, filtroPeriodo),
+    ).filter((c) => isStatusAtividadeContabilizavel(c.statusAtividade));
+    return filtrarPorTiposAtividade(
+      base,
+      tiposAtividadeOpcoes,
+      tiposAtividadeFiltro,
+      (c) => c.tipoAtividade,
+    );
+  }, [
+    chamadosProcessados,
+    filtroPeriodo,
+    tiposAtividadeOpcoes,
+    tiposAtividadeFiltro,
+  ]);
+
   /** Linhas flat (1 O.S.) no período — cards de volume usam status_* do banco. */
-  const toaOsPeriodo = useMemo(
-    () =>
-      filtrarToaOsContabilizaveis(
-        filtrarToaOsRows(toaOsRows, filtroPeriodo),
-      ),
-    [toaOsRows, filtroPeriodo],
-  );
+  const toaOsPeriodo = useMemo(() => {
+    const base = filtrarToaOsContabilizaveis(
+      filtrarToaOsRows(toaOsRows, filtroPeriodo),
+    );
+    return filtrarPorTiposAtividade(
+      base,
+      tiposAtividadeOpcoes,
+      tiposAtividadeFiltro,
+      (row) => row.tipo_atividade,
+    );
+  }, [toaOsRows, filtroPeriodo, tiposAtividadeOpcoes, tiposAtividadeFiltro]);
 
   /** Range dinâmico a partir das data_toa do dataset (ex.: "Junho 2026 - Agosto 2026"). */
   const rangePeriodoToa = useMemo(
@@ -2036,6 +2063,14 @@ function KpiDesempenhoProjecaoToa({
 
   return (
     <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <FiltroTipoAtividade
+          id="desempenho-tipo-atividade"
+          opcoesDisponiveis={tiposAtividadeOpcoes}
+          valoresSelecionados={tiposAtividadeFiltro}
+          onChange={setTiposAtividadeFiltro}
+        />
+      </div>
       {mostrarCardsAnaliticoEToa ? (
         <>
           <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm text-sky-900">
