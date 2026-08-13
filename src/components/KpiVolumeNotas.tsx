@@ -94,6 +94,8 @@ type ResumoCapacidade = {
   mediaSabado: number;
   /** Média de notas produtivas por dia com operação. */
   mediaNotasDia: number;
+  /** Soma reais + fantasma (só quando projeção ativa). */
+  projecaoTotalMes: number | null;
 };
 
 const DIAS_SEMANA_CURTO = [
@@ -129,6 +131,7 @@ function CustomXAxisTick({
   mostrarQuantTecnicos = false,
   valorNotas = 0,
   valorTecnicos = 0,
+  isProjecao = false,
 }: CustomXAxisTickProps & {
   modo: "dia" | "mes";
   diaSemana?: string;
@@ -136,8 +139,12 @@ function CustomXAxisTick({
   mostrarQuantTecnicos?: boolean;
   valorNotas?: number;
   valorTecnicos?: number;
+  /** Dia futuro com valores fantasma (cores de pendência). */
+  isProjecao?: boolean;
 }) {
   const labelPrincipal = String(payload?.value ?? "");
+  const corNotas = isProjecao ? "#ea580c" : "#16a34a";
+  const corTecnicos = isProjecao ? "#ca8a04" : "#f59e0b";
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -157,12 +164,18 @@ function CustomXAxisTick({
           </>
         )}
         {mostrarQuantDiaria && valorNotas > 0 ? (
-          <tspan x={0} dy={modo === "mes" ? 16 : 18} fill="#16a34a" fontSize={11} fontWeight={700}>
+          <tspan
+            x={0}
+            dy={modo === "mes" ? 16 : 18}
+            fill={corNotas}
+            fontSize={11}
+            fontWeight={700}
+          >
             {valorNotas}
           </tspan>
         ) : null}
         {mostrarQuantTecnicos && valorTecnicos > 0 ? (
-          <tspan x={0} dy={16} fill="#f59e0b" fontSize={11} fontWeight={700}>
+          <tspan x={0} dy={16} fill={corTecnicos} fontSize={11} fontWeight={700}>
             {valorTecnicos} Téc
           </tspan>
         ) : null}
@@ -243,6 +256,8 @@ function mediaArredondada(valores: number[]): number {
 function calcularResumoCapacidade(
   data: ChartPoint[],
   notas: NotaVolumeAgg[],
+  dataComProjecao?: ChartPoint[],
+  projecaoAtiva = false,
 ): ResumoCapacidade | null {
   if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
 
@@ -270,10 +285,21 @@ function calcularResumoCapacidade(
   const mediaNotasDia =
     qtdDias > 0 ? Math.round(totalNotas / qtdDias) : 0;
 
+  let projecaoTotalMes: number | null = null;
+  if (projecaoAtiva && dataComProjecao) {
+    const reais = dataComProjecao.reduce((acc, d) => acc + d.produtivas, 0);
+    const fantasma = dataComProjecao.reduce(
+      (acc, d) => acc + (Number(d.produtivas_fantasma) || 0),
+      0,
+    );
+    projecaoTotalMes = reais + fantasma;
+  }
+
   return {
     mediaSemana: tecnicosUteis.size,
     mediaSabado: tecnicosSabado.size,
     mediaNotasDia,
+    projecaoTotalMes,
   };
 }
 
@@ -727,9 +753,21 @@ export function KpiVolumeNotas() {
   const resumoCapacidade = useMemo(
     () =>
       serie.modo === "dia"
-        ? calcularResumoCapacidade(serieBase.data, notasFiltradas)
+        ? calcularResumoCapacidade(
+            serieBase.data,
+            notasFiltradas,
+            serie.data,
+            mostrarProjecao && podeProjetar,
+          )
         : null,
-    [serie.modo, serieBase.data, notasFiltradas],
+    [
+      serie.modo,
+      serie.data,
+      serieBase.data,
+      notasFiltradas,
+      mostrarProjecao,
+      podeProjetar,
+    ],
   );
 
   const tituloGraficoMes =
@@ -989,6 +1027,19 @@ export function KpiVolumeNotas() {
                       {formatQuantidade(resumoCapacidade.mediaNotasDia)} Notas
                       por dia
                     </span>
+                    {mostrarProjecao &&
+                    resumoCapacidade.projecaoTotalMes != null ? (
+                      <>
+                        <span className="text-gray-300" aria-hidden>
+                          |
+                        </span>
+                        <span className="text-orange-700">
+                          Projeção:{" "}
+                          {formatQuantidade(resumoCapacidade.projecaoTotalMes)}{" "}
+                          Notas para final do mês
+                        </span>
+                      </>
+                    ) : null}
                   </p>
                 ) : null}
               </div>
@@ -1048,6 +1099,15 @@ export function KpiVolumeNotas() {
                       tickMargin={12}
                       tick={(props: CustomXAxisTickProps) => {
                         const point = serie.data[props.index ?? 0];
+                        const isProjecao =
+                          serie.modo === "dia" &&
+                          (Number(point?.produtivas_fantasma) || 0) > 0;
+                        const valorNotas = isProjecao
+                          ? Number(point?.produtivas_fantasma) || 0
+                          : (point?.produtivas ?? 0);
+                        const valorTecnicos = isProjecao
+                          ? Number(point?.tecnicos_fantasma) || 0
+                          : (point?.qtd_tecnicos ?? 0);
                         return (
                           <CustomXAxisTick
                             {...props}
@@ -1055,8 +1115,9 @@ export function KpiVolumeNotas() {
                             diaSemana={point?.diaSemana}
                             mostrarQuantDiaria={mostrarQuantDiaria}
                             mostrarQuantTecnicos={mostrarQuantTecnicos}
-                            valorNotas={point?.produtivas ?? 0}
-                            valorTecnicos={point?.qtd_tecnicos ?? 0}
+                            valorNotas={valorNotas}
+                            valorTecnicos={valorTecnicos}
+                            isProjecao={isProjecao}
                           />
                         );
                       }}
