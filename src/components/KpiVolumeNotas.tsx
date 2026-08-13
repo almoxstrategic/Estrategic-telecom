@@ -30,7 +30,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -1382,18 +1381,36 @@ export function KpiVolumeNotas() {
               />
               Aplicar imediatamente ao filtro atual
             </label>
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsModalPadraoOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="button" onClick={salvarPadraoAtividades}>
-                Salvar Padrão
-              </Button>
-            </DialogFooter>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  className="text-sm text-gray-500 transition-colors hover:text-gray-800"
+                  onClick={() => setTiposPadraoDraft([])}
+                >
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-green-600 transition-colors hover:text-green-800"
+                  onClick={() => setTiposPadraoDraft([...tiposAtividadeOpcoes])}
+                >
+                  Todos
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsModalPadraoOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={salvarPadraoAtividades}>
+                  Salvar Padrão
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
