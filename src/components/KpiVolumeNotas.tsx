@@ -63,8 +63,6 @@ const MESES = [
   { value: 12, label: "Dezembro" },
 ] as const;
 
-type VisaoGrafico = "Geral" | "Produtivas" | "Improdutivas";
-
 type NotaVolumeAgg = {
   chave: string;
   dataIso: string;
@@ -86,12 +84,15 @@ type ChartPoint = {
   improdutivas: number;
   total: number;
   qtd_tecnicos: number;
+  /** Barras/linha cinza quando toggle Projeção está ativo. */
+  produtivas_fantasma?: number | null;
+  tecnicos_fantasma?: number | null;
 };
 
 type ResumoCapacidade = {
   mediaSemana: number;
   mediaSabado: number;
-  /** Média de notas/dia conforme filtro Visualizar. */
+  /** Média de notas produtivas por dia com operação. */
   mediaNotasDia: number;
 };
 
@@ -117,32 +118,36 @@ type CustomXAxisTickProps = {
   payload?: { value?: string | number };
 };
 
-/** Rótulo do eixo X em 2 linhas: dia (01) + dia da semana (Seg). */
+/** Rótulo do eixo X: dia + semana (+ qtd produtiva opcional). */
 function CustomXAxisTick({
   x = 0,
   y = 0,
   payload,
   diaSemana,
-}: CustomXAxisTickProps & { diaSemana?: string }) {
+  mostrarQuantDiaria = false,
+  valorReal = 0,
+}: CustomXAxisTickProps & {
+  diaSemana?: string;
+  mostrarQuantDiaria?: boolean;
+  valorReal?: number;
+}) {
   const dia = String(payload?.value ?? "").padStart(2, "0");
   const semana = diaSemana ?? "";
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        dy={20}
-        textAnchor="middle"
-        fill="#666"
-        fontSize={13}
-      >
-        <tspan x={0} dy={0} fontWeight={600}>
+      <text x={0} y={0} dy={20} textAnchor="middle" fontSize={13}>
+        <tspan x={0} dy={0} fill="#666" fontWeight={600}>
           {dia}
         </tspan>
-        <tspan x={0} dy={18} fill="#6b7280" fontSize={12}>
+        <tspan x={0} dy={16} fill="#666" fontSize={12}>
           {semana}
         </tspan>
+        {mostrarQuantDiaria && valorReal > 0 ? (
+          <tspan x={0} dy={18} fill="#16a34a" fontSize={11} fontWeight={700}>
+            {valorReal}
+          </tspan>
+        ) : null}
       </text>
     </g>
   );
@@ -214,21 +219,10 @@ function mediaArredondada(valores: number[]): number {
 }
 
 /**
- * Médias de headcount + média produtiva (notas/dia) na visão diária.
- * Seg–Sex / Sáb — só dias com pelo menos 1 técnico.
- * Média produtiva: volume do filtro Visualizar ÷ dias com operação.
+ * Médias de headcount + média produtiva (notas produtivas/dia) na visão diária.
  */
-function calcularResumoCapacidade(
-  data: ChartPoint[],
-  visao: VisaoGrafico,
-): ResumoCapacidade | null {
+function calcularResumoCapacidade(data: ChartPoint[]): ResumoCapacidade | null {
   if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
-
-  const volumeDoDia = (d: ChartPoint): number => {
-    if (visao === "Produtivas") return d.produtivas;
-    if (visao === "Improdutivas") return d.improdutivas;
-    return d.total;
-  };
 
   const comHeadcount = data.filter((d) => d.qtd_tecnicos > 0);
   const uteis = comHeadcount.filter(
@@ -236,8 +230,8 @@ function calcularResumoCapacidade(
   );
   const sabados = comHeadcount.filter((d) => d.diaJs === 6);
 
-  const diasComOperacao = data.filter((d) => volumeDoDia(d) > 0);
-  const totalNotas = data.reduce((acc, d) => acc + volumeDoDia(d), 0);
+  const diasComOperacao = data.filter((d) => d.produtivas > 0);
+  const totalNotas = data.reduce((acc, d) => acc + d.produtivas, 0);
   const qtdDias =
     diasComOperacao.length > 0 ? diasComOperacao.length : data.length;
   const mediaNotasDia =
@@ -248,6 +242,104 @@ function calcularResumoCapacidade(
     mediaSabado: mediaArredondada(sabados.map((d) => d.qtd_tecnicos)),
     mediaNotasDia,
   };
+}
+
+/**
+ * Médias históricas por dia da semana (0=Dom … 6=Sáb),
+ * a partir dos dias até o cutoff (inclui zeros de fins de semana).
+ * Fallback: média global do período se ainda não houver amostra daquele weekday.
+ */
+function calcularMediasPorDiaSemana(
+  historicoAteCutoff: ChartPoint[],
+): Record<number, { produtivas: number; tecnicos: number }> {
+  const buckets = new Map<number, { prod: number[]; tec: number[] }>();
+  for (const d of historicoAteCutoff) {
+    if (d.diaJs == null) continue;
+    const b = buckets.get(d.diaJs) ?? { prod: [], tec: [] };
+    b.prod.push(d.produtivas);
+    b.tec.push(d.qtd_tecnicos);
+    buckets.set(d.diaJs, b);
+  }
+
+  const mediaGlobalProd = mediaArredondada(
+    historicoAteCutoff.map((d) => d.produtivas),
+  );
+  const mediaGlobalTec = mediaArredondada(
+    historicoAteCutoff.map((d) => d.qtd_tecnicos),
+  );
+
+  const medias: Record<number, { produtivas: number; tecnicos: number }> = {};
+  for (let js = 0; js <= 6; js++) {
+    const b = buckets.get(js);
+    if (b && b.prod.length > 0) {
+      medias[js] = {
+        produtivas: mediaArredondada(b.prod),
+        tecnicos: mediaArredondada(b.tec),
+      };
+    } else {
+      medias[js] = {
+        produtivas: mediaGlobalProd,
+        tecnicos: mediaGlobalTec,
+      };
+    }
+  }
+  return medias;
+}
+
+/**
+ * Projeção só após o último dia com produção real, usando a média
+ * histórica do mesmo dia da semana (sazonalidade Dom/Sáb/úteis).
+ */
+function aplicarProjecaoMedia(
+  data: ChartPoint[],
+  modo: "dia" | "mes",
+  mostrarProjecao: boolean,
+): ChartPoint[] {
+  if (!mostrarProjecao || modo !== "dia" || data.length === 0) {
+    return data.map((d) => ({
+      ...d,
+      produtivas_fantasma: 0,
+      tecnicos_fantasma: null,
+    }));
+  }
+
+  const diasComProducao = data.filter((d) => d.produtivas > 0);
+  if (diasComProducao.length === 0) {
+    return data.map((d) => ({
+      ...d,
+      produtivas_fantasma: 0,
+      tecnicos_fantasma: null,
+    }));
+  }
+
+  /** Último dia operacional do mês (maior dia com produtivas > 0). */
+  const ultimoDiaComDados = Math.max(
+    ...diasComProducao.map((d) => Number(d.chave) || 0),
+  );
+
+  const historicoAteCutoff = data.filter(
+    (d) => (Number(d.chave) || 0) <= ultimoDiaComDados,
+  );
+  const mediasPorSemana = calcularMediasPorDiaSemana(historicoAteCutoff);
+
+  return data.map((d) => {
+    const diaNum = Number(d.chave) || 0;
+    const isFuturo = diaNum > ultimoDiaComDados;
+    const isAncora = diaNum === ultimoDiaComDados;
+    const js = d.diaJs ?? 0;
+    const mediaDia = mediasPorSemana[js] ?? { produtivas: 0, tecnicos: 0 };
+
+    return {
+      ...d,
+      produtivas_fantasma: isFuturo ? mediaDia.produtivas : 0,
+      // null no passado; âncora no último real; média do weekday no futuro.
+      tecnicos_fantasma: isFuturo
+        ? mediaDia.tecnicos
+        : isAncora
+          ? d.qtd_tecnicos
+          : null,
+    };
+  });
 }
 
 /**
@@ -467,7 +559,8 @@ export function KpiVolumeNotas() {
   const [ano, setAno] = useState<number | null>(null);
   const [mesesSelecionados, setMesesSelecionados] = useState<number[]>([]);
   const [mesesOpen, setMesesOpen] = useState(false);
-  const [visaoGrafico, setVisaoGrafico] = useState<VisaoGrafico>("Produtivas");
+  const [mostrarProjecao, setMostrarProjecao] = useState(false);
+  const [mostrarQuantDiaria, setMostrarQuantDiaria] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -569,17 +662,27 @@ export function KpiVolumeNotas() {
     };
   }, [notasFiltradas]);
 
-  const serie = useMemo(
+  const serieBase = useMemo(
     () => montarSerieChart(notasFiltradas),
     [notasFiltradas],
   );
 
+  const serie = useMemo(
+    () => ({
+      modo: serieBase.modo,
+      data: aplicarProjecaoMedia(
+        serieBase.data,
+        serieBase.modo,
+        mostrarProjecao,
+      ),
+    }),
+    [serieBase, mostrarProjecao],
+  );
+
   const resumoCapacidade = useMemo(
     () =>
-      serie.modo === "dia"
-        ? calcularResumoCapacidade(serie.data, visaoGrafico)
-        : null,
-    [serie, visaoGrafico],
+      serie.modo === "dia" ? calcularResumoCapacidade(serieBase.data) : null,
+    [serie.modo, serieBase.data],
   );
 
   const tituloGraficoMes =
@@ -643,7 +746,6 @@ export function KpiVolumeNotas() {
   const limparFiltros = () => {
     setAno(null);
     setMesesSelecionados([]);
-    setVisaoGrafico("Produtivas");
   };
 
   const toggleMes = (mes: number) => {
@@ -653,11 +755,6 @@ export function KpiVolumeNotas() {
         : [...prev, mes].sort((a, b) => a - b),
     );
   };
-
-  const mostrarProdutivas =
-    visaoGrafico === "Geral" || visaoGrafico === "Produtivas";
-  const mostrarImprodutivas =
-    visaoGrafico === "Geral" || visaoGrafico === "Improdutivas";
 
   return (
     <div className="space-y-6">
@@ -848,20 +945,25 @@ export function KpiVolumeNotas() {
                   </p>
                 ) : null}
               </div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                Visualizar:
-                <select
-                  value={visaoGrafico}
-                  onChange={(e) =>
-                    setVisaoGrafico(e.target.value as VisaoGrafico)
-                  }
-                  className="rounded-md border border-gray-300 bg-background px-2 py-1 text-sm text-foreground outline-none"
-                >
-                  <option value="Geral">Geral</option>
-                  <option value="Produtivas">Produtivas</option>
-                  <option value="Improdutivas">Improdutivas</option>
-                </select>
-              </label>
+              <div className="flex flex-wrap items-center justify-end gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                  <Checkbox
+                    checked={mostrarProjecao}
+                    onCheckedChange={(v) => setMostrarProjecao(v === true)}
+                    aria-label="Projeção (Bas. Média)"
+                  />
+                  <span className="font-medium">Projeção (Bas. Média)</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                  <Checkbox
+                    checked={mostrarQuantDiaria}
+                    onCheckedChange={(v) => setMostrarQuantDiaria(v === true)}
+                    aria-label="Quant. diária no dia"
+                    disabled={serie.modo !== "dia"}
+                  />
+                  <span className="font-medium">Quant. diária no dia</span>
+                </label>
+              </div>
             </div>
 
             {serie.data.length === 0 ? (
@@ -877,7 +979,12 @@ export function KpiVolumeNotas() {
                       top: 8,
                       right: 16,
                       left: 0,
-                      bottom: serie.modo === "dia" ? 48 : 8,
+                      bottom:
+                        serie.modo === "dia"
+                          ? mostrarQuantDiaria
+                            ? 64
+                            : 48
+                          : 8,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -893,6 +1000,8 @@ export function KpiVolumeNotas() {
                                 <CustomXAxisTick
                                   {...props}
                                   diaSemana={point?.diaSemana}
+                                  mostrarQuantDiaria={mostrarQuantDiaria}
+                                  valorReal={point?.produtivas ?? 0}
                                 />
                               );
                             }
@@ -908,7 +1017,9 @@ export function KpiVolumeNotas() {
                       }
                       height={
                         serie.modo === "dia"
-                          ? 70
+                          ? mostrarQuantDiaria
+                            ? 88
+                            : 70
                           : serie.data.length > 6
                             ? 70
                             : 30
@@ -934,12 +1045,16 @@ export function KpiVolumeNotas() {
                         const label =
                           name === "produtivas"
                             ? "Produtivas"
-                            : name === "improdutivas"
-                              ? "Improdutivas"
+                            : name === "produtivas_fantasma" ||
+                                name === "Projeção"
+                              ? "Projeção"
                               : name === "qtd_tecnicos" ||
                                   name === "Técnicos Operando"
                                 ? "Técnicos Operando"
-                                : name;
+                                : name === "tecnicos_fantasma" ||
+                                    name === "Projeção Técnicos"
+                                  ? "Projeção Técnicos"
+                                  : name;
                         return [formatQuantidade(value), label];
                       }}
                       labelFormatter={(label) => {
@@ -955,37 +1070,36 @@ export function KpiVolumeNotas() {
                       formatter={(value) =>
                         value === "produtivas"
                           ? "Produtivas"
-                          : value === "improdutivas"
-                            ? "Improdutivas"
+                          : value === "produtivas_fantasma"
+                            ? "Projeção"
                             : value === "qtd_tecnicos"
                               ? "Técnicos Operando"
-                              : value
+                              : value === "tecnicos_fantasma"
+                                ? "Projeção Técnicos"
+                                : value
                       }
                     />
-                    {mostrarProdutivas && (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="produtivas"
+                      name="produtivas"
+                      fill="#16a34a"
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={36}
+                      cursor={serie.modo === "mes" ? "pointer" : "default"}
+                      onClick={handleBarClick}
+                    />
+                    {mostrarProjecao && serie.modo === "dia" ? (
                       <Bar
                         yAxisId="left"
-                        dataKey="produtivas"
-                        name="produtivas"
-                        fill="#16a34a"
+                        dataKey="produtivas_fantasma"
+                        name="Projeção"
+                        fill="#d1d5db"
+                        opacity={0.6}
                         radius={[3, 3, 0, 0]}
                         maxBarSize={36}
-                        cursor={serie.modo === "mes" ? "pointer" : "default"}
-                        onClick={handleBarClick}
                       />
-                    )}
-                    {mostrarImprodutivas && (
-                      <Bar
-                        yAxisId="left"
-                        dataKey="improdutivas"
-                        name="improdutivas"
-                        fill="#ef4444"
-                        radius={[3, 3, 0, 0]}
-                        maxBarSize={36}
-                        cursor={serie.modo === "mes" ? "pointer" : "default"}
-                        onClick={handleBarClick}
-                      />
-                    )}
+                    ) : null}
                     <Line
                       yAxisId="right"
                       type="monotone"
@@ -996,6 +1110,20 @@ export function KpiVolumeNotas() {
                       dot={{ r: 3 }}
                       activeDot={{ r: 5 }}
                     />
+                    {mostrarProjecao && serie.modo === "dia" ? (
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="tecnicos_fantasma"
+                        name="Projeção Técnicos"
+                        stroke="#9ca3af"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        connectNulls={false}
+                        dot={{ r: 2 }}
+                        activeDot={{ r: 4 }}
+                      />
+                    ) : null}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
