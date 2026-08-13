@@ -259,38 +259,47 @@ function mediaArredondada(valores: number[]): number {
 }
 
 /**
- * Capacidade operacional média por dia (Seg–Sex / Sáb) + média produtiva.
- * Usa `qtd_tecnicos` dos pontos diários do gráfico (não headcount acumulado do mês).
+ * Headcount Seg–Sex (técnicos distintos no mês) + média de capacidade por sábado
+ * (únicos por data de sábado, depois média arredondada) + média produtiva.
  */
 function calcularResumoCapacidade(
   data: ChartPoint[],
+  notas: NotaVolumeAgg[],
   dataComProjecao?: ChartPoint[],
   projecaoAtiva = false,
 ): ResumoCapacidade | null {
   if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
 
-  const diasUteis = data.filter(
-    (d) =>
-      d.diaJs != null &&
-      d.diaJs >= 1 &&
-      d.diaJs <= 5 &&
-      d.produtivas > 0,
-  );
-  const sabados = data.filter(
-    (d) => d.diaJs === 6 && d.produtivas > 0,
-  );
+  const tecnicosUteis = new Set<string>();
+  const tecnicosPorSabado = new Map<string, Set<string>>();
 
-  const mediaSemana =
-    diasUteis.length > 0
+  for (const n of notas) {
+    const tecnico = n.tecnico?.trim();
+    if (!tecnico || tecnico === "Sem técnico") continue;
+    const iso = n.dataIso.slice(0, 10);
+    const [anoStr, mesStr, diaStr] = iso.split("-");
+    const ano = Number(anoStr);
+    const mes = Number(mesStr);
+    const dia = Number(diaStr);
+    if (!ano || !mes || !dia) continue;
+    const js = new Date(ano, mes - 1, dia).getDay();
+    if (js >= 1 && js <= 5) {
+      tecnicosUteis.add(tecnico);
+    } else if (js === 6) {
+      const set = tecnicosPorSabado.get(iso) ?? new Set<string>();
+      set.add(tecnico);
+      tecnicosPorSabado.set(iso, set);
+    }
+  }
+
+  const quantidadesSabado = Array.from(tecnicosPorSabado.values()).map(
+    (set) => set.size,
+  );
+  const mediaTecnicosSabado =
+    quantidadesSabado.length > 0
       ? Math.round(
-          diasUteis.reduce((acc, d) => acc + d.qtd_tecnicos, 0) /
-            diasUteis.length,
-        )
-      : 0;
-  const mediaSabado =
-    sabados.length > 0
-      ? Math.round(
-          sabados.reduce((acc, d) => acc + d.qtd_tecnicos, 0) / sabados.length,
+          quantidadesSabado.reduce((acc, val) => acc + val, 0) /
+            quantidadesSabado.length,
         )
       : 0;
 
@@ -312,8 +321,8 @@ function calcularResumoCapacidade(
   }
 
   return {
-    mediaSemana,
-    mediaSabado,
+    mediaSemana: tecnicosUteis.size,
+    mediaSabado: mediaTecnicosSabado,
     mediaNotasDia,
     projecaoTotalMes,
   };
@@ -798,6 +807,7 @@ export function KpiVolumeNotas() {
       serie.modo === "dia"
         ? calcularResumoCapacidade(
             serieBase.data,
+            notasFiltradas,
             serie.data,
             mostrarProjecao && podeProjetar,
           )
@@ -806,6 +816,7 @@ export function KpiVolumeNotas() {
       serie.modo,
       serie.data,
       serieBase.data,
+      notasFiltradas,
       mostrarProjecao,
       podeProjetar,
     ],
