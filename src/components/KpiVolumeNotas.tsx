@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   CalendarRange,
   Check,
+  CheckCheck,
   ChevronsUpDown,
   ClipboardCheck,
   FilterX,
+  Search,
+  Settings,
+  X,
   XCircle,
 } from "lucide-react";
 import {
@@ -22,6 +26,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -35,6 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useApp } from "@/lib/app-store";
 import {
   FATURAMENTO_HISTORICO_ATE,
   fetchAnaliticoHistorico,
@@ -47,6 +61,44 @@ import {
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
 import { normalizeNumeroWo, normalizeToaLogin } from "@/lib/toa-store";
+
+const FILTRO_ATIVIDADES_STORAGE_FALLBACK = "@app:filtro_atividades";
+const PADRAO_ATIVIDADES_STORAGE_FALLBACK = "@app:padrao_atividades";
+
+function filtroAtividadesStorageKey(userKey?: string | null): string {
+  const id = String(userKey ?? "").trim();
+  if (id) return `filtro_atividades_${id}`;
+  return FILTRO_ATIVIDADES_STORAGE_FALLBACK;
+}
+
+function padraoAtividadesStorageKey(userKey?: string | null): string {
+  const id = String(userKey ?? "").trim();
+  if (id) return `padrao_atividades_${id}`;
+  return PADRAO_ATIVIDADES_STORAGE_FALLBACK;
+}
+
+/** `null` = nunca gravado (primeiro acesso). */
+function readTiposAtividadeStorage(key: string): string[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw == null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return null;
+  }
+}
+
+function writeTiposAtividadeStorage(key: string, value: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* quota / private mode */
+  }
+}
 
 const MESES = [
   { value: 1, label: "Janeiro" },
@@ -71,6 +123,8 @@ type NotaVolumeAgg = {
   fonte: "analitico" | "toa";
   /** Identificador do técnico (login / equipe) para headcount. */
   tecnico: string;
+  /** Serviço real da WO (TOA); ausente no analítico legado. */
+  tipo_atividade?: string;
 };
 
 type ChartPoint = {
@@ -453,6 +507,7 @@ function agregarNotasToa(rows: ToaImportacaoRow[]): NotaVolumeAgg[] {
     const statusNota: "Produtiva" | "Improdutiva" =
       row.status_nota === "Produtiva" ? "Produtiva" : "Improdutiva";
     const tecnico = tecnicoFromToa(row);
+    const tipoAtividade = String(row.tipo_atividade ?? "").trim();
 
     const prev = byWo.get(numeroWo);
     if (!prev) {
@@ -463,6 +518,7 @@ function agregarNotasToa(rows: ToaImportacaoRow[]): NotaVolumeAgg[] {
         statusNota,
         fonte: "toa",
         tecnico,
+        tipo_atividade: tipoAtividade || undefined,
       });
       continue;
     }
@@ -470,6 +526,9 @@ function agregarNotasToa(rows: ToaImportacaoRow[]): NotaVolumeAgg[] {
     if (statusNota === "Produtiva") prev.statusNota = "Produtiva";
     if (dataIso < prev.dataIso) prev.dataIso = dataIso;
     if (!prev.tecnico || prev.tecnico === "Sem técnico") prev.tecnico = tecnico;
+    if (tipoAtividade && !prev.tipo_atividade) {
+      prev.tipo_atividade = tipoAtividade;
+    }
   }
 
   return Array.from(byWo.values());
@@ -612,6 +671,17 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
 }
 
 export function KpiVolumeNotas() {
+  const { user } = useApp();
+  const userStorageId = user?.id || user?.email;
+  const tiposStorageKey = useMemo(
+    () => filtroAtividadesStorageKey(userStorageId),
+    [userStorageId],
+  );
+  const padraoStorageKey = useMemo(
+    () => padraoAtividadesStorageKey(userStorageId),
+    [userStorageId],
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toaRows, setToaRows] = useState<ToaImportacaoRow[]>([]);
@@ -622,9 +692,34 @@ export function KpiVolumeNotas() {
   const [ano, setAno] = useState<number | null>(null);
   const [mesesSelecionados, setMesesSelecionados] = useState<number[]>([]);
   const [mesesOpen, setMesesOpen] = useState(false);
+  const [tiposAtividadeFiltro, setTiposAtividadeFiltro] = useState<string[]>(
+    [],
+  );
+  const [tiposOpen, setTiposOpen] = useState(false);
+  const [buscaTipo, setBuscaTipo] = useState("");
+  const [padraoSalvo, setPadraoSalvo] = useState<string[]>([]);
+  const [isModalPadraoOpen, setIsModalPadraoOpen] = useState(false);
+  const [tiposPadraoDraft, setTiposPadraoDraft] = useState<string[]>([]);
+  const [aplicarPadraoAoSalvar, setAplicarPadraoAoSalvar] = useState(true);
+  /** Distingue “ainda não inicializado” de “usuário desmarcou tudo”. */
+  const tiposAtividadeUserClearedRef = useRef(false);
+  /** Evita gravar no localStorage antes da hidratação. */
+  const tiposPersistReadyRef = useRef(false);
   const [mostrarProjecao, setMostrarProjecao] = useState(false);
   const [mostrarQuantDiaria, setMostrarQuantDiaria] = useState(false);
   const [mostrarQuantTecnicos, setMostrarQuantTecnicos] = useState(false);
+
+  useEffect(() => {
+    tiposPersistReadyRef.current = false;
+    tiposAtividadeUserClearedRef.current = false;
+    setTiposAtividadeFiltro([]);
+    setBuscaTipo("");
+  }, [tiposStorageKey]);
+
+  useEffect(() => {
+    const stored = readTiposAtividadeStorage(padraoStorageKey);
+    setPadraoSalvo(stored ?? []);
+  }, [padraoStorageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -704,13 +799,98 @@ export function KpiVolumeNotas() {
     );
   }, [mesesDisponiveis]);
 
+  const tiposAtividadeOpcoes = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of toaRows) {
+      const tipo = String(row.tipo_atividade ?? "").trim();
+      if (tipo) set.add(tipo);
+    }
+    return Array.from(set).sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [toaRows]);
+
+  useEffect(() => {
+    if (tiposAtividadeOpcoes.length === 0) return;
+
+    setTiposAtividadeFiltro((prev) => {
+      if (!tiposPersistReadyRef.current) {
+        const stored = readTiposAtividadeStorage(tiposStorageKey);
+        tiposPersistReadyRef.current = true;
+
+        if (stored === null) {
+          // Primeiro acesso: todas as opções.
+          tiposAtividadeUserClearedRef.current = false;
+          return [...tiposAtividadeOpcoes];
+        }
+
+        tiposAtividadeUserClearedRef.current = stored.length === 0;
+        const pruned = stored.filter((t) => tiposAtividadeOpcoes.includes(t));
+        if (stored.length > 0 && pruned.length === 0) {
+          return [...tiposAtividadeOpcoes];
+        }
+        return pruned;
+      }
+
+      if (prev.length === 0) {
+        if (tiposAtividadeUserClearedRef.current) return prev;
+        return [...tiposAtividadeOpcoes];
+      }
+      const pruned = prev.filter((t) => tiposAtividadeOpcoes.includes(t));
+      const prevSet = new Set(prev);
+      const novos = tiposAtividadeOpcoes.filter((t) => !prevSet.has(t));
+      // Tinha todas as opções anteriores → inclui as novas automaticamente.
+      const tinhaTodasAnteriores =
+        pruned.length === prev.length &&
+        pruned.length + novos.length === tiposAtividadeOpcoes.length;
+      if (tinhaTodasAnteriores) return [...tiposAtividadeOpcoes];
+      return pruned;
+    });
+  }, [tiposAtividadeOpcoes, tiposStorageKey]);
+
+  useEffect(() => {
+    if (!tiposPersistReadyRef.current) return;
+    writeTiposAtividadeStorage(tiposStorageKey, tiposAtividadeFiltro);
+  }, [tiposAtividadeFiltro, tiposStorageKey]);
+
+  const tiposAtividadeOpcoesVisiveis = useMemo(() => {
+    const q = buscaTipo.trim().toLowerCase();
+    if (!q) return tiposAtividadeOpcoes;
+    return tiposAtividadeOpcoes.filter((tipo) =>
+      tipo.toLowerCase().includes(q),
+    );
+  }, [tiposAtividadeOpcoes, buscaTipo]);
+
   const notasFiltradas = useMemo(() => {
     const notas = [
       ...agregarNotasAnalitico(analiticoRows),
       ...agregarNotasToa(toaRows),
     ];
-    return filtrarNotasPorPeriodo(notas, ano, mesesSelecionados);
-  }, [analiticoRows, toaRows, ano, mesesSelecionados]);
+    const porPeriodo = filtrarNotasPorPeriodo(notas, ano, mesesSelecionados);
+
+    // Sem opções TOA → não restringe (ex.: só analítico legado).
+    if (tiposAtividadeOpcoes.length === 0) return porPeriodo;
+    // Painel operacional: nada selecionado → gráfico/cards zerados.
+    if (tiposAtividadeFiltro.length === 0) return [];
+
+    const todosSelecionados =
+      tiposAtividadeFiltro.length === tiposAtividadeOpcoes.length &&
+      tiposAtividadeOpcoes.every((t) => tiposAtividadeFiltro.includes(t));
+    if (todosSelecionados) return porPeriodo;
+
+    return porPeriodo.filter(
+      (item) =>
+        Boolean(item.tipo_atividade) &&
+        tiposAtividadeFiltro.includes(item.tipo_atividade!),
+    );
+  }, [
+    analiticoRows,
+    toaRows,
+    ano,
+    mesesSelecionados,
+    tiposAtividadeFiltro,
+    tiposAtividadeOpcoes,
+  ]);
 
   const totais = useMemo(() => {
     let produtivas = 0;
@@ -812,6 +992,22 @@ export function KpiVolumeNotas() {
     return `${mesesSelecionados.length} meses`;
   }, [mesesSelecionados]);
 
+  const labelTiposTrigger = useMemo(() => {
+    if (tiposAtividadeOpcoes.length === 0) return "Sem tipos";
+    if (tiposAtividadeFiltro.length === 0) return "Nenhum";
+    if (
+      tiposAtividadeFiltro.length === tiposAtividadeOpcoes.length &&
+      tiposAtividadeOpcoes.every((t) => tiposAtividadeFiltro.includes(t))
+    ) {
+      return "Todos";
+    }
+    if (tiposAtividadeFiltro.length === 1) return tiposAtividadeFiltro[0]!;
+    if (tiposAtividadeFiltro.length <= 2) {
+      return tiposAtividadeFiltro.join(", ");
+    }
+    return `${tiposAtividadeFiltro.length} tipos`;
+  }, [tiposAtividadeFiltro, tiposAtividadeOpcoes]);
+
   const periodoDescricao = useMemo(() => {
     const blend =
       "Analítico (≤ jun/2026) + TOA (≥ jul/2026)";
@@ -831,6 +1027,8 @@ export function KpiVolumeNotas() {
   const limparFiltros = () => {
     setAno(null);
     setMesesSelecionados([]);
+    tiposAtividadeUserClearedRef.current = false;
+    setTiposAtividadeFiltro([...tiposAtividadeOpcoes]);
   };
 
   const toggleMes = (mes: number) => {
@@ -839,6 +1037,74 @@ export function KpiVolumeNotas() {
         ? prev.filter((m) => m !== mes)
         : [...prev, mes].sort((a, b) => a - b),
     );
+  };
+
+  const toggleTipoAtividade = (tipo: string) => {
+    setTiposAtividadeFiltro((prev) => {
+      const next = prev.includes(tipo)
+        ? prev.filter((t) => t !== tipo)
+        : [...prev, tipo].sort((a, b) =>
+            a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+          );
+      tiposAtividadeUserClearedRef.current = next.length === 0;
+      return next;
+    });
+  };
+
+  const selecionarTodosTipos = () => {
+    tiposAtividadeUserClearedRef.current = false;
+    setTiposAtividadeFiltro([...tiposAtividadeOpcoes]);
+  };
+
+  const limparTiposAtividade = () => {
+    tiposAtividadeUserClearedRef.current = true;
+    setTiposAtividadeFiltro([]);
+  };
+
+  const aplicarSelecaoTipos = (tipos: string[]) => {
+    const next = [...tipos].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+    tiposAtividadeUserClearedRef.current = next.length === 0;
+    setTiposAtividadeFiltro(next);
+  };
+
+  const usarPadraoAtividades = () => {
+    if (padraoSalvo.length === 0) return;
+    aplicarSelecaoTipos(padraoSalvo);
+  };
+
+  const abrirModalPadrao = () => {
+    const seed =
+      padraoSalvo.length > 0
+        ? padraoSalvo.filter((t) => tiposAtividadeOpcoes.includes(t))
+        : tiposAtividadeFiltro.filter((t) => tiposAtividadeOpcoes.includes(t));
+    setTiposPadraoDraft(seed);
+    setAplicarPadraoAoSalvar(true);
+    setTiposOpen(false);
+    setIsModalPadraoOpen(true);
+  };
+
+  const toggleTipoPadraoDraft = (tipo: string) => {
+    setTiposPadraoDraft((prev) =>
+      prev.includes(tipo)
+        ? prev.filter((t) => t !== tipo)
+        : [...prev, tipo].sort((a, b) =>
+            a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+          ),
+    );
+  };
+
+  const salvarPadraoAtividades = () => {
+    const next = [...tiposPadraoDraft].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+    writeTiposAtividadeStorage(padraoStorageKey, next);
+    setPadraoSalvo(next);
+    if (aplicarPadraoAoSalvar) {
+      aplicarSelecaoTipos(next);
+    }
+    setIsModalPadraoOpen(false);
   };
 
   return (
@@ -941,6 +1207,120 @@ export function KpiVolumeNotas() {
             </Popover>
           </div>
 
+          <div className="flex items-center gap-2">
+            <Label className="shrink-0 text-sm font-medium">
+              Tipo de Atividade:
+            </Label>
+            <Popover
+              open={tiposOpen}
+              onOpenChange={(open) => {
+                setTiposOpen(open);
+                if (!open) setBuscaTipo("");
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={tiposOpen}
+                  disabled={tiposAtividadeOpcoes.length === 0}
+                  className="w-[240px] justify-between font-normal"
+                >
+                  <span className="truncate">{labelTiposTrigger}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="start">
+                <div className="sticky top-0 z-10 space-y-2 border-b border-border bg-white px-2 pb-2 pt-2 dark:bg-background">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      value={buscaTipo}
+                      onChange={(e) => setBuscaTipo(e.target.value)}
+                      placeholder="Buscar tipo..."
+                      className="h-8 border-border/80 bg-white pl-8 text-sm shadow-none dark:bg-background"
+                      aria-label="Buscar tipo de atividade"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Multi-seleção
+                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                        onClick={limparTiposAtividade}
+                      >
+                        Limpar
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
+                        onClick={usarPadraoAtividades}
+                        disabled={padraoSalvo.length === 0}
+                        title={
+                          padraoSalvo.length === 0
+                            ? "Defina um padrão primeiro"
+                            : "Aplicar tipos padrão"
+                        }
+                      >
+                        Usar padrão
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary hover:underline"
+                        onClick={selecionarTodosTipos}
+                      >
+                        Todos
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <ul className="max-h-56 space-y-1 overflow-y-auto px-2 py-2">
+                  {tiposAtividadeOpcoesVisiveis.length === 0 ? (
+                    <li className="px-2 py-3 text-center text-xs text-muted-foreground">
+                      Nenhum tipo encontrado
+                    </li>
+                  ) : (
+                    tiposAtividadeOpcoesVisiveis.map((tipo) => {
+                      const checked = tiposAtividadeFiltro.includes(tipo);
+                      return (
+                        <li key={tipo}>
+                          <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => toggleTipoAtividade(tipo)}
+                              aria-label={tipo}
+                            />
+                            <span className="flex-1 truncate" title={tipo}>
+                              {tipo}
+                            </span>
+                            {checked ? (
+                              <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                            ) : null}
+                          </label>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+                <div className="sticky bottom-0 border-t border-border bg-white px-2 py-2 dark:bg-background">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                    onClick={abrirModalPadrao}
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    Definir padrão
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
           <Button
             type="button"
             variant="outline"
@@ -954,6 +1334,69 @@ export function KpiVolumeNotas() {
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{periodoDescricao}</p>
       </div>
+
+      <Dialog open={isModalPadraoOpen} onOpenChange={setIsModalPadraoOpen}>
+        <DialogContent className="max-h-[85vh] max-w-md gap-0 overflow-hidden p-0 sm:rounded-lg">
+          <div className="border-b border-border px-6 py-4">
+            <DialogHeader>
+              <DialogTitle>Definir Tipos Padrão</DialogTitle>
+              <DialogDescription>
+                Escolha os serviços essenciais que poderão ser aplicados
+                rapidamente pelo botão &quot;Usar padrão&quot;.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <ul className="max-h-[min(50vh,360px)] space-y-1 overflow-y-auto px-4 py-3">
+            {tiposAtividadeOpcoes.length === 0 ? (
+              <li className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Nenhum tipo disponível na base carregada.
+              </li>
+            ) : (
+              tiposAtividadeOpcoes.map((tipo) => {
+                const checked = tiposPadraoDraft.includes(tipo);
+                return (
+                  <li key={tipo}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => toggleTipoPadraoDraft(tipo)}
+                        aria-label={tipo}
+                      />
+                      <span className="flex-1 truncate" title={tipo}>
+                        {tipo}
+                      </span>
+                      {checked ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      ) : null}
+                    </label>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+          <div className="space-y-3 border-t border-border px-6 py-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                checked={aplicarPadraoAoSalvar}
+                onCheckedChange={(v) => setAplicarPadraoAoSalvar(v === true)}
+              />
+              Aplicar imediatamente ao filtro atual
+            </label>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsModalPadraoOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={salvarPadraoAtividades}>
+                Salvar Padrão
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Carregando métricas...</p>
@@ -1072,6 +1515,39 @@ export function KpiVolumeNotas() {
                   />
                   <span className="font-medium">Quant. Técnicos</span>
                 </label>
+
+                <div
+                  className="mx-1 hidden h-4 w-px bg-gray-300 sm:block"
+                  aria-hidden
+                />
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    title="Selecionar todos"
+                    aria-label="Selecionar todos"
+                    className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                    onClick={() => {
+                      if (podeProjetar) setMostrarProjecao(true);
+                      setMostrarQuantDiaria(true);
+                      setMostrarQuantTecnicos(true);
+                    }}
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Limpar visualizações"
+                    aria-label="Limpar visualizações"
+                    className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                    onClick={() => {
+                      setMostrarProjecao(false);
+                      setMostrarQuantDiaria(false);
+                      setMostrarQuantTecnicos(false);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
 

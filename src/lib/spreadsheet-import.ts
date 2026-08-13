@@ -40,6 +40,31 @@ function pick(row: RawRow, ...aliases: string[]): string {
   return "";
 }
 
+/**
+ * Planilha TOA tem duas colunas "Tipo de Atividade":
+ * 1ª = classificação (ex.: Normal); 2ª = serviço real (Instalacao, …).
+ * `rowsFromMatrix` sufixa a 2ª como `…_1` (ou `.1` em alguns exports).
+ * Preferimos a 2ª ocorrência (índice 1); se só houver uma, usa a única.
+ */
+function pickNthByHeader(
+  row: RawRow,
+  aliases: string[],
+  nthZeroBased: number,
+): string {
+  const bases = new Set(aliases.map((a) => normalizeHeader(a)));
+  const values: string[] = [];
+  for (const [k, v] of Object.entries(row)) {
+    const n = normalizeHeader(k);
+    const base = n.replace(/[_.]\d+$/, "");
+    if (bases.has(n) || bases.has(base)) {
+      values.push(trimCell(v));
+    }
+  }
+  if (values.length === 0) return "";
+  if (nthZeroBased < values.length) return values[nthZeroBased] ?? "";
+  return values[0] ?? "";
+}
+
 function parseNumber(value: string): number {
   return parseLocaleNumber(value);
 }
@@ -192,16 +217,11 @@ async function parseCsv(file: File): Promise<RawRow[]> {
   if (lines.length < 2) return [];
 
   const delimiter = detectDelimiter(lines[0]);
-  const headers = splitCsvLine(lines[0], delimiter).map((h) => trimCell(h));
-  return lines.slice(1).map((line) => {
-    const cells = splitCsvLine(line, delimiter);
-    const row: RawRow = {};
-    headers.forEach((h, i) => {
-      if (!h) return;
-      row[h] = trimCell(cells[i]);
-    });
-    return row;
-  });
+  const matrix = lines.map((line) =>
+    splitCsvLine(line, delimiter).map((c) => trimCell(c)),
+  );
+  // Mesma deduplicação de cabeçalhos do XLSX (Tipo de Atividade_1, etc.).
+  return rowsFromMatrix(matrix);
 }
 
 /**
@@ -464,12 +484,20 @@ export async function parseToaFile(file: File): Promise<ToaLinha[]> {
           "Janela Servico_1",
         ),
         duracao: pick(row, "Duração", "Duracao", "duração", "duracao"),
-        tipoAtividade: pick(
-          row,
-          "Tipo de Atividade",
-          "Tipo Atividade",
-          "tipo de atividade",
-        ),
+        // 2ª "Tipo de Atividade" = serviço real (não a 1ª "Normal").
+        tipoAtividade:
+          pick(
+            row,
+            "Tipo de Atividade_1",
+            "Tipo de Atividade.1",
+            "Tipo Atividade_1",
+            "Tipo Atividade.1",
+          ) ||
+          pickNthByHeader(
+            row,
+            ["Tipo de Atividade", "Tipo Atividade", "tipo de atividade"],
+            1,
+          ),
         categoriasCapacidade: pick(
           row,
           "Categorias da Capacidade",
