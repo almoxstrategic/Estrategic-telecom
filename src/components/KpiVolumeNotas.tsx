@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -45,7 +46,7 @@ import {
   type AnaliticoHistoricoRow,
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
-import { normalizeNumeroWo } from "@/lib/toa-store";
+import { normalizeNumeroWo, normalizeToaLogin } from "@/lib/toa-store";
 
 const MESES = [
   { value: 1, label: "Janeiro" },
@@ -70,6 +71,8 @@ type NotaVolumeAgg = {
   competencia: number;
   statusNota: "Produtiva" | "Improdutiva";
   fonte: "analitico" | "toa";
+  /** Identificador do técnico (login / equipe) para headcount. */
+  tecnico: string;
 };
 
 type ChartPoint = {
@@ -77,9 +80,19 @@ type ChartPoint = {
   label: string;
   /** Abreviação do dia da semana (visão diária). */
   diaSemana?: string;
+  /** 0=Dom … 6=Sáb (visão diária). */
+  diaJs?: number;
   produtivas: number;
   improdutivas: number;
   total: number;
+  qtd_tecnicos: number;
+};
+
+type ResumoCapacidade = {
+  mediaSemana: number;
+  mediaSabado: number;
+  /** Média de notas/dia conforme filtro Visualizar. */
+  mediaNotasDia: number;
 };
 
 const DIAS_SEMANA_CURTO = [
@@ -171,6 +184,72 @@ function isCompetenciaToa(ym: number): boolean {
   return ym > FATURAMENTO_HISTORICO_ATE;
 }
 
+function tecnicoFromAnalitico(row: AnaliticoHistoricoRow): string {
+  const equipe = String(row.id_equipe ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (equipe) return equipe;
+  const servidor = String(row.servidor ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return servidor || "Sem técnico";
+}
+
+function tecnicoFromToa(row: ToaImportacaoRow): string {
+  const login = normalizeToaLogin(row.login_tecnico);
+  if (login) return login;
+  const nome = String(row.nome_tecnico ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return nome || "Sem técnico";
+}
+
+function mediaArredondada(valores: number[]): number {
+  if (valores.length === 0) return 0;
+  const soma = valores.reduce((acc, n) => acc + n, 0);
+  return Math.round(soma / valores.length);
+}
+
+/**
+ * Médias de headcount + média produtiva (notas/dia) na visão diária.
+ * Seg–Sex / Sáb — só dias com pelo menos 1 técnico.
+ * Média produtiva: volume do filtro Visualizar ÷ dias com operação.
+ */
+function calcularResumoCapacidade(
+  data: ChartPoint[],
+  visao: VisaoGrafico,
+): ResumoCapacidade | null {
+  if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
+
+  const volumeDoDia = (d: ChartPoint): number => {
+    if (visao === "Produtivas") return d.produtivas;
+    if (visao === "Improdutivas") return d.improdutivas;
+    return d.total;
+  };
+
+  const comHeadcount = data.filter((d) => d.qtd_tecnicos > 0);
+  const uteis = comHeadcount.filter(
+    (d) => d.diaJs != null && d.diaJs >= 1 && d.diaJs <= 5,
+  );
+  const sabados = comHeadcount.filter((d) => d.diaJs === 6);
+
+  const diasComOperacao = data.filter((d) => volumeDoDia(d) > 0);
+  const totalNotas = data.reduce((acc, d) => acc + volumeDoDia(d), 0);
+  const qtdDias =
+    diasComOperacao.length > 0 ? diasComOperacao.length : data.length;
+  const mediaNotasDia =
+    qtdDias > 0 ? Math.round(totalNotas / qtdDias) : 0;
+
+  return {
+    mediaSemana: mediaArredondada(uteis.map((d) => d.qtd_tecnicos)),
+    mediaSabado: mediaArredondada(sabados.map((d) => d.qtd_tecnicos)),
+    mediaNotasDia,
+  };
+}
+
 /**
  * Analítico: cada linha = 1 nota produtiva (faturada Claro).
  * Só competências ≤ jun/2026.
@@ -196,6 +275,7 @@ function agregarNotasAnalitico(
       competencia,
       statusNota: "Produtiva",
       fonte: "analitico",
+      tecnico: tecnicoFromAnalitico(row),
     });
   }
   return out;
@@ -221,6 +301,7 @@ function agregarNotasToa(rows: ToaImportacaoRow[]): NotaVolumeAgg[] {
 
     const statusNota: "Produtiva" | "Improdutiva" =
       row.status_nota === "Produtiva" ? "Produtiva" : "Improdutiva";
+    const tecnico = tecnicoFromToa(row);
 
     const prev = byWo.get(numeroWo);
     if (!prev) {
@@ -230,12 +311,14 @@ function agregarNotasToa(rows: ToaImportacaoRow[]): NotaVolumeAgg[] {
         competencia,
         statusNota,
         fonte: "toa",
+        tecnico,
       });
       continue;
     }
 
     if (statusNota === "Produtiva") prev.statusNota = "Produtiva";
     if (dataIso < prev.dataIso) prev.dataIso = dataIso;
+    if (!prev.tecnico || prev.tecnico === "Sem técnico") prev.tecnico = tecnico;
   }
 
   return Array.from(byWo.values());
@@ -284,13 +367,25 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
 } {
   const unica = competenciaUnica(notas);
   if (unica !== null) {
-    const byDay = new Map<number, { produtivas: number; improdutivas: number }>();
+    const byDay = new Map<
+      number,
+      {
+        produtivas: number;
+        improdutivas: number;
+        tecnicos: Set<string>;
+      }
+    >();
     for (const n of notas) {
       const dia = Number(n.dataIso.slice(8, 10));
       if (!Number.isFinite(dia) || dia < 1 || dia > 31) continue;
-      const bucket = byDay.get(dia) ?? { produtivas: 0, improdutivas: 0 };
+      const bucket = byDay.get(dia) ?? {
+        produtivas: 0,
+        improdutivas: 0,
+        tecnicos: new Set<string>(),
+      };
       if (n.statusNota === "Produtiva") bucket.produtivas += 1;
       else bucket.improdutivas += 1;
+      if (n.tecnico) bucket.tecnicos.add(n.tecnico);
       byDay.set(dia, bucket);
     }
     const anoComp = Math.floor(unica / 100);
@@ -300,14 +395,21 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
     return {
       modo: "dia",
       data: dias.map((dia) => {
-        const b = byDay.get(dia) ?? { produtivas: 0, improdutivas: 0 };
+        const b = byDay.get(dia) ?? {
+          produtivas: 0,
+          improdutivas: 0,
+          tecnicos: new Set<string>(),
+        };
+        const dataRef = new Date(anoComp, mesComp - 1, dia);
         return {
           chave: String(dia),
           label: String(dia).padStart(2, "0"),
           diaSemana: diaSemanaCurto(anoComp, mesComp, dia),
+          diaJs: dataRef.getDay(),
           produtivas: b.produtivas,
           improdutivas: b.improdutivas,
           total: b.produtivas + b.improdutivas,
+          qtd_tecnicos: b.tecnicos.size,
         };
       }),
     };
@@ -315,15 +417,21 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
 
   const byComp = new Map<
     number,
-    { produtivas: number; improdutivas: number }
+    {
+      produtivas: number;
+      improdutivas: number;
+      tecnicos: Set<string>;
+    }
   >();
   for (const n of notas) {
     const bucket = byComp.get(n.competencia) ?? {
       produtivas: 0,
       improdutivas: 0,
+      tecnicos: new Set<string>(),
     };
     if (n.statusNota === "Produtiva") bucket.produtivas += 1;
     else bucket.improdutivas += 1;
+    if (n.tecnico) bucket.tecnicos.add(n.tecnico);
     byComp.set(n.competencia, bucket);
   }
 
@@ -331,13 +439,18 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
   return {
     modo: "mes",
     data: comps.map((ym) => {
-      const b = byComp.get(ym) ?? { produtivas: 0, improdutivas: 0 };
+      const b = byComp.get(ym) ?? {
+        produtivas: 0,
+        improdutivas: 0,
+        tecnicos: new Set<string>(),
+      };
       return {
         chave: String(ym),
         label: labelCompetencia(ym),
         produtivas: b.produtivas,
         improdutivas: b.improdutivas,
         total: b.produtivas + b.improdutivas,
+        qtd_tecnicos: b.tecnicos.size,
       };
     }),
   };
@@ -460,6 +573,19 @@ export function KpiVolumeNotas() {
     () => montarSerieChart(notasFiltradas),
     [notasFiltradas],
   );
+
+  const resumoCapacidade = useMemo(
+    () =>
+      serie.modo === "dia"
+        ? calcularResumoCapacidade(serie.data, visaoGrafico)
+        : null,
+    [serie, visaoGrafico],
+  );
+
+  const tituloGraficoMes =
+    mesesSelecionados.length === 1
+      ? mesLabel(mesesSelecionados[0]!)
+      : "Geral";
 
   /** Clique na barra do mês → filtra Ano + Mês e entra na visão diária. */
   const aplicarDrillDownMes = (point: ChartPoint | undefined) => {
@@ -693,11 +819,35 @@ export function KpiVolumeNotas() {
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 font-bold text-foreground">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                Volume de Notas —{" "}
-                {serie.modo === "dia" ? "por dia" : "por mês"}
-              </h2>
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <h2 className="flex items-center gap-2 font-bold text-foreground">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  Volume de Notas — {tituloGraficoMes}
+                </h2>
+                {resumoCapacidade ? (
+                  <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-gray-600">
+                    <span>
+                      Seg - Sexta: {formatQuantidade(resumoCapacidade.mediaSemana)}{" "}
+                      Técnicos
+                    </span>
+                    <span className="text-gray-300" aria-hidden>
+                      |
+                    </span>
+                    <span>
+                      Sáb: {formatQuantidade(resumoCapacidade.mediaSabado)}{" "}
+                      Técnicos
+                    </span>
+                    <span className="text-gray-300" aria-hidden>
+                      |
+                    </span>
+                    <span>
+                      Média produtiva:{" "}
+                      {formatQuantidade(resumoCapacidade.mediaNotasDia)} Notas
+                      por dia
+                    </span>
+                  </p>
+                ) : null}
+              </div>
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 Visualizar:
                 <select
@@ -721,11 +871,11 @@ export function KpiVolumeNotas() {
             ) : (
               <div className={`h-[450px] w-full ${serie.modo === "mes" ? "cursor-pointer" : ""}`}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
+                  <ComposedChart
                     data={serie.data}
                     margin={{
                       top: 8,
-                      right: 12,
+                      right: 16,
                       left: 0,
                       bottom: serie.modo === "dia" ? 48 : 8,
                     }}
@@ -765,15 +915,33 @@ export function KpiVolumeNotas() {
                       }
                     />
                     <YAxis
+                      yAxisId="left"
                       allowDecimals={false}
                       tick={{ fontSize: 11 }}
                       width={40}
                     />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      allowDecimals={false}
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={40}
+                    />
                     <Tooltip
-                      formatter={(value: number, name: string) => [
-                        formatQuantidade(value),
-                        name === "produtivas" ? "Produtivas" : "Improdutivas",
-                      ]}
+                      formatter={(value: number, name: string) => {
+                        const label =
+                          name === "produtivas"
+                            ? "Produtivas"
+                            : name === "improdutivas"
+                              ? "Improdutivas"
+                              : name === "qtd_tecnicos" ||
+                                  name === "Técnicos Operando"
+                                ? "Técnicos Operando"
+                                : name;
+                        return [formatQuantidade(value), label];
+                      }}
                       labelFormatter={(label) => {
                         if (serie.modo !== "dia") return String(label);
                         const point = serie.data.find((p) => p.label === label);
@@ -785,11 +953,18 @@ export function KpiVolumeNotas() {
                     />
                     <Legend
                       formatter={(value) =>
-                        value === "produtivas" ? "Produtivas" : "Improdutivas"
+                        value === "produtivas"
+                          ? "Produtivas"
+                          : value === "improdutivas"
+                            ? "Improdutivas"
+                            : value === "qtd_tecnicos"
+                              ? "Técnicos Operando"
+                              : value
                       }
                     />
                     {mostrarProdutivas && (
                       <Bar
+                        yAxisId="left"
                         dataKey="produtivas"
                         name="produtivas"
                         fill="#16a34a"
@@ -801,6 +976,7 @@ export function KpiVolumeNotas() {
                     )}
                     {mostrarImprodutivas && (
                       <Bar
+                        yAxisId="left"
                         dataKey="improdutivas"
                         name="improdutivas"
                         fill="#ef4444"
@@ -810,7 +986,17 @@ export function KpiVolumeNotas() {
                         onClick={handleBarClick}
                       />
                     )}
-                  </BarChart>
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="qtd_tecnicos"
+                      name="Técnicos Operando"
+                      stroke="#f59e0b"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
