@@ -118,34 +118,52 @@ type CustomXAxisTickProps = {
   payload?: { value?: string | number };
 };
 
-/** Rótulo do eixo X: dia + semana (+ qtd produtiva opcional). */
+/** Rótulo do eixo X (visão mensal ou diária) com qtds opcionais. */
 function CustomXAxisTick({
   x = 0,
   y = 0,
   payload,
+  modo,
   diaSemana,
   mostrarQuantDiaria = false,
-  valorReal = 0,
+  mostrarQuantTecnicos = false,
+  valorNotas = 0,
+  valorTecnicos = 0,
 }: CustomXAxisTickProps & {
+  modo: "dia" | "mes";
   diaSemana?: string;
   mostrarQuantDiaria?: boolean;
-  valorReal?: number;
+  mostrarQuantTecnicos?: boolean;
+  valorNotas?: number;
+  valorTecnicos?: number;
 }) {
-  const dia = String(payload?.value ?? "").padStart(2, "0");
-  const semana = diaSemana ?? "";
+  const labelPrincipal = String(payload?.value ?? "");
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={20} textAnchor="middle" fontSize={13}>
-        <tspan x={0} dy={0} fill="#666" fontWeight={600}>
-          {dia}
-        </tspan>
-        <tspan x={0} dy={16} fill="#666" fontSize={12}>
-          {semana}
-        </tspan>
-        {mostrarQuantDiaria && valorReal > 0 ? (
-          <tspan x={0} dy={18} fill="#16a34a" fontSize={11} fontWeight={700}>
-            {valorReal}
+      <text x={0} y={0} dy={16} textAnchor="middle" fontSize={12}>
+        {modo === "mes" ? (
+          <tspan x={0} dy={0} fill="#666" fontWeight={600} fontSize={11}>
+            {labelPrincipal}
+          </tspan>
+        ) : (
+          <>
+            <tspan x={0} dy={0} fill="#666" fontWeight={600} fontSize={13}>
+              {labelPrincipal.padStart(2, "0")}
+            </tspan>
+            <tspan x={0} dy={16} fill="#666" fontSize={12}>
+              {diaSemana ?? ""}
+            </tspan>
+          </>
+        )}
+        {mostrarQuantDiaria && valorNotas > 0 ? (
+          <tspan x={0} dy={modo === "mes" ? 16 : 18} fill="#16a34a" fontSize={11} fontWeight={700}>
+            {valorNotas}
+          </tspan>
+        ) : null}
+        {mostrarQuantTecnicos && valorTecnicos > 0 ? (
+          <tspan x={0} dy={16} fill="#f59e0b" fontSize={11} fontWeight={700}>
+            {valorTecnicos} Téc
           </tspan>
         ) : null}
       </text>
@@ -219,16 +237,31 @@ function mediaArredondada(valores: number[]): number {
 }
 
 /**
- * Médias de headcount + média produtiva (notas produtivas/dia) na visão diária.
+ * Headcount único (Seg–Sex / Sáb) + média produtiva (notas/dia).
+ * Seg–Sex e Sáb usam Set de técnicos distintos nas notas do período.
  */
-function calcularResumoCapacidade(data: ChartPoint[]): ResumoCapacidade | null {
+function calcularResumoCapacidade(
+  data: ChartPoint[],
+  notas: NotaVolumeAgg[],
+): ResumoCapacidade | null {
   if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
 
-  const comHeadcount = data.filter((d) => d.qtd_tecnicos > 0);
-  const uteis = comHeadcount.filter(
-    (d) => d.diaJs != null && d.diaJs >= 1 && d.diaJs <= 5,
-  );
-  const sabados = comHeadcount.filter((d) => d.diaJs === 6);
+  const tecnicosUteis = new Set<string>();
+  const tecnicosSabado = new Set<string>();
+
+  for (const n of notas) {
+    const tecnico = n.tecnico?.trim();
+    if (!tecnico || tecnico === "Sem técnico") continue;
+    const iso = n.dataIso.slice(0, 10);
+    const [anoStr, mesStr, diaStr] = iso.split("-");
+    const ano = Number(anoStr);
+    const mes = Number(mesStr);
+    const dia = Number(diaStr);
+    if (!ano || !mes || !dia) continue;
+    const js = new Date(ano, mes - 1, dia).getDay();
+    if (js >= 1 && js <= 5) tecnicosUteis.add(tecnico);
+    else if (js === 6) tecnicosSabado.add(tecnico);
+  }
 
   const diasComOperacao = data.filter((d) => d.produtivas > 0);
   const totalNotas = data.reduce((acc, d) => acc + d.produtivas, 0);
@@ -238,8 +271,8 @@ function calcularResumoCapacidade(data: ChartPoint[]): ResumoCapacidade | null {
     qtdDias > 0 ? Math.round(totalNotas / qtdDias) : 0;
 
   return {
-    mediaSemana: mediaArredondada(uteis.map((d) => d.qtd_tecnicos)),
-    mediaSabado: mediaArredondada(sabados.map((d) => d.qtd_tecnicos)),
+    mediaSemana: tecnicosUteis.size,
+    mediaSabado: tecnicosSabado.size,
     mediaNotasDia,
   };
 }
@@ -477,7 +510,9 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
       };
       if (n.statusNota === "Produtiva") bucket.produtivas += 1;
       else bucket.improdutivas += 1;
-      if (n.tecnico) bucket.tecnicos.add(n.tecnico);
+      if (n.tecnico && n.tecnico !== "Sem técnico") {
+        bucket.tecnicos.add(n.tecnico);
+      }
       byDay.set(dia, bucket);
     }
     const anoComp = Math.floor(unica / 100);
@@ -523,7 +558,9 @@ function montarSerieChart(notas: NotaVolumeAgg[]): {
     };
     if (n.statusNota === "Produtiva") bucket.produtivas += 1;
     else bucket.improdutivas += 1;
-    if (n.tecnico) bucket.tecnicos.add(n.tecnico);
+    if (n.tecnico && n.tecnico !== "Sem técnico") {
+      bucket.tecnicos.add(n.tecnico);
+    }
     byComp.set(n.competencia, bucket);
   }
 
@@ -561,6 +598,7 @@ export function KpiVolumeNotas() {
   const [mesesOpen, setMesesOpen] = useState(false);
   const [mostrarProjecao, setMostrarProjecao] = useState(false);
   const [mostrarQuantDiaria, setMostrarQuantDiaria] = useState(false);
+  const [mostrarQuantTecnicos, setMostrarQuantTecnicos] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -667,22 +705,31 @@ export function KpiVolumeNotas() {
     [notasFiltradas],
   );
 
+  /** Projeção só na visão diária (mês específico ≠ Todos). */
+  const podeProjetar = serieBase.modo === "dia";
+
+  useEffect(() => {
+    if (!podeProjetar) setMostrarProjecao(false);
+  }, [podeProjetar]);
+
   const serie = useMemo(
     () => ({
       modo: serieBase.modo,
       data: aplicarProjecaoMedia(
         serieBase.data,
         serieBase.modo,
-        mostrarProjecao,
+        mostrarProjecao && podeProjetar,
       ),
     }),
-    [serieBase, mostrarProjecao],
+    [serieBase, mostrarProjecao, podeProjetar],
   );
 
   const resumoCapacidade = useMemo(
     () =>
-      serie.modo === "dia" ? calcularResumoCapacidade(serieBase.data) : null,
-    [serie.modo, serieBase.data],
+      serie.modo === "dia"
+        ? calcularResumoCapacidade(serieBase.data, notasFiltradas)
+        : null,
+    [serie.modo, serieBase.data, notasFiltradas],
   );
 
   const tituloGraficoMes =
@@ -946,22 +993,33 @@ export function KpiVolumeNotas() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-4">
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-                  <Checkbox
-                    checked={mostrarProjecao}
-                    onCheckedChange={(v) => setMostrarProjecao(v === true)}
-                    aria-label="Projeção (Bas. Média)"
-                  />
-                  <span className="font-medium">Projeção (Bas. Média)</span>
-                </label>
+                {podeProjetar ? (
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                    <Checkbox
+                      checked={mostrarProjecao}
+                      onCheckedChange={(v) => setMostrarProjecao(v === true)}
+                      aria-label="Projeção (Bas. Média)"
+                    />
+                    <span className="font-medium">Projeção (Bas. Média)</span>
+                  </label>
+                ) : null}
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
                   <Checkbox
                     checked={mostrarQuantDiaria}
                     onCheckedChange={(v) => setMostrarQuantDiaria(v === true)}
                     aria-label="Quant. diária no dia"
-                    disabled={serie.modo !== "dia"}
                   />
                   <span className="font-medium">Quant. diária no dia</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                  <Checkbox
+                    checked={mostrarQuantTecnicos}
+                    onCheckedChange={(v) =>
+                      setMostrarQuantTecnicos(v === true)
+                    }
+                    aria-label="Quant. Técnicos"
+                  />
+                  <span className="font-medium">Quant. Técnicos</span>
                 </label>
               </div>
             </div>
@@ -980,49 +1038,32 @@ export function KpiVolumeNotas() {
                       right: 16,
                       left: 0,
                       bottom:
-                        serie.modo === "dia"
-                          ? mostrarQuantDiaria
-                            ? 64
-                            : 48
-                          : 8,
+                        mostrarQuantDiaria || mostrarQuantTecnicos ? 72 : 48,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis
                       dataKey="label"
                       interval={serie.modo === "dia" ? 0 : "preserveEnd"}
-                      tickMargin={serie.modo === "dia" ? 12 : 4}
-                      tick={
-                        serie.modo === "dia"
-                          ? (props: CustomXAxisTickProps) => {
-                              const point = serie.data[props.index ?? 0];
-                              return (
-                                <CustomXAxisTick
-                                  {...props}
-                                  diaSemana={point?.diaSemana}
-                                  mostrarQuantDiaria={mostrarQuantDiaria}
-                                  valorReal={point?.produtivas ?? 0}
-                                />
-                              );
-                            }
-                          : { fontSize: 11 }
-                      }
-                      angle={
-                        serie.modo === "mes" && serie.data.length > 6 ? -30 : 0
-                      }
-                      textAnchor={
-                        serie.modo === "mes" && serie.data.length > 6
-                          ? "end"
-                          : "middle"
-                      }
+                      tickMargin={12}
+                      tick={(props: CustomXAxisTickProps) => {
+                        const point = serie.data[props.index ?? 0];
+                        return (
+                          <CustomXAxisTick
+                            {...props}
+                            modo={serie.modo}
+                            diaSemana={point?.diaSemana}
+                            mostrarQuantDiaria={mostrarQuantDiaria}
+                            mostrarQuantTecnicos={mostrarQuantTecnicos}
+                            valorNotas={point?.produtivas ?? 0}
+                            valorTecnicos={point?.qtd_tecnicos ?? 0}
+                          />
+                        );
+                      }}
+                      angle={0}
+                      textAnchor="middle"
                       height={
-                        serie.modo === "dia"
-                          ? mostrarQuantDiaria
-                            ? 88
-                            : 70
-                          : serie.data.length > 6
-                            ? 70
-                            : 30
+                        mostrarQuantDiaria || mostrarQuantTecnicos ? 100 : 80
                       }
                     />
                     <YAxis
