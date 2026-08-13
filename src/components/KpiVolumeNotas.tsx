@@ -259,33 +259,40 @@ function mediaArredondada(valores: number[]): number {
 }
 
 /**
- * Headcount único (Seg–Sex / Sáb) + média produtiva (notas/dia).
- * Seg–Sex e Sáb usam Set de técnicos distintos nas notas do período.
+ * Capacidade operacional média por dia (Seg–Sex / Sáb) + média produtiva.
+ * Usa `qtd_tecnicos` dos pontos diários do gráfico (não headcount acumulado do mês).
  */
 function calcularResumoCapacidade(
   data: ChartPoint[],
-  notas: NotaVolumeAgg[],
   dataComProjecao?: ChartPoint[],
   projecaoAtiva = false,
 ): ResumoCapacidade | null {
   if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
 
-  const tecnicosUteis = new Set<string>();
-  const tecnicosSabado = new Set<string>();
+  const diasUteis = data.filter(
+    (d) =>
+      d.diaJs != null &&
+      d.diaJs >= 1 &&
+      d.diaJs <= 5 &&
+      d.produtivas > 0,
+  );
+  const sabados = data.filter(
+    (d) => d.diaJs === 6 && d.produtivas > 0,
+  );
 
-  for (const n of notas) {
-    const tecnico = n.tecnico?.trim();
-    if (!tecnico || tecnico === "Sem técnico") continue;
-    const iso = n.dataIso.slice(0, 10);
-    const [anoStr, mesStr, diaStr] = iso.split("-");
-    const ano = Number(anoStr);
-    const mes = Number(mesStr);
-    const dia = Number(diaStr);
-    if (!ano || !mes || !dia) continue;
-    const js = new Date(ano, mes - 1, dia).getDay();
-    if (js >= 1 && js <= 5) tecnicosUteis.add(tecnico);
-    else if (js === 6) tecnicosSabado.add(tecnico);
-  }
+  const mediaSemana =
+    diasUteis.length > 0
+      ? Math.round(
+          diasUteis.reduce((acc, d) => acc + d.qtd_tecnicos, 0) /
+            diasUteis.length,
+        )
+      : 0;
+  const mediaSabado =
+    sabados.length > 0
+      ? Math.round(
+          sabados.reduce((acc, d) => acc + d.qtd_tecnicos, 0) / sabados.length,
+        )
+      : 0;
 
   const diasComOperacao = data.filter((d) => d.produtivas > 0);
   const totalNotas = data.reduce((acc, d) => acc + d.produtivas, 0);
@@ -305,8 +312,8 @@ function calcularResumoCapacidade(
   }
 
   return {
-    mediaSemana: tecnicosUteis.size,
-    mediaSabado: tecnicosSabado.size,
+    mediaSemana,
+    mediaSabado,
     mediaNotasDia,
     projecaoTotalMes,
   };
@@ -791,7 +798,6 @@ export function KpiVolumeNotas() {
       serie.modo === "dia"
         ? calcularResumoCapacidade(
             serieBase.data,
-            notasFiltradas,
             serie.data,
             mostrarProjecao && podeProjetar,
           )
@@ -800,7 +806,6 @@ export function KpiVolumeNotas() {
       serie.modo,
       serie.data,
       serieBase.data,
-      notasFiltradas,
       mostrarProjecao,
       podeProjetar,
     ],
@@ -1102,9 +1107,9 @@ export function KpiVolumeNotas() {
                   <Checkbox
                     checked={mostrarQuantDiaria}
                     onCheckedChange={(v) => setMostrarQuantDiaria(v === true)}
-                    aria-label="Quant. diária no dia"
+                    aria-label="Quantidade de Notas"
                   />
-                  <span className="font-medium">Quant. diária no dia</span>
+                  <span className="font-medium">Quantidade de Notas</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
                   <Checkbox
@@ -1112,9 +1117,9 @@ export function KpiVolumeNotas() {
                     onCheckedChange={(v) =>
                       setMostrarQuantTecnicos(v === true)
                     }
-                    aria-label="Quant. Técnicos"
+                    aria-label="Quantidade de Técnicos"
                   />
-                  <span className="font-medium">Quant. Técnicos</span>
+                  <span className="font-medium">Quantidade de Técnicos</span>
                 </label>
 
                 <div
