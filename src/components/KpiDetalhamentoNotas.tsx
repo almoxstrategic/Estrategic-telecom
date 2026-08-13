@@ -418,8 +418,8 @@ function BairroChartTooltip({
 
   const valor = Number(entry.value) || 0;
   const isProdutivas = data.tipo === "produtivas";
-  const totalLabel = isProdutivas ? "Produtivas" : "Quebras";
-  const totalLocal = data.totalNotasBairro;
+  const statusLabel = isProdutivas ? "Produtivas" : "Improdutivas";
+  const totalLocal = Number(data.totalNotasBairro) || valor;
   const pct = formatPct(valor, totalLocal);
   const top5 = isProdutivas
     ? data.top5TecnicosProdutivos
@@ -429,13 +429,13 @@ function BairroChartTooltip({
     <div className="rounded-md border border-gray-200 bg-white p-3 shadow-md">
       <p className="text-sm font-bold text-gray-900">{String(label ?? data.bairro)}</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        {totalLabel}:{" "}
+        {statusLabel}:{" "}
         <span
           className={`font-semibold tabular-nums ${
             isProdutivas ? "text-green-700" : "text-red-600"
           }`}
         >
-          {formatQuantidade(valor)} ({pct})
+          {formatQuantidade(valor)} de {formatQuantidade(totalLocal)} ({pct})
         </span>
       </p>
       {top5.length > 0 ? (

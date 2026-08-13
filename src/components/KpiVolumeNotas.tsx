@@ -101,8 +101,10 @@ type ChartPoint = {
 type ResumoCapacidade = {
   mediaSemana: number;
   mediaSabado: number;
-  /** Média de notas produtivas por dia com operação. */
+  /** Média de notas produtivas por dia com operação produtiva. */
   mediaNotasDia: number;
+  /** Total (prod+improd) / dias com ≥1 nota. */
+  mediaNotaGeral: number;
   /** Soma reais + fantasma (só quando projeção ativa). */
   projecaoTotalMes: number | null;
 };
@@ -260,7 +262,7 @@ function mediaArredondada(valores: number[]): number {
 
 /**
  * Headcount Seg–Sex (técnicos distintos no mês) + média de capacidade por sábado
- * (únicos por data de sábado, depois média arredondada) + média produtiva.
+ * + médias de nota (geral, produtiva e por técnico/diária).
  */
 function calcularResumoCapacidade(
   data: ChartPoint[],
@@ -303,12 +305,22 @@ function calcularResumoCapacidade(
         )
       : 0;
 
-  const diasComOperacao = data.filter((d) => d.produtivas > 0);
-  const totalNotas = data.reduce((acc, d) => acc + d.produtivas, 0);
-  const qtdDias =
-    diasComOperacao.length > 0 ? diasComOperacao.length : data.length;
+  const totalAbsolutoNotas = data.reduce(
+    (acc, d) => acc + d.produtivas + d.improdutivas,
+    0,
+  );
+  const diasOperados = data.filter(
+    (d) => d.produtivas + d.improdutivas > 0,
+  ).length;
+  const mediaNotaGeral =
+    diasOperados > 0 ? Math.round(totalAbsolutoNotas / diasOperados) : 0;
+
+  const diasComProducao = data.filter((d) => d.produtivas > 0);
+  const totalProdutivas = data.reduce((acc, d) => acc + d.produtivas, 0);
+  const qtdDiasProd =
+    diasComProducao.length > 0 ? diasComProducao.length : data.length;
   const mediaNotasDia =
-    qtdDias > 0 ? Math.round(totalNotas / qtdDias) : 0;
+    qtdDiasProd > 0 ? Math.round(totalProdutivas / qtdDiasProd) : 0;
 
   let projecaoTotalMes: number | null = null;
   if (projecaoAtiva && dataComProjecao) {
@@ -324,6 +336,7 @@ function calcularResumoCapacidade(
     mediaSemana: tecnicosUteis.size,
     mediaSabado: mediaTecnicosSabado,
     mediaNotasDia,
+    mediaNotaGeral,
     projecaoTotalMes,
   };
 }
@@ -1069,8 +1082,8 @@ export function KpiVolumeNotas() {
                 {resumoCapacidade ? (
                   <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-gray-600">
                     <span>
-                      Seg - Sexta: {formatQuantidade(resumoCapacidade.mediaSemana)}{" "}
-                      Técnicos
+                      Seg - Sexta:{" "}
+                      {formatQuantidade(resumoCapacidade.mediaSemana)} Técnicos
                     </span>
                     <span className="text-gray-300" aria-hidden>
                       |
@@ -1078,6 +1091,14 @@ export function KpiVolumeNotas() {
                     <span>
                       Sáb: {formatQuantidade(resumoCapacidade.mediaSabado)}{" "}
                       Técnicos
+                    </span>
+                    <span className="text-gray-300" aria-hidden>
+                      |
+                    </span>
+                    <span>
+                      Média de Nota (Geral):{" "}
+                      {formatQuantidade(resumoCapacidade.mediaNotaGeral)} Por
+                      dia
                     </span>
                     <span className="text-gray-300" aria-hidden>
                       |
