@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { fetchProfile } from "./auth-guards";
+import { fetchProfile, MSG_USUARIO_DESLIGADO } from "./auth-guards";
 import {
   getAuthSnapshot,
   initAuthSession,
@@ -79,6 +79,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const profile = await fetchProfile(data.session.user.id);
     if (!profile) throw new Error("Perfil não encontrado.");
+    if (profile.status === "DEMITIDO") {
+      await supabase.auth.signOut();
+      setCachedAuth(null, null);
+      setSession(null);
+      setUser(null);
+      throw new Error(MSG_USUARIO_DESLIGADO);
+    }
 
     setCachedAuth(data.session, profile);
     setSession(data.session);
@@ -108,6 +115,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const profile = await fetchProfile(current.user.id);
+    if (profile?.status === "DEMITIDO") {
+      await supabase.auth.signOut();
+      setCachedAuth(null, null);
+      setSession(null);
+      setUser(null);
+      return null;
+    }
     setCachedAuth(current, profile);
     setSession(current);
     setUser(profile);

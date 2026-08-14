@@ -116,3 +116,26 @@ export function canImportPainelDados(
 export function isTecnicoCampoRole(role: string | null | undefined): boolean {
   return normalizeUserRole(role) === "tecnico";
 }
+
+/** Conta master — não deve aparecer na Gestão de Equipe nem ser demitida. */
+export function isMasterAdminRole(role: string | null | undefined): boolean {
+  return normalizeUserRole(role) === "admin";
+}
+
+const MASTER_ADMIN_EMAILS = new Set(["admin@estrategic.com"]);
+
+export function isMasterAdminAccount(params: {
+  role?: string | null;
+  email?: string | null;
+  login?: string | null;
+}): boolean {
+  if (isMasterAdminRole(params.role)) return true;
+  const email = String(params.email ?? "")
+    .trim()
+    .toLowerCase();
+  if (email && MASTER_ADMIN_EMAILS.has(email)) return true;
+  const login = String(params.login ?? "")
+    .trim()
+    .toLowerCase();
+  return login === "admin";
+}

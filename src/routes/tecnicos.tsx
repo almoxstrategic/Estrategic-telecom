@@ -36,15 +36,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { updateTecnico } from "@/lib/admin-actions.server";
 import { useApp } from "@/lib/app-store";
 import { requireAdmin } from "@/lib/auth-guards";
 import { formatCelularMask, isValidCelular } from "@/lib/auth-identificacao";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
-import { canManageTeam } from "@/lib/roles";
+import { canManageTeam, normalizeUserRole, roleLabel } from "@/lib/roles";
 import {
   deleteTecnico,
-  fetchTecnicos,
+  fetchColaboradoresEquipe,
   updateTecnicoStatus,
   type TecnicoProfile,
   type TecnicoStatus,
@@ -88,6 +95,7 @@ function TecnicosPage() {
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [filtroCargo, setFiltroCargo] = useState("Todos");
   const [abaAtiva, setAbaAtiva] = useState<"ativos" | "demitidos">("ativos");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
@@ -103,7 +111,7 @@ function TecnicosPage() {
   const loadTecnicos = async () => {
     setLoading(true);
     try {
-      setTecnicos(await fetchTecnicos());
+      setTecnicos(await fetchColaboradoresEquipe());
     } catch (err) {
       toast.error((err as Error).message || "Erro ao carregar técnicos.");
     } finally {
@@ -120,15 +128,26 @@ function TecnicosPage() {
       abaAtiva === "ativos" ? tecnico.status === "ATIVO" : tecnico.status === "DEMITIDO",
     );
 
-    const q = query.trim().toLowerCase();
-    if (!q) return porAba;
+    const porCargo =
+      filtroCargo === "Todos"
+        ? porAba
+        : porAba.filter((tecnico) => {
+            const cargo = normalizeUserRole(tecnico.role);
+            if (filtroCargo === "Técnicos") return cargo === "tecnico";
+            if (filtroCargo === "Gerente") return cargo === "gerente";
+            if (filtroCargo === "COP") return cargo === "cop";
+            return true;
+          });
 
-    return porAba.filter((tecnico) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return porCargo;
+
+    return porCargo.filter((tecnico) => {
       const nome = tecnico.nome.toLowerCase();
       const matricula = (tecnico.identificacao ?? "").toLowerCase();
       return nome.includes(q) || matricula.includes(q);
     });
-  }, [tecnicos, abaAtiva, query]);
+  }, [tecnicos, abaAtiva, query, filtroCargo]);
 
   const exportarTecnicosParaExcel = () => {
     if (tecnicosFiltrados.length === 0) {
@@ -140,6 +159,7 @@ function TecnicosPage() {
       Nome: tecnico.nome,
       Matrícula: tecnico.identificacao ?? "—",
       Login: tecnico.login ?? "—",
+      Cargo: roleLabel(tecnico.role),
       Celular: formatCelularExibicao(tecnico.celular),
       Status: tecnico.status,
       "Data de Cadastro": formatDataCadastro(tecnico.created_at),
@@ -328,26 +348,44 @@ function TecnicosPage() {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {abaAtiva === "ativos" ? "Colaboradores ativos" : "Colaboradores demitidos"}
-              {query.trim() ? " (com filtro de busca)" : ""}
+              {query.trim() || filtroCargo !== "Todos" ? " (com filtro)" : ""}
             </p>
           </div>
         )}
 
         {!loading && tecnicos.length > 0 && (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm focus-within:ring-1 focus-within:ring-primary">
-            <Search className="h-5 w-5 text-muted-foreground" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nome ou matrícula..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca">
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm focus-within:ring-1 focus-within:ring-primary">
+              <Search className="h-5 w-5 text-muted-foreground" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nome ou matrícula..."
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+              {query && (
+                <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-cargo-equipe" className="shrink-0 text-sm font-medium">
+                Cargo:
+              </Label>
+              <Select value={filtroCargo} onValueChange={setFiltroCargo}>
+                <SelectTrigger id="filtro-cargo-equipe" className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos</SelectItem>
+                  <SelectItem value="Técnicos">Técnicos</SelectItem>
+                  <SelectItem value="Gerente">Gerente</SelectItem>
+                  <SelectItem value="COP">COP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
 
@@ -399,11 +437,11 @@ function TecnicosPage() {
               {tecnicosFiltrados.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-background/50 p-10 text-center">
                   <p className="text-sm text-muted-foreground">
-                    {query.trim()
-                      ? `Nenhum técnico encontrado para "${query}" nesta aba.`
+                    {query.trim() || filtroCargo !== "Todos"
+                      ? "Nenhum colaborador encontrado para os filtros nesta aba."
                       : abaAtiva === "ativos"
-                        ? "Nenhum técnico ativo."
-                        : "Nenhum técnico demitido."}
+                        ? "Nenhum colaborador ativo."
+                        : "Nenhum colaborador demitido."}
                   </p>
                 </div>
               ) : (
@@ -414,10 +452,11 @@ function TecnicosPage() {
                       className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-4 shadow-sm"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold">{tecnico.nome}</div>
+                        <div className="truncate font-semibold uppercase">{tecnico.nome}</div>
                         <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                           <span>Matrícula: {tecnico.identificacao ?? "—"}</span>
                           <span>Login: {tecnico.login ?? "—"}</span>
+                          <span>Cargo: {roleLabel(tecnico.role)}</span>
                         </div>
                       </div>
 
@@ -517,7 +556,7 @@ function TecnicosPage() {
                     <User className="h-6 w-6" />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-lg font-bold">{profileTarget.nome}</p>
+                    <p className="truncate text-lg font-bold uppercase">{profileTarget.nome}</p>
                     <p className="text-xs text-muted-foreground">Colaborador de campo</p>
                   </div>
                 </div>
@@ -527,7 +566,7 @@ function TecnicosPage() {
                     <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Nome Completo
                     </dt>
-                    <dd className="mt-0.5 font-medium">{profileTarget.nome}</dd>
+                    <dd className="mt-0.5 font-medium uppercase">{profileTarget.nome}</dd>
                   </div>
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -590,7 +629,7 @@ function TecnicosPage() {
           {editTarget && (
             <form onSubmit={salvarEdicao} className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
-                <p className="font-semibold">{editTarget.nome}</p>
+                <p className="font-semibold uppercase">{editTarget.nome}</p>
                 <p className="text-xs text-muted-foreground">
                   Login: {editTarget.login ?? "—"} · Id TOA: {editTarget.identificacao ?? "—"}
                 </p>

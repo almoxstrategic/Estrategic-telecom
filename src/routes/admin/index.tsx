@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarClock,
   ChartColumn,
+  ClipboardList,
   Database,
   FileUp,
   Map,
@@ -35,7 +36,12 @@ type AdminSearch = {
 export const Route = createFileRoute("/admin/")({
   validateSearch: (search: Record<string, unknown>): AdminSearch => {
     const tab = search.tab;
-    if (tab === "inicio" || tab === "miscelaneas" || tab === "serializados") {
+    if (
+      tab === "inicio" ||
+      tab === "miscelaneas" ||
+      tab === "serializados" ||
+      tab === "lancamentos"
+    ) {
       return { tab };
     }
     return {};
@@ -250,7 +256,7 @@ function AdminHome() {
               </div>
             </Link>
           </section>
-        ) : showOperacional ? (
+        ) : showOperacional && activeTab === "Serializados" ? (
           <section className={MODULE_GRID_CLASS}>
             <div className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
@@ -317,6 +323,27 @@ function AdminHome() {
                 </div>
               </div>
             </div>
+          </section>
+        ) : showOperacional && activeTab === "Lançamentos" ? (
+          <section className={MODULE_GRID_CLASS}>
+            <a
+              href="#"
+              onClick={(e) => e.preventDefault()}
+              className="block w-full"
+              aria-label="Relatório de campo (em desenvolvimento)"
+            >
+              <div className={`${MODULE_CARD_CLASS} border-border`}>
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-700">
+                  <ClipboardList className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Relatório de campo</div>
+                  <div className="text-xs text-muted-foreground">
+                    Gestão de relatórios operacionais (Em desenvolvimento)
+                  </div>
+                </div>
+              </div>
+            </a>
           </section>
         ) : null}
       </main>

@@ -7,6 +7,7 @@ export type AppUser = {
   login?: string;
   nome: string;
   role: UserRole;
+  status?: "ATIVO" | "DEMITIDO";
 };
 
 export type Evidencia = {

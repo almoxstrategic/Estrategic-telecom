@@ -45,7 +45,7 @@ export function initAuthSession(): Promise<void> {
 
   if (initPromise) return initPromise;
 
-  initPromise = (async () => {
+    initPromise = (async () => {
     const supabase = getSupabaseClient();
 
     const {
@@ -54,12 +54,22 @@ export function initAuthSession(): Promise<void> {
 
     session = initialSession;
     user = initialSession ? await fetchProfile(initialSession.user.id) : null;
+    if (user?.status === "DEMITIDO") {
+      await supabase.auth.signOut();
+      session = null;
+      user = null;
+    }
     ready = true;
     notify();
 
     supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       session = nextSession;
       user = nextSession ? await fetchProfile(nextSession.user.id) : null;
+      if (user?.status === "DEMITIDO") {
+        await supabase.auth.signOut();
+        session = null;
+        user = null;
+      }
       notify();
     });
   })();

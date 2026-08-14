@@ -1,5 +1,7 @@
 import { deleteTecnicoEvidencePhotos } from "./evidencias-service";
+import { isMasterAdminAccount, normalizeUserRole } from "./roles";
 import { getSupabaseClient } from "./supabase";
+import type { UserRole } from "./types";
 
 export type TecnicoStatus = "ATIVO" | "DEMITIDO";
 
@@ -11,6 +13,7 @@ export type TecnicoProfile = {
   celular: string | null;
   created_at: string | null;
   status: TecnicoStatus;
+  role: UserRole;
 };
 
 function normalizeStatus(value: unknown): TecnicoStatus {
@@ -29,6 +32,7 @@ function mapTecnicoRow(row: {
   celular: string | null;
   created_at: string | null;
   status?: string | null;
+  role?: string | null;
 }): TecnicoProfile {
   return {
     id: row.id,
@@ -38,7 +42,18 @@ function mapTecnicoRow(row: {
     celular: row.celular,
     created_at: row.created_at,
     status: normalizeStatus(row.status),
+    role: normalizeUserRole(row.role),
   };
+}
+
+function excluiMasterAdmin(lista: TecnicoProfile[]): TecnicoProfile[] {
+  return lista.filter(
+    (colaborador) =>
+      !isMasterAdminAccount({
+        role: colaborador.role,
+        login: colaborador.login,
+      }),
+  );
 }
 
 /** Chaves normalizadas (matrícula, login, id, nome) dos técnicos demitidos. */
@@ -65,27 +80,57 @@ export function isTecnicoDemitido(
   return false;
 }
 
+const COLABORADOR_SELECT =
+  "id, nome, identificacao, login, celular, created_at, status, role";
+
+/** Técnicos de campo (combos, KPIs, pendências). */
 export async function fetchTecnicos(): Promise<TecnicoProfile[]> {
   const supabase = getSupabaseClient();
   const withStatus = await supabase
     .from("profiles")
-    .select("id, nome, identificacao, login, celular, created_at, status")
+    .select(COLABORADOR_SELECT)
     .eq("role", "tecnico")
     .order("nome", { ascending: true });
 
   if (!withStatus.error) {
-    return (withStatus.data ?? []).map(mapTecnicoRow);
+    return excluiMasterAdmin((withStatus.data ?? []).map(mapTecnicoRow));
   }
 
   // Fallback se a coluna status ainda não existir no banco.
   const fallback = await supabase
     .from("profiles")
-    .select("id, nome, identificacao, login, celular, created_at")
+    .select("id, nome, identificacao, login, celular, created_at, role")
     .eq("role", "tecnico")
     .order("nome", { ascending: true });
 
   if (fallback.error) throw fallback.error;
-  return (fallback.data ?? []).map(mapTecnicoRow);
+  return excluiMasterAdmin((fallback.data ?? []).map(mapTecnicoRow));
+}
+
+/**
+ * Gestão de Equipe: todos os colaboradores, exceto a conta master (role admin).
+ * Gerente e COP continuam visíveis.
+ */
+export async function fetchColaboradoresEquipe(): Promise<TecnicoProfile[]> {
+  const supabase = getSupabaseClient();
+  const withStatus = await supabase
+    .from("profiles")
+    .select(COLABORADOR_SELECT)
+    .neq("role", "admin")
+    .order("nome", { ascending: true });
+
+  if (!withStatus.error) {
+    return excluiMasterAdmin((withStatus.data ?? []).map(mapTecnicoRow));
+  }
+
+  const fallback = await supabase
+    .from("profiles")
+    .select("id, nome, identificacao, login, celular, created_at, role")
+    .neq("role", "admin")
+    .order("nome", { ascending: true });
+
+  if (fallback.error) throw fallback.error;
+  return excluiMasterAdmin((fallback.data ?? []).map(mapTecnicoRow));
 }
 
 export async function updateTecnicoStatus(
@@ -97,7 +142,7 @@ export async function updateTecnicoStatus(
     .from("profiles")
     .update({ status })
     .eq("id", tecnicoId)
-    .eq("role", "tecnico");
+    .neq("role", "admin");
 
   if (error) throw error;
 }
