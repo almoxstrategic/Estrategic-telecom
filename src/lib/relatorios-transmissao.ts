@@ -1,6 +1,6 @@
 import { getStoragePublicUrl, getSupabaseClient } from "./supabase";
 
-export type RelatorioStatus = "em_aberto" | "avisado" | "fechado";
+export type RelatorioStatus = "em_aberto" | "avisado" | "fechado" | "pendente";
 export type TipoExecucao = "implantacao" | "empresarial";
 
 export type StoredPhoto = {
@@ -28,6 +28,7 @@ export type RelatorioPayload = {
     fotoFim: StoredPhoto | null;
     metragem: string;
     obs: string;
+    fotosExtras: StoredPhoto[];
   };
   posteConexao: FotoGrupoPayload;
   caixaEmenda: FotoGrupoPayload;
@@ -52,6 +53,8 @@ export type RelatorioTransmissao = {
   tipo_execucao: TipoExecucao | null;
   status: RelatorioStatus;
   payload: RelatorioPayload;
+  motivo_pendencia: string | null;
+  data_pendencia: string | null;
   avisado_at: string | null;
   fechado_at: string | null;
   created_at: string;
@@ -74,7 +77,7 @@ export function emptyRelatorioPayload(): RelatorioPayload {
   return {
     lancamentoRe: null,
     qntPostesRe: "",
-    metragemRe: { fotoInicio: null, fotoFim: null, metragem: "", obs: "" },
+    metragemRe: { fotoInicio: null, fotoFim: null, metragem: "", obs: "", fotosExtras: [] },
     posteConexao: { fotos: [], obs: "" },
     caixaEmenda: { fotos: [], obs: "" },
     sobraTecnica: { fotos: [], obs: "" },
@@ -93,7 +96,11 @@ function parsePayload(raw: unknown): RelatorioPayload {
   return {
     ...base,
     ...src,
-    metragemRe: { ...base.metragemRe, ...src.metragemRe },
+    metragemRe: {
+      ...base.metragemRe,
+      ...src.metragemRe,
+      fotosExtras: src.metragemRe?.fotosExtras ?? [],
+    },
     posteConexao: { ...base.posteConexao, ...src.posteConexao },
     caixaEmenda: { ...base.caixaEmenda, ...src.caixaEmenda },
     sobraTecnica: { ...base.sobraTecnica, ...src.sobraTecnica },
@@ -118,6 +125,8 @@ type DbRow = {
   tipo_execucao: TipoExecucao | null;
   status: RelatorioStatus;
   payload: unknown;
+  motivo_pendencia: string | null;
+  data_pendencia: string | null;
   avisado_at: string | null;
   fechado_at: string | null;
   created_at: string;
@@ -139,6 +148,8 @@ function mapRow(row: DbRow): RelatorioTransmissao {
     tipo_execucao: row.tipo_execucao,
     status: row.status,
     payload: parsePayload(row.payload),
+    motivo_pendencia: row.motivo_pendencia ?? null,
+    data_pendencia: row.data_pendencia ?? null,
     avisado_at: row.avisado_at,
     fechado_at: row.fechado_at,
     created_at: row.created_at,
@@ -148,10 +159,10 @@ function mapRow(row: DbRow): RelatorioTransmissao {
 }
 
 const SELECT_COLS =
-  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
+  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
 
 const SELECT_COLS_PLAIN =
-  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, avisado_at, fechado_at, created_at, updated_at";
+  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
 
 export async function uploadRelatorioPhoto(
   tecnicoId: string,
@@ -201,7 +212,7 @@ export async function findRelatorioAbertoPorOsWf(
     .from("relatorios_transmissao")
     .select(SELECT_COLS)
     .eq("os_wf", osWf.trim())
-    .in("status", ["em_aberto", "avisado"])
+    .in("status", ["em_aberto", "avisado", "pendente"])
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -210,7 +221,7 @@ export async function findRelatorioAbertoPorOsWf(
       .from("relatorios_transmissao")
       .select(SELECT_COLS_PLAIN)
       .eq("os_wf", osWf.trim())
-      .in("status", ["em_aberto", "avisado"])
+      .in("status", ["em_aberto", "avisado", "pendente"])
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -304,7 +315,12 @@ export async function avisarConclusaoRelatorio(id: string): Promise<RelatorioTra
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("relatorios_transmissao")
-    .update({ status: "avisado", avisado_at: new Date().toISOString() })
+    .update({
+      status: "avisado",
+      avisado_at: new Date().toISOString(),
+      motivo_pendencia: null,
+      data_pendencia: null,
+    })
     .eq("id", id)
     .neq("status", "fechado")
     .select(SELECT_COLS)
@@ -312,7 +328,12 @@ export async function avisarConclusaoRelatorio(id: string): Promise<RelatorioTra
   if (error) {
     const fallback = await supabase
       .from("relatorios_transmissao")
-      .update({ status: "avisado", avisado_at: new Date().toISOString() })
+      .update({
+      status: "avisado",
+      avisado_at: new Date().toISOString(),
+      motivo_pendencia: null,
+      data_pendencia: null,
+    })
       .eq("id", id)
       .neq("status", "fechado")
       .select(SELECT_COLS_PLAIN)
@@ -336,17 +357,12 @@ export async function fetchMeusRelatoriosTransmissao(
   return (data ?? []).map((row) => mapRow(row as DbRow));
 }
 
-export async function fetchRelatoriosTransmissaoAdmin(
-  statusGroup: "abertos" | "fechados",
-): Promise<RelatorioTransmissao[]> {
+export async function fetchRelatoriosTransmissaoAdmin(): Promise<RelatorioTransmissao[]> {
   const supabase = getSupabaseClient();
-  let query = supabase.from("relatorios_transmissao").select(SELECT_COLS);
-  if (statusGroup === "fechados") {
-    query = query.eq("status", "fechado");
-  } else {
-    query = query.in("status", ["em_aberto", "avisado"]);
-  }
-  const { data, error } = await query.order("updated_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("relatorios_transmissao")
+    .select(SELECT_COLS)
+    .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((row) => mapRow(row as DbRow));
 }
@@ -355,9 +371,106 @@ export async function fecharRelatorioTransmissao(id: string): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("relatorios_transmissao")
-    .update({ status: "fechado", fechado_at: new Date().toISOString() })
+    .update({
+      status: "fechado",
+      fechado_at: new Date().toISOString(),
+      motivo_pendencia: null,
+      data_pendencia: null,
+    })
     .eq("id", id);
   if (error) throw error;
+}
+
+export async function sinalizarPendenciaRelatorio(
+  id: string,
+  motivo: string,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from("relatorios_transmissao")
+    .update({
+      status: "pendente",
+      motivo_pendencia: motivo.trim() || "Pendência sinalizada pela supervisão.",
+      data_pendencia: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .neq("status", "fechado");
+  if (error) throw error;
+}
+
+export async function patchRelatorioPayloadAdmin(
+  id: string,
+  payload: RelatorioPayload,
+): Promise<RelatorioTransmissao> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("relatorios_transmissao")
+    .update({ payload })
+    .eq("id", id)
+    .select(SELECT_COLS)
+    .single();
+  if (error) {
+    const fallback = await supabase
+      .from("relatorios_transmissao")
+      .update({ payload })
+      .eq("id", id)
+      .select(SELECT_COLS_PLAIN)
+      .single();
+    if (fallback.error) throw fallback.error;
+    return mapRow(fallback.data as DbRow);
+  }
+  return mapRow(data as DbRow);
+}
+
+export async function excluirRelatorioTransmissao(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("relatorios_transmissao").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export type RelatorioFotoCategoria =
+  | "metragemRe"
+  | "posteConexao"
+  | "caixaEmenda"
+  | "sobraTecnica"
+  | "aterramentoTerrometro"
+  | "novoAterramentoPoste"
+  | "posicaoConexaoEstacao"
+  | "etiquetaIdentificacao"
+  | "outrasFotos";
+
+export function appendStoredPhotoToPayload(
+  payload: RelatorioPayload,
+  categoria: RelatorioFotoCategoria,
+  stored: StoredPhoto,
+): RelatorioPayload {
+  if (categoria === "metragemRe") {
+    const re = payload.metragemRe;
+    if (!re.fotoInicio) {
+      return { ...payload, metragemRe: { ...re, fotoInicio: stored } };
+    }
+    if (!re.fotoFim) {
+      return { ...payload, metragemRe: { ...re, fotoFim: stored } };
+    }
+    return {
+      ...payload,
+      metragemRe: { ...re, fotosExtras: [...(re.fotosExtras ?? []), stored] },
+    };
+  }
+  if (categoria === "outrasFotos") {
+    return {
+      ...payload,
+      outrasFotos: [
+        ...payload.outrasFotos,
+        { id: crypto.randomUUID(), ref: "Admin", foto: stored, obs: "" },
+      ],
+    };
+  }
+  const grupo = payload[categoria];
+  return {
+    ...payload,
+    [categoria]: { ...grupo, fotos: [...grupo.fotos, stored] },
+  };
 }
 
 export function subscribeRelatoriosTransmissao(

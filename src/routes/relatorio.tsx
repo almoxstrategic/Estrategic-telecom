@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Bell, Plus, Save } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
@@ -99,6 +99,7 @@ function RelatorioPage() {
   const [osWfInput, setOsWfInput] = useState("");
   const [osWf, setOsWf] = useState("");
   const [status, setStatus] = useState<RelatorioStatus>("em_aberto");
+  const [motivoPendencia, setMotivoPendencia] = useState<string | null>(null);
   const [loadingById, setLoadingById] = useState(Boolean(reportIdFromUrl));
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
@@ -113,6 +114,7 @@ function RelatorioPage() {
   const [metragemObs, setMetragemObs] = useState("");
   const [fotoInicioStored, setFotoInicioStored] = useState<StoredPhoto | null>(null);
   const [fotoFimStored, setFotoFimStored] = useState<StoredPhoto | null>(null);
+  const [fotosExtrasRe, setFotosExtrasRe] = useState<StoredPhoto[]>([]);
   const [poste, setPoste] = useState<FotoSlot[]>([newFotoSlot()]);
   const [posteObs, setPosteObs] = useState("");
   const [caixa, setCaixa] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -143,6 +145,7 @@ function RelatorioPage() {
         fotoFim: fotoFimStored,
         metragem,
         obs: metragemObs,
+        fotosExtras: fotosExtrasRe,
       },
       posteConexao: { fotos: fotosDosSlots(poste), obs: posteObs },
       caixaEmenda: { fotos: fotosDosSlots(caixa), obs: caixaObs },
@@ -163,6 +166,7 @@ function RelatorioPage() {
     qntPostesRe,
     fotoInicioStored,
     fotoFimStored,
+    fotosExtrasRe,
     metragem,
     metragemObs,
     poste,
@@ -184,7 +188,7 @@ function RelatorioPage() {
 
   const persistDraft = useCallback(
     async (payloadOverride?: RelatorioPayload) => {
-      if (!currentReportId || status !== "em_aberto") return;
+      if (!currentReportId || (status !== "em_aberto" && status !== "pendente")) return;
       setSaveHint("saving");
       try {
         await patchRelatorioDraft(currentReportId, {
@@ -251,9 +255,10 @@ function RelatorioPage() {
       outras,
       fotoInicioStored,
       fotoFimStored,
+      fotosExtrasRe,
     ],
     1500,
-    step === 2 && Boolean(currentReportId) && status === "em_aberto",
+    step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
   );
 
   const applyRelatorio = (row: RelatorioTransmissao) => {
@@ -262,6 +267,7 @@ function RelatorioPage() {
     setCurrentReportId(row.id);
     setOsWf(row.os_wf);
     setStatus(row.status);
+    setMotivoPendencia(row.motivo_pendencia);
     setCliente(row.cliente);
     setEndereco(row.endereco);
     setCidade(row.cidade);
@@ -275,6 +281,7 @@ function RelatorioPage() {
     setMetragemObs(p.metragemRe?.obs ?? "");
     setFotoInicioStored(p.metragemRe?.fotoInicio ?? null);
     setFotoFimStored(p.metragemRe?.fotoFim ?? null);
+    setFotosExtrasRe(p.metragemRe?.fotosExtras ?? []);
     setPoste(slotsFromStored(p.posteConexao?.fotos ?? [], 1));
     setPosteObs(p.posteConexao?.obs ?? "");
     setCaixa(slotsFromStored(p.caixaEmenda?.fotos ?? [], 1));
@@ -299,7 +306,7 @@ function RelatorioPage() {
       })),
     );
     setStep(2);
-    if (row.status === "em_aberto") {
+    if (row.status === "em_aberto" || row.status === "pendente") {
       window.setTimeout(() => {
         canAutosaveRef.current = true;
       }, 800);
@@ -445,7 +452,7 @@ function RelatorioPage() {
   );
 
   const onAvisar = async () => {
-    if (!currentReportId || status !== "em_aberto") return;
+    if (!currentReportId || (status !== "em_aberto" && status !== "pendente")) return;
     if (!headerOk) {
       toast.error("Preencha os dados da obra e o tipo de execução antes de avisar.");
       return;
@@ -455,8 +462,13 @@ function RelatorioPage() {
       await persistDraft();
       const saved = await avisarConclusaoRelatorio(currentReportId);
       setStatus(saved.status);
+      setMotivoPendencia(null);
       canAutosaveRef.current = false;
-      toast.success("Conclusão avisada. O relatório foi para o histórico.");
+      toast.success(
+        status === "pendente"
+          ? "Correção enviada. O relatório voltou para análise do admin."
+          : "Conclusão avisada. O relatório foi para análise.",
+      );
     } catch (err) {
       toast.error((err as Error).message || "Não foi possível avisar o relatório.");
     } finally {
@@ -465,12 +477,13 @@ function RelatorioPage() {
   };
 
   const showReMetragem = tipo === "implantacao" && lancamentoRe === "sim";
-  const readOnly = status !== "em_aberto";
+  const readOnly = status === "avisado" || status === "fechado";
   const voltarInicio = () => {
     canAutosaveRef.current = false;
     setStep(1);
     setCurrentReportId(null);
     setOsWfInput("");
+    setMotivoPendencia(null);
     setSaveHint("idle");
   };
 
@@ -550,7 +563,9 @@ function RelatorioPage() {
             <p className="text-sm text-muted-foreground">
               {readOnly
                 ? "Somente visualização — este relatório já foi avisado ou fechado."
-                : "Rascunho vivo — salvamento automático. O admin já enxerga este contrato."}
+                : status === "pendente"
+                  ? "Corrija os pontos indicados e avise novamente a conclusão."
+                  : "Rascunho vivo — salvamento automático. O admin já enxerga este contrato."}
             </p>
           </div>
           <span className="shrink-0 text-xs font-medium text-muted-foreground">
@@ -564,9 +579,24 @@ function RelatorioPage() {
                   ? "Salvo"
                   : saveHint === "error"
                     ? "Falha ao salvar"
-                    : "Em aberto"}
+                    : status === "pendente"
+                      ? "Pendência"
+                      : "Em aberto"}
           </span>
         </header>
+
+        {status === "pendente" ? (
+          <div
+            role="alert"
+            className="mb-5 flex gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              <span className="font-semibold">Relatório com pendência: </span>
+              {motivoPendencia?.trim() || "A supervisão solicitou correções neste relatório."}
+            </p>
+          </div>
+        ) : null}
 
         <form
           id="relatorio-form"
@@ -768,7 +798,6 @@ function RelatorioPage() {
                             onChange={(e) => setMetragemObs(e.target.value)}
                             rows={3}
                             disabled={readOnly}
-                            className={inputClass()}
                             className={inputClass()}
                           />
                         </div>
