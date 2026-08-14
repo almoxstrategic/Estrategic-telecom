@@ -34,6 +34,7 @@ import { resetAdminTabToInicio } from "@/lib/admin-tab";
 import {
   canAccessAdminPanel,
   canAccessOperacionalMenus,
+  isTecnicoTransmissaoRole,
   roleLabel,
 } from "@/lib/roles";
 
@@ -99,6 +100,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useApp();
   const navigate = useNavigate();
   const isAdmin = canAccessAdminPanel(user?.role);
+  const isTransmissao = isTecnicoTransmissaoRole(user?.role);
   const showOperacional = canAccessOperacionalMenus(user?.role);
   const { pathname, search } = useRouterState({
     select: (s) => ({
@@ -542,15 +544,27 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <Home className="h-5 w-5 text-primary" />
               Início
             </Link>
-            <Link
-              to="/historico"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
-              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
-            >
-              <ClipboardList className="h-5 w-5 text-primary" />
-              Meus Registros
-            </Link>
+            {isTransmissao ? (
+              <Link
+                to="/relatorio"
+                onClick={onNavigate}
+                className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+              >
+                <ClipboardList className="h-5 w-5 text-primary" />
+                Relatório
+              </Link>
+            ) : (
+              <Link
+                to="/historico"
+                onClick={onNavigate}
+                className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+              >
+                <ClipboardList className="h-5 w-5 text-primary" />
+                Meus Registros
+              </Link>
+            )}
           </>
         )}
       </div>

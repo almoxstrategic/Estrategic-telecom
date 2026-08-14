@@ -326,12 +326,7 @@ function AdminHome() {
           </section>
         ) : showOperacional && activeTab === "Lançamentos" ? (
           <section className={MODULE_GRID_CLASS}>
-            <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
-              className="block w-full"
-              aria-label="Relatório de campo (em desenvolvimento)"
-            >
+            <Link to="/admin/lancamentos" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-700">
                   <ClipboardList className="h-6 w-6" />
@@ -339,11 +334,11 @@ function AdminHome() {
                 <div>
                   <div className="font-bold text-foreground">Relatório de campo</div>
                   <div className="text-xs text-muted-foreground">
-                    Gestão de relatórios operacionais (Em desenvolvimento)
+                    Gestão de relatórios da equipe de lançamento
                   </div>
                 </div>
               </div>
-            </a>
+            </Link>
           </section>
         ) : null}
       </main>

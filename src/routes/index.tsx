@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Ruler } from "lucide-react";
+import { FileText, Ruler } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissao";
+import { useApp } from "@/lib/app-store";
 import { requireHomeEntry } from "@/lib/auth-guards";
+import { isTecnicoTransmissaoRole } from "@/lib/roles";
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => requireHomeEntry(),
@@ -15,6 +18,9 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
+  const { user } = useApp();
+  const isTransmissao = isTecnicoTransmissaoRole(user?.role);
+
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
@@ -24,26 +30,37 @@ function HomePage() {
         </section>
 
         <section className="grid grid-cols-1 gap-4">
-          <Link to="/metragem" className="block">
-            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
-                <Ruler className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="font-bold text-foreground">Evidência de Metragem</div>
-                <div className="text-xs text-muted-foreground">
-                  Registre foto de início e fim da WO
+          {isTransmissao ? (
+            <Link to="/relatorio" className="block">
+              <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Preparar relatório</div>
+                  <div className="text-xs text-muted-foreground">
+                    Iniciar um novo relatório de campo
+                  </div>
                 </div>
               </div>
-            </div>
-          </Link>
-
-          {/* Vistoria Técnica — oculto temporariamente
-          <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-border bg-muted/40 p-5 opacity-70">
-            ...
-          </div>
-          */}
+            </Link>
+          ) : (
+            <Link to="/metragem" className="block">
+              <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
+                  <Ruler className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-foreground">Evidência de Metragem</div>
+                  <div className="text-xs text-muted-foreground">
+                    Registre foto de início e fim da WO
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
         </section>
+        {isTransmissao && user?.id ? <MeusRelatoriosTransmissao tecnicoId={user.id} /> : null}
       </main>
     </div>
   );

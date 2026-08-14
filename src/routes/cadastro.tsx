@@ -41,6 +41,7 @@ function CadastroPage() {
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
   const [loading, setLoading] = useState(false);
+  const matriculaObrigatoria = poderes !== "TRANSMISSAO";
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +50,17 @@ function CadastroPage() {
       return;
     }
 
-    if (!isValidMatricula(identificacao)) {
+    const role: UserRole = roleFromPoderesSelect(poderes);
+    const matriculaNormalizada = identificacao.trim()
+      ? normalizeMatricula(identificacao)
+      : "";
+
+    if (role === "transmissao") {
+      if (matriculaNormalizada && !isValidMatricula(matriculaNormalizada)) {
+        toast.error("Matrícula inválida. Use 2–20 caracteres alfanuméricos (ex: Z628337).");
+        return;
+      }
+    } else if (!isValidMatricula(identificacao)) {
       toast.error("Matrícula inválida. Use 2–20 caracteres alfanuméricos (ex: Z628337).");
       return;
     }
@@ -64,8 +75,6 @@ function CadastroPage() {
       return;
     }
 
-    const role: UserRole = roleFromPoderesSelect(poderes);
-
     const accessToken = getAccessToken();
     if (!accessToken) {
       toast.error("Sessão expirada. Faça login novamente.");
@@ -77,7 +86,7 @@ function CadastroPage() {
       await createUserAccount({
         data: {
           accessToken,
-          identificacao: normalizeMatricula(identificacao),
+          identificacao: matriculaNormalizada,
           celular: celular.replace(/\D/g, ""),
           login: login.trim(),
           password: senha,
@@ -125,7 +134,12 @@ function CadastroPage() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold">Identificação (Matrícula)</label>
+            <label className="mb-1.5 block text-sm font-semibold">
+              Identificação (Matrícula)
+              {!matriculaObrigatoria ? (
+                <span className="ml-1 font-normal text-muted-foreground">(opcional)</span>
+              ) : null}
+            </label>
             <input
               type="text"
               autoCapitalize="characters"
@@ -133,10 +147,12 @@ function CadastroPage() {
               onChange={(e) => setIdentificacao(normalizeMatricula(e.target.value))}
               placeholder="Ex: Z628337"
               className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base uppercase outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              required
+              required={matriculaObrigatoria}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Código alfanumérico do colaborador no sistema legado.
+              {matriculaObrigatoria
+                ? "Código alfanumérico do colaborador no sistema legado."
+                : "Opcional para Técnico Transmissão. Deixe em branco se não houver matrícula TOA."}
             </p>
           </div>
           <div>
@@ -169,7 +185,8 @@ function CadastroPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-muted-foreground">
-              Técnico = app de campo · Admin/Gerente = painel completo · COP = painel somente leitura
+              Técnico = evidência IAT · Transmissão = relatório de lançamento · Admin/Gerente =
+              painel completo · COP = painel somente leitura
             </p>
           </div>
           <div>

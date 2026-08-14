@@ -1,7 +1,7 @@
 import type { UserRole } from "./types";
 
 /** Roles persistidas no banco (lowercase, sem acento). */
-export const USER_ROLES = ["tecnico", "admin", "gerente", "cop"] as const;
+export const USER_ROLES = ["tecnico", "admin", "gerente", "cop", "transmissao"] as const;
 
 /** Acesso total de escrita no painel (equivalentes). */
 export const PAINEL_FULL_ROLES = ["admin", "gerente"] as const;
@@ -14,6 +14,11 @@ export type PainelAccessRole = (typeof PAINEL_ACCESS_ROLES)[number];
 
 export const ROLE_SELECT_OPTIONS = [
   { value: "TECNICO", role: "tecnico" as const, label: "Técnico" },
+  {
+    value: "TRANSMISSAO",
+    role: "transmissao" as const,
+    label: "Técnico Transmissão",
+  },
   { value: "ADMIN", role: "admin" as const, label: "Admin" },
   { value: "GERENTE", role: "gerente" as const, label: "Gerente" },
   { value: "COP", role: "cop" as const, label: "COP" },
@@ -29,7 +34,8 @@ export function normalizeUserRole(value: unknown): UserRole {
     role === "admin" ||
     role === "gerente" ||
     role === "tecnico" ||
-    role === "cop"
+    role === "cop" ||
+    role === "transmissao"
   ) {
     return role;
   }
@@ -49,6 +55,8 @@ export function roleLabel(role: string | null | undefined): string {
       return "Gerente";
     case "cop":
       return "COP";
+    case "transmissao":
+      return "Técnico Transmissão";
     default:
       return "Técnico";
   }
@@ -115,6 +123,10 @@ export function canImportPainelDados(
 
 export function isTecnicoCampoRole(role: string | null | undefined): boolean {
   return normalizeUserRole(role) === "tecnico";
+}
+
+export function isTecnicoTransmissaoRole(role: string | null | undefined): boolean {
+  return normalizeUserRole(role) === "transmissao";
 }
 
 /** Conta master — não deve aparecer na Gestão de Equipe nem ser demitida. */

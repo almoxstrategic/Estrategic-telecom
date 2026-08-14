@@ -8,7 +8,7 @@ import {
   normalizeLogin,
   normalizeMatricula,
 } from "./auth-identificacao";
-import { hasPainelAdminAccess } from "./roles";
+import { hasPainelAdminAccess, normalizeUserRole } from "./roles";
 import {
   getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
@@ -58,13 +58,6 @@ const withToken = z.object({
   accessToken: z.string().min(1),
 });
 
-const matriculaField = z
-  .string()
-  .transform((v) => normalizeMatricula(v))
-  .refine((v) => matriculaSchema.test(v), {
-    message: "Matrícula deve ser alfanumérica (2 a 20 caracteres, ex: Z628337).",
-  });
-
 const celularField = z
   .string()
   .transform((v) => v.replace(/\D/g, ""))
@@ -81,19 +74,45 @@ const loginField = z
 
 export const createUserAccount = createServerFn({ method: "POST" })
   .validator(
-    withToken.extend({
-      identificacao: matriculaField,
-      celular: celularField,
-      login: loginField,
-      password: z.string().min(6),
-      nome: z.string().min(2),
-      role: z.enum(["admin", "gerente", "tecnico", "cop"]).default("tecnico"),
-    }),
+    withToken
+      .extend({
+        identificacao: z.string().optional().default(""),
+        celular: celularField,
+        login: loginField,
+        password: z.string().min(6),
+        nome: z.string().min(2),
+        role: z
+          .enum(["admin", "gerente", "tecnico", "cop", "transmissao"])
+          .default("tecnico"),
+      })
+      .superRefine((data, ctx) => {
+        const matricula = normalizeMatricula(data.identificacao ?? "");
+        if (data.role === "transmissao") {
+          if (matricula && !matriculaSchema.test(matricula)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["identificacao"],
+              message:
+                "Matrícula deve ser alfanumérica (2 a 20 caracteres, ex: Z628337).",
+            });
+          }
+          return;
+        }
+        if (!matriculaSchema.test(matricula)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["identificacao"],
+            message:
+              "Matrícula deve ser alfanumérica (2 a 20 caracteres, ex: Z628337).",
+          });
+        }
+      }),
   )
   .handler(async ({ data }) => {
     await assertAdmin(data.accessToken);
     const supabase = getServiceClient();
-    const matricula = normalizeMatricula(data.identificacao);
+    const role = normalizeUserRole(data.role);
+    const matricula = normalizeMatricula(data.identificacao ?? "") || null;
     const login = normalizeLogin(data.login);
     const authEmail = loginToAuthEmail(login);
 
@@ -105,20 +124,26 @@ export const createUserAccount = createServerFn({ method: "POST" })
 
     if (existingLogin) throw new Error("Este login já está em uso.");
 
-    const { data: existingMatricula } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("identificacao", matricula)
-      .maybeSingle();
+    if (matricula) {
+      const { data: existingMatricula } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("identificacao", matricula)
+        .maybeSingle();
 
-    if (existingMatricula) throw new Error("Esta matrícula já está cadastrada.");
+      if (existingMatricula) throw new Error("Esta matrícula já está cadastrada.");
+    }
 
     const { data: created, error } = await supabase.auth.admin.createUser({
       email: authEmail,
       password: data.password,
       email_confirm: true,
-      app_metadata: { role: data.role },
-      user_metadata: { nome: data.nome, identificacao: matricula, login },
+      app_metadata: { role },
+      user_metadata: {
+        nome: data.nome,
+        login,
+        ...(matricula ? { identificacao: matricula } : {}),
+      },
     });
 
     if (error) {
@@ -133,7 +158,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
     const { error: profileError } = await supabase.from("profiles").upsert({
       id: created.user.id,
       nome: data.nome,
-      role: data.role,
+      role,
       identificacao: matricula,
       login,
       celular: data.celular,

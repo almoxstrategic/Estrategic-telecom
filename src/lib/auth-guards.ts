@@ -9,6 +9,7 @@ import {
 import {
   canAccessAdminPanel,
   canManageTeam,
+  isTecnicoTransmissaoRole,
   normalizeUserRole,
 } from "./roles";
 import type { AppUser } from "./types";
@@ -155,6 +156,15 @@ export async function requireTecnico(): Promise<AppUser> {
     return authUser;
   }
   throw redirect({ to: "/admin" });
+}
+
+/** Relatório de lançamento: apenas Técnico Transmissão. */
+export async function requireTecnicoTransmissao(): Promise<AppUser> {
+  const authUser = await requireTecnico();
+  if (!isTecnicoTransmissaoRole(authUser.role)) {
+    throw redirect({ to: "/" });
+  }
+  return authUser;
 }
 
 export async function requireTecnicoOrAdmin(): Promise<AppUser> {

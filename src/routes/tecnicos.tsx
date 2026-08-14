@@ -134,6 +134,7 @@ function TecnicosPage() {
         : porAba.filter((tecnico) => {
             const cargo = normalizeUserRole(tecnico.role);
             if (filtroCargo === "Técnicos") return cargo === "tecnico";
+            if (filtroCargo === "Transmissão") return cargo === "transmissao";
             if (filtroCargo === "Gerente") return cargo === "gerente";
             if (filtroCargo === "COP") return cargo === "cop";
             return true;
@@ -381,6 +382,7 @@ function TecnicosPage() {
                 <SelectContent>
                   <SelectItem value="Todos">Todos</SelectItem>
                   <SelectItem value="Técnicos">Técnicos</SelectItem>
+                  <SelectItem value="Transmissão">Transmissão</SelectItem>
                   <SelectItem value="Gerente">Gerente</SelectItem>
                   <SelectItem value="COP">COP</SelectItem>
                 </SelectContent>

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as TecnicosRouteImport } from './routes/tecnicos'
+import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as PrevisaoReservaRouteImport } from './routes/previsao-reserva'
 import { Route as MetragemRouteImport } from './routes/metragem'
 import { Route as MediaBaixaTecnicoRouteImport } from './routes/media-baixa-tecnico'
@@ -26,6 +27,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminPendenciasRouteImport } from './routes/admin/pendencias'
+import { Route as AdminLancamentosRouteImport } from './routes/admin/lancamentos'
 import { Route as AdminImportacaoRouteImport } from './routes/admin/importacao'
 import { Route as AdminEnviarEvidenciaRouteImport } from './routes/admin/enviar-evidencia'
 import { Route as AdminKpisIndexRouteImport } from './routes/admin/kpis/index'
@@ -44,6 +46,11 @@ const TodosRoute = TodosRouteImport.update({
 const TecnicosRoute = TecnicosRouteImport.update({
   id: '/tecnicos',
   path: '/tecnicos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatorioRoute = RelatorioRouteImport.update({
+  id: '/relatorio',
+  path: '/relatorio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrevisaoReservaRoute = PrevisaoReservaRouteImport.update({
@@ -121,6 +128,11 @@ const AdminPendenciasRoute = AdminPendenciasRouteImport.update({
   path: '/pendencias',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLancamentosRoute = AdminLancamentosRouteImport.update({
+  id: '/lancamentos',
+  path: '/lancamentos',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminImportacaoRoute = AdminImportacaoRouteImport.update({
   id: '/importacao',
   path: '/importacao',
@@ -184,10 +196,12 @@ export interface FileRoutesByFullPath {
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
+  '/relatorio': typeof RelatorioRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
+  '/admin/lancamentos': typeof AdminLancamentosRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/kpis/$modulo': typeof AdminKpisModuloRoute
@@ -211,10 +225,12 @@ export interface FileRoutesByTo {
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
+  '/relatorio': typeof RelatorioRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
+  '/admin/lancamentos': typeof AdminLancamentosRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin': typeof AdminIndexRoute
   '/admin/kpis/$modulo': typeof AdminKpisModuloRoute
@@ -240,10 +256,12 @@ export interface FileRoutesById {
   '/media-baixa-tecnico': typeof MediaBaixaTecnicoRoute
   '/metragem': typeof MetragemRoute
   '/previsao-reserva': typeof PrevisaoReservaRoute
+  '/relatorio': typeof RelatorioRoute
   '/tecnicos': typeof TecnicosRoute
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
+  '/admin/lancamentos': typeof AdminLancamentosRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/kpis/$modulo': typeof AdminKpisModuloRoute
@@ -270,10 +288,12 @@ export interface FileRouteTypes {
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
+    | '/relatorio'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
     | '/admin/importacao'
+    | '/admin/lancamentos'
     | '/admin/pendencias'
     | '/admin/'
     | '/admin/kpis/$modulo'
@@ -297,10 +317,12 @@ export interface FileRouteTypes {
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
+    | '/relatorio'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
     | '/admin/importacao'
+    | '/admin/lancamentos'
     | '/admin/pendencias'
     | '/admin'
     | '/admin/kpis/$modulo'
@@ -325,10 +347,12 @@ export interface FileRouteTypes {
     | '/media-baixa-tecnico'
     | '/metragem'
     | '/previsao-reserva'
+    | '/relatorio'
     | '/tecnicos'
     | '/todos'
     | '/admin/enviar-evidencia'
     | '/admin/importacao'
+    | '/admin/lancamentos'
     | '/admin/pendencias'
     | '/admin/'
     | '/admin/kpis/$modulo'
@@ -354,6 +378,7 @@ export interface RootRouteChildren {
   MediaBaixaTecnicoRoute: typeof MediaBaixaTecnicoRoute
   MetragemRoute: typeof MetragemRoute
   PrevisaoReservaRoute: typeof PrevisaoReservaRoute
+  RelatorioRoute: typeof RelatorioRoute
   TecnicosRoute: typeof TecnicosRoute
   TodosRoute: typeof TodosRoute
   ApiEvidenciasAdminSubmitRoute: typeof ApiEvidenciasAdminSubmitRoute
@@ -377,6 +402,13 @@ declare module '@tanstack/react-router' {
       path: '/tecnicos'
       fullPath: '/tecnicos'
       preLoaderRoute: typeof TecnicosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorio': {
+      id: '/relatorio'
+      path: '/relatorio'
+      fullPath: '/relatorio'
+      preLoaderRoute: typeof RelatorioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/previsao-reserva': {
@@ -484,6 +516,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPendenciasRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/lancamentos': {
+      id: '/admin/lancamentos'
+      path: '/lancamentos'
+      fullPath: '/admin/lancamentos'
+      preLoaderRoute: typeof AdminLancamentosRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/importacao': {
       id: '/admin/importacao'
       path: '/importacao'
@@ -553,6 +592,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminEnviarEvidenciaRoute: typeof AdminEnviarEvidenciaRoute
   AdminImportacaoRoute: typeof AdminImportacaoRoute
+  AdminLancamentosRoute: typeof AdminLancamentosRoute
   AdminPendenciasRoute: typeof AdminPendenciasRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminKpisModuloRoute: typeof AdminKpisModuloRoute
@@ -562,6 +602,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminEnviarEvidenciaRoute: AdminEnviarEvidenciaRoute,
   AdminImportacaoRoute: AdminImportacaoRoute,
+  AdminLancamentosRoute: AdminLancamentosRoute,
   AdminPendenciasRoute: AdminPendenciasRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminKpisModuloRoute: AdminKpisModuloRoute,
@@ -584,6 +625,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediaBaixaTecnicoRoute: MediaBaixaTecnicoRoute,
   MetragemRoute: MetragemRoute,
   PrevisaoReservaRoute: PrevisaoReservaRoute,
+  RelatorioRoute: RelatorioRoute,
   TecnicosRoute: TecnicosRoute,
   TodosRoute: TodosRoute,
   ApiEvidenciasAdminSubmitRoute: ApiEvidenciasAdminSubmitRoute,
