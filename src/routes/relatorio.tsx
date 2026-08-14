@@ -51,6 +51,16 @@ export const Route = createFileRoute("/relatorio")({
   component: RelatorioPage,
 });
 
+type AbaEmpresarial = "RE" | "RC" | "equipamento" | "teste-optico" | "teste-potencia";
+
+const ABAS_EMPRESARIAIS: { id: AbaEmpresarial; label: string }[] = [
+  { id: "RE", label: "Rede Acesso (RE)" },
+  { id: "RC", label: "Rede Cliente (RC)" },
+  { id: "equipamento", label: "Equipamento" },
+  { id: "teste-optico", label: "Teste Óptico" },
+  { id: "teste-potencia", label: "Teste Potência" },
+];
+
 type OutraFotoState = {
   id: string;
   ref: string;
@@ -111,6 +121,7 @@ function RelatorioPage() {
   const [responsavel, setResponsavel] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
+  const [abaEmpresarial, setAbaEmpresarial] = useState<AbaEmpresarial>("RE");
   const [lancamentoRe, setLancamentoRe] = useState<"sim" | "nao" | "">("");
   const [cabos, setCabos] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
   const [poste, setPoste] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -665,11 +676,35 @@ function RelatorioPage() {
           </div>
 
           {tipo === "empresarial" ? (
+            <>
+              <nav
+                className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+                aria-label="Seções do relatório empresarial"
+              >
+                {ABAS_EMPRESARIAIS.map((aba) => {
+                  const ativa = abaEmpresarial === aba.id;
+                  return (
+                    <button
+                      key={aba.id}
+                      type="button"
+                      onClick={() => setAbaEmpresarial(aba.id)}
+                      className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold whitespace-nowrap transition ${
+                        ativa
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {aba.label}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {abaEmpresarial === "RE" ? (
             <EvidencePhotoPasteProvider>
               <>
-                  <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <h2 className="text-base font-bold">Rede Acesso (RE)</h2>
-                    <p className="text-sm font-semibold">Lançamento cabos (RE)?</p>
+                  <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                    <h2 className="text-base font-bold">Lançamento cabos (RE)?</h2>
                     <div className="flex gap-2">
                       <ChoiceButton
                         active={lancamentoRe === "sim"}
@@ -689,9 +724,10 @@ function RelatorioPage() {
                         NÃO
                       </ChoiceButton>
                     </div>
+                  </div>
                     {showReMetragem ? (
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-bold">Metragem de cabo</h3>
+                      <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <h2 className="text-base font-bold">Metragem de cabo</h2>
                         {cabos.map((cabo, index) => (
                           <div
                             key={cabo.id}
@@ -796,7 +832,6 @@ function RelatorioPage() {
                         )}
                       </div>
                     ) : null}
-                  </div>
 
                   <RelatorioFotosBloco
                     title="Poste de conexão"
@@ -826,6 +861,17 @@ function RelatorioPage() {
                     onPickPhoto={(id, file) =>
                       handleGrupoPhoto(setPlaqueta, "plaquetaIdentificacao", id, file)
                     }
+                  />
+                  <RelatorioFotosBloco
+                    title="Sobra técnica / Fiberloop instalado"
+                    hint="Duas fotos iniciais"
+                    slots={sobra}
+                    onChange={setSobra}
+                    obs={sobraObs}
+                    onObsChange={setSobraObs}
+                    minSlots={2}
+                    readOnly={readOnly}
+                    onPickPhoto={(id, file) => handleGrupoPhoto(setSobra, "sobraTecnica", id, file)}
                   />
                   <RelatorioFotosBloco
                     title="Novo aterramento do poste"
@@ -870,17 +916,6 @@ function RelatorioPage() {
                     onPickPhoto={(id, file) =>
                       handleGrupoPhoto(setEtiqueta, "etiquetaIdentificacao", id, file)
                     }
-                  />
-                  <RelatorioFotosBloco
-                    title="Sobra técnica / Fiberloop instalado"
-                    hint="Duas fotos iniciais"
-                    slots={sobra}
-                    onChange={setSobra}
-                    obs={sobraObs}
-                    onObsChange={setSobraObs}
-                    minSlots={2}
-                    readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setSobra, "sobraTecnica", id, file)}
                   />
 
               <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -991,6 +1026,12 @@ function RelatorioPage() {
               </div>
               </>
             </EvidencePhotoPasteProvider>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+                  Campos em definição.
+                </div>
+              )}
+            </>
           ) : tipo === "implantacao" ? (
             <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
               Os campos específicos de Implantação serão definidos em breve. Você já pode avisar a
