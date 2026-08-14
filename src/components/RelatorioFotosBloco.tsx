@@ -108,6 +108,17 @@ export function RelatorioFotosBloco({
         </div>
       ))}
 
+      <div>
+        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+        <textarea
+          value={obs}
+          onChange={(e) => onObsChange(e.target.value)}
+          rows={3}
+          disabled={readOnly}
+          className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+        />
+      </div>
+
       {readOnly ? null : (
         <button
           type="button"
@@ -117,17 +128,6 @@ export function RelatorioFotosBloco({
           <Plus className="h-4 w-4" /> Adicionar mais fotos
         </button>
       )}
-
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold">Observação (opcional)</label>
-        <textarea
-          value={obs}
-          onChange={(e) => onObsChange(e.target.value)}
-          rows={3}
-          disabled={readOnly}
-          className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
-        />
-      </div>
     </div>
   );
 }

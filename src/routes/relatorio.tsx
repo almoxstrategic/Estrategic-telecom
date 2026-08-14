@@ -18,11 +18,14 @@ import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   avisarConclusaoRelatorio,
+  emptyCaboMetragem,
   emptyRelatorioPayload,
   fetchRelatorioTransmissaoById,
   iniciarOuRetomarRelatorio,
   patchRelatorioDraft,
   uploadRelatorioPhoto,
+  type CaboMetragemPayload,
+  type RelatorioFotoGrupoKey,
   type RelatorioPayload,
   type RelatorioStatus,
   type RelatorioTransmissao,
@@ -109,16 +112,13 @@ function RelatorioPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [lancamentoRe, setLancamentoRe] = useState<"sim" | "nao" | "">("");
-  const [qntPostesRe, setQntPostesRe] = useState("");
-  const [metragem, setMetragem] = useState("");
-  const [metragemObs, setMetragemObs] = useState("");
-  const [fotoInicioStored, setFotoInicioStored] = useState<StoredPhoto | null>(null);
-  const [fotoFimStored, setFotoFimStored] = useState<StoredPhoto | null>(null);
-  const [fotosExtrasRe, setFotosExtrasRe] = useState<StoredPhoto[]>([]);
+  const [cabos, setCabos] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
   const [poste, setPoste] = useState<FotoSlot[]>([newFotoSlot()]);
   const [posteObs, setPosteObs] = useState("");
   const [caixa, setCaixa] = useState<FotoSlot[]>([newFotoSlot()]);
   const [caixaObs, setCaixaObs] = useState("");
+  const [plaqueta, setPlaqueta] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [plaquetaObs, setPlaquetaObs] = useState("");
   const [sobra, setSobra] = useState<FotoSlot[]>(() => [newFotoSlot(), newFotoSlot()]);
   const [sobraObs, setSobraObs] = useState("");
   const [terrometro, setTerrometro] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -129,7 +129,9 @@ function RelatorioPage() {
   const [posicaoObs, setPosicaoObs] = useState("");
   const [etiqueta, setEtiqueta] = useState<FotoSlot[]>([newFotoSlot()]);
   const [etiquetaObs, setEtiquetaObs] = useState("");
-  const [outras, setOutras] = useState<OutraFotoState[]>([]);
+  const [outras, setOutras] = useState<OutraFotoState[]>(() => [
+    { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
+  ]);
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -139,21 +141,15 @@ function RelatorioPage() {
     return {
       ...emptyRelatorioPayload(),
       lancamentoRe: lancamentoRe === "sim" ? true : lancamentoRe === "nao" ? false : null,
-      qntPostesRe,
-      metragemRe: {
-        fotoInicio: fotoInicioStored,
-        fotoFim: fotoFimStored,
-        metragem,
-        obs: metragemObs,
-        fotosExtras: fotosExtrasRe,
-      },
+      metragensCabo: cabos,
       posteConexao: { fotos: fotosDosSlots(poste), obs: posteObs },
       caixaEmenda: { fotos: fotosDosSlots(caixa), obs: caixaObs },
-      sobraTecnica: { fotos: fotosDosSlots(sobra), obs: sobraObs },
-      aterramentoTerrometro: { fotos: fotosDosSlots(terrometro), obs: terrometroObs },
+      plaquetaIdentificacao: { fotos: fotosDosSlots(plaqueta), obs: plaquetaObs },
       novoAterramentoPoste: { fotos: fotosDosSlots(novoAterramento), obs: novoAterramentoObs },
+      aterramentoTerrometro: { fotos: fotosDosSlots(terrometro), obs: terrometroObs },
       posicaoConexaoEstacao: { fotos: fotosDosSlots(posicao), obs: posicaoObs },
       etiquetaIdentificacao: { fotos: fotosDosSlots(etiqueta), obs: etiquetaObs },
+      sobraTecnica: { fotos: fotosDosSlots(sobra), obs: sobraObs },
       outrasFotos: outras.map((item) => ({
         id: item.id,
         ref: item.ref,
@@ -163,26 +159,23 @@ function RelatorioPage() {
     };
   }, [
     lancamentoRe,
-    qntPostesRe,
-    fotoInicioStored,
-    fotoFimStored,
-    fotosExtrasRe,
-    metragem,
-    metragemObs,
+    cabos,
     poste,
     posteObs,
     caixa,
     caixaObs,
-    sobra,
-    sobraObs,
-    terrometro,
-    terrometroObs,
+    plaqueta,
+    plaquetaObs,
     novoAterramento,
     novoAterramentoObs,
+    terrometro,
+    terrometroObs,
     posicao,
     posicaoObs,
     etiqueta,
     etiquetaObs,
+    sobra,
+    sobraObs,
     outras,
   ]);
 
@@ -235,11 +228,10 @@ function RelatorioPage() {
       dataInicio,
       tipo,
       lancamentoRe,
-      qntPostesRe,
-      metragem,
-      metragemObs,
+      cabos,
       posteObs,
       caixaObs,
+      plaquetaObs,
       sobraObs,
       terrometroObs,
       novoAterramentoObs,
@@ -247,15 +239,13 @@ function RelatorioPage() {
       etiquetaObs,
       poste,
       caixa,
+      plaqueta,
       sobra,
       terrometro,
       novoAterramento,
       posicao,
       etiqueta,
       outras,
-      fotoInicioStored,
-      fotoFimStored,
-      fotosExtrasRe,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -276,16 +266,13 @@ function RelatorioPage() {
     setDataInicio(row.data_inicio_execucao);
     setTipo(row.tipo_execucao ?? "");
     setLancamentoRe(p.lancamentoRe === true ? "sim" : p.lancamentoRe === false ? "nao" : "");
-    setQntPostesRe(p.qntPostesRe ?? "");
-    setMetragem(p.metragemRe?.metragem ?? "");
-    setMetragemObs(p.metragemRe?.obs ?? "");
-    setFotoInicioStored(p.metragemRe?.fotoInicio ?? null);
-    setFotoFimStored(p.metragemRe?.fotoFim ?? null);
-    setFotosExtrasRe(p.metragemRe?.fotosExtras ?? []);
+    setCabos(p.metragensCabo.length > 0 ? p.metragensCabo : [emptyCaboMetragem()]);
     setPoste(slotsFromStored(p.posteConexao?.fotos ?? [], 1));
     setPosteObs(p.posteConexao?.obs ?? "");
     setCaixa(slotsFromStored(p.caixaEmenda?.fotos ?? [], 1));
     setCaixaObs(p.caixaEmenda?.obs ?? "");
+    setPlaqueta(slotsFromStored(p.plaquetaIdentificacao?.fotos ?? [], 1));
+    setPlaquetaObs(p.plaquetaIdentificacao?.obs ?? "");
     setSobra(slotsFromStored(p.sobraTecnica?.fotos ?? [], 2));
     setSobraObs(p.sobraTecnica?.obs ?? "");
     setTerrometro(slotsFromStored(p.aterramentoTerrometro?.fotos ?? [], 1));
@@ -296,14 +283,17 @@ function RelatorioPage() {
     setPosicaoObs(p.posicaoConexaoEstacao?.obs ?? "");
     setEtiqueta(slotsFromStored(p.etiquetaIdentificacao?.fotos ?? [], 1));
     setEtiquetaObs(p.etiquetaIdentificacao?.obs ?? "");
+    const outrasCarregadas = (p.outrasFotos ?? []).map((item) => ({
+      id: item.id || crypto.randomUUID(),
+      ref: item.ref,
+      file: null as EvidencePhotoRef | null,
+      stored: item.foto,
+      obs: item.obs,
+    }));
     setOutras(
-      (p.outrasFotos ?? []).map((item) => ({
-        id: item.id || crypto.randomUUID(),
-        ref: item.ref,
-        file: null,
-        stored: item.foto,
-        obs: item.obs,
-      })),
+      outrasCarregadas.length > 0
+        ? outrasCarregadas
+        : [{ id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" }],
     );
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
@@ -387,53 +377,53 @@ function RelatorioPage() {
 
   const handleGrupoPhoto = (
     setter: React.Dispatch<React.SetStateAction<FotoSlot[]>>,
-    tag: string,
+    grupoKey: RelatorioFotoGrupoKey,
     slotId: string,
     file: EvidencePhotoRef | null,
   ) => {
     if (!file) {
-      setter((prev) => prev.map((slot) => (slot.id === slotId ? { ...slot, stored: null, file: null } : slot)));
+      setter((prev) =>
+        prev.map((slot) => (slot.id === slotId ? { ...slot, stored: null, file: null } : slot)),
+      );
       return;
     }
-    void uploadFotoImediato(file, `${tag}-${slotId.slice(0, 8)}`, (stored) => {
-      setter((prev) =>
-        prev.map((slot) => (slot.id === slotId ? { ...slot, file: null, stored } : slot)),
-      );
-      const nextSlots = (
-        tag === "poste"
-          ? poste
-          : tag === "caixa"
-            ? caixa
-            : tag === "sobra"
-              ? sobra
-              : tag === "terrometro"
-                ? terrometro
-                : tag === "novo-aterramento"
-                  ? novoAterramento
-                  : tag === "posicao"
-                    ? posicao
-                    : etiqueta
-      ).map((slot) => (slot.id === slotId ? { ...slot, stored, file: null } : slot));
-      const payload = buildPayload();
-      const grupoKey =
-        tag === "poste"
-          ? "posteConexao"
-          : tag === "caixa"
-            ? "caixaEmenda"
-            : tag === "sobra"
-              ? "sobraTecnica"
-              : tag === "terrometro"
-                ? "aterramentoTerrometro"
-                : tag === "novo-aterramento"
-                  ? "novoAterramentoPoste"
-                  : tag === "posicao"
-                    ? "posicaoConexaoEstacao"
-                    : "etiquetaIdentificacao";
+    void uploadFotoImediato(file, `${grupoKey}-${slotId.slice(0, 8)}`, (stored) => {
+      let nextSlots: FotoSlot[] = [];
+      setter((prev) => {
+        nextSlots = prev.map((slot) =>
+          slot.id === slotId ? { ...slot, file: null, stored } : slot,
+        );
+        return nextSlots;
+      });
+      const grupo = buildPayload()[grupoKey];
       return {
-        ...payload,
-        [grupoKey]: { ...payload[grupoKey], fotos: fotosDosSlots(nextSlots) },
+        ...buildPayload(),
+        [grupoKey]: { ...grupo, fotos: fotosDosSlots(nextSlots) },
       };
     });
+  };
+
+  const handleCaboPhoto = (
+    caboId: string,
+    campo: "fotoInicio" | "fotoFim",
+    file: EvidencePhotoRef | null,
+  ) => {
+    if (!file) {
+      setCabos((prev) => prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item)));
+      return;
+    }
+    void uploadFotoImediato(file, `cabo-${campo}-${caboId.slice(0, 8)}`, (stored) => {
+      let nextCabos: CaboMetragemPayload[] = [];
+      setCabos((prev) => {
+        nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: stored } : item));
+        return nextCabos;
+      });
+      return { ...buildPayload(), metragensCabo: nextCabos };
+    });
+  };
+
+  const patchCabo = (caboId: string, patch: Partial<CaboMetragemPayload>) => {
+    setCabos((prev) => prev.map((item) => (item.id === caboId ? { ...item, ...patch } : item)));
   };
 
   const headerOk = useMemo(
@@ -680,7 +670,10 @@ function RelatorioPage() {
                     <div className="flex gap-2">
                       <ChoiceButton
                         active={lancamentoRe === "sim"}
-                        onClick={() => setLancamentoRe("sim")}
+                        onClick={() => {
+                          setLancamentoRe("sim");
+                          setCabos((prev) => (prev.length ? prev : [emptyCaboMetragem()]));
+                        }}
                         disabled={readOnly}
                       >
                         SIM
@@ -695,188 +688,196 @@ function RelatorioPage() {
                     </div>
                     {showReMetragem ? (
                       <div className="space-y-4">
-                        <div>
-                          <label className="mb-1.5 block text-sm font-semibold">
-                            QNT TOTAL DE POSTES (RE)
-                          </label>
-                          <input
-                            inputMode="numeric"
-                            value={qntPostesRe}
-                            onChange={(e) => setQntPostesRe(e.target.value.replace(/\D/g, ""))}
-                            disabled={readOnly}
-                            className={inputClass()}
-                          />
-                        </div>
-                        {fotoInicioStored ? (
-                          <div className="overflow-hidden rounded-xl border">
-                            <p className="px-2 pt-2 text-sm font-semibold">Foto inicial</p>
-                            <ExpandableImage src={fotoInicioStored.url} alt="Foto inicial" />
-                            {readOnly ? null : (
-                              <button
-                                type="button"
-                                className="w-full py-2 text-xs text-primary"
-                                onClick={() => setFotoInicioStored(null)}
-                              >
-                                Trocar foto
-                              </button>
+                        <h3 className="text-sm font-bold">Metragem de cabo</h3>
+                        {cabos.map((cabo, index) => (
+                          <div
+                            key={cabo.id}
+                            className="space-y-3 rounded-xl border border-border p-4"
+                          >
+                            <p className="text-sm font-semibold">Cabo {index + 1}</p>
+                            <div>
+                              <label className="mb-1.5 block text-sm font-semibold">
+                                Tipo do cabo
+                              </label>
+                              <input
+                                type="text"
+                                value={cabo.tipoCabo}
+                                onChange={(e) => patchCabo(cabo.id, { tipoCabo: e.target.value })}
+                                placeholder="Ex: 12FO"
+                                disabled={readOnly}
+                                className={inputClass()}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-sm font-semibold">Metragem</label>
+                              <input
+                                inputMode="decimal"
+                                value={cabo.metragem}
+                                onChange={(e) => patchCabo(cabo.id, { metragem: e.target.value })}
+                                disabled={readOnly}
+                                className={inputClass()}
+                              />
+                            </div>
+                            {cabo.fotoInicio ? (
+                              <div className="overflow-hidden rounded-xl border">
+                                <p className="px-2 pt-2 text-sm font-semibold">Foto inicial</p>
+                                <ExpandableImage src={cabo.fotoInicio.url} alt="Foto inicial" />
+                                {readOnly ? null : (
+                                  <button
+                                    type="button"
+                                    className="w-full py-2 text-xs text-primary"
+                                    onClick={() => handleCaboPhoto(cabo.id, "fotoInicio", null)}
+                                  >
+                                    Trocar foto
+                                  </button>
+                                )}
+                              </div>
+                            ) : readOnly ? (
+                              <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
+                            ) : (
+                              <PhotoUpload
+                                label="Foto inicial"
+                                suffix="inicio"
+                                value={null}
+                                onChange={(file) => {
+                                  if (file) handleCaboPhoto(cabo.id, "fotoInicio", file);
+                                }}
+                              />
                             )}
-                          </div>
-                        ) : readOnly ? (
-                          <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
-                        ) : (
-                          <PhotoUpload
-                            label="Foto inicial"
-                            suffix="inicio"
-                            value={null}
-                            onChange={(file) => {
-                              if (!file) return;
-                              void uploadFotoImediato(file, "re-inicio", (stored) => {
-                                setFotoInicioStored(stored);
-                                return {
-                                  ...buildPayload(),
-                                  metragemRe: {
-                                    ...buildPayload().metragemRe,
-                                    fotoInicio: stored,
-                                  },
-                                };
-                              });
-                            }}
-                          />
-                        )}
-                        {fotoFimStored ? (
-                          <div className="overflow-hidden rounded-xl border">
-                            <p className="px-2 pt-2 text-sm font-semibold">Foto final</p>
-                            <ExpandableImage src={fotoFimStored.url} alt="Foto final" />
-                            {readOnly ? null : (
-                              <button
-                                type="button"
-                                className="w-full py-2 text-xs text-primary"
-                                onClick={() => setFotoFimStored(null)}
-                              >
-                                Trocar foto
-                              </button>
+                            {cabo.fotoFim ? (
+                              <div className="overflow-hidden rounded-xl border">
+                                <p className="px-2 pt-2 text-sm font-semibold">Foto final</p>
+                                <ExpandableImage src={cabo.fotoFim.url} alt="Foto final" />
+                                {readOnly ? null : (
+                                  <button
+                                    type="button"
+                                    className="w-full py-2 text-xs text-primary"
+                                    onClick={() => handleCaboPhoto(cabo.id, "fotoFim", null)}
+                                  >
+                                    Trocar foto
+                                  </button>
+                                )}
+                              </div>
+                            ) : readOnly ? (
+                              <p className="text-sm text-muted-foreground">Sem foto final.</p>
+                            ) : (
+                              <PhotoUpload
+                                label="Foto final"
+                                suffix="fim"
+                                value={null}
+                                onChange={(file) => {
+                                  if (file) handleCaboPhoto(cabo.id, "fotoFim", file);
+                                }}
+                              />
                             )}
+                            <div>
+                              <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+                              <textarea
+                                value={cabo.obs}
+                                onChange={(e) => patchCabo(cabo.id, { obs: e.target.value })}
+                                rows={3}
+                                disabled={readOnly}
+                                className={inputClass()}
+                              />
+                            </div>
                           </div>
-                        ) : readOnly ? (
-                          <p className="text-sm text-muted-foreground">Sem foto final.</p>
-                        ) : (
-                          <PhotoUpload
-                            label="Foto final"
-                            suffix="fim"
-                            value={null}
-                            onChange={(file) => {
-                              if (!file) return;
-                              void uploadFotoImediato(file, "re-fim", (stored) => {
-                                setFotoFimStored(stored);
-                                return {
-                                  ...buildPayload(),
-                                  metragemRe: {
-                                    ...buildPayload().metragemRe,
-                                    fotoFim: stored,
-                                  },
-                                };
-                              });
-                            }}
-                          />
+                        ))}
+                        {readOnly ? null : (
+                          <button
+                            type="button"
+                            onClick={() => setCabos((prev) => [...prev, emptyCaboMetragem()])}
+                            className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+                          >
+                            <Plus className="h-4 w-4" /> Adicionar mais cabo
+                          </button>
                         )}
-                        <div>
-                          <label className="mb-1.5 block text-sm font-semibold">Metragem</label>
-                          <input
-                            inputMode="decimal"
-                            value={metragem}
-                            onChange={(e) => setMetragem(e.target.value)}
-                            disabled={readOnly}
-                            className={inputClass()}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-sm font-semibold">
-                            Observação (opcional)
-                          </label>
-                          <textarea
-                            value={metragemObs}
-                            onChange={(e) => setMetragemObs(e.target.value)}
-                            rows={3}
-                            disabled={readOnly}
-                            className={inputClass()}
-                          />
-                        </div>
                       </div>
                     ) : null}
                   </div>
 
                   <RelatorioFotosBloco
                     title="Poste de conexão"
-                    hint="Opcional"
                     slots={poste}
                     onChange={setPoste}
                     obs={posteObs}
                     onObsChange={setPosteObs}
                     readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setPoste, "poste", id, file)}
+                    onPickPhoto={(id, file) => handleGrupoPhoto(setPoste, "posteConexao", id, file)}
                   />
                   <RelatorioFotosBloco
                     title="Caixa de emenda"
-                    hint="Opcional"
                     slots={caixa}
                     onChange={setCaixa}
                     obs={caixaObs}
                     onObsChange={setCaixaObs}
                     readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setCaixa, "caixa", id, file)}
+                    onPickPhoto={(id, file) => handleGrupoPhoto(setCaixa, "caixaEmenda", id, file)}
                   />
                   <RelatorioFotosBloco
-                    title="Sobra técnica"
-                    hint="Opcional — duas fotos iniciais"
-                    slots={sobra}
-                    onChange={setSobra}
-                    obs={sobraObs}
-                    onObsChange={setSobraObs}
-                    minSlots={2}
+                    title="Plaqueta de Identificação"
+                    slots={plaqueta}
+                    onChange={setPlaqueta}
+                    obs={plaquetaObs}
+                    onObsChange={setPlaquetaObs}
                     readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setSobra, "sobra", id, file)}
-                  />
-                  <RelatorioFotosBloco
-                    title="Aterramento — Terrometro"
-                    hint="Opcional"
-                    slots={terrometro}
-                    onChange={setTerrometro}
-                    obs={terrometroObs}
-                    onObsChange={setTerrometroObs}
-                    readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setTerrometro, "terrometro", id, file)}
+                    onPickPhoto={(id, file) =>
+                      handleGrupoPhoto(setPlaqueta, "plaquetaIdentificacao", id, file)
+                    }
                   />
                   <RelatorioFotosBloco
                     title="Novo aterramento do poste"
-                    hint="Opcional"
                     slots={novoAterramento}
                     onChange={setNovoAterramento}
                     obs={novoAterramentoObs}
                     onObsChange={setNovoAterramentoObs}
                     readOnly={readOnly}
                     onPickPhoto={(id, file) =>
-                      handleGrupoPhoto(setNovoAterramento, "novo-aterramento", id, file)
+                      handleGrupoPhoto(setNovoAterramento, "novoAterramentoPoste", id, file)
+                    }
+                  />
+                  <RelatorioFotosBloco
+                    title="Aterramento - TERROMETRO"
+                    slots={terrometro}
+                    onChange={setTerrometro}
+                    obs={terrometroObs}
+                    onObsChange={setTerrometroObs}
+                    readOnly={readOnly}
+                    onPickPhoto={(id, file) =>
+                      handleGrupoPhoto(setTerrometro, "aterramentoTerrometro", id, file)
                     }
                   />
                   <RelatorioFotosBloco
                     title="Posição de conexão na Estação/PPC (DGO/DIO)"
-                    hint="Opcional"
                     slots={posicao}
                     onChange={setPosicao}
                     obs={posicaoObs}
                     onObsChange={setPosicaoObs}
                     readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setPosicao, "posicao", id, file)}
+                    onPickPhoto={(id, file) =>
+                      handleGrupoPhoto(setPosicao, "posicaoConexaoEstacao", id, file)
+                    }
                   />
                   <RelatorioFotosBloco
-                    title="Etiqueta de identificação na Estação/PPC"
-                    hint="Opcional"
+                    title="ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC"
                     slots={etiqueta}
                     onChange={setEtiqueta}
                     obs={etiquetaObs}
                     onObsChange={setEtiquetaObs}
                     readOnly={readOnly}
-                    onPickPhoto={(id, file) => handleGrupoPhoto(setEtiqueta, "etiqueta", id, file)}
+                    onPickPhoto={(id, file) =>
+                      handleGrupoPhoto(setEtiqueta, "etiquetaIdentificacao", id, file)
+                    }
+                  />
+                  <RelatorioFotosBloco
+                    title="Sobra técnica / Fiberloop instalado"
+                    hint="Duas fotos iniciais"
+                    slots={sobra}
+                    onChange={setSobra}
+                    obs={sobraObs}
+                    onObsChange={setSobraObs}
+                    minSlots={2}
+                    readOnly={readOnly}
+                    onPickPhoto={(id, file) => handleGrupoPhoto(setSobra, "sobraTecnica", id, file)}
                   />
                 </>
               ) : (
@@ -886,23 +887,7 @@ function RelatorioPage() {
               )}
 
               <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-base font-bold">Outras fotos</h2>
-                  {readOnly ? null : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOutras((prev) => [
-                          ...prev,
-                          { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
-                        ])
-                      }
-                      className="inline-flex items-center gap-1 text-sm font-semibold text-primary"
-                    >
-                      <Plus className="h-4 w-4" /> Adicionar
-                    </button>
-                  )}
-                </div>
+                <h2 className="text-base font-bold">Outras fotos</h2>
                 {outras.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
                 ) : (
@@ -973,22 +958,38 @@ function RelatorioPage() {
                           }}
                         />
                       )}
-                      <textarea
-                        value={item.obs}
-                        onChange={(e) =>
-                          setOutras((prev) =>
-                            prev.map((row) =>
-                              row.id === item.id ? { ...row, obs: e.target.value } : row,
-                            ),
-                          )
-                        }
-                        placeholder="Observação (opcional)"
-                        rows={2}
-                        disabled={readOnly}
-                        className={inputClass()}
-                      />
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+                        <textarea
+                          value={item.obs}
+                          onChange={(e) =>
+                            setOutras((prev) =>
+                              prev.map((row) =>
+                                row.id === item.id ? { ...row, obs: e.target.value } : row,
+                              ),
+                            )
+                          }
+                          rows={2}
+                          disabled={readOnly}
+                          className={inputClass()}
+                        />
+                      </div>
                     </div>
                   ))
+                )}
+                {readOnly ? null : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOutras((prev) => [
+                        ...prev,
+                        { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
+                      ])
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+                  >
+                    <Plus className="h-4 w-4" /> Adicionar mais fotos
+                  </button>
                 )}
               </div>
             </EvidencePhotoPasteProvider>

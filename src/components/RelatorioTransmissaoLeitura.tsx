@@ -14,13 +14,6 @@ function tipoLabel(tipo: RelatorioTransmissao["tipo_execucao"]) {
   return "Ainda não informado";
 }
 
-function fotosRe(row: RelatorioTransmissao): StoredPhoto[] {
-  const re = row.payload?.metragemRe;
-  return [re?.fotoInicio, re?.fotoFim, ...(re?.fotosExtras ?? [])].filter(
-    (f): f is StoredPhoto => Boolean(f),
-  );
-}
-
 function PhotoGrid({ fotos }: { fotos: StoredPhoto[] }) {
   if (!fotos.length) {
     return <p className="text-sm text-muted-foreground">Sem fotos nesta seção.</p>;
@@ -77,13 +70,14 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         <Campo label="Tipo" value={tipoLabel(row.tipo_execucao)} />
       </div>
 
-      {payload?.lancamentoRe === true ? (
+      {(payload?.metragensCabo ?? []).map((cabo, index) => (
         <Secao
-          titulo={`Postes e metragem — RE (${payload.qntPostesRe || "—"} postes · ${payload.metragemRe.metragem || "—"})`}
-          obs={payload.metragemRe.obs}
-          fotos={fotosRe(row)}
+          key={cabo.id}
+          titulo={`Cabo ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
+          obs={cabo.obs}
+          fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
         />
-      ) : null}
+      ))}
       <Secao
         titulo="Poste de conexão"
         obs={payload?.posteConexao.obs}
@@ -95,19 +89,19 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         fotos={payload?.caixaEmenda.fotos ?? []}
       />
       <Secao
-        titulo="Sobra técnica"
-        obs={payload?.sobraTecnica.obs}
-        fotos={payload?.sobraTecnica.fotos ?? []}
+        titulo="Plaqueta de Identificação"
+        obs={payload?.plaquetaIdentificacao.obs}
+        fotos={payload?.plaquetaIdentificacao.fotos ?? []}
       />
       <Secao
-        titulo="Terrometro"
-        obs={payload?.aterramentoTerrometro.obs}
-        fotos={payload?.aterramentoTerrometro.fotos ?? []}
-      />
-      <Secao
-        titulo="Novo aterramento"
+        titulo="Novo aterramento do poste"
         obs={payload?.novoAterramentoPoste.obs}
         fotos={payload?.novoAterramentoPoste.fotos ?? []}
+      />
+      <Secao
+        titulo="Aterramento - TERROMETRO"
+        obs={payload?.aterramentoTerrometro.obs}
+        fotos={payload?.aterramentoTerrometro.fotos ?? []}
       />
       <Secao
         titulo="Posição DGO/DIO"
@@ -115,9 +109,14 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         fotos={payload?.posicaoConexaoEstacao.fotos ?? []}
       />
       <Secao
-        titulo="Etiqueta"
+        titulo="Etiqueta na estação/PPC"
         obs={payload?.etiquetaIdentificacao.obs}
         fotos={payload?.etiquetaIdentificacao.fotos ?? []}
+      />
+      <Secao
+        titulo="Sobra técnica / Fiberloop"
+        obs={payload?.sobraTecnica.obs}
+        fotos={payload?.sobraTecnica.fotos ?? []}
       />
       {(payload?.outrasFotos ?? [])
         .filter((item) => item.foto || item.ref || item.obs)

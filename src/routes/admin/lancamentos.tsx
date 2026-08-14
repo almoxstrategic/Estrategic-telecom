@@ -184,17 +184,17 @@ function RelatorioDetalhe({
   uploadingCategoria: RelatorioFotoCategoria | null;
 }) {
   const payload = row.payload;
-  const fotosRe = [
-    payload?.metragemRe.fotoInicio,
-    payload?.metragemRe.fotoFim,
-    ...(payload?.metragemRe.fotosExtras ?? []),
-  ].filter((f): f is StoredPhoto => Boolean(f));
+  const cabos = payload?.metragensCabo ?? [];
+  const fotosCabosCount = cabos.reduce(
+    (acc, cabo) => acc + Number(Boolean(cabo.fotoInicio)) + Number(Boolean(cabo.fotoFim)),
+    0,
+  );
   const blocoProps = (categoria: RelatorioFotoCategoria) => ({
     canEdit: canEditPhotos,
     onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file),
     uploadKey: `${row.id}-${categoria}-${
-      categoria === "metragemRe"
-        ? fotosRe.length
+      categoria === "metragensCabo"
+        ? fotosCabosCount
         : categoria === "outrasFotos"
           ? (payload?.outrasFotos.length ?? 0)
           : (payload?.[categoria].fotos.length ?? 0)
@@ -232,12 +232,23 @@ function RelatorioDetalhe({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           Postes e metragem
         </h3>
-        <EvidenciaBloco
-          title={`RE — ${payload?.qntPostesRe || "—"} postes · metragem ${payload?.metragemRe.metragem || "—"}`}
-          obs={payload?.metragemRe.obs}
-          fotos={fotosRe}
-          {...blocoProps("metragemRe")}
-        />
+        {cabos.length === 0 && canEditPhotos ? (
+          <EvidenciaBloco
+            title="Metragem de cabo (RE)"
+            obs={null}
+            fotos={[]}
+            {...blocoProps("metragensCabo")}
+          />
+        ) : null}
+        {cabos.map((cabo, index) => (
+          <EvidenciaBloco
+            key={cabo.id}
+            title={`Cabo ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
+            obs={cabo.obs}
+            fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
+            {...blocoProps("metragensCabo")}
+          />
+        ))}
         <EvidenciaBloco
           title="Poste de conexão"
           obs={payload?.posteConexao.obs}
@@ -270,10 +281,11 @@ function RelatorioDetalhe({
         </h3>
         {(
           [
-            ["Terrometro", "aterramentoTerrometro"],
-            ["Novo aterramento", "novoAterramentoPoste"],
+            ["Plaqueta de Identificação", "plaquetaIdentificacao"],
+            ["Novo aterramento do poste", "novoAterramentoPoste"],
+            ["Aterramento - TERROMETRO", "aterramentoTerrometro"],
             ["Posição DGO/DIO", "posicaoConexaoEstacao"],
-            ["Etiqueta", "etiquetaIdentificacao"],
+            ["Etiqueta na estação/PPC", "etiquetaIdentificacao"],
           ] as const
         ).map(([title, key]) => (
           <EvidenciaBloco
