@@ -138,6 +138,9 @@ function RelatorioPage() {
   const canAutosaveRef = useRef(false);
 
   const buildPayload = useCallback((): RelatorioPayload => {
+    if (tipo !== "empresarial") {
+      return emptyRelatorioPayload();
+    }
     return {
       ...emptyRelatorioPayload(),
       lancamentoRe: lancamentoRe === "sim" ? true : lancamentoRe === "nao" ? false : null,
@@ -158,6 +161,7 @@ function RelatorioPage() {
       })),
     };
   }, [
+    tipo,
     lancamentoRe,
     cabos,
     poste,
@@ -466,7 +470,7 @@ function RelatorioPage() {
     }
   };
 
-  const showReMetragem = tipo === "implantacao" && lancamentoRe === "sim";
+  const showReMetragem = tipo === "empresarial" && lancamentoRe === "sim";
   const readOnly = status === "avisado" || status === "fechado";
   const voltarInicio = () => {
     canAutosaveRef.current = false;
@@ -660,10 +664,9 @@ function RelatorioPage() {
             </div>
           </div>
 
-          {tipo ? (
+          {tipo === "empresarial" ? (
             <EvidencePhotoPasteProvider>
-              {tipo === "implantacao" ? (
-                <>
+              <>
                   <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <h2 className="text-base font-bold">Rede Acesso (RE)</h2>
                     <p className="text-sm font-semibold">Lançamento cabos (RE)?</p>
@@ -879,12 +882,6 @@ function RelatorioPage() {
                     readOnly={readOnly}
                     onPickPhoto={(id, file) => handleGrupoPhoto(setSobra, "sobraTecnica", id, file)}
                   />
-                </>
-              ) : (
-                <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
-                  Para execução empresarial, registre as evidências em Outras fotos abaixo.
-                </div>
-              )}
 
               <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-base font-bold">Outras fotos</h2>
@@ -992,7 +989,13 @@ function RelatorioPage() {
                   </button>
                 )}
               </div>
+              </>
             </EvidencePhotoPasteProvider>
+          ) : tipo === "implantacao" ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+              Os campos específicos de Implantação serão definidos em breve. Você já pode avisar a
+              conclusão do relatório.
+            </div>
           ) : null}
         </form>
       </main>
