@@ -29,6 +29,10 @@ export type OutraFotoState = {
   obs: string;
 };
 
+export function emptyOutraFoto(): OutraFotoState {
+  return { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" };
+}
+
 export function inputClass() {
   return "w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted";
 }
@@ -113,6 +117,8 @@ export type GrupoFotoCampo = {
 
 export function RelatorioRedeAcesso({
   readOnly,
+  header,
+  lancamentoTitle = "Lançamento cabos (RE)?",
   lancamentoRe,
   onLancamentoRe,
   cabos,
@@ -126,6 +132,8 @@ export function RelatorioRedeAcesso({
   onOutraPhoto,
 }: {
   readOnly: boolean;
+  header?: ReactNode;
+  lancamentoTitle?: string;
   lancamentoRe: "sim" | "nao" | "";
   onLancamentoRe: (value: "sim" | "nao") => void;
   cabos: CaboMetragemPayload[];
@@ -151,8 +159,9 @@ export function RelatorioRedeAcesso({
   return (
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
+        {header}
         <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-base font-bold">Lançamento cabos (RE)?</h2>
+          <h2 className="text-base font-bold">{lancamentoTitle}</h2>
           <div className="flex gap-2">
             <ChoiceButton
               active={lancamentoRe === "sim"}

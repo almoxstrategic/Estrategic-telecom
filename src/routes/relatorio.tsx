@@ -9,6 +9,7 @@ import {
   RelatorioAbaFixa,
   RelatorioAbasCampo,
   RelatorioRedeAcesso,
+  emptyOutraFoto,
   inputClass,
   type AbaCampo,
   type OutraFotoState,
@@ -56,6 +57,15 @@ function fotosDosSlots(slots: FotoSlot[]): StoredPhoto[] {
   return slots.map((slot) => slot.stored).filter((foto): foto is StoredPhoto => Boolean(foto));
 }
 
+function outrasParaPayload(items: OutraFotoState[]): RelatorioPayload["outrasFotos"] {
+  return items.map((item) => ({
+    id: item.id,
+    ref: item.ref,
+    foto: item.stored,
+    obs: item.obs,
+  }));
+}
+
 function RelatorioPage() {
   const { user } = useApp();
   const { id: reportIdFromUrl } = Route.useSearch();
@@ -92,9 +102,23 @@ function RelatorioPage() {
   const [posicaoObs, setPosicaoObs] = useState("");
   const [etiqueta, setEtiqueta] = useState<FotoSlot[]>([newFotoSlot()]);
   const [etiquetaObs, setEtiquetaObs] = useState("");
-  const [outras, setOutras] = useState<OutraFotoState[]>(() => [
-    { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
-  ]);
+  const [outras, setOutras] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
+  const [tecnologiaAcesso, setTecnologiaAcesso] = useState("");
+  const [lancamentoCabosRC, setLancamentoCabosRC] = useState<"sim" | "nao" | "">("");
+  const [cabosRc, setCabosRc] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
+  const [rcPoste, setRcPoste] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcPosteObs, setRcPosteObs] = useState("");
+  const [rcCaixa, setRcCaixa] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcCaixaObs, setRcCaixaObs] = useState("");
+  const [rcTerminacao, setRcTerminacao] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcTerminacaoObs, setRcTerminacaoObs] = useState("");
+  const [rcPlaqueta, setRcPlaqueta] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcPlaquetaObs, setRcPlaquetaObs] = useState("");
+  const [rcEntradaInterna, setRcEntradaInterna] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcEntradaInternaObs, setRcEntradaInternaObs] = useState("");
+  const [rcEntradaExterna, setRcEntradaExterna] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcEntradaExternaObs, setRcEntradaExternaObs] = useState("");
+  const [outrasRc, setOutrasRc] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -116,12 +140,18 @@ function RelatorioPage() {
       posicaoConexaoEstacao: { fotos: fotosDosSlots(posicao), obs: posicaoObs },
       etiquetaIdentificacao: { fotos: fotosDosSlots(etiqueta), obs: etiquetaObs },
       sobraTecnica: { fotos: fotosDosSlots(sobra), obs: sobraObs },
-      outrasFotos: outras.map((item) => ({
-        id: item.id,
-        ref: item.ref,
-        foto: item.stored,
-        obs: item.obs,
-      })),
+      outrasFotos: outrasParaPayload(outras),
+      tecnologiaAcesso,
+      lancamentoRc:
+        lancamentoCabosRC === "sim" ? true : lancamentoCabosRC === "nao" ? false : null,
+      metragensCaboRc: cabosRc,
+      rcPosteConexao: { fotos: fotosDosSlots(rcPoste), obs: rcPosteObs },
+      rcCaixaEmenda: { fotos: fotosDosSlots(rcCaixa), obs: rcCaixaObs },
+      rcTerminacaoCabo: { fotos: fotosDosSlots(rcTerminacao), obs: rcTerminacaoObs },
+      rcPlaquetaIdentificacao: { fotos: fotosDosSlots(rcPlaqueta), obs: rcPlaquetaObs },
+      rcEntradaInterna: { fotos: fotosDosSlots(rcEntradaInterna), obs: rcEntradaInternaObs },
+      rcEntradaExterna: { fotos: fotosDosSlots(rcEntradaExterna), obs: rcEntradaExternaObs },
+      outrasFotosRc: outrasParaPayload(outrasRc),
     };
   }, [
     tipo,
@@ -144,6 +174,22 @@ function RelatorioPage() {
     sobra,
     sobraObs,
     outras,
+    tecnologiaAcesso,
+    lancamentoCabosRC,
+    cabosRc,
+    rcPoste,
+    rcPosteObs,
+    rcCaixa,
+    rcCaixaObs,
+    rcTerminacao,
+    rcTerminacaoObs,
+    rcPlaqueta,
+    rcPlaquetaObs,
+    rcEntradaInterna,
+    rcEntradaInternaObs,
+    rcEntradaExterna,
+    rcEntradaExternaObs,
+    outrasRc,
   ]);
 
   const persistDraft = useCallback(
@@ -213,6 +259,22 @@ function RelatorioPage() {
       posicao,
       etiqueta,
       outras,
+      tecnologiaAcesso,
+      lancamentoCabosRC,
+      cabosRc,
+      rcPosteObs,
+      rcCaixaObs,
+      rcTerminacaoObs,
+      rcPlaquetaObs,
+      rcEntradaInternaObs,
+      rcEntradaExternaObs,
+      rcPoste,
+      rcCaixa,
+      rcTerminacao,
+      rcPlaqueta,
+      rcEntradaInterna,
+      rcEntradaExterna,
+      outrasRc,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -257,11 +319,30 @@ function RelatorioPage() {
       stored: item.foto,
       obs: item.obs,
     }));
-    setOutras(
-      outrasCarregadas.length > 0
-        ? outrasCarregadas
-        : [{ id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" }],
-    );
+    setOutras(outrasCarregadas.length > 0 ? outrasCarregadas : [emptyOutraFoto()]);
+    setTecnologiaAcesso(p.tecnologiaAcesso ?? "");
+    setLancamentoCabosRC(p.lancamentoRc === true ? "sim" : p.lancamentoRc === false ? "nao" : "");
+    setCabosRc(p.metragensCaboRc.length > 0 ? p.metragensCaboRc : [emptyCaboMetragem()]);
+    setRcPoste(slotsFromStored(p.rcPosteConexao?.fotos ?? [], 1));
+    setRcPosteObs(p.rcPosteConexao?.obs ?? "");
+    setRcCaixa(slotsFromStored(p.rcCaixaEmenda?.fotos ?? [], 1));
+    setRcCaixaObs(p.rcCaixaEmenda?.obs ?? "");
+    setRcTerminacao(slotsFromStored(p.rcTerminacaoCabo?.fotos ?? [], 1));
+    setRcTerminacaoObs(p.rcTerminacaoCabo?.obs ?? "");
+    setRcPlaqueta(slotsFromStored(p.rcPlaquetaIdentificacao?.fotos ?? [], 1));
+    setRcPlaquetaObs(p.rcPlaquetaIdentificacao?.obs ?? "");
+    setRcEntradaInterna(slotsFromStored(p.rcEntradaInterna?.fotos ?? [], 1));
+    setRcEntradaInternaObs(p.rcEntradaInterna?.obs ?? "");
+    setRcEntradaExterna(slotsFromStored(p.rcEntradaExterna?.fotos ?? [], 1));
+    setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
+    const outrasRcCarregadas = (p.outrasFotosRc ?? []).map((item) => ({
+      id: item.id || crypto.randomUUID(),
+      ref: item.ref,
+      file: null as EvidencePhotoRef | null,
+      stored: item.foto,
+      obs: item.obs,
+    }));
+    setOutrasRc(outrasRcCarregadas.length > 0 ? outrasRcCarregadas : [emptyOutraFoto()]);
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       window.setTimeout(() => {
@@ -377,26 +458,68 @@ function RelatorioPage() {
   };
 
   const handleCaboPhoto = (
+    setter: React.Dispatch<React.SetStateAction<CaboMetragemPayload[]>>,
+    payloadKey: "metragensCabo" | "metragensCaboRc",
     caboId: string,
     campo: "fotoInicio" | "fotoFim",
     file: EvidencePhotoRef | null,
   ) => {
     if (!file) {
-      setCabos((prev) => prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item)));
+      setter((prev) => prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item)));
       return;
     }
-    void uploadFotoImediato(file, `cabo-${campo}-${caboId.slice(0, 8)}`, (stored) => {
+    void uploadFotoImediato(file, `${payloadKey}-${campo}-${caboId.slice(0, 8)}`, (stored) => {
       let nextCabos: CaboMetragemPayload[] = [];
-      setCabos((prev) => {
+      setter((prev) => {
         nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: stored } : item));
         return nextCabos;
       });
-      return { ...buildPayload(), metragensCabo: nextCabos };
+      return { ...buildPayload(), [payloadKey]: nextCabos };
     });
   };
 
-  const patchCabo = (caboId: string, patch: Partial<CaboMetragemPayload>) => {
-    setCabos((prev) => prev.map((item) => (item.id === caboId ? { ...item, ...patch } : item)));
+  const handleOutraPhoto = (
+    setter: React.Dispatch<React.SetStateAction<OutraFotoState[]>>,
+    payloadKey: "outrasFotos" | "outrasFotosRc",
+    itemId: string,
+    file: EvidencePhotoRef,
+  ) => {
+    void uploadFotoImediato(file, `${payloadKey}-${itemId.slice(0, 8)}`, (stored) => {
+      let next: OutraFotoState[] = [];
+      setter((prev) => {
+        next = prev.map((row) => (row.id === itemId ? { ...row, file: null, stored } : row));
+        return next;
+      });
+      return { ...buildPayload(), [payloadKey]: outrasParaPayload(next) };
+    });
+  };
+
+  const patchCabo = (
+    setter: React.Dispatch<React.SetStateAction<CaboMetragemPayload[]>>,
+    caboId: string,
+    patch: Partial<CaboMetragemPayload>,
+  ) => {
+    setter((prev) => prev.map((item) => (item.id === caboId ? { ...item, ...patch } : item)));
+  };
+
+  const grupoSetters: Record<
+    RelatorioFotoGrupoKey,
+    React.Dispatch<React.SetStateAction<FotoSlot[]>>
+  > = {
+    posteConexao: setPoste,
+    caixaEmenda: setCaixa,
+    plaquetaIdentificacao: setPlaqueta,
+    sobraTecnica: setSobra,
+    novoAterramentoPoste: setNovoAterramento,
+    aterramentoTerrometro: setTerrometro,
+    posicaoConexaoEstacao: setPosicao,
+    etiquetaIdentificacao: setEtiqueta,
+    rcPosteConexao: setRcPoste,
+    rcCaixaEmenda: setRcCaixa,
+    rcTerminacaoCabo: setRcTerminacao,
+    rcPlaquetaIdentificacao: setRcPlaqueta,
+    rcEntradaInterna: setRcEntradaInterna,
+    rcEntradaExterna: setRcEntradaExterna,
   };
 
   const headerOk = useMemo(
@@ -442,6 +565,7 @@ function RelatorioPage() {
   const readOnly = status === "avisado" || status === "fechado";
   const mostrarFormularioCampo = tipo === "empresarial" || tipo === "implantacao";
   const mostrarRedeAcesso = tipo === "implantacao" || (tipo === "empresarial" && abaCampo === "RE");
+  const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
   const voltarInicio = () => {
     canAutosaveRef.current = false;
     setStep(1);
@@ -659,9 +783,11 @@ function RelatorioPage() {
                     }
                   }}
                   cabos={cabos}
-                  onPatchCabo={patchCabo}
+                  onPatchCabo={(id, patch) => patchCabo(setCabos, id, patch)}
                   onAddCabo={() => setCabos((prev) => [...prev, emptyCaboMetragem()])}
-                  onCaboPhoto={handleCaboPhoto}
+                  onCaboPhoto={(caboId, campo, file) =>
+                    handleCaboPhoto(setCabos, "metragensCabo", caboId, campo, file)
+                  }
                   grupos={[
                     {
                       grupoKey: "posteConexao",
@@ -731,40 +857,108 @@ function RelatorioPage() {
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file) => {
-                    const setterByGrupo: Record<
-                      RelatorioFotoGrupoKey,
-                      React.Dispatch<React.SetStateAction<FotoSlot[]>>
-                    > = {
-                      posteConexao: setPoste,
-                      caixaEmenda: setCaixa,
-                      plaquetaIdentificacao: setPlaqueta,
-                      sobraTecnica: setSobra,
-                      novoAterramentoPoste: setNovoAterramento,
-                      aterramentoTerrometro: setTerrometro,
-                      posicaoConexaoEstacao: setPosicao,
-                      etiquetaIdentificacao: setEtiqueta,
-                    };
-                    handleGrupoPhoto(setterByGrupo[grupoKey], grupoKey, slotId, file);
+                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
                   }}
                   outras={outras}
                   onOutrasChange={setOutras}
-                  onOutraPhoto={(itemId, file) => {
-                    void uploadFotoImediato(file, `outra-${itemId.slice(0, 8)}`, (stored) => {
-                      setOutras((prev) =>
-                        prev.map((row) =>
-                          row.id === itemId ? { ...row, file: null, stored } : row,
-                        ),
-                      );
-                      return {
-                        ...buildPayload(),
-                        outrasFotos: outras.map((row) =>
-                          row.id === itemId
-                            ? { id: row.id, ref: row.ref, foto: stored, obs: row.obs }
-                            : { id: row.id, ref: row.ref, foto: row.stored, obs: row.obs },
-                        ),
-                      };
-                    });
+                  onOutraPhoto={(itemId, file) =>
+                    handleOutraPhoto(setOutras, "outrasFotos", itemId, file)
+                  }
+                />
+              ) : mostrarRedeCliente ? (
+                <RelatorioRedeAcesso
+                  readOnly={readOnly}
+                  header={
+                    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                      <label
+                        htmlFor="tecnologia-acesso"
+                        className="mb-1.5 block text-sm font-semibold"
+                      >
+                        Tecnologia de Acesso
+                      </label>
+                      <input
+                        id="tecnologia-acesso"
+                        type="text"
+                        value={tecnologiaAcesso}
+                        onChange={(e) => setTecnologiaAcesso(e.target.value)}
+                        placeholder="Ex: GPON, Metro Ethernet"
+                        disabled={readOnly}
+                        className={inputClass()}
+                      />
+                    </div>
+                  }
+                  lancamentoTitle="Lançamento cabos (RC)?"
+                  lancamentoRe={lancamentoCabosRC}
+                  onLancamentoRe={(value) => {
+                    setLancamentoCabosRC(value);
+                    if (value === "sim") {
+                      setCabosRc((prev) => (prev.length ? prev : [emptyCaboMetragem()]));
+                    }
                   }}
+                  cabos={cabosRc}
+                  onPatchCabo={(id, patch) => patchCabo(setCabosRc, id, patch)}
+                  onAddCabo={() => setCabosRc((prev) => [...prev, emptyCaboMetragem()])}
+                  onCaboPhoto={(caboId, campo, file) =>
+                    handleCaboPhoto(setCabosRc, "metragensCaboRc", caboId, campo, file)
+                  }
+                  grupos={[
+                    {
+                      grupoKey: "rcPosteConexao",
+                      title: "Poste de conexão (Rede cliente com Rede Externa)",
+                      slots: rcPoste,
+                      onChange: setRcPoste,
+                      obs: rcPosteObs,
+                      onObsChange: setRcPosteObs,
+                    },
+                    {
+                      grupoKey: "rcCaixaEmenda",
+                      title: "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
+                      slots: rcCaixa,
+                      onChange: setRcCaixa,
+                      obs: rcCaixaObs,
+                      onObsChange: setRcCaixaObs,
+                    },
+                    {
+                      grupoKey: "rcTerminacaoCabo",
+                      title: "Terminação do cabo no cliente (PTO/Roseta - área interna)",
+                      slots: rcTerminacao,
+                      onChange: setRcTerminacao,
+                      obs: rcTerminacaoObs,
+                      onObsChange: setRcTerminacaoObs,
+                    },
+                    {
+                      grupoKey: "rcPlaquetaIdentificacao",
+                      title: "Plaqueta de Identificação - Terminação do cabo no cliente",
+                      slots: rcPlaqueta,
+                      onChange: setRcPlaqueta,
+                      obs: rcPlaquetaObs,
+                      onObsChange: setRcPlaquetaObs,
+                    },
+                    {
+                      grupoKey: "rcEntradaInterna",
+                      title: "Entrada do cabo no cliente (Área interna)",
+                      slots: rcEntradaInterna,
+                      onChange: setRcEntradaInterna,
+                      obs: rcEntradaInternaObs,
+                      onObsChange: setRcEntradaInternaObs,
+                    },
+                    {
+                      grupoKey: "rcEntradaExterna",
+                      title: "Entrada do cabo no cliente (Área externa)",
+                      slots: rcEntradaExterna,
+                      onChange: setRcEntradaExterna,
+                      obs: rcEntradaExternaObs,
+                      onObsChange: setRcEntradaExternaObs,
+                    },
+                  ]}
+                  onGrupoPhoto={(grupoKey, slotId, file) => {
+                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
+                  }}
+                  outras={outrasRc}
+                  onOutrasChange={setOutrasRc}
+                  onOutraPhoto={(itemId, file) =>
+                    handleOutraPhoto(setOutrasRc, "outrasFotosRc", itemId, file)
+                  }
                 />
               ) : tipo === "empresarial" ? (
                 <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">

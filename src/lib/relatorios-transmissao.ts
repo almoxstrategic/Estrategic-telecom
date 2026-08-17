@@ -29,7 +29,7 @@ export type CaboMetragemPayload = {
   obs: string;
 };
 
-export type RelatorioFotoGrupoKey =
+export type RelatorioFotoGrupoKeyRe =
   | "posteConexao"
   | "caixaEmenda"
   | "plaquetaIdentificacao"
@@ -38,6 +38,16 @@ export type RelatorioFotoGrupoKey =
   | "posicaoConexaoEstacao"
   | "etiquetaIdentificacao"
   | "sobraTecnica";
+
+export type RelatorioFotoGrupoKeyRc =
+  | "rcPosteConexao"
+  | "rcCaixaEmenda"
+  | "rcTerminacaoCabo"
+  | "rcPlaquetaIdentificacao"
+  | "rcEntradaInterna"
+  | "rcEntradaExterna";
+
+export type RelatorioFotoGrupoKey = RelatorioFotoGrupoKeyRe | RelatorioFotoGrupoKeyRc;
 
 export type RelatorioPayload = {
   lancamentoRe: boolean | null;
@@ -51,6 +61,16 @@ export type RelatorioPayload = {
   etiquetaIdentificacao: FotoGrupoPayload;
   sobraTecnica: FotoGrupoPayload;
   outrasFotos: OutraFotoPayload[];
+  tecnologiaAcesso: string;
+  lancamentoRc: boolean | null;
+  metragensCaboRc: CaboMetragemPayload[];
+  rcPosteConexao: FotoGrupoPayload;
+  rcCaixaEmenda: FotoGrupoPayload;
+  rcTerminacaoCabo: FotoGrupoPayload;
+  rcPlaquetaIdentificacao: FotoGrupoPayload;
+  rcEntradaInterna: FotoGrupoPayload;
+  rcEntradaExterna: FotoGrupoPayload;
+  outrasFotosRc: OutraFotoPayload[];
 };
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
@@ -97,19 +117,33 @@ export type RelatorioDraftPatch = {
   payload?: RelatorioPayload;
 };
 
+function emptyFotoGrupo(): FotoGrupoPayload {
+  return { fotos: [], obs: "" };
+}
+
 export function emptyRelatorioPayload(): RelatorioPayload {
   return {
     lancamentoRe: null,
     metragensCabo: [],
-    posteConexao: { fotos: [], obs: "" },
-    caixaEmenda: { fotos: [], obs: "" },
-    plaquetaIdentificacao: { fotos: [], obs: "" },
-    novoAterramentoPoste: { fotos: [], obs: "" },
-    aterramentoTerrometro: { fotos: [], obs: "" },
-    posicaoConexaoEstacao: { fotos: [], obs: "" },
-    etiquetaIdentificacao: { fotos: [], obs: "" },
-    sobraTecnica: { fotos: [], obs: "" },
+    posteConexao: emptyFotoGrupo(),
+    caixaEmenda: emptyFotoGrupo(),
+    plaquetaIdentificacao: emptyFotoGrupo(),
+    novoAterramentoPoste: emptyFotoGrupo(),
+    aterramentoTerrometro: emptyFotoGrupo(),
+    posicaoConexaoEstacao: emptyFotoGrupo(),
+    etiquetaIdentificacao: emptyFotoGrupo(),
+    sobraTecnica: emptyFotoGrupo(),
     outrasFotos: [],
+    tecnologiaAcesso: "",
+    lancamentoRc: null,
+    metragensCaboRc: [],
+    rcPosteConexao: emptyFotoGrupo(),
+    rcCaixaEmenda: emptyFotoGrupo(),
+    rcTerminacaoCabo: emptyFotoGrupo(),
+    rcPlaquetaIdentificacao: emptyFotoGrupo(),
+    rcEntradaInterna: emptyFotoGrupo(),
+    rcEntradaExterna: emptyFotoGrupo(),
+    outrasFotosRc: [],
   };
 }
 
@@ -120,19 +154,26 @@ type LegacyMetragemRe = {
   obs?: string;
 };
 
+function parseCabosList(raw: unknown): CaboMetragemPayload[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  return raw.map((item) => {
+    const cabo = (item ?? {}) as Partial<CaboMetragemPayload>;
+    return {
+      id: cabo.id || crypto.randomUUID(),
+      tipoCabo: cabo.tipoCabo ?? "",
+      metragem: cabo.metragem ?? "",
+      fotoInicio: cabo.fotoInicio ?? null,
+      fotoFim: cabo.fotoFim ?? null,
+      obs: cabo.obs ?? "",
+    };
+  });
+}
+
 function parseCabos(raw: unknown): CaboMetragemPayload[] {
   if (!raw || typeof raw !== "object") return [];
   const src = raw as Partial<RelatorioPayload> & { metragemRe?: LegacyMetragemRe };
-  if (Array.isArray(src.metragensCabo) && src.metragensCabo.length > 0) {
-    return src.metragensCabo.map((item) => ({
-      id: item.id || crypto.randomUUID(),
-      tipoCabo: item.tipoCabo ?? "",
-      metragem: item.metragem ?? "",
-      fotoInicio: item.fotoInicio ?? null,
-      fotoFim: item.fotoFim ?? null,
-      obs: item.obs ?? "",
-    }));
-  }
+  const fromArray = parseCabosList(src.metragensCabo);
+  if (fromArray.length > 0) return fromArray;
   const old = src.metragemRe;
   if (old && (old.fotoInicio || old.fotoFim || old.metragem || old.obs)) {
     return [
@@ -149,6 +190,26 @@ function parseCabos(raw: unknown): CaboMetragemPayload[] {
   return [];
 }
 
+function parseOutrasFotos(raw: unknown): OutraFotoPayload[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const foto = (item ?? {}) as Partial<OutraFotoPayload>;
+    return {
+      id: foto.id || crypto.randomUUID(),
+      ref: foto.ref ?? "",
+      foto: foto.foto ?? null,
+      obs: foto.obs ?? "",
+    };
+  });
+}
+
+function parseFotoGrupo(
+  base: FotoGrupoPayload,
+  raw: FotoGrupoPayload | undefined,
+): FotoGrupoPayload {
+  return { ...base, ...raw, fotos: raw?.fotos ?? [], obs: raw?.obs ?? "" };
+}
+
 function parsePayload(raw: unknown): RelatorioPayload {
   const base = emptyRelatorioPayload();
   if (!raw || typeof raw !== "object") return base;
@@ -158,15 +219,25 @@ function parsePayload(raw: unknown): RelatorioPayload {
     ...src,
     lancamentoRe: src.lancamentoRe ?? null,
     metragensCabo: parseCabos(raw),
-    posteConexao: { ...base.posteConexao, ...src.posteConexao },
-    caixaEmenda: { ...base.caixaEmenda, ...src.caixaEmenda },
-    plaquetaIdentificacao: { ...base.plaquetaIdentificacao, ...src.plaquetaIdentificacao },
-    novoAterramentoPoste: { ...base.novoAterramentoPoste, ...src.novoAterramentoPoste },
-    aterramentoTerrometro: { ...base.aterramentoTerrometro, ...src.aterramentoTerrometro },
-    posicaoConexaoEstacao: { ...base.posicaoConexaoEstacao, ...src.posicaoConexaoEstacao },
-    etiquetaIdentificacao: { ...base.etiquetaIdentificacao, ...src.etiquetaIdentificacao },
-    sobraTecnica: { ...base.sobraTecnica, ...src.sobraTecnica },
-    outrasFotos: src.outrasFotos ?? [],
+    posteConexao: parseFotoGrupo(base.posteConexao, src.posteConexao),
+    caixaEmenda: parseFotoGrupo(base.caixaEmenda, src.caixaEmenda),
+    plaquetaIdentificacao: parseFotoGrupo(base.plaquetaIdentificacao, src.plaquetaIdentificacao),
+    novoAterramentoPoste: parseFotoGrupo(base.novoAterramentoPoste, src.novoAterramentoPoste),
+    aterramentoTerrometro: parseFotoGrupo(base.aterramentoTerrometro, src.aterramentoTerrometro),
+    posicaoConexaoEstacao: parseFotoGrupo(base.posicaoConexaoEstacao, src.posicaoConexaoEstacao),
+    etiquetaIdentificacao: parseFotoGrupo(base.etiquetaIdentificacao, src.etiquetaIdentificacao),
+    sobraTecnica: parseFotoGrupo(base.sobraTecnica, src.sobraTecnica),
+    outrasFotos: parseOutrasFotos(src.outrasFotos),
+    tecnologiaAcesso: src.tecnologiaAcesso ?? "",
+    lancamentoRc: src.lancamentoRc ?? null,
+    metragensCaboRc: parseCabosList(src.metragensCaboRc),
+    rcPosteConexao: parseFotoGrupo(base.rcPosteConexao, src.rcPosteConexao),
+    rcCaixaEmenda: parseFotoGrupo(base.rcCaixaEmenda, src.rcCaixaEmenda),
+    rcTerminacaoCabo: parseFotoGrupo(base.rcTerminacaoCabo, src.rcTerminacaoCabo),
+    rcPlaquetaIdentificacao: parseFotoGrupo(base.rcPlaquetaIdentificacao, src.rcPlaquetaIdentificacao),
+    rcEntradaInterna: parseFotoGrupo(base.rcEntradaInterna, src.rcEntradaInterna),
+    rcEntradaExterna: parseFotoGrupo(base.rcEntradaExterna, src.rcEntradaExterna),
+    outrasFotosRc: parseOutrasFotos(src.outrasFotosRc),
   };
 }
 
@@ -486,28 +557,33 @@ export async function excluirRelatorioTransmissao(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export type RelatorioFotoCategoria = RelatorioFotoGrupoKey | "metragensCabo" | "outrasFotos";
+export type RelatorioFotoCategoria =
+  | RelatorioFotoGrupoKey
+  | "metragensCabo"
+  | "outrasFotos"
+  | "metragensCaboRc"
+  | "outrasFotosRc";
 
 export function appendStoredPhotoToPayload(
   payload: RelatorioPayload,
   categoria: RelatorioFotoCategoria,
   stored: StoredPhoto,
 ): RelatorioPayload {
-  if (categoria === "metragensCabo") {
-    const list = payload.metragensCabo.length
-      ? payload.metragensCabo.map((item) => ({ ...item }))
-      : [emptyCaboMetragem()];
+  if (categoria === "metragensCabo" || categoria === "metragensCaboRc") {
+    const list = (payload[categoria].length
+      ? payload[categoria].map((item) => ({ ...item }))
+      : [emptyCaboMetragem()]);
     const last = list[list.length - 1];
     if (!last.fotoInicio) last.fotoInicio = stored;
     else if (!last.fotoFim) last.fotoFim = stored;
     else list.push({ ...emptyCaboMetragem(), fotoInicio: stored });
-    return { ...payload, metragensCabo: list };
+    return { ...payload, [categoria]: list };
   }
-  if (categoria === "outrasFotos") {
+  if (categoria === "outrasFotos" || categoria === "outrasFotosRc") {
     return {
       ...payload,
-      outrasFotos: [
-        ...payload.outrasFotos,
+      [categoria]: [
+        ...payload[categoria],
         { id: crypto.randomUUID(), ref: "Admin", foto: stored, obs: "" },
       ],
     };

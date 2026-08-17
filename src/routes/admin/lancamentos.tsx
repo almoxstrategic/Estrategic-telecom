@@ -185,20 +185,26 @@ function RelatorioDetalhe({
 }) {
   const payload = row.payload;
   const cabos = payload?.metragensCabo ?? [];
+  const cabosRc = payload?.metragensCaboRc ?? [];
   const fotosCabosCount = cabos.reduce(
     (acc, cabo) => acc + Number(Boolean(cabo.fotoInicio)) + Number(Boolean(cabo.fotoFim)),
     0,
   );
+  const fotosCabosRcCount = cabosRc.reduce(
+    (acc, cabo) => acc + Number(Boolean(cabo.fotoInicio)) + Number(Boolean(cabo.fotoFim)),
+    0,
+  );
+  const blocoCount = (categoria: RelatorioFotoCategoria) => {
+    if (categoria === "metragensCabo") return fotosCabosCount;
+    if (categoria === "metragensCaboRc") return fotosCabosRcCount;
+    if (categoria === "outrasFotos") return payload?.outrasFotos.length ?? 0;
+    if (categoria === "outrasFotosRc") return payload?.outrasFotosRc.length ?? 0;
+    return payload?.[categoria].fotos.length ?? 0;
+  };
   const blocoProps = (categoria: RelatorioFotoCategoria) => ({
     canEdit: canEditPhotos,
     onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file),
-    uploadKey: `${row.id}-${categoria}-${
-      categoria === "metragensCabo"
-        ? fotosCabosCount
-        : categoria === "outrasFotos"
-          ? (payload?.outrasFotos.length ?? 0)
-          : (payload?.[categoria].fotos.length ?? 0)
-    }`,
+    uploadKey: `${row.id}-${categoria}-${blocoCount(categoria)}`,
     uploading: uploadingCategoria === categoria,
   });
 
@@ -216,6 +222,17 @@ function RelatorioDetalhe({
           <MetaField label="Técnico" value={row.tecnico_nome ?? "—"} />
           <MetaField label="Início" value={formatDate(row.data_inicio_execucao)} />
           <MetaField label="Tipo" value={tipoLabel(row.tipo_execucao)} />
+          <MetaField label="Tecnologia de Acesso" value={payload?.tecnologiaAcesso || "—"} />
+          <MetaField
+            label="Lançamento cabos (RC)"
+            value={
+              payload?.lancamentoRc === true
+                ? "SIM"
+                : payload?.lancamentoRc === false
+                  ? "NÃO"
+                  : "—"
+            }
+          />
         </div>
       </div>
 
@@ -311,6 +328,63 @@ function RelatorioDetalhe({
           obs={null}
           fotos={[]}
           {...blocoProps("outrasFotos")}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Rede Cliente (RC)
+        </h3>
+        {cabosRc.length === 0 && canEditPhotos ? (
+          <EvidenciaBloco
+            title="Metragem de cabo (RC)"
+            obs={null}
+            fotos={[]}
+            {...blocoProps("metragensCaboRc")}
+          />
+        ) : null}
+        {cabosRc.map((cabo, index) => (
+          <EvidenciaBloco
+            key={cabo.id}
+            title={`Cabo RC ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
+            obs={cabo.obs}
+            fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
+            {...blocoProps("metragensCaboRc")}
+          />
+        ))}
+        {(
+          [
+            ["Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao"],
+            ["Caixa de emenda na acomodação (Rede cliente com Rede Externa)", "rcCaixaEmenda"],
+            ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
+            ["Plaqueta de Identificação - Terminação do cabo no cliente", "rcPlaquetaIdentificacao"],
+            ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
+            ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
+          ] as const
+        ).map(([title, key]) => (
+          <EvidenciaBloco
+            key={key}
+            title={title}
+            obs={payload?.[key].obs}
+            fotos={payload?.[key].fotos ?? []}
+            {...blocoProps(key)}
+          />
+        ))}
+        {(payload?.outrasFotosRc ?? [])
+          .filter((item) => item.foto || item.ref || item.obs)
+          .map((item) => (
+            <EvidenciaBloco
+              key={item.id}
+              title={`Outra (RC) — ${item.ref || "sem REF"}`}
+              obs={item.obs}
+              fotos={item.foto ? [item.foto] : []}
+            />
+          ))}
+        <EvidenciaBloco
+          title="Outras fotos (RC)"
+          obs={null}
+          fotos={[]}
+          {...blocoProps("outrasFotosRc")}
         />
       </section>
     </div>

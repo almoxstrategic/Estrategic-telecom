@@ -73,7 +73,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
       {(payload?.metragensCabo ?? []).map((cabo, index) => (
         <Secao
           key={cabo.id}
-          titulo={`Cabo ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
+          titulo={`Cabo RE ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
           obs={cabo.obs}
           fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
         />
@@ -123,7 +123,65 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         .map((item) => (
           <Secao
             key={item.id}
-            titulo={`Outra — ${item.ref || "sem REF"}`}
+            titulo={`Outra (RE) — ${item.ref || "sem REF"}`}
+            obs={item.obs}
+            fotos={item.foto ? [item.foto] : []}
+          />
+        ))}
+
+      {payload?.tecnologiaAcesso ? (
+        <Campo label="Tecnologia de Acesso" value={payload.tecnologiaAcesso} />
+      ) : null}
+      {payload?.lancamentoRc === true || payload?.lancamentoRc === false ? (
+        <Campo
+          label="Lançamento cabos (RC)"
+          value={payload.lancamentoRc ? "SIM" : "NÃO"}
+        />
+      ) : null}
+      {(payload?.metragensCaboRc ?? []).map((cabo, index) => (
+        <Secao
+          key={cabo.id}
+          titulo={`Cabo RC ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
+          obs={cabo.obs}
+          fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
+        />
+      ))}
+      <Secao
+        titulo="Poste de conexão (Rede cliente com Rede Externa)"
+        obs={payload?.rcPosteConexao.obs}
+        fotos={payload?.rcPosteConexao.fotos ?? []}
+      />
+      <Secao
+        titulo="Caixa de emenda na acomodação (Rede cliente com Rede Externa)"
+        obs={payload?.rcCaixaEmenda.obs}
+        fotos={payload?.rcCaixaEmenda.fotos ?? []}
+      />
+      <Secao
+        titulo="Terminação do cabo no cliente (PTO/Roseta - área interna)"
+        obs={payload?.rcTerminacaoCabo.obs}
+        fotos={payload?.rcTerminacaoCabo.fotos ?? []}
+      />
+      <Secao
+        titulo="Plaqueta de Identificação - Terminação do cabo no cliente"
+        obs={payload?.rcPlaquetaIdentificacao.obs}
+        fotos={payload?.rcPlaquetaIdentificacao.fotos ?? []}
+      />
+      <Secao
+        titulo="Entrada do cabo no cliente (Área interna)"
+        obs={payload?.rcEntradaInterna.obs}
+        fotos={payload?.rcEntradaInterna.fotos ?? []}
+      />
+      <Secao
+        titulo="Entrada do cabo no cliente (Área externa)"
+        obs={payload?.rcEntradaExterna.obs}
+        fotos={payload?.rcEntradaExterna.fotos ?? []}
+      />
+      {(payload?.outrasFotosRc ?? [])
+        .filter((item) => item.foto || item.ref || item.obs)
+        .map((item) => (
+          <Secao
+            key={item.id}
+            titulo={`Outra (RC) — ${item.ref || "sem REF"}`}
             obs={item.obs}
             fotos={item.foto ? [item.foto] : []}
           />
