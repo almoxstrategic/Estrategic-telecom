@@ -77,16 +77,18 @@ const MESES = [
 
 /** JS getDay(): 0=Dom … 6=Sáb — UI só Seg–Sáb. */
 const DIAS_UTEIS = [
-  { dow: 1, label: "Segunda", curto: "Seg" },
-  { dow: 2, label: "Terça", curto: "Ter" },
-  { dow: 3, label: "Quarta", curto: "Qua" },
-  { dow: 4, label: "Quinta", curto: "Qui" },
-  { dow: 5, label: "Sexta", curto: "Sex" },
-  { dow: 6, label: "Sábado", curto: "Sáb" },
+  { dow: 1, label: "Segunda", curto: "Seg", completo: "Segunda-feira" },
+  { dow: 2, label: "Terça", curto: "Ter", completo: "Terça-feira" },
+  { dow: 3, label: "Quarta", curto: "Qua", completo: "Quarta-feira" },
+  { dow: 4, label: "Quinta", curto: "Qui", completo: "Quinta-feira" },
+  { dow: 5, label: "Sexta", curto: "Sex", completo: "Sexta-feira" },
+  { dow: 6, label: "Sábado", curto: "Sáb", completo: "Sábado" },
 ] as const;
 
 const TECNICO_TODOS = "Todos";
 const DESCRICAO_DESCONHECIDA = "Motivo Desconhecido";
+/** Dias com volume menor que isso não entram no card Dia (Maior %). */
+const MIN_NOTAS_DIA_TAXA = 5;
 const PIE_COLORS = {
   improdutivo: { manha: "#f59e0b", tarde: "#dc2626" },
   produtivo: { manha: "#4ade80", tarde: "#16a34a" },
@@ -98,9 +100,18 @@ type DiaSemanaAgg = {
   dow: number;
   dia: string;
   diaCurto: string;
+  completo: string;
   produtivas: number;
   improdutivas: number;
   taxaReprovacao: number;
+};
+
+type DrillDownDiaModalAgg = {
+  dia: string;
+  diaCurto: string;
+  alvo: number;
+  total: number;
+  percentual: number;
 };
 
 type RankingUsoCodigoDia = {
@@ -157,31 +168,7 @@ type RaioXQuebra = {
   numeroWo: string;
 };
 
-type Top3TipoOsItem = {
-  nome: string;
-  percentual: number;
-};
-
-type TecnicoDiaDetalheAgg = {
-  nome: string;
-  produtivas: number;
-  improdutivas: number;
-  aproveitamento: number;
-  top3Prod: Top3TipoOsItem[];
-  top3Improd: Top3TipoOsItem[];
-};
-
 type OrdemDirecao = "asc" | "desc";
-
-type OrdemDiaState = {
-  coluna: "produtivas" | "improdutivas" | "aproveitamento";
-  direcao: OrdemDirecao;
-};
-
-type OrdemMatrizState = {
-  coluna: "produtivasTotal" | "aprovGeral" | number;
-  direcao: OrdemDirecao;
-};
 
 type OrdemRankGeralState = {
   coluna:
@@ -193,21 +180,9 @@ type OrdemRankGeralState = {
   direcao: OrdemDirecao;
 };
 
-type DiaCelulaSemana = {
-  aproveitamento: number | null;
-  piorJanela: string | null;
-};
-
 type DiaCelulaRankGeral = {
   pct: number | null;
   janela: string | null;
-};
-
-type TecnicoSemanaMatrizAgg = {
-  nome: string;
-  produtivasTotal: number;
-  aproveitamentoGeral: number;
-  porDia: Record<number, DiaCelulaSemana>;
 };
 
 type RankGeralTecnicoAgg = {
@@ -471,24 +446,13 @@ function nomeTecnicoRow(row: ToaImportacaoRow): string {
   return login || "—";
 }
 
-function top3TipoOsLabels(notas: ToaImportacaoRow[]): Top3TipoOsItem[] {
-  const counts = new Map<string, number>();
-  for (const nota of notas) {
-    const tipo = String(nota.tipo_os ?? "").trim() || "—";
-    counts.set(tipo, (counts.get(tipo) ?? 0) + 1);
-  }
-  const total = [...counts.values()].reduce((acc, n) => acc + n, 0);
-  if (total === 0) return [];
-  return [...counts.entries()]
-    .sort(
-      (a, b) =>
-        b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"),
-    )
-    .slice(0, 3)
-    .map(([tipo, qtd]) => ({
-      nome: tipo,
-      percentual: (qtd / total) * 100,
-    }));
+function notaPassaStatusSelecionado(
+  row: ToaImportacaoRow,
+  status: StatusContratoFiltro,
+): boolean {
+  return status === "PRODUTIVO"
+    ? row.status_nota === "Produtiva"
+    : row.status_nota === "Improdutiva";
 }
 
 function setaOrdenacao(
@@ -541,13 +505,6 @@ function janelaDominantePorStatus(
     }
   }
   return melhor;
-}
-
-function piorJanelaImprodutiva(
-  notas: ToaImportacaoRow[],
-  dicionario: DicionarioCodigosBaixaMap,
-): string | null {
-  return janelaDominantePorStatus(notas, dicionario, "IMPRODUTIVO");
 }
 
 function piorJanelaDasNotas(notas: ToaImportacaoRow[]): string | null {
@@ -622,24 +579,17 @@ export function AnaliseComportamento() {
     useState<StatusContratoFiltro>("IMPRODUTIVO");
   const [periodoSeeded, setPeriodoSeeded] = useState(false);
   const [modalDiaAberto, setModalDiaAberto] = useState(false);
-  const [diaFiltroModal, setDiaFiltroModal] = useState<string>("Seg");
-  const [buscaTecnicoModal, setBuscaTecnicoModal] = useState("");
+  const [diaDestaque, setDiaDestaque] = useState<string | null>(null);
   const [modalAno, setModalAno] = useState<number | null>(null);
   const [modalMes, setModalMes] = useState<number | null>(null);
+  const [modalStatus, setModalStatus] =
+    useState<StatusContratoFiltro>("IMPRODUTIVO");
   const [rowsModal, setRowsModal] = useState<ToaImportacaoRow[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
   const [modalTop10Aberto, setModalTop10Aberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<AbaPainelInferior>("rank-geral");
   const [abaOrigemRaioX, setAbaOrigemRaioX] =
     useState<AbaPainelInferior | null>(null);
-  const [ordemDia, setOrdemDia] = useState<OrdemDiaState>({
-    coluna: "produtivas",
-    direcao: "desc",
-  });
-  const [ordemMatriz, setOrdemMatriz] = useState<OrdemMatrizState>({
-    coluna: "produtivasTotal",
-    direcao: "desc",
-  });
   const [ordemRankGeral, setOrdemRankGeral] = useState<OrdemRankGeralState>({
     coluna: "produtivasGeral",
     direcao: "desc",
@@ -841,12 +791,43 @@ export function AnaliseComportamento() {
         dow: d.dow,
         dia: d.label,
         diaCurto: d.curto,
+        completo: d.completo,
         produtivas: b.produtivas,
         improdutivas: b.improdutivas,
         taxaReprovacao: total > 0 ? (b.improdutivas / total) * 100 : 0,
       };
     });
   }, [notasFiltradas]);
+
+  /** Mesma base do gráfico Seg–Sáb (notas únicas / WO). */
+  const notasCards = useMemo(
+    () =>
+      notasFiltradas.filter((nota) => {
+        const dow = diaDaSemanaFromIso(nota.data_toa);
+        return dow != null && dow !== 0;
+      }),
+    [notasFiltradas],
+  );
+
+  const totalNotasPeriodo = useMemo(
+    () =>
+      porDiaSemana.reduce(
+        (acc, d) => acc + d.produtivas + d.improdutivas,
+        0,
+      ),
+    [porDiaSemana],
+  );
+
+  /** Notas do gráfico restritas ao Status (numerador de Código/Tipo). */
+  const notasCardsDoStatus = useMemo(
+    () =>
+      notasCards.filter((row) => {
+        const codigo = normalizeCodigoBaixa(row.cod_baixa);
+        if (!codigo) return false;
+        return statusContratoDoCodigo(codigo, dicionario) === statusFiltro;
+      }),
+    [notasCards, dicionario, statusFiltro],
+  );
 
   /** Notas do período (Ano/Mês/Técnico) no status selecionado — total geral. */
   const notasStatusGlobais = useMemo(() => {
@@ -865,9 +846,6 @@ export function AnaliseComportamento() {
     );
   }, [notasStatusGlobais, codigoFiltro]);
 
-  const totalNotasGlobais = notasStatusGlobais.length;
-  const totalNotasAlvo = notasAlvo.length;
-
   const rowsParaTop10 = useMemo(() => {
     if (!codigoFiltro) return rowsFiltradas;
     return rowsFiltradas.filter(
@@ -878,7 +856,7 @@ export function AnaliseComportamento() {
   const porTurno = useMemo(() => {
     let manha = 0;
     let tarde = 0;
-    for (const row of notasAlvo) {
+    for (const row of notasCards) {
       if (turnoDaRow(row) === "Manhã") manha += 1;
       else tarde += 1;
     }
@@ -894,7 +872,7 @@ export function AnaliseComportamento() {
         { name: "Tarde", value: tarde, fill: cores.tarde },
       ].filter((p) => p.value > 0),
     };
-  }, [notasAlvo, statusFiltro]);
+  }, [notasCards, statusFiltro]);
 
   const isQuebraCard = (nota: ToaImportacaoRow): boolean => {
     if (nota.status_nota !== "Improdutiva") return false;
@@ -905,38 +883,47 @@ export function AnaliseComportamento() {
   /** Card 4: volume (produtivo) ou taxa de reprovação (improdutivo). */
   const turnoMaiorFadiga = useMemo(() => {
     if (statusFiltro === "PRODUTIVO") {
-      if (!notasAlvo.length) return null;
+      if (!notasCards.length) return null;
       if (porTurno.tarde > porTurno.manha) {
         return {
           turno: "Tarde" as const,
           quebras: porTurno.tarde,
-          totalBucket: porTurno.tarde,
-          taxa: 100,
+          totalBucket: totalNotasPeriodo,
+          taxa:
+            totalNotasPeriodo > 0
+              ? (porTurno.tarde / totalNotasPeriodo) * 100
+              : 0,
         };
       }
       if (porTurno.manha > porTurno.tarde) {
         return {
           turno: "Manhã" as const,
           quebras: porTurno.manha,
-          totalBucket: porTurno.manha,
-          taxa: 100,
+          totalBucket: totalNotasPeriodo,
+          taxa:
+            totalNotasPeriodo > 0
+              ? (porTurno.manha / totalNotasPeriodo) * 100
+              : 0,
         };
       }
       return {
         turno: "Empate" as const,
         quebras: porTurno.manha,
-        totalBucket: porTurno.manha,
-        taxa: 100,
+        totalBucket: totalNotasPeriodo,
+        taxa:
+          totalNotasPeriodo > 0
+            ? (porTurno.manha / totalNotasPeriodo) * 100
+            : 0,
       };
     }
 
-    if (!notasFiltradas.length) return null;
+    if (!notasCards.length) return null;
 
     let manhaQ = 0;
     let manhaT = 0;
     let tardeQ = 0;
     let tardeT = 0;
-    for (const nota of notasFiltradas) {
+    for (const nota of notasCards) {
       const turno = turnoDaRow(nota);
       if (turno === "Manhã") {
         manhaT += 1;
@@ -955,25 +942,31 @@ export function AnaliseComportamento() {
       return {
         turno: "Tarde" as const,
         quebras: tardeQ,
-        totalBucket: tardeT,
-        taxa: taxaT,
+        totalBucket: totalNotasPeriodo,
+        taxa: totalNotasPeriodo > 0 ? (tardeQ / totalNotasPeriodo) * 100 : 0,
       };
     }
     if (taxaM > taxaT || (taxaM === taxaT && manhaQ > tardeQ)) {
       return {
         turno: "Manhã" as const,
         quebras: manhaQ,
-        totalBucket: manhaT,
-        taxa: taxaM,
+        totalBucket: totalNotasPeriodo,
+        taxa: totalNotasPeriodo > 0 ? (manhaQ / totalNotasPeriodo) * 100 : 0,
       };
     }
     return {
       turno: "Empate" as const,
       quebras: manhaQ,
-      totalBucket: manhaT,
-      taxa: taxaM,
+      totalBucket: totalNotasPeriodo,
+      taxa: totalNotasPeriodo > 0 ? (manhaQ / totalNotasPeriodo) * 100 : 0,
     };
-  }, [statusFiltro, notasAlvo.length, porTurno, notasFiltradas, codigoFiltro]);
+  }, [
+    statusFiltro,
+    notasCards,
+    porTurno,
+    totalNotasPeriodo,
+    codigoFiltro,
+  ]);
 
   type JanelaCardAgg = {
     janela: string;
@@ -990,8 +983,8 @@ export function AnaliseComportamento() {
   const analiseJanelasMacro = useMemo(() => {
     const ranking = agregarRankingJanelasMacro({
       statusFiltro,
-      notasAlvo,
-      notasFiltradas,
+      notasAlvo: notasCards,
+      notasFiltradas: notasCards,
       dicionario,
       isQuebra: isQuebraCard,
     });
@@ -1062,7 +1055,7 @@ export function AnaliseComportamento() {
 
     if (statusFiltro === "PRODUTIVO") {
       const countsMicro = new Map<string, number>();
-      for (const row of notasAlvo) {
+      for (const row of notasCards) {
         const hora = horaBaixaDaRow(row);
         if (janelaMacroDaHora(hora) !== macro.janela) continue;
         const micro = janelaMicroDaHora(hora);
@@ -1072,7 +1065,7 @@ export function AnaliseComportamento() {
     }
 
     const bucketsMicro = new Map<string, { quebras: number; total: number }>();
-    for (const nota of notasFiltradas) {
+    for (const nota of notasCards) {
       const hora = horaBaixaDaRow(nota);
       if (janelaMacroDaHora(hora) !== macro.janela) continue;
       const micro = janelaMicroDaHora(hora);
@@ -1086,7 +1079,7 @@ export function AnaliseComportamento() {
     }
 
     return { ranking, macro, micro: vencedoraTaxa(bucketsMicro) };
-  }, [statusFiltro, notasAlvo, notasFiltradas, dicionario, codigoFiltro]);
+  }, [statusFiltro, notasCards, dicionario, codigoFiltro]);
 
   const rankingPorJanela = analiseJanelasMacro.ranking;
   const janelaImprodutivaMacro = analiseJanelasMacro.macro;
@@ -1094,9 +1087,9 @@ export function AnaliseComportamento() {
 
   const codOfensor = useMemo(() => {
     const counts = new Map<string, number>();
-    const totalImprodutivas = notasStatusGlobais.length;
+    const totalImprodutivas = totalNotasPeriodo;
 
-    for (const row of notasStatusGlobais) {
+    for (const row of notasCardsDoStatus) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
       counts.set(codigo, (counts.get(codigo) ?? 0) + 1);
@@ -1139,7 +1132,7 @@ export function AnaliseComportamento() {
         pct: (melhorQtd / totalImprodutivas) * 100,
       },
     };
-  }, [notasStatusGlobais]);
+  }, [notasCardsDoStatus, totalNotasPeriodo]);
 
   const codigoOfensorVencedor = codOfensor.ofensor?.codigo ?? null;
   const codigoAlvo = codigoFiltro || codigoOfensorVencedor;
@@ -1147,19 +1140,22 @@ export function AnaliseComportamento() {
   /** Card 5: ofensor global ou código filtrado vs total geral. */
   const cardCodigoExibido = useMemo(() => {
     if (!codigoFiltro) return codOfensor.ofensor;
-    if (totalNotasGlobais === 0) return null;
+    if (totalNotasPeriodo === 0) return null;
+    const quantidade = notasCards.filter(
+      (row) => normalizeCodigoBaixa(row.cod_baixa) === codigoFiltro,
+    ).length;
     return {
       codigo: codigoFiltro,
-      quantidade: totalNotasAlvo,
-      pct: (totalNotasAlvo / totalNotasGlobais) * 100,
+      quantidade,
+      pct: (quantidade / totalNotasPeriodo) * 100,
     };
-  }, [codigoFiltro, codOfensor.ofensor, totalNotasAlvo, totalNotasGlobais]);
+  }, [codigoFiltro, codOfensor.ofensor, notasCards, totalNotasPeriodo]);
 
   const tipoOfensorMacro = useMemo(() => {
-    if (!notasAlvo.length) return null;
+    if (!notasCardsDoStatus.length) return null;
 
     const counts = new Map<string, number>();
-    for (const row of notasAlvo) {
+    for (const row of notasCardsDoStatus) {
       const codigo = normalizeCodigoBaixa(row.cod_baixa);
       if (!codigo) continue;
       const motivo =
@@ -1184,94 +1180,71 @@ export function AnaliseComportamento() {
       }
     }
     return melhor ? { motivo: melhor, quantidade } : null;
-  }, [notasAlvo, dicionario]);
+  }, [notasCardsDoStatus, dicionario]);
 
-  /** Card 3: volume (produtivo) ou taxa de reprovação do dia (improdutivo). */
-  const diaMaisCritico = useMemo(() => {
-    if (statusFiltro === "PRODUTIVO") {
-      if (!notasAlvo.length) return null;
-      const counts = new Map<number, number>();
-      for (const row of notasAlvo) {
-        const dow = diaDaSemanaFromIso(row.data_toa);
-        if (dow == null || dow === 0) continue;
-        counts.set(dow, (counts.get(dow) ?? 0) + 1);
-      }
-      let bestDow: number | null = null;
-      let bestQtd = 0;
-      for (const [dow, qtd] of counts) {
-        if (
-          qtd > bestQtd ||
-          (qtd === bestQtd && bestDow != null && dow < bestDow)
-        ) {
-          bestDow = dow;
-          bestQtd = qtd;
-        } else if (bestDow == null && qtd > 0) {
-          bestDow = dow;
-          bestQtd = qtd;
-        }
-      }
-      if (bestDow == null || bestQtd === 0) return null;
-      const meta = DIAS_UTEIS.find((d) => d.dow === bestDow);
+  const metricasPorDia = useMemo(() => {
+    const isImprod = statusFiltro === "IMPRODUTIVO";
+    return porDiaSemana.map((d) => {
+      const totalDia = d.produtivas + d.improdutivas;
+      const alvo = isImprod ? d.improdutivas : d.produtivas;
       return {
-        dia: meta?.label ?? "—",
-        quantidade: bestQtd,
-        totalBucket: totalNotasAlvo,
-        pct: totalNotasAlvo > 0 ? (bestQtd / totalNotasAlvo) * 100 : 0,
+        ...d,
+        totalDia,
+        alvo,
+        taxa: totalDia > 0 ? (alvo / totalDia) * 100 : 0,
       };
-    }
+    });
+  }, [porDiaSemana, statusFiltro]);
 
-    const buckets = new Map<
-      number,
-      { quebras: number; total: number }
-    >();
-    for (const nota of notasFiltradas) {
-      const dow = diaDaSemanaFromIso(nota.data_toa);
-      if (dow == null || dow === 0) continue;
-      let b = buckets.get(dow);
-      if (!b) {
-        b = { quebras: 0, total: 0 };
-        buckets.set(dow, b);
+  /** Card Dia (Maior %): melhor taxa do status, ignorando volume insignificante. */
+  const diaMaiorTaxa = useMemo(() => {
+    const candidatos = metricasPorDia.filter(
+      (d) => d.totalDia >= MIN_NOTAS_DIA_TAXA,
+    );
+    if (candidatos.length === 0) return null;
+    const vencedor = candidatos.reduce((best, atual) => {
+      if (atual.taxa > best.taxa) return atual;
+      if (atual.taxa === best.taxa && atual.totalDia > best.totalDia) {
+        return atual;
       }
-      b.total += 1;
-      if (isQuebraCard(nota)) b.quebras += 1;
-    }
-
-    let bestDow: number | null = null;
-    let bestQuebras = 0;
-    let bestTotal = 0;
-    let bestTaxa = -1;
-    for (const [dow, b] of buckets) {
-      if (b.total === 0) continue;
-      const taxa = (b.quebras / b.total) * 100;
       if (
-        taxa > bestTaxa ||
-        (taxa === bestTaxa && b.quebras > bestQuebras) ||
-        (taxa === bestTaxa &&
-          b.quebras === bestQuebras &&
-          bestDow != null &&
-          dow < bestDow)
+        atual.taxa === best.taxa &&
+        atual.totalDia === best.totalDia &&
+        atual.dow < best.dow
       ) {
-        bestDow = dow;
-        bestQuebras = b.quebras;
-        bestTotal = b.total;
-        bestTaxa = taxa;
+        return atual;
       }
-    }
-    if (bestDow == null || bestTaxa < 0) return null;
-    const meta = DIAS_UTEIS.find((d) => d.dow === bestDow);
+      return best;
+    });
+    if (vencedor.totalDia === 0) return null;
     return {
-      dia: meta?.label ?? "—",
-      quantidade: bestQuebras,
-      totalBucket: bestTotal,
-      pct: bestTaxa,
+      dia: vencedor.dia,
+      diaCurto: vencedor.diaCurto,
+      completo: vencedor.completo,
+      alvo: vencedor.alvo,
+      totalDia: vencedor.totalDia,
+      taxa: vencedor.taxa,
     };
-  }, [
-    statusFiltro,
-    notasAlvo,
-    totalNotasAlvo,
-    notasFiltradas,
-    codigoFiltro,
-  ]);
+  }, [metricasPorDia]);
+
+  /** Card Dia (Maior volume): maior quantidade absoluta do status selecionado. */
+  const diaMaiorVolume = useMemo(() => {
+    if (totalNotasPeriodo === 0) return null;
+    const vencedor = metricasPorDia.reduce((best, atual) => {
+      if (atual.alvo > best.alvo) return atual;
+      if (atual.alvo === best.alvo && atual.dow < best.dow) return atual;
+      return best;
+    });
+    if (vencedor.alvo === 0) return null;
+    return {
+      dia: vencedor.dia,
+      diaCurto: vencedor.diaCurto,
+      completo: vencedor.completo,
+      alvo: vencedor.alvo,
+      totalGeral: totalNotasPeriodo,
+      pct: (vencedor.alvo / totalNotasPeriodo) * 100,
+    };
+  }, [metricasPorDia, totalNotasPeriodo]);
 
   const rankingUsoCodigo = useMemo((): RankingUsoCodigo[] => {
     if (!codigoAlvo) return [];
@@ -1453,11 +1426,11 @@ export function AnaliseComportamento() {
     );
   }, [todosCodigosBaixa, buscaCodBaixa]);
 
-  const abrirModalDia = (diaCurto: string) => {
-    setDiaFiltroModal(diaCurto);
-    setBuscaTecnicoModal("");
+  const abrirModalDia = (diaCompleto: string | null) => {
+    setDiaDestaque(diaCompleto);
     setModalAno(ano);
     setModalMes(mes);
+    setModalStatus(statusFiltro);
     setModalDiaAberto(true);
   };
 
@@ -1465,11 +1438,18 @@ export function AnaliseComportamento() {
     setModalDiaAberto(false);
   };
 
+  const limparFiltrosModalDia = () => {
+    setModalAno(null);
+    setModalMes(null);
+    setModalStatus(statusFiltro);
+  };
+
   useEffect(() => {
     if (!modalDiaAberto) return;
     setModalAno(ano);
     setModalMes(mes);
-  }, [modalDiaAberto, ano, mes]);
+    setModalStatus(statusFiltro);
+  }, [modalDiaAberto, ano, mes, statusFiltro]);
 
   useEffect(() => {
     if (!modalDiaAberto) return;
@@ -1511,165 +1491,46 @@ export function AnaliseComportamento() {
     [rowsModal],
   );
 
-  const diaDowModal = useMemo(() => {
-    return DIAS_UTEIS.find((d) => d.curto === diaFiltroModal)?.dow ?? 1;
-  }, [diaFiltroModal]);
-
-  const modoDiaEspecifico = true;
-
-  const detalheTecnicosDia = useMemo((): TecnicoDiaDetalheAgg[] => {
-    if (!modalDiaAberto) return [];
-
-    const porTecnico = new Map<
-      string,
-      { prod: ToaImportacaoRow[]; improd: ToaImportacaoRow[] }
-    >();
-
-    for (const nota of notasBaseModal) {
-      const dow = diaDaSemanaFromIso(nota.data_toa);
-      if (dow !== diaDowModal) continue;
-      const nome = nomeTecnicoRow(nota);
-      if (!nome || nome === "—") continue;
-      let acc = porTecnico.get(nome);
-      if (!acc) {
-        acc = { prod: [], improd: [] };
-        porTecnico.set(nome, acc);
-      }
-      if (nota.status_nota === "Produtiva") acc.prod.push(nota);
-      else acc.improd.push(nota);
+  /**
+   * Drill-down Seg–Sáb: X = notas no status local; Y = total do mesmo contexto
+   * (Ano/Mês, sem Status).
+   */
+  const drillDownDiasModal = useMemo((): DrillDownDiaModalAgg[] => {
+    const totalPorDia = new Map<number, number>();
+    const alvoPorDia = new Map<number, number>();
+    for (const d of DIAS_UTEIS) {
+      totalPorDia.set(d.dow, 0);
+      alvoPorDia.set(d.dow, 0);
     }
-
-    const busca = buscaTecnicoModal.trim().toLowerCase();
-    return [...porTecnico.entries()]
-      .filter(([nome]) => !busca || nome.toLowerCase().includes(busca))
-      .map(([nome, acc]) => {
-        const produtivas = acc.prod.length;
-        const improdutivas = acc.improd.length;
-        const total = produtivas + improdutivas;
-        return {
-          nome,
-          produtivas,
-          improdutivas,
-          aproveitamento: total > 0 ? (produtivas / total) * 100 : 0,
-          top3Prod: top3TipoOsLabels(acc.prod),
-          top3Improd: top3TipoOsLabels(acc.improd),
-        };
-      });
-  }, [
-    modalDiaAberto,
-    modoDiaEspecifico,
-    diaDowModal,
-    notasBaseModal,
-    buscaTecnicoModal,
-  ]);
-
-  const detalheTecnicosDiaOrdenado = useMemo(() => {
-    const fator = ordemDia.direcao === "asc" ? 1 : -1;
-    return [...detalheTecnicosDia].sort((a, b) => {
-      const va = a[ordemDia.coluna];
-      const vb = b[ordemDia.coluna];
-      if (va !== vb) return (va - vb) * fator;
-      return a.nome.localeCompare(b.nome, "pt-BR");
-    });
-  }, [detalheTecnicosDia, ordemDia]);
-
-  const matrizTecnicosSemana = useMemo((): TecnicoSemanaMatrizAgg[] => {
-    if (!modalDiaAberto || modoDiaEspecifico) return [];
-
-    type Acc = {
-      prod: number;
-      improd: number;
-      porDia: Map<
-        number,
-        { prod: number; improd: number; notasDia: ToaImportacaoRow[] }
-      >;
-    };
-    const porTecnico = new Map<string, Acc>();
 
     for (const nota of notasBaseModal) {
       const dow = diaDaSemanaFromIso(nota.data_toa);
       if (dow == null || dow === 0) continue;
-      const nome = nomeTecnicoRow(nota);
-      if (!nome || nome === "—") continue;
-      let acc = porTecnico.get(nome);
-      if (!acc) {
-        acc = { prod: 0, improd: 0, porDia: new Map() };
-        porTecnico.set(nome, acc);
-      }
-      let diaAcc = acc.porDia.get(dow);
-      if (!diaAcc) {
-        diaAcc = { prod: 0, improd: 0, notasDia: [] };
-        acc.porDia.set(dow, diaAcc);
-      }
-      diaAcc.notasDia.push(nota);
-      if (nota.status_nota === "Produtiva") {
-        acc.prod += 1;
-        diaAcc.prod += 1;
-      } else {
-        acc.improd += 1;
-        diaAcc.improd += 1;
+      if (!totalPorDia.has(dow)) continue;
+      totalPorDia.set(dow, (totalPorDia.get(dow) ?? 0) + 1);
+      if (notaPassaStatusSelecionado(nota, modalStatus)) {
+        alvoPorDia.set(dow, (alvoPorDia.get(dow) ?? 0) + 1);
       }
     }
 
-    const busca = buscaTecnicoModal.trim().toLowerCase();
-    return [...porTecnico.entries()]
-      .filter(([nome]) => !busca || nome.toLowerCase().includes(busca))
-      .map(([nome, acc]) => {
-        const total = acc.prod + acc.improd;
-        const porDia: Record<number, DiaCelulaSemana> = {};
-        for (const d of DIAS_UTEIS) {
-          const diaAcc = acc.porDia.get(d.dow);
-          if (!diaAcc || diaAcc.prod + diaAcc.improd === 0) {
-            porDia[d.dow] = { aproveitamento: null, piorJanela: null };
-            continue;
-          }
-          const totalDia = diaAcc.prod + diaAcc.improd;
-          porDia[d.dow] = {
-            aproveitamento: (diaAcc.prod / totalDia) * 100,
-            piorJanela: piorJanelaImprodutiva(diaAcc.notasDia, dicionario),
-          };
-        }
-        return {
-          nome,
-          produtivasTotal: acc.prod,
-          aproveitamentoGeral: total > 0 ? (acc.prod / total) * 100 : 0,
-          porDia,
-        };
-      });
-  }, [
-    modalDiaAberto,
-    modoDiaEspecifico,
-    notasBaseModal,
-    buscaTecnicoModal,
-    dicionario,
-  ]);
-
-  const matrizTecnicosSemanaOrdenada = useMemo(() => {
-    const fator = ordemMatriz.direcao === "asc" ? 1 : -1;
-    return [...matrizTecnicosSemana].sort((a, b) => {
-      let va: number;
-      let vb: number;
-      if (ordemMatriz.coluna === "produtivasTotal") {
-        va = a.produtivasTotal;
-        vb = b.produtivasTotal;
-      } else if (ordemMatriz.coluna === "aprovGeral") {
-        va = a.aproveitamentoGeral;
-        vb = b.aproveitamentoGeral;
-      } else {
-        const dow = ordemMatriz.coluna;
-        va = valorOrdenacaoComNulos(
-          a.porDia[dow]?.aproveitamento,
-          ordemMatriz.direcao,
-        );
-        vb = valorOrdenacaoComNulos(
-          b.porDia[dow]?.aproveitamento,
-          ordemMatriz.direcao,
-        );
-      }
-      if (va !== vb) return (va - vb) * fator;
-      return a.nome.localeCompare(b.nome, "pt-BR");
+    return DIAS_UTEIS.map((d) => {
+      const alvo = alvoPorDia.get(d.dow) ?? 0;
+      const total = totalPorDia.get(d.dow) ?? 0;
+      const percentual = total > 0 ? (alvo / total) * 100 : 0;
+      return {
+        dia: d.completo,
+        diaCurto: d.curto,
+        alvo,
+        total,
+        percentual,
+      };
     });
-  }, [matrizTecnicosSemana, ordemMatriz]);
+  }, [notasBaseModal, modalStatus]);
+
+  const somaTotalNotasModal = useMemo(
+    () => drillDownDiasModal.reduce((acc, d) => acc + d.total, 0),
+    [drillDownDiasModal],
+  );
 
   /** Rank Geral: volumetria cruzada + dias reativos ao Status. */
   const rankGeralMatriz = useMemo((): RankGeralTecnicoAgg[] => {
@@ -1783,39 +1644,6 @@ export function AnaliseComportamento() {
     );
   }, [rankGeralMatrizOrdenada, buscaTecnicoRank]);
 
-  const alternarOrdemDia = (
-    coluna: OrdemDiaState["coluna"],
-  ) => {
-    setOrdemDia((prev) =>
-      prev.coluna === coluna
-        ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
-        : { coluna, direcao: "desc" },
-    );
-  };
-
-  const alternarOrdemMatriz = (
-    coluna: OrdemMatrizState["coluna"],
-  ) => {
-    setOrdemMatriz((prev) =>
-      prev.coluna === coluna
-        ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
-        : { coluna, direcao: "desc" },
-    );
-  };
-
-  const alternarOrdemRankGeral = (coluna: OrdemRankGeralState["coluna"]) => {
-    setOrdemRankGeral((prev) =>
-      prev.coluna === coluna
-        ? { coluna, direcao: prev.direcao === "asc" ? "desc" : "asc" }
-        : { coluna, direcao: "desc" },
-    );
-  };
-
-  const tituloModalDia = useMemo(() => {
-    const dia = DIAS_UTEIS.find((d) => d.curto === diaFiltroModal);
-    return `Detalhamento - Improdutiva · ${dia?.label ?? diaFiltroModal}`;
-  }, [diaFiltroModal]);
-
   const filtrosLimpos = ano === null && mes === null;
   const visaoEquipe = tecnicoFiltro === TECNICO_TODOS;
 
@@ -1871,7 +1699,6 @@ export function AnaliseComportamento() {
       : "Cód. mais Produtivo";
   const labelVolumeCurto = isModoImprodutivo ? "quebras" : "produção";
   const labelVolumeTurno = isModoImprodutivo ? "quebras" : "notas";
-  const labelDiaPct = isModoImprodutivo ? "reprovação" : "aprovação";
   const labelColunaTipo = isModoImprodutivo
     ? "Tipo de quebra"
     : "Tipo de nota";
@@ -1890,9 +1717,8 @@ export function AnaliseComportamento() {
     return `${formatQuantidade(qtd)} de ${formatQuantidade(total)} (${formatPct(pct)})`;
   };
 
-  const fracaoSobreAlvo = (qtd: number) => fracaoSobre(qtd, totalNotasAlvo);
-  const fracaoSobreGlobais = (qtd: number) =>
-    fracaoSobre(qtd, totalNotasGlobais);
+  const fracaoSobrePeriodo = (qtd: number) =>
+    fracaoSobre(qtd, totalNotasPeriodo);
 
   useEffect(() => {
     if (!modalTop10Aberto) return;
@@ -2085,8 +1911,8 @@ export function AnaliseComportamento() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-3 xl:grid-cols-6">
-            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-stretch gap-4">
+            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <Clock className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
@@ -2106,8 +1932,8 @@ export function AnaliseComportamento() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMacro
                     ? isModoImprodutivo
-                      ? `maior índice de quebras - ${formatQuantidade(janelaImprodutivaMacro.quantidade)} de ${formatQuantidade(janelaImprodutivaMacro.totalBucket)} (${formatPct(janelaImprodutivaMacro.taxa)})`
-                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMacro.quantidade)}`
+                      ? `maior índice de quebras - ${fracaoSobrePeriodo(janelaImprodutivaMacro.quantidade)}`
+                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobrePeriodo(janelaImprodutivaMacro.quantidade)}`
                     : isModoImprodutivo
                       ? "maior índice de quebras"
                       : `maior volume de ${labelVolumeCurto}`}
@@ -2115,7 +1941,7 @@ export function AnaliseComportamento() {
               </div>
             </div>
 
-            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <Clock className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
@@ -2135,8 +1961,8 @@ export function AnaliseComportamento() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {janelaImprodutivaMicro
                     ? isModoImprodutivo
-                      ? `maior índice de quebras - ${formatQuantidade(janelaImprodutivaMicro.quantidade)} de ${formatQuantidade(janelaImprodutivaMicro.totalBucket)} (${formatPct(janelaImprodutivaMicro.taxa)})`
-                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobreAlvo(janelaImprodutivaMicro.quantidade)}`
+                      ? `maior índice de quebras - ${fracaoSobrePeriodo(janelaImprodutivaMicro.quantidade)}`
+                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobrePeriodo(janelaImprodutivaMicro.quantidade)}`
                     : isModoImprodutivo
                       ? "maior índice de quebras"
                       : `maior volume de ${labelVolumeCurto}`}
@@ -2144,30 +1970,79 @@ export function AnaliseComportamento() {
               </div>
             </div>
 
-            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div
+              className="flex min-w-[200px] flex-1 cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalDia(diaMaiorTaxa?.completo ?? null)
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  abrirModalDia(diaMaiorTaxa?.completo ?? null);
+                }
+              }}
+              title="Abrir detalhamento por dia da semana"
+            >
               <div className="flex items-center gap-2">
                 <CalendarDays className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Dia
+                  Dia (Maior %)
                 </span>
               </div>
               <div
                 className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
               >
-                {diaMaisCritico?.dia ?? "—"}
+                {diaMaiorTaxa?.dia ?? "—"}
               </div>
               <div className="mt-auto">
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {diaMaisCritico
+                  {diaMaiorTaxa
                     ? isModoImprodutivo
-                      ? `${formatPct(diaMaisCritico.pct)} de reprovação - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(diaMaisCritico.totalBucket)}`
-                      : `${formatPct(diaMaisCritico.pct)} de ${labelDiaPct} - ${formatQuantidade(diaMaisCritico.quantidade)} de ${formatQuantidade(totalNotasAlvo)}`
+                      ? `${formatPct(diaMaiorTaxa.taxa)} de quebra - ${formatQuantidade(diaMaiorTaxa.alvo)} de ${formatQuantidade(diaMaiorTaxa.totalDia)}`
+                      : `${formatPct(diaMaiorTaxa.taxa)} de aprovação - ${formatQuantidade(diaMaiorTaxa.alvo)} de ${formatQuantidade(diaMaiorTaxa.totalDia)}`
                     : "Sem dados no período"}
                 </p>
               </div>
             </div>
 
-            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div
+              className="flex min-w-[200px] flex-1 cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalDia(diaMaiorVolume?.completo ?? null)
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  abrirModalDia(diaMaiorVolume?.completo ?? null);
+                }
+              }}
+              title="Abrir detalhamento por dia da semana"
+            >
+              <div className="flex items-center gap-2">
+                <CalendarDays className={`h-5 w-5 shrink-0 ${corDestaque}`} />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Dia (Maior volume)
+                </span>
+              </div>
+              <div
+                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
+              >
+                {diaMaiorVolume?.dia ?? "—"}
+              </div>
+              <div className="mt-auto">
+                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  {diaMaiorVolume
+                    ? `${formatPct(diaMaiorVolume.pct)} do volume total - ${formatQuantidade(diaMaiorVolume.alvo)} de ${formatQuantidade(diaMaiorVolume.totalGeral)}`
+                    : "Sem dados no período"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 {turnoMaiorFadiga?.turno === "Manhã" ? (
                   <Sunrise className={`h-5 w-5 shrink-0 ${corDestaque}`} />
@@ -2187,14 +2062,14 @@ export function AnaliseComportamento() {
                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                   {turnoMaiorFadiga
                     ? isModoImprodutivo
-                      ? `${formatPct(turnoMaiorFadiga.taxa)} de reprovação - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(turnoMaiorFadiga.totalBucket)}`
-                      : `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${formatQuantidade(turnoMaiorFadiga.quebras)} de ${formatQuantidade(totalNotasAlvo)}`
+                      ? `${formatPct(turnoMaiorFadiga.taxa)} de reprovação - ${fracaoSobrePeriodo(turnoMaiorFadiga.quebras)}`
+                      : `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${fracaoSobrePeriodo(turnoMaiorFadiga.quebras)}`
                     : "Sem horário de início-fim"}
                 </p>
               </div>
             </div>
 
-            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <AlertTriangle className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
@@ -2211,13 +2086,13 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {cardCodigoExibido
-                    ? `recorrência - ${fracaoSobreGlobais(cardCodigoExibido.quantidade)}`
+                    ? `recorrência - ${fracaoSobrePeriodo(cardCodigoExibido.quantidade)}`
                     : "recorrência"}
                 </p>
               </div>
             </div>
 
-            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <Target className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 <span className="text-sm font-medium text-muted-foreground">
@@ -2232,7 +2107,7 @@ export function AnaliseComportamento() {
               <div className="mt-auto">
                 <p className="mt-1 text-xs text-muted-foreground">
                   {tipoOfensorMacro
-                    ? `categoria com maior índice - ${fracaoSobreAlvo(tipoOfensorMacro.quantidade)}`
+                    ? `categoria com maior índice - ${fracaoSobrePeriodo(tipoOfensorMacro.quantidade)}`
                     : "categoria com maior índice"}
                 </p>
               </div>
@@ -2307,7 +2182,7 @@ export function AnaliseComportamento() {
                           const payload = (data?.payload ?? data) as
                             | DiaSemanaAgg
                             | undefined;
-                          if (payload?.diaCurto) abrirModalDia(payload.diaCurto);
+                          if (payload?.completo) abrirModalDia(payload.completo);
                         }}
                       />
                       <Bar
@@ -2320,7 +2195,7 @@ export function AnaliseComportamento() {
                           const payload = (data?.payload ?? data) as
                             | DiaSemanaAgg
                             | undefined;
-                          if (payload?.diaCurto) abrirModalDia(payload.diaCurto);
+                          if (payload?.completo) abrirModalDia(payload.completo);
                         }}
                       />
                     </BarChart>
@@ -3025,7 +2900,7 @@ export function AnaliseComportamento() {
           onClick={fecharModalDia}
         >
           <div
-            className="flex max-h-[90vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+            className="flex max-h-[90vh] w-[95vw] max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -3034,24 +2909,12 @@ export function AnaliseComportamento() {
                   id="modal-dia-semana-titulo"
                   className="text-lg font-bold text-foreground"
                 >
-                  {tituloModalDia}
+                  Detalhamento por Dia da Semana
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Clique em um dia no gráfico · Esc ou fora para fechar
+                  Visão diária do período · Esc ou fora para fechar
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">
-                  <div className="relative w-full max-w-xs">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="search"
-                      value={buscaTecnicoModal}
-                      onChange={(e) => setBuscaTecnicoModal(e.target.value)}
-                      placeholder="Buscar técnico..."
-                      aria-label="Buscar técnico"
-                      className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
-                    />
-                  </div>
-
                   <div className="flex items-center gap-2">
                     <Label
                       htmlFor="modal-dia-ano"
@@ -3127,27 +2990,37 @@ export function AnaliseComportamento() {
 
                   <div className="flex items-center gap-2">
                     <Label
-                      htmlFor="modal-dia-semana"
+                      htmlFor="modal-dia-status"
                       className="shrink-0 text-sm font-medium"
                     >
-                      Dia:
+                      Status:
                     </Label>
                     <Select
-                      value={diaFiltroModal}
-                      onValueChange={setDiaFiltroModal}
+                      value={modalStatus}
+                      onValueChange={(v) =>
+                        setModalStatus(v as StatusContratoFiltro)
+                      }
                     >
-                      <SelectTrigger id="modal-dia-semana" className="w-[120px]">
-                        <SelectValue placeholder="Dia" />
+                      <SelectTrigger id="modal-dia-status" className="w-[160px]">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {DIAS_UTEIS.map((d) => (
-                          <SelectItem key={d.dow} value={d.curto}>
-                            {d.curto}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="IMPRODUTIVO">Improdutiva</SelectItem>
+                        <SelectItem value="PRODUTIVO">Produtiva</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto gap-1.5"
+                    onClick={limparFiltrosModalDia}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar Filtros
+                  </Button>
                 </div>
               </div>
               <button
@@ -3165,210 +3038,65 @@ export function AnaliseComportamento() {
                 <p className="py-10 text-center text-sm text-muted-foreground">
                   Carregando detalhamento...
                 </p>
-              ) : modoDiaEspecifico ? (
-                detalheTecnicosDia.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhum técnico com notas neste dia no período.
-                  </p>
-                ) : (
-                  <div className="relative overflow-x-auto rounded-lg border border-gray-100">
-                    <table className="w-full min-w-[56rem] text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-left text-muted-foreground">
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                            Nome (Técnico)
-                          </th>
-                          <th
-                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() => alternarOrdemDia("produtivas")}
-                          >
-                            Produtivas
-                            {setaOrdenacao(
-                              ordemDia.coluna === "produtivas",
-                              ordemDia.direcao,
-                            )}
-                          </th>
-                          <th
-                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() => alternarOrdemDia("improdutivas")}
-                          >
-                            Improdutivas
-                            {setaOrdenacao(
-                              ordemDia.coluna === "improdutivas",
-                              ordemDia.direcao,
-                            )}
-                          </th>
-                          <th
-                            className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() => alternarOrdemDia("aproveitamento")}
-                          >
-                            Aproveitamento
-                            {setaOrdenacao(
-                              ordemDia.coluna === "aproveitamento",
-                              ordemDia.direcao,
-                            )}
-                          </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                            Top 3 Tipo O.S Prod.
-                          </th>
-                          <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                            Top 3 Tipo O.S Improd.
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detalheTecnicosDiaOrdenado.map((tec) => (
-                          <tr
-                            key={tec.nome}
-                            className="border-b border-border/60 last:border-b-0"
-                          >
-                            <td className="px-3 py-2 font-medium text-gray-900">
-                              {tec.nome}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums text-green-600">
-                              {formatQuantidade(tec.produtivas)}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums text-red-600">
-                              {formatQuantidade(tec.improdutivas)}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-                              {formatPct(tec.aproveitamento)}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-gray-700">
-                              {tec.top3Prod.length > 0 ? (
-                                tec.top3Prod.map((os, idx) => (
-                                  <div key={`${tec.nome}-prod-${idx}`} className="mb-1 last:mb-0">
-                                    {os.nome} ({os.percentual.toLocaleString("pt-BR", {
-                                      minimumFractionDigits: 0,
-                                      maximumFractionDigits: 1,
-                                    })}
-                                    %)
-                                  </div>
-                                ))
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-gray-700">
-                              {tec.top3Improd.length > 0 ? (
-                                tec.top3Improd.map((os, idx) => (
-                                  <div key={`${tec.nome}-improd-${idx}`} className="mb-1 last:mb-0">
-                                    {os.nome} ({os.percentual.toLocaleString("pt-BR", {
-                                      minimumFractionDigits: 0,
-                                      maximumFractionDigits: 1,
-                                    })}
-                                    %)
-                                  </div>
-                                ))
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              ) : matrizTecnicosSemanaOrdenada.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">
-                  Nenhum técnico com notas no período.
-                </p>
               ) : (
-                <div className="relative overflow-x-auto rounded-lg border border-gray-100">
-                  <table className="w-full min-w-[72rem] text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="sticky top-0 z-10 bg-white px-3 py-2 font-semibold shadow-sm">
-                          Técnico
-                        </th>
-                        <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
-                          onClick={() => alternarOrdemMatriz("produtivasTotal")}
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                    <p className="text-sm font-medium text-gray-700">
+                      Total de notas no período filtrado:{" "}
+                      <span className="tabular-nums font-bold text-foreground">
+                        {formatQuantidade(somaTotalNotasModal)}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {drillDownDiasModal.map((item) => {
+                      const destacado = item.dia === diaDestaque;
+                      const larguraBarra = Math.min(
+                        Math.max(item.percentual, 0),
+                        100,
+                      );
+                      const corBarra =
+                        modalStatus === "PRODUTIVO"
+                          ? "bg-green-500"
+                          : "bg-red-500";
+                      return (
+                        <div
+                          key={item.dia}
+                          className={`rounded-xl border p-4 shadow-sm ${
+                            destacado
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-100 bg-white"
+                          }`}
                         >
-                          Produtivas (Total)
-                          {setaOrdenacao(
-                            ordemMatriz.coluna === "produtivasTotal",
-                            ordemMatriz.direcao,
-                          )}
-                        </th>
-                        <th
-                          className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-right font-semibold shadow-sm hover:bg-gray-100"
-                          onClick={() => alternarOrdemMatriz("aprovGeral")}
-                        >
-                          Aprov. Geral
-                          {setaOrdenacao(
-                            ordemMatriz.coluna === "aprovGeral",
-                            ordemMatriz.direcao,
-                          )}
-                        </th>
-                        {DIAS_UTEIS.map((d) => (
-                          <th
-                            key={d.dow}
-                            className="sticky top-0 z-10 min-w-[110px] cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() => alternarOrdemMatriz(d.dow)}
-                          >
-                            {d.curto}.
-                            {setaOrdenacao(
-                              ordemMatriz.coluna === d.dow,
-                              ordemMatriz.direcao,
-                            )}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {matrizTecnicosSemanaOrdenada.map((tec) => (
-                        <tr
-                          key={tec.nome}
-                          className="border-b border-border/60 last:border-b-0"
-                        >
-                          <td className="px-3 py-2 font-medium text-gray-900">
-                            {tec.nome}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-green-600">
-                            {formatQuantidade(tec.produtivasTotal)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-                            {formatPct(tec.aproveitamentoGeral)}
-                          </td>
-                          {DIAS_UTEIS.map((d) => {
-                            const cel = tec.porDia[d.dow];
-                            if (
-                              !cel ||
-                              cel.aproveitamento == null
-                            ) {
-                              return (
-                                <td
-                                  key={d.dow}
-                                  className="min-w-[110px] px-3 py-2 text-center align-middle text-muted-foreground"
-                                >
-                                  -
-                                </td>
-                              );
-                            }
-                            return (
-                              <td
-                                key={d.dow}
-                                className="min-w-[110px] px-3 py-2 text-center align-middle tabular-nums"
-                              >
-                                <div className="flex flex-col items-center justify-center">
-                                  <span className="text-sm font-medium text-gray-800">
-                                    {Math.round(cel.aproveitamento)}%
-                                  </span>
-                                  {cel.piorJanela ? (
-                                    <span className="mt-1 whitespace-nowrap text-xs text-red-500">
-                                      ({formatarJanelaHorario(cel.piorJanela)})
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-gray-900">
+                              {item.dia}
+                            </p>
+                            <p
+                              className={`text-sm font-semibold tabular-nums ${
+                                modalStatus === "PRODUTIVO"
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {formatPct(item.percentual)}
+                            </p>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className={`h-full rounded-full transition-all ${corBarra}`}
+                              style={{ width: `${larguraBarra}%` }}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs tabular-nums text-muted-foreground">
+                            {formatQuantidade(item.alvo)} de{" "}
+                            {formatQuantidade(item.total)} notas
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
