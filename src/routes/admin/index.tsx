@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import {
+  ADMIN_TAB_LABELS,
   ADMIN_TABS,
   adminTabFromSearch,
   loadPersistedAdminTab,
@@ -120,7 +121,7 @@ function AdminHome() {
                     : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab}
+                {ADMIN_TAB_LABELS[tab]}
               </button>
             ))}
           </div>
@@ -334,7 +335,7 @@ function AdminHome() {
                 <div>
                   <div className="font-bold text-foreground">Relatório de campo</div>
                   <div className="text-xs text-muted-foreground">
-                    Gestão de relatórios da equipe de lançamento
+                    Gestão de relatórios da equipe de transmissão
                   </div>
                 </div>
               </div>
