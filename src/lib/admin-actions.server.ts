@@ -82,7 +82,15 @@ export const createUserAccount = createServerFn({ method: "POST" })
         password: z.string().min(6),
         nome: z.string().min(2),
         role: z
-          .enum(["admin", "gerente", "tecnico", "cop", "transmissao"])
+          .enum([
+            "admin",
+            "gerente",
+            "tecnico",
+            "cop",
+            "transmissao",
+            "supervisor_iat",
+            "supervisor_transmissao",
+          ])
           .default("tecnico"),
       })
       .superRefine((data, ctx) => {

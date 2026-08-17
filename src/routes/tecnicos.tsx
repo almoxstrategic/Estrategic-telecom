@@ -137,6 +137,10 @@ function TecnicosPage() {
             if (filtroCargo === "Transmissão") return cargo === "transmissao";
             if (filtroCargo === "Gerente") return cargo === "gerente";
             if (filtroCargo === "COP") return cargo === "cop";
+            if (filtroCargo === "Supervisor IAT") return cargo === "supervisor_iat";
+            if (filtroCargo === "Supervisor Transmissão") {
+              return cargo === "supervisor_transmissao";
+            }
             return true;
           });
 
@@ -385,6 +389,10 @@ function TecnicosPage() {
                   <SelectItem value="Transmissão">Transmissão</SelectItem>
                   <SelectItem value="Gerente">Gerente</SelectItem>
                   <SelectItem value="COP">COP</SelectItem>
+                  <SelectItem value="Supervisor IAT">Supervisor IAT</SelectItem>
+                  <SelectItem value="Supervisor Transmissão">
+                    Supervisor Transmissão
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
