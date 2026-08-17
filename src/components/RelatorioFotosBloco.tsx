@@ -1,4 +1,4 @@
-import { Plus, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import type { EvidencePhotoRef } from "@/lib/types";
@@ -32,7 +32,7 @@ export function RelatorioFotosBloco({
   obs,
   onObsChange,
   onPickPhoto,
-  minSlots: _minSlots = 1,
+  minSlots = 1,
   readOnly = false,
 }: {
   title: string;
@@ -57,6 +57,11 @@ export function RelatorioFotosBloco({
     updateSlot(id, { file, stored: file ? null : undefined });
   };
 
+  const removerSlot = (index: number) => {
+    if (index < minSlots) return;
+    onChange(slots.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div>
@@ -64,49 +69,62 @@ export function RelatorioFotosBloco({
         {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
       </div>
 
-      {slots.map((slot, index) => (
-        <div key={slot.id} className="space-y-2">
-          {slot.file && !readOnly ? (
-            <PhotoUpload
-              label={`Foto ${index + 1}`}
-              suffix={index === 0 ? "inicio" : "fim"}
-              value={slot.file}
-              onChange={(file) => handlePick(slot.id, file)}
-            />
-          ) : slot.stored ? (
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-sm font-semibold">Foto {index + 1}</div>
-                {readOnly ? null : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateSlot(slot.id, { stored: null, file: null });
-                      onPickPhoto?.(slot.id, null);
-                    }}
-                    className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Remover foto"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+      {slots.map((slot, index) => {
+        const podeExcluir = !readOnly && index >= minSlots;
+        return (
+          <div key={slot.id} className="relative space-y-2">
+            {podeExcluir ? (
+              <button
+                type="button"
+                onClick={() => removerSlot(index)}
+                className="absolute right-0 top-0 z-10 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                aria-label={`Excluir foto ${index + 1}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            ) : null}
+            {slot.file && !readOnly ? (
+              <PhotoUpload
+                label={`Foto ${index + 1}`}
+                suffix={index === 0 ? "inicio" : "fim"}
+                value={slot.file}
+                onChange={(file) => handlePick(slot.id, file)}
+              />
+            ) : slot.stored ? (
+              <div>
+                <div className="mb-2 flex items-center justify-between pr-8">
+                  <div className="text-sm font-semibold">Foto {index + 1}</div>
+                  {readOnly ? null : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateSlot(slot.id, { stored: null, file: null });
+                        onPickPhoto?.(slot.id, null);
+                      }}
+                      className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remover foto"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="overflow-hidden rounded-xl border border-border">
+                  <ExpandableImage src={slot.stored.url} alt={`Foto ${index + 1}`} />
+                </div>
               </div>
-              <div className="overflow-hidden rounded-xl border border-border">
-                <ExpandableImage src={slot.stored.url} alt={`Foto ${index + 1}`} />
-              </div>
-            </div>
-          ) : readOnly ? (
-            <p className="text-sm text-muted-foreground">Sem foto {index + 1}.</p>
-          ) : (
-            <PhotoUpload
-              label={`Foto ${index + 1}`}
-              suffix={index === 0 ? "inicio" : "fim"}
-              value={null}
-              onChange={(file) => handlePick(slot.id, file)}
-            />
-          )}
-        </div>
-      ))}
+            ) : readOnly ? (
+              <p className="text-sm text-muted-foreground">Sem foto {index + 1}.</p>
+            ) : (
+              <PhotoUpload
+                label={`Foto ${index + 1}`}
+                suffix={index === 0 ? "inicio" : "fim"}
+                value={null}
+                onChange={(file) => handlePick(slot.id, file)}
+              />
+            )}
+          </div>
+        );
+      })}
 
       <div>
         <label className="mb-1.5 block text-sm font-semibold">OBS</label>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -27,10 +27,11 @@ export type OutraFotoState = {
   file: EvidencePhotoRef | null;
   stored: StoredPhoto | null;
   obs: string;
+  obsAdmin: string;
 };
 
 export function emptyOutraFoto(): OutraFotoState {
-  return { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" };
+  return { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "", obsAdmin: "" };
 }
 
 export function inputClass() {
@@ -112,6 +113,8 @@ export type GrupoFotoCampo = {
   obs: string;
   onChange: (slots: FotoSlot[]) => void;
   onObsChange: (obs: string) => void;
+  obsAdmin?: string;
+  onObsAdminChange?: (obs: string) => void;
   grupoKey: RelatorioFotoGrupoKey;
 };
 
@@ -124,12 +127,14 @@ export function RelatorioRedeAcesso({
   cabos,
   onPatchCabo,
   onAddCabo,
+  onRemoveCabo,
   onCaboPhoto,
   grupos,
   onGrupoPhoto,
   outras,
   onOutrasChange,
   onOutraPhoto,
+  showObsAdmin = false,
 }: {
   readOnly: boolean;
   header?: ReactNode;
@@ -139,6 +144,7 @@ export function RelatorioRedeAcesso({
   cabos: CaboMetragemPayload[];
   onPatchCabo: (id: string, patch: Partial<CaboMetragemPayload>) => void;
   onAddCabo: () => void;
+  onRemoveCabo?: (id: string) => void;
   onCaboPhoto: (
     caboId: string,
     campo: "fotoInicio" | "fotoFim",
@@ -153,8 +159,10 @@ export function RelatorioRedeAcesso({
   outras: OutraFotoState[];
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef) => void;
+  showObsAdmin?: boolean;
 }) {
   const mostrarMetragem = lancamentoRe === "sim";
+  const metragemDesabilitada = lancamentoRe === "nao";
 
   return (
     <EvidencePhotoPasteProvider>
@@ -180,12 +188,33 @@ export function RelatorioRedeAcesso({
           </div>
         </div>
 
-        {mostrarMetragem ? (
+        {metragemDesabilitada ? (
+          <div className="pointer-events-none rounded-2xl border border-border bg-gray-100 p-5 opacity-60 shadow-sm">
+            <h2 className="text-base font-bold">Metragem de cabo</h2>
+            <div className="flex min-h-[120px] items-center justify-center">
+              <span className="rounded-full bg-white px-3 py-1.5 text-center text-sm font-semibold text-gray-700">
+                Sem lançamento de cabos nesta OS
+              </span>
+            </div>
+          </div>
+        ) : mostrarMetragem ? (
           <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-bold">Metragem de cabo</h2>
             {cabos.map((cabo, index) => (
-              <div key={cabo.id} className="space-y-3 rounded-xl border border-border p-4">
-                <p className="text-sm font-semibold">Cabo {index + 1}</p>
+              <div key={cabo.id} className="relative space-y-3 rounded-xl border border-border p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold">Cabo {index + 1}</p>
+                  {!readOnly && index >= 1 && onRemoveCabo ? (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveCabo(cabo.id)}
+                      className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                      aria-label={`Excluir cabo ${index + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
                   <input
@@ -207,58 +236,64 @@ export function RelatorioRedeAcesso({
                     className={inputClass()}
                   />
                 </div>
-                {cabo.fotoInicio ? (
-                  <div className="overflow-hidden rounded-xl border">
-                    <p className="px-2 pt-2 text-sm font-semibold">Foto inicial</p>
-                    <ExpandableImage src={cabo.fotoInicio.url} alt="Foto inicial" />
-                    {readOnly ? null : (
-                      <button
-                        type="button"
-                        className="w-full py-2 text-xs text-primary"
-                        onClick={() => onCaboPhoto(cabo.id, "fotoInicio", null)}
-                      >
-                        Trocar foto
-                      </button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-bold">Foto Inicial</p>
+                    {cabo.fotoInicio ? (
+                      <div className="overflow-hidden rounded-xl border">
+                        <ExpandableImage src={cabo.fotoInicio.url} alt="Foto Inicial" />
+                        {readOnly ? null : (
+                          <button
+                            type="button"
+                            className="w-full py-2 text-xs text-primary"
+                            onClick={() => onCaboPhoto(cabo.id, "fotoInicio", null)}
+                          >
+                            Trocar foto
+                          </button>
+                        )}
+                      </div>
+                    ) : readOnly ? (
+                      <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
+                    ) : (
+                      <PhotoUpload
+                        label="Foto Inicial"
+                        suffix="inicio"
+                        value={null}
+                        onChange={(file) => {
+                          if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
+                        }}
+                      />
                     )}
                   </div>
-                ) : readOnly ? (
-                  <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
-                ) : (
-                  <PhotoUpload
-                    label="Foto inicial"
-                    suffix="inicio"
-                    value={null}
-                    onChange={(file) => {
-                      if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
-                    }}
-                  />
-                )}
-                {cabo.fotoFim ? (
-                  <div className="overflow-hidden rounded-xl border">
-                    <p className="px-2 pt-2 text-sm font-semibold">Foto final</p>
-                    <ExpandableImage src={cabo.fotoFim.url} alt="Foto final" />
-                    {readOnly ? null : (
-                      <button
-                        type="button"
-                        className="w-full py-2 text-xs text-primary"
-                        onClick={() => onCaboPhoto(cabo.id, "fotoFim", null)}
-                      >
-                        Trocar foto
-                      </button>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-bold">Foto Final</p>
+                    {cabo.fotoFim ? (
+                      <div className="overflow-hidden rounded-xl border">
+                        <ExpandableImage src={cabo.fotoFim.url} alt="Foto Final" />
+                        {readOnly ? null : (
+                          <button
+                            type="button"
+                            className="w-full py-2 text-xs text-primary"
+                            onClick={() => onCaboPhoto(cabo.id, "fotoFim", null)}
+                          >
+                            Trocar foto
+                          </button>
+                        )}
+                      </div>
+                    ) : readOnly ? (
+                      <p className="text-sm text-muted-foreground">Sem foto final.</p>
+                    ) : (
+                      <PhotoUpload
+                        label="Foto Final"
+                        suffix="fim"
+                        value={null}
+                        onChange={(file) => {
+                          if (file) onCaboPhoto(cabo.id, "fotoFim", file);
+                        }}
+                      />
                     )}
                   </div>
-                ) : readOnly ? (
-                  <p className="text-sm text-muted-foreground">Sem foto final.</p>
-                ) : (
-                  <PhotoUpload
-                    label="Foto final"
-                    suffix="fim"
-                    value={null}
-                    onChange={(file) => {
-                      if (file) onCaboPhoto(cabo.id, "fotoFim", file);
-                    }}
-                  />
-                )}
+                </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold">OBS</label>
                   <textarea
@@ -316,13 +351,23 @@ export function RelatorioOutrasFotos({
   onOutrasChange,
   onOutraPhoto,
   readOnly,
+  showObsAdmin = false,
 }: {
   title?: string;
   outras: OutraFotoState[];
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef) => void;
   readOnly: boolean;
+  showObsAdmin?: boolean;
 }) {
+  const removerItem = (id: string) => {
+    onOutrasChange((prev) => {
+      const index = prev.findIndex((row) => row.id === id);
+      if (index < 1) return prev;
+      return prev.filter((row) => row.id !== id);
+    });
+  };
+
   return (
     <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-bold">{title}</h2>
@@ -330,7 +375,17 @@ export function RelatorioOutrasFotos({
         <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
       ) : (
         outras.map((item, index) => (
-          <div key={item.id} className="space-y-3 rounded-xl border border-border p-4">
+          <div key={item.id} className="relative space-y-3 rounded-xl border border-border p-4">
+            {!readOnly && index >= 1 ? (
+              <button
+                type="button"
+                onClick={() => removerItem(item.id)}
+                className="absolute right-3 top-3 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                aria-label={`Excluir foto extra ${index + 1}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            ) : null}
             <label className="mb-1.5 block text-sm font-semibold">REF:</label>
             <input
               type="text"
@@ -397,7 +452,7 @@ export function RelatorioOutrasFotos({
           onClick={() =>
             onOutrasChange((prev) => [
               ...prev,
-              { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
+              { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "", obsAdmin: "" },
             ])
           }
           className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"

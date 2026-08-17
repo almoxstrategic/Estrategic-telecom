@@ -17,6 +17,7 @@ import {
 } from "@/components/RelatorioRedeAcesso";
 import { useApp } from "@/lib/app-store";
 import { requireTecnicoTransmissao } from "@/lib/auth-guards";
+import { hasPainelFullAccess } from "@/lib/roles";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
@@ -26,6 +27,8 @@ import {
   fetchRelatorioTransmissaoById,
   iniciarOuRetomarRelatorio,
   patchRelatorioDraft,
+  readObsAdmin,
+  removeExtraById,
   uploadRelatorioPhoto,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
@@ -59,12 +62,21 @@ function fotosDosSlots(slots: FotoSlot[]): StoredPhoto[] {
   return slots.map((slot) => slot.stored).filter((foto): foto is StoredPhoto => Boolean(foto));
 }
 
+function grupoPayload(
+  slots: FotoSlot[],
+  obs: string,
+  obsAdmin = "",
+): RelatorioPayload["posteConexao"] {
+  return { fotos: fotosDosSlots(slots), obs, obsAdmin };
+}
+
 function outrasParaPayload(items: OutraFotoState[]): RelatorioPayload["outrasFotos"] {
   return items.map((item) => ({
     id: item.id,
     ref: item.ref,
     foto: item.stored,
     obs: item.obs,
+    obsAdmin: item.obsAdmin ?? "",
   }));
 }
 
@@ -77,11 +89,12 @@ function outrasFromPayload(
     file: null as EvidencePhotoRef | null,
     stored: item.foto,
     obs: item.obs,
+    obsAdmin: readObsAdmin(item),
   }));
   return mapped.length > 0 ? mapped : [emptyOutraFoto()];
 }
 
-type FotoGrupoUi = { slots: FotoSlot[]; obs: string };
+type FotoGrupoUi = { slots: FotoSlot[]; obs: string; obsAdmin: string };
 
 const EQ_GRUPO_KEYS: RelatorioFotoGrupoKeyEq[] = [
   "eqClienteFachada",
@@ -100,18 +113,18 @@ const EQ_GRUPO_KEYS: RelatorioFotoGrupoKeyEq[] = [
 
 function emptyEqGrupos(): Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi> {
   return {
-    eqClienteFachada: { slots: [newFotoSlot()], obs: "" },
-    eqClienteAmbiente: { slots: [newFotoSlot()], obs: "" },
-    eqClienteRack: { slots: [newFotoSlot()], obs: "" },
-    eqClienteDgo: { slots: [newFotoSlot()], obs: "" },
-    eqClienteEquipamentos: { slots: [newFotoSlot()], obs: "" },
-    eqClienteEtiqueta: { slots: [newFotoSlot()], obs: "" },
-    eqClienteSgp: { slots: [newFotoSlot()], obs: "" },
-    eqEstacaoGeral: { slots: [newFotoSlot()], obs: "" },
-    eqEstacaoRack: { slots: [newFotoSlot()], obs: "" },
-    eqEstacaoEquipamento: { slots: [newFotoSlot()], obs: "" },
-    eqEstacaoEtiqueta: { slots: [newFotoSlot()], obs: "" },
-    eqEstacaoDgo: { slots: [newFotoSlot()], obs: "" },
+    eqClienteFachada: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqClienteAmbiente: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqClienteRack: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqClienteDgo: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqClienteEquipamentos: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqClienteEtiqueta: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqClienteSgp: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqEstacaoGeral: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqEstacaoRack: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqEstacaoEquipamento: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqEstacaoEtiqueta: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    eqEstacaoDgo: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
   };
 }
 
@@ -124,6 +137,7 @@ function eqGruposFromPayload(
     next[key] = {
       slots: slotsFromStored(grupo?.fotos ?? [], 1),
       obs: grupo?.obs ?? "",
+      obsAdmin: readObsAdmin(grupo),
     };
   }
   return next;
@@ -166,6 +180,9 @@ function RelatorioPage() {
   const [etiqueta, setEtiqueta] = useState<FotoSlot[]>([newFotoSlot()]);
   const [etiquetaObs, setEtiquetaObs] = useState("");
   const [outras, setOutras] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
+  const [obsAdminGrupos, setObsAdminGrupos] = useState<
+    Partial<Record<RelatorioFotoGrupoKey, string>>
+  >({});
   const [tecnologiaAcesso, setTecnologiaAcesso] = useState("");
   const [lancamentoCabosRC, setLancamentoCabosRC] = useState<"sim" | "nao" | "">("");
   const [cabosRc, setCabosRc] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
@@ -200,77 +217,109 @@ function RelatorioPage() {
       ...emptyRelatorioPayload(),
       lancamentoRe: lancamentoRe === "sim" ? true : lancamentoRe === "nao" ? false : null,
       metragensCabo: cabos,
-      posteConexao: { fotos: fotosDosSlots(poste), obs: posteObs },
-      caixaEmenda: { fotos: fotosDosSlots(caixa), obs: caixaObs },
-      plaquetaIdentificacao: { fotos: fotosDosSlots(plaqueta), obs: plaquetaObs },
-      novoAterramentoPoste: { fotos: fotosDosSlots(novoAterramento), obs: novoAterramentoObs },
-      aterramentoTerrometro: { fotos: fotosDosSlots(terrometro), obs: terrometroObs },
-      posicaoConexaoEstacao: { fotos: fotosDosSlots(posicao), obs: posicaoObs },
-      etiquetaIdentificacao: { fotos: fotosDosSlots(etiqueta), obs: etiquetaObs },
-      sobraTecnica: { fotos: fotosDosSlots(sobra), obs: sobraObs },
+      posteConexao: grupoPayload(poste, posteObs, obsAdminGrupos.posteConexao),
+      caixaEmenda: grupoPayload(caixa, caixaObs, obsAdminGrupos.caixaEmenda),
+      plaquetaIdentificacao: grupoPayload(plaqueta, plaquetaObs, obsAdminGrupos.plaquetaIdentificacao),
+      novoAterramentoPoste: grupoPayload(
+        novoAterramento,
+        novoAterramentoObs,
+        obsAdminGrupos.novoAterramentoPoste,
+      ),
+      aterramentoTerrometro: grupoPayload(
+        terrometro,
+        terrometroObs,
+        obsAdminGrupos.aterramentoTerrometro,
+      ),
+      posicaoConexaoEstacao: grupoPayload(posicao, posicaoObs, obsAdminGrupos.posicaoConexaoEstacao),
+      etiquetaIdentificacao: grupoPayload(etiqueta, etiquetaObs, obsAdminGrupos.etiquetaIdentificacao),
+      sobraTecnica: grupoPayload(sobra, sobraObs, obsAdminGrupos.sobraTecnica),
       outrasFotos: outrasParaPayload(outras),
       tecnologiaAcesso,
       lancamentoRc:
         lancamentoCabosRC === "sim" ? true : lancamentoCabosRC === "nao" ? false : null,
       metragensCaboRc: cabosRc,
-      rcPosteConexao: { fotos: fotosDosSlots(rcPoste), obs: rcPosteObs },
-      rcCaixaEmenda: { fotos: fotosDosSlots(rcCaixa), obs: rcCaixaObs },
-      rcTerminacaoCabo: { fotos: fotosDosSlots(rcTerminacao), obs: rcTerminacaoObs },
-      rcPlaquetaIdentificacao: { fotos: fotosDosSlots(rcPlaqueta), obs: rcPlaquetaObs },
-      rcEntradaInterna: { fotos: fotosDosSlots(rcEntradaInterna), obs: rcEntradaInternaObs },
-      rcEntradaExterna: { fotos: fotosDosSlots(rcEntradaExterna), obs: rcEntradaExternaObs },
+      rcPosteConexao: grupoPayload(rcPoste, rcPosteObs, obsAdminGrupos.rcPosteConexao),
+      rcCaixaEmenda: grupoPayload(rcCaixa, rcCaixaObs, obsAdminGrupos.rcCaixaEmenda),
+      rcTerminacaoCabo: grupoPayload(rcTerminacao, rcTerminacaoObs, obsAdminGrupos.rcTerminacaoCabo),
+      rcPlaquetaIdentificacao: grupoPayload(
+        rcPlaqueta,
+        rcPlaquetaObs,
+        obsAdminGrupos.rcPlaquetaIdentificacao,
+      ),
+      rcEntradaInterna: grupoPayload(
+        rcEntradaInterna,
+        rcEntradaInternaObs,
+        obsAdminGrupos.rcEntradaInterna,
+      ),
+      rcEntradaExterna: grupoPayload(
+        rcEntradaExterna,
+        rcEntradaExternaObs,
+        obsAdminGrupos.rcEntradaExterna,
+      ),
       outrasFotosRc: outrasParaPayload(outrasRc),
-      eqClienteFachada: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteFachada.slots),
-        obs: eqGrupos.eqClienteFachada.obs,
-      },
-      eqClienteAmbiente: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteAmbiente.slots),
-        obs: eqGrupos.eqClienteAmbiente.obs,
-      },
-      eqClienteRack: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteRack.slots),
-        obs: eqGrupos.eqClienteRack.obs,
-      },
-      eqClienteDgo: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteDgo.slots),
-        obs: eqGrupos.eqClienteDgo.obs,
-      },
-      eqClienteEquipamentos: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteEquipamentos.slots),
-        obs: eqGrupos.eqClienteEquipamentos.obs,
-      },
-      eqClienteEtiqueta: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteEtiqueta.slots),
-        obs: eqGrupos.eqClienteEtiqueta.obs,
-      },
-      eqClienteSgp: {
-        fotos: fotosDosSlots(eqGrupos.eqClienteSgp.slots),
-        obs: eqGrupos.eqClienteSgp.obs,
-      },
+      eqClienteFachada: grupoPayload(
+        eqGrupos.eqClienteFachada.slots,
+        eqGrupos.eqClienteFachada.obs,
+        eqGrupos.eqClienteFachada.obsAdmin,
+      ),
+      eqClienteAmbiente: grupoPayload(
+        eqGrupos.eqClienteAmbiente.slots,
+        eqGrupos.eqClienteAmbiente.obs,
+        eqGrupos.eqClienteAmbiente.obsAdmin,
+      ),
+      eqClienteRack: grupoPayload(
+        eqGrupos.eqClienteRack.slots,
+        eqGrupos.eqClienteRack.obs,
+        eqGrupos.eqClienteRack.obsAdmin,
+      ),
+      eqClienteDgo: grupoPayload(
+        eqGrupos.eqClienteDgo.slots,
+        eqGrupos.eqClienteDgo.obs,
+        eqGrupos.eqClienteDgo.obsAdmin,
+      ),
+      eqClienteEquipamentos: grupoPayload(
+        eqGrupos.eqClienteEquipamentos.slots,
+        eqGrupos.eqClienteEquipamentos.obs,
+        eqGrupos.eqClienteEquipamentos.obsAdmin,
+      ),
+      eqClienteEtiqueta: grupoPayload(
+        eqGrupos.eqClienteEtiqueta.slots,
+        eqGrupos.eqClienteEtiqueta.obs,
+        eqGrupos.eqClienteEtiqueta.obsAdmin,
+      ),
+      eqClienteSgp: grupoPayload(
+        eqGrupos.eqClienteSgp.slots,
+        eqGrupos.eqClienteSgp.obs,
+        eqGrupos.eqClienteSgp.obsAdmin,
+      ),
       outrasFotosEqCliente: outrasParaPayload(outrasEqCliente),
       relatorioEstacao: relatorioEstacao === "sim",
       estacaoEntregaAcesso,
-      eqEstacaoGeral: {
-        fotos: fotosDosSlots(eqGrupos.eqEstacaoGeral.slots),
-        obs: eqGrupos.eqEstacaoGeral.obs,
-      },
-      eqEstacaoRack: {
-        fotos: fotosDosSlots(eqGrupos.eqEstacaoRack.slots),
-        obs: eqGrupos.eqEstacaoRack.obs,
-      },
-      eqEstacaoEquipamento: {
-        fotos: fotosDosSlots(eqGrupos.eqEstacaoEquipamento.slots),
-        obs: eqGrupos.eqEstacaoEquipamento.obs,
-      },
-      eqEstacaoEtiqueta: {
-        fotos: fotosDosSlots(eqGrupos.eqEstacaoEtiqueta.slots),
-        obs: eqGrupos.eqEstacaoEtiqueta.obs,
-      },
-      eqEstacaoDgo: {
-        fotos: fotosDosSlots(eqGrupos.eqEstacaoDgo.slots),
-        obs: eqGrupos.eqEstacaoDgo.obs,
-      },
+      eqEstacaoGeral: grupoPayload(
+        eqGrupos.eqEstacaoGeral.slots,
+        eqGrupos.eqEstacaoGeral.obs,
+        eqGrupos.eqEstacaoGeral.obsAdmin,
+      ),
+      eqEstacaoRack: grupoPayload(
+        eqGrupos.eqEstacaoRack.slots,
+        eqGrupos.eqEstacaoRack.obs,
+        eqGrupos.eqEstacaoRack.obsAdmin,
+      ),
+      eqEstacaoEquipamento: grupoPayload(
+        eqGrupos.eqEstacaoEquipamento.slots,
+        eqGrupos.eqEstacaoEquipamento.obs,
+        eqGrupos.eqEstacaoEquipamento.obsAdmin,
+      ),
+      eqEstacaoEtiqueta: grupoPayload(
+        eqGrupos.eqEstacaoEtiqueta.slots,
+        eqGrupos.eqEstacaoEtiqueta.obs,
+        eqGrupos.eqEstacaoEtiqueta.obsAdmin,
+      ),
+      eqEstacaoDgo: grupoPayload(
+        eqGrupos.eqEstacaoDgo.slots,
+        eqGrupos.eqEstacaoDgo.obs,
+        eqGrupos.eqEstacaoDgo.obsAdmin,
+      ),
       outrasFotosEqEstacao: outrasParaPayload(outrasEqEstacao),
     };
   }, [
@@ -294,6 +343,7 @@ function RelatorioPage() {
     sobra,
     sobraObs,
     outras,
+    obsAdminGrupos,
     tecnologiaAcesso,
     lancamentoCabosRC,
     cabosRc,
@@ -443,6 +493,22 @@ function RelatorioPage() {
     setEtiqueta(slotsFromStored(p.etiquetaIdentificacao?.fotos ?? [], 1));
     setEtiquetaObs(p.etiquetaIdentificacao?.obs ?? "");
     setOutras(outrasFromPayload(p.outrasFotos));
+    setObsAdminGrupos({
+      posteConexao: readObsAdmin(p.posteConexao),
+      caixaEmenda: readObsAdmin(p.caixaEmenda),
+      plaquetaIdentificacao: readObsAdmin(p.plaquetaIdentificacao),
+      novoAterramentoPoste: readObsAdmin(p.novoAterramentoPoste),
+      aterramentoTerrometro: readObsAdmin(p.aterramentoTerrometro),
+      posicaoConexaoEstacao: readObsAdmin(p.posicaoConexaoEstacao),
+      etiquetaIdentificacao: readObsAdmin(p.etiquetaIdentificacao),
+      sobraTecnica: readObsAdmin(p.sobraTecnica),
+      rcPosteConexao: readObsAdmin(p.rcPosteConexao),
+      rcCaixaEmenda: readObsAdmin(p.rcCaixaEmenda),
+      rcTerminacaoCabo: readObsAdmin(p.rcTerminacaoCabo),
+      rcPlaquetaIdentificacao: readObsAdmin(p.rcPlaquetaIdentificacao),
+      rcEntradaInterna: readObsAdmin(p.rcEntradaInterna),
+      rcEntradaExterna: readObsAdmin(p.rcEntradaExterna),
+    });
     setTecnologiaAcesso(p.tecnologiaAcesso ?? "");
     setLancamentoCabosRC(p.lancamentoRc === true ? "sim" : p.lancamentoRc === false ? "nao" : "");
     setCabosRc(p.metragensCaboRc.length > 0 ? p.metragensCaboRc : [emptyCaboMetragem()]);
@@ -638,6 +704,16 @@ function RelatorioPage() {
   const setEqGrupoObs = (key: RelatorioFotoGrupoKeyEq) => (obs: string) => {
     setEqGrupos((prev) => ({ ...prev, [key]: { ...prev[key], obs } }));
   };
+
+  const setEqGrupoObsAdmin = (key: RelatorioFotoGrupoKeyEq) => (obsAdmin: string) => {
+    setEqGrupos((prev) => ({ ...prev, [key]: { ...prev[key], obsAdmin } }));
+  };
+
+  const patchObsAdminGrupo = (key: RelatorioFotoGrupoKey) => (obsAdmin: string) => {
+    setObsAdminGrupos((prev) => ({ ...prev, [key]: obsAdmin }));
+  };
+
+  const showObsAdmin = hasPainelFullAccess(user?.role);
 
   const grupoSetters: Record<
     RelatorioFotoGrupoKey,
@@ -935,9 +1011,11 @@ function RelatorioPage() {
                   cabos={cabos}
                   onPatchCabo={(id, patch) => patchCabo(setCabos, id, patch)}
                   onAddCabo={() => setCabos((prev) => [...prev, emptyCaboMetragem()])}
+                  onRemoveCabo={(id) => setCabos((prev) => removeExtraById(prev, id))}
                   onCaboPhoto={(caboId, campo, file) =>
                     handleCaboPhoto(setCabos, "metragensCabo", caboId, campo, file)
                   }
+                  showObsAdmin={showObsAdmin}
                   grupos={[
                     {
                       grupoKey: "posteConexao",
@@ -946,6 +1024,8 @@ function RelatorioPage() {
                       onChange: setPoste,
                       obs: posteObs,
                       onObsChange: setPosteObs,
+                      obsAdmin: obsAdminGrupos.posteConexao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("posteConexao"),
                     },
                     {
                       grupoKey: "caixaEmenda",
@@ -954,6 +1034,8 @@ function RelatorioPage() {
                       onChange: setCaixa,
                       obs: caixaObs,
                       onObsChange: setCaixaObs,
+                      obsAdmin: obsAdminGrupos.caixaEmenda ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("caixaEmenda"),
                     },
                     {
                       grupoKey: "plaquetaIdentificacao",
@@ -962,6 +1044,8 @@ function RelatorioPage() {
                       onChange: setPlaqueta,
                       obs: plaquetaObs,
                       onObsChange: setPlaquetaObs,
+                      obsAdmin: obsAdminGrupos.plaquetaIdentificacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("plaquetaIdentificacao"),
                     },
                     {
                       grupoKey: "sobraTecnica",
@@ -972,6 +1056,8 @@ function RelatorioPage() {
                       onChange: setSobra,
                       obs: sobraObs,
                       onObsChange: setSobraObs,
+                      obsAdmin: obsAdminGrupos.sobraTecnica ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("sobraTecnica"),
                     },
                     {
                       grupoKey: "novoAterramentoPoste",
@@ -980,6 +1066,8 @@ function RelatorioPage() {
                       onChange: setNovoAterramento,
                       obs: novoAterramentoObs,
                       onObsChange: setNovoAterramentoObs,
+                      obsAdmin: obsAdminGrupos.novoAterramentoPoste ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("novoAterramentoPoste"),
                     },
                     {
                       grupoKey: "aterramentoTerrometro",
@@ -988,6 +1076,8 @@ function RelatorioPage() {
                       onChange: setTerrometro,
                       obs: terrometroObs,
                       onObsChange: setTerrometroObs,
+                      obsAdmin: obsAdminGrupos.aterramentoTerrometro ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("aterramentoTerrometro"),
                     },
                     {
                       grupoKey: "posicaoConexaoEstacao",
@@ -996,6 +1086,8 @@ function RelatorioPage() {
                       onChange: setPosicao,
                       obs: posicaoObs,
                       onObsChange: setPosicaoObs,
+                      obsAdmin: obsAdminGrupos.posicaoConexaoEstacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("posicaoConexaoEstacao"),
                     },
                     {
                       grupoKey: "etiquetaIdentificacao",
@@ -1004,6 +1096,8 @@ function RelatorioPage() {
                       onChange: setEtiqueta,
                       obs: etiquetaObs,
                       onObsChange: setEtiquetaObs,
+                      obsAdmin: obsAdminGrupos.etiquetaIdentificacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("etiquetaIdentificacao"),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file) => {
@@ -1048,9 +1142,11 @@ function RelatorioPage() {
                   cabos={cabosRc}
                   onPatchCabo={(id, patch) => patchCabo(setCabosRc, id, patch)}
                   onAddCabo={() => setCabosRc((prev) => [...prev, emptyCaboMetragem()])}
+                  onRemoveCabo={(id) => setCabosRc((prev) => removeExtraById(prev, id))}
                   onCaboPhoto={(caboId, campo, file) =>
                     handleCaboPhoto(setCabosRc, "metragensCaboRc", caboId, campo, file)
                   }
+                  showObsAdmin={showObsAdmin}
                   grupos={[
                     {
                       grupoKey: "rcPosteConexao",
@@ -1059,6 +1155,8 @@ function RelatorioPage() {
                       onChange: setRcPoste,
                       obs: rcPosteObs,
                       onObsChange: setRcPosteObs,
+                      obsAdmin: obsAdminGrupos.rcPosteConexao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcPosteConexao"),
                     },
                     {
                       grupoKey: "rcCaixaEmenda",
@@ -1067,6 +1165,8 @@ function RelatorioPage() {
                       onChange: setRcCaixa,
                       obs: rcCaixaObs,
                       onObsChange: setRcCaixaObs,
+                      obsAdmin: obsAdminGrupos.rcCaixaEmenda ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcCaixaEmenda"),
                     },
                     {
                       grupoKey: "rcTerminacaoCabo",
@@ -1075,6 +1175,8 @@ function RelatorioPage() {
                       onChange: setRcTerminacao,
                       obs: rcTerminacaoObs,
                       onObsChange: setRcTerminacaoObs,
+                      obsAdmin: obsAdminGrupos.rcTerminacaoCabo ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcTerminacaoCabo"),
                     },
                     {
                       grupoKey: "rcPlaquetaIdentificacao",
@@ -1083,6 +1185,8 @@ function RelatorioPage() {
                       onChange: setRcPlaqueta,
                       obs: rcPlaquetaObs,
                       onObsChange: setRcPlaquetaObs,
+                      obsAdmin: obsAdminGrupos.rcPlaquetaIdentificacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcPlaquetaIdentificacao"),
                     },
                     {
                       grupoKey: "rcEntradaInterna",
@@ -1091,6 +1195,8 @@ function RelatorioPage() {
                       onChange: setRcEntradaInterna,
                       obs: rcEntradaInternaObs,
                       onObsChange: setRcEntradaInternaObs,
+                      obsAdmin: obsAdminGrupos.rcEntradaInterna ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcEntradaInterna"),
                     },
                     {
                       grupoKey: "rcEntradaExterna",
@@ -1099,6 +1205,8 @@ function RelatorioPage() {
                       onChange: setRcEntradaExterna,
                       obs: rcEntradaExternaObs,
                       onObsChange: setRcEntradaExternaObs,
+                      obsAdmin: obsAdminGrupos.rcEntradaExterna ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcEntradaExterna"),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file) => {
@@ -1113,6 +1221,7 @@ function RelatorioPage() {
               ) : mostrarEquipamento ? (
                 <RelatorioEquipamento
                   readOnly={readOnly}
+                  showObsAdmin={showObsAdmin}
                   gruposCliente={[
                     {
                       grupoKey: "eqClienteFachada",
@@ -1121,6 +1230,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteFachada"),
                       obs: eqGrupos.eqClienteFachada.obs,
                       onObsChange: setEqGrupoObs("eqClienteFachada"),
+                      obsAdmin: eqGrupos.eqClienteFachada.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteFachada"),
                     },
                     {
                       grupoKey: "eqClienteAmbiente",
@@ -1129,6 +1240,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteAmbiente"),
                       obs: eqGrupos.eqClienteAmbiente.obs,
                       onObsChange: setEqGrupoObs("eqClienteAmbiente"),
+                      obsAdmin: eqGrupos.eqClienteAmbiente.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteAmbiente"),
                     },
                     {
                       grupoKey: "eqClienteRack",
@@ -1137,6 +1250,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteRack"),
                       obs: eqGrupos.eqClienteRack.obs,
                       onObsChange: setEqGrupoObs("eqClienteRack"),
+                      obsAdmin: eqGrupos.eqClienteRack.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteRack"),
                     },
                     {
                       grupoKey: "eqClienteDgo",
@@ -1145,6 +1260,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteDgo"),
                       obs: eqGrupos.eqClienteDgo.obs,
                       onObsChange: setEqGrupoObs("eqClienteDgo"),
+                      obsAdmin: eqGrupos.eqClienteDgo.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteDgo"),
                     },
                     {
                       grupoKey: "eqClienteEquipamentos",
@@ -1153,6 +1270,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteEquipamentos"),
                       obs: eqGrupos.eqClienteEquipamentos.obs,
                       onObsChange: setEqGrupoObs("eqClienteEquipamentos"),
+                      obsAdmin: eqGrupos.eqClienteEquipamentos.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteEquipamentos"),
                     },
                     {
                       grupoKey: "eqClienteEtiqueta",
@@ -1161,6 +1280,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteEtiqueta"),
                       obs: eqGrupos.eqClienteEtiqueta.obs,
                       onObsChange: setEqGrupoObs("eqClienteEtiqueta"),
+                      obsAdmin: eqGrupos.eqClienteEtiqueta.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteEtiqueta"),
                     },
                     {
                       grupoKey: "eqClienteSgp",
@@ -1169,6 +1290,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqClienteSgp"),
                       obs: eqGrupos.eqClienteSgp.obs,
                       onObsChange: setEqGrupoObs("eqClienteSgp"),
+                      obsAdmin: eqGrupos.eqClienteSgp.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteSgp"),
                     },
                   ]}
                   outrasCliente={outrasEqCliente}
@@ -1188,6 +1311,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqEstacaoGeral"),
                       obs: eqGrupos.eqEstacaoGeral.obs,
                       onObsChange: setEqGrupoObs("eqEstacaoGeral"),
+                      obsAdmin: eqGrupos.eqEstacaoGeral.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoGeral"),
                     },
                     {
                       grupoKey: "eqEstacaoRack",
@@ -1196,6 +1321,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqEstacaoRack"),
                       obs: eqGrupos.eqEstacaoRack.obs,
                       onObsChange: setEqGrupoObs("eqEstacaoRack"),
+                      obsAdmin: eqGrupos.eqEstacaoRack.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoRack"),
                     },
                     {
                       grupoKey: "eqEstacaoEquipamento",
@@ -1204,6 +1331,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqEstacaoEquipamento"),
                       obs: eqGrupos.eqEstacaoEquipamento.obs,
                       onObsChange: setEqGrupoObs("eqEstacaoEquipamento"),
+                      obsAdmin: eqGrupos.eqEstacaoEquipamento.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoEquipamento"),
                     },
                     {
                       grupoKey: "eqEstacaoEtiqueta",
@@ -1212,6 +1341,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqEstacaoEtiqueta"),
                       obs: eqGrupos.eqEstacaoEtiqueta.obs,
                       onObsChange: setEqGrupoObs("eqEstacaoEtiqueta"),
+                      obsAdmin: eqGrupos.eqEstacaoEtiqueta.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoEtiqueta"),
                     },
                     {
                       grupoKey: "eqEstacaoDgo",
@@ -1220,6 +1351,8 @@ function RelatorioPage() {
                       onChange: setEqGrupoSlots("eqEstacaoDgo"),
                       obs: eqGrupos.eqEstacaoDgo.obs,
                       onObsChange: setEqGrupoObs("eqEstacaoDgo"),
+                      obsAdmin: eqGrupos.eqEstacaoDgo.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoDgo"),
                     },
                   ]}
                   outrasEstacao={outrasEqEstacao}

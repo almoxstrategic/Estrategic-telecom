@@ -12,6 +12,7 @@ import type { RelatorioFotoGrupoKey } from "@/lib/relatorios-transmissao";
 
 export function RelatorioEquipamento({
   readOnly,
+  showObsAdmin = false,
   gruposCliente,
   outrasCliente,
   onOutrasClienteChange,
@@ -27,6 +28,7 @@ export function RelatorioEquipamento({
   onGrupoPhoto,
 }: {
   readOnly: boolean;
+  showObsAdmin?: boolean;
   gruposCliente: GrupoFotoCampo[];
   outrasCliente: OutraFotoState[];
   onOutrasClienteChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;

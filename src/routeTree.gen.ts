@@ -27,15 +27,16 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminPendenciasRouteImport } from './routes/admin/pendencias'
-import { Route as AdminLancamentosRouteImport } from './routes/admin/lancamentos'
 import { Route as AdminImportacaoRouteImport } from './routes/admin/importacao'
 import { Route as AdminEnviarEvidenciaRouteImport } from './routes/admin/enviar-evidencia'
+import { Route as AdminLancamentosIndexRouteImport } from './routes/admin/lancamentos/index'
 import { Route as AdminKpisIndexRouteImport } from './routes/admin/kpis/index'
 import { Route as ApiEvidenciasTestEmailRouteImport } from './routes/api/evidencias.test-email'
 import { Route as ApiEvidenciasSubmitRouteImport } from './routes/api/evidencias.submit'
 import { Route as ApiEvidenciasNotifyEmailRouteImport } from './routes/api/evidencias.notify-email'
 import { Route as ApiEvidenciasBatchSubmitRouteImport } from './routes/api/evidencias.batch-submit'
 import { Route as ApiEvidenciasAdminSubmitRouteImport } from './routes/api/evidencias.admin-submit'
+import { Route as AdminLancamentosIdRouteImport } from './routes/admin/lancamentos/$id'
 import { Route as AdminKpisModuloRouteImport } from './routes/admin/kpis/$modulo'
 
 const TodosRoute = TodosRouteImport.update({
@@ -128,11 +129,6 @@ const AdminPendenciasRoute = AdminPendenciasRouteImport.update({
   path: '/pendencias',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminLancamentosRoute = AdminLancamentosRouteImport.update({
-  id: '/lancamentos',
-  path: '/lancamentos',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminImportacaoRoute = AdminImportacaoRouteImport.update({
   id: '/importacao',
   path: '/importacao',
@@ -141,6 +137,11 @@ const AdminImportacaoRoute = AdminImportacaoRouteImport.update({
 const AdminEnviarEvidenciaRoute = AdminEnviarEvidenciaRouteImport.update({
   id: '/enviar-evidencia',
   path: '/enviar-evidencia',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLancamentosIndexRoute = AdminLancamentosIndexRouteImport.update({
+  id: '/lancamentos/',
+  path: '/lancamentos/',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminKpisIndexRoute = AdminKpisIndexRouteImport.update({
@@ -176,6 +177,11 @@ const ApiEvidenciasAdminSubmitRoute =
     path: '/api/evidencias/admin-submit',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminLancamentosIdRoute = AdminLancamentosIdRouteImport.update({
+  id: '/lancamentos/$id',
+  path: '/lancamentos/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminKpisModuloRoute = AdminKpisModuloRouteImport.update({
   id: '/kpis/$modulo',
   path: '/kpis/$modulo',
@@ -201,16 +207,17 @@ export interface FileRoutesByFullPath {
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
-  '/admin/lancamentos': typeof AdminLancamentosRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/kpis/$modulo': typeof AdminKpisModuloRoute
+  '/admin/lancamentos/$id': typeof AdminLancamentosIdRoute
   '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
   '/api/evidencias/batch-submit': typeof ApiEvidenciasBatchSubmitRoute
   '/api/evidencias/notify-email': typeof ApiEvidenciasNotifyEmailRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
   '/api/evidencias/test-email': typeof ApiEvidenciasTestEmailRoute
   '/admin/kpis/': typeof AdminKpisIndexRoute
+  '/admin/lancamentos/': typeof AdminLancamentosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -230,16 +237,17 @@ export interface FileRoutesByTo {
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
-  '/admin/lancamentos': typeof AdminLancamentosRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin': typeof AdminIndexRoute
   '/admin/kpis/$modulo': typeof AdminKpisModuloRoute
+  '/admin/lancamentos/$id': typeof AdminLancamentosIdRoute
   '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
   '/api/evidencias/batch-submit': typeof ApiEvidenciasBatchSubmitRoute
   '/api/evidencias/notify-email': typeof ApiEvidenciasNotifyEmailRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
   '/api/evidencias/test-email': typeof ApiEvidenciasTestEmailRoute
   '/admin/kpis': typeof AdminKpisIndexRoute
+  '/admin/lancamentos': typeof AdminLancamentosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -261,16 +269,17 @@ export interface FileRoutesById {
   '/todos': typeof TodosRoute
   '/admin/enviar-evidencia': typeof AdminEnviarEvidenciaRoute
   '/admin/importacao': typeof AdminImportacaoRoute
-  '/admin/lancamentos': typeof AdminLancamentosRoute
   '/admin/pendencias': typeof AdminPendenciasRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/kpis/$modulo': typeof AdminKpisModuloRoute
+  '/admin/lancamentos/$id': typeof AdminLancamentosIdRoute
   '/api/evidencias/admin-submit': typeof ApiEvidenciasAdminSubmitRoute
   '/api/evidencias/batch-submit': typeof ApiEvidenciasBatchSubmitRoute
   '/api/evidencias/notify-email': typeof ApiEvidenciasNotifyEmailRoute
   '/api/evidencias/submit': typeof ApiEvidenciasSubmitRoute
   '/api/evidencias/test-email': typeof ApiEvidenciasTestEmailRoute
   '/admin/kpis/': typeof AdminKpisIndexRoute
+  '/admin/lancamentos/': typeof AdminLancamentosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -293,16 +302,17 @@ export interface FileRouteTypes {
     | '/todos'
     | '/admin/enviar-evidencia'
     | '/admin/importacao'
-    | '/admin/lancamentos'
     | '/admin/pendencias'
     | '/admin/'
     | '/admin/kpis/$modulo'
+    | '/admin/lancamentos/$id'
     | '/api/evidencias/admin-submit'
     | '/api/evidencias/batch-submit'
     | '/api/evidencias/notify-email'
     | '/api/evidencias/submit'
     | '/api/evidencias/test-email'
     | '/admin/kpis/'
+    | '/admin/lancamentos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -322,16 +332,17 @@ export interface FileRouteTypes {
     | '/todos'
     | '/admin/enviar-evidencia'
     | '/admin/importacao'
-    | '/admin/lancamentos'
     | '/admin/pendencias'
     | '/admin'
     | '/admin/kpis/$modulo'
+    | '/admin/lancamentos/$id'
     | '/api/evidencias/admin-submit'
     | '/api/evidencias/batch-submit'
     | '/api/evidencias/notify-email'
     | '/api/evidencias/submit'
     | '/api/evidencias/test-email'
     | '/admin/kpis'
+    | '/admin/lancamentos'
   id:
     | '__root__'
     | '/'
@@ -352,16 +363,17 @@ export interface FileRouteTypes {
     | '/todos'
     | '/admin/enviar-evidencia'
     | '/admin/importacao'
-    | '/admin/lancamentos'
     | '/admin/pendencias'
     | '/admin/'
     | '/admin/kpis/$modulo'
+    | '/admin/lancamentos/$id'
     | '/api/evidencias/admin-submit'
     | '/api/evidencias/batch-submit'
     | '/api/evidencias/notify-email'
     | '/api/evidencias/submit'
     | '/api/evidencias/test-email'
     | '/admin/kpis/'
+    | '/admin/lancamentos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -516,13 +528,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPendenciasRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/lancamentos': {
-      id: '/admin/lancamentos'
-      path: '/lancamentos'
-      fullPath: '/admin/lancamentos'
-      preLoaderRoute: typeof AdminLancamentosRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/importacao': {
       id: '/admin/importacao'
       path: '/importacao'
@@ -535,6 +540,13 @@ declare module '@tanstack/react-router' {
       path: '/enviar-evidencia'
       fullPath: '/admin/enviar-evidencia'
       preLoaderRoute: typeof AdminEnviarEvidenciaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/lancamentos/': {
+      id: '/admin/lancamentos/'
+      path: '/lancamentos'
+      fullPath: '/admin/lancamentos/'
+      preLoaderRoute: typeof AdminLancamentosIndexRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/kpis/': {
@@ -579,6 +591,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEvidenciasAdminSubmitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/lancamentos/$id': {
+      id: '/admin/lancamentos/$id'
+      path: '/lancamentos/$id'
+      fullPath: '/admin/lancamentos/$id'
+      preLoaderRoute: typeof AdminLancamentosIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/kpis/$modulo': {
       id: '/admin/kpis/$modulo'
       path: '/kpis/$modulo'
@@ -592,21 +611,23 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminEnviarEvidenciaRoute: typeof AdminEnviarEvidenciaRoute
   AdminImportacaoRoute: typeof AdminImportacaoRoute
-  AdminLancamentosRoute: typeof AdminLancamentosRoute
   AdminPendenciasRoute: typeof AdminPendenciasRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminKpisModuloRoute: typeof AdminKpisModuloRoute
+  AdminLancamentosIdRoute: typeof AdminLancamentosIdRoute
   AdminKpisIndexRoute: typeof AdminKpisIndexRoute
+  AdminLancamentosIndexRoute: typeof AdminLancamentosIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminEnviarEvidenciaRoute: AdminEnviarEvidenciaRoute,
   AdminImportacaoRoute: AdminImportacaoRoute,
-  AdminLancamentosRoute: AdminLancamentosRoute,
   AdminPendenciasRoute: AdminPendenciasRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminKpisModuloRoute: AdminKpisModuloRoute,
+  AdminLancamentosIdRoute: AdminLancamentosIdRoute,
   AdminKpisIndexRoute: AdminKpisIndexRoute,
+  AdminLancamentosIndexRoute: AdminLancamentosIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

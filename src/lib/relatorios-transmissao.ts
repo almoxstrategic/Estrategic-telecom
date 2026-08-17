@@ -11,6 +11,7 @@ export type StoredPhoto = {
 export type FotoGrupoPayload = {
   fotos: StoredPhoto[];
   obs: string;
+  obsAdmin: string;
 };
 
 export type OutraFotoPayload = {
@@ -18,6 +19,7 @@ export type OutraFotoPayload = {
   ref: string;
   foto: StoredPhoto | null;
   obs: string;
+  obsAdmin: string;
 };
 
 export type CaboMetragemPayload = {
@@ -27,6 +29,7 @@ export type CaboMetragemPayload = {
   fotoInicio: StoredPhoto | null;
   fotoFim: StoredPhoto | null;
   obs: string;
+  obsAdmin: string;
 };
 
 export type RelatorioFotoGrupoKeyRe =
@@ -120,6 +123,7 @@ export function emptyCaboMetragem(): CaboMetragemPayload {
     fotoInicio: null,
     fotoFim: null,
     obs: "",
+    obsAdmin: "",
   };
 }
 
@@ -156,8 +160,16 @@ export type RelatorioDraftPatch = {
   payload?: RelatorioPayload;
 };
 
+export function readObsAdmin(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const obj = raw as { obsAdmin?: unknown; obs_admin?: unknown };
+  if (typeof obj.obsAdmin === "string") return obj.obsAdmin;
+  if (typeof obj.obs_admin === "string") return obj.obs_admin;
+  return "";
+}
+
 function emptyFotoGrupo(): FotoGrupoPayload {
-  return { fotos: [], obs: "" };
+  return { fotos: [], obs: "", obsAdmin: "" };
 }
 
 export function emptyRelatorioPayload(): RelatorioPayload {
@@ -220,6 +232,7 @@ function parseCabosList(raw: unknown): CaboMetragemPayload[] {
       fotoInicio: cabo.fotoInicio ?? null,
       fotoFim: cabo.fotoFim ?? null,
       obs: cabo.obs ?? "",
+      obsAdmin: readObsAdmin(cabo),
     };
   });
 }
@@ -239,6 +252,7 @@ function parseCabos(raw: unknown): CaboMetragemPayload[] {
         fotoInicio: old.fotoInicio ?? null,
         fotoFim: old.fotoFim ?? null,
         obs: old.obs ?? "",
+        obsAdmin: readObsAdmin(old),
       },
     ];
   }
@@ -254,6 +268,7 @@ function parseOutrasFotos(raw: unknown): OutraFotoPayload[] {
       ref: foto.ref ?? "",
       foto: foto.foto ?? null,
       obs: foto.obs ?? "",
+      obsAdmin: readObsAdmin(foto),
     };
   });
 }
@@ -262,7 +277,13 @@ function parseFotoGrupo(
   base: FotoGrupoPayload,
   raw: FotoGrupoPayload | undefined,
 ): FotoGrupoPayload {
-  return { ...base, ...raw, fotos: raw?.fotos ?? [], obs: raw?.obs ?? "" };
+  return {
+    ...base,
+    ...raw,
+    fotos: raw?.fotos ?? [],
+    obs: raw?.obs ?? "",
+    obsAdmin: readObsAdmin(raw),
+  };
 }
 
 function parsePayload(raw: unknown): RelatorioPayload {
@@ -662,7 +683,7 @@ export function appendStoredPhotoToPayload(
       ...payload,
       [categoria]: [
         ...payload[categoria],
-        { id: crypto.randomUUID(), ref: "Admin", foto: stored, obs: "" },
+        { id: crypto.randomUUID(), ref: "Admin", foto: stored, obs: "", obsAdmin: "" },
       ],
     };
   }
@@ -671,6 +692,17 @@ export function appendStoredPhotoToPayload(
     ...payload,
     [categoria]: { ...grupo, fotos: [...grupo.fotos, stored] },
   };
+}
+
+export function removeExtraById<T extends { id: string }>(items: T[], id: string): T[] {
+  const index = items.findIndex((item) => item.id === id);
+  if (index < 1) return items;
+  return items.filter((item) => item.id !== id);
+}
+
+export function removeFotoGrupoAt(grupo: FotoGrupoPayload, index: number): FotoGrupoPayload {
+  if (index < 1) return grupo;
+  return { ...grupo, fotos: grupo.fotos.filter((_, i) => i !== index) };
 }
 
 export function subscribeRelatoriosTransmissao(
