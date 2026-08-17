@@ -199,6 +199,8 @@ function RelatorioDetalhe({
     if (categoria === "metragensCaboRc") return fotosCabosRcCount;
     if (categoria === "outrasFotos") return payload?.outrasFotos.length ?? 0;
     if (categoria === "outrasFotosRc") return payload?.outrasFotosRc.length ?? 0;
+    if (categoria === "outrasFotosEqCliente") return payload?.outrasFotosEqCliente.length ?? 0;
+    if (categoria === "outrasFotosEqEstacao") return payload?.outrasFotosEqEstacao.length ?? 0;
     return payload?.[categoria].fotos.length ?? 0;
   };
   const blocoProps = (categoria: RelatorioFotoCategoria) => ({
@@ -385,6 +387,93 @@ function RelatorioDetalhe({
           obs={null}
           fotos={[]}
           {...blocoProps("outrasFotosRc")}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Equipamentos no Cliente
+        </h3>
+        {(
+          [
+            ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
+            ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
+            ["(Rack ou Local)", "eqClienteRack"],
+            ["DGO /DID; Roseta ou Pach panel", "eqClienteDgo"],
+            ["Equipamentos (No Cliente)", "eqClienteEquipamentos"],
+            ["Etiqueta de Identificação", "eqClienteEtiqueta"],
+            ["Identificação SGP no Cliente", "eqClienteSgp"],
+          ] as const
+        ).map(([title, key]) => (
+          <EvidenciaBloco
+            key={key}
+            title={title}
+            obs={payload?.[key].obs}
+            fotos={payload?.[key].fotos ?? []}
+            {...blocoProps(key)}
+          />
+        ))}
+        {(payload?.outrasFotosEqCliente ?? [])
+          .filter((item) => item.foto || item.ref || item.obs)
+          .map((item) => (
+            <EvidenciaBloco
+              key={item.id}
+              title={`Outra (Equip. cliente) — ${item.ref || "sem REF"}`}
+              obs={item.obs}
+              fotos={item.foto ? [item.foto] : []}
+            />
+          ))}
+        <EvidenciaBloco
+          title="Outras fotos (Equip. cliente)"
+          obs={null}
+          fotos={[]}
+          {...blocoProps("outrasFotosEqCliente")}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Equipamentos na Estação/PPC
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Relatório fotográfico da estação:{" "}
+          {payload?.relatorioEstacao ? "SIM" : "NÃO"}
+          {payload?.estacaoEntregaAcesso
+            ? ` · ${payload.estacaoEntregaAcesso}`
+            : ""}
+        </p>
+        {(
+          [
+            ["Estação - (Foto geral da estação/PPC)", "eqEstacaoGeral"],
+            ["(Rack ou Local Instalação)", "eqEstacaoRack"],
+            ["Equipamento instalado (Na estação/PPC)", "eqEstacaoEquipamento"],
+            ["Etiqueta de identificação", "eqEstacaoEtiqueta"],
+            ["DGO / DID / ROUTER (Conexão)", "eqEstacaoDgo"],
+          ] as const
+        ).map(([title, key]) => (
+          <EvidenciaBloco
+            key={key}
+            title={title}
+            obs={payload?.[key].obs}
+            fotos={payload?.[key].fotos ?? []}
+            {...blocoProps(key)}
+          />
+        ))}
+        {(payload?.outrasFotosEqEstacao ?? [])
+          .filter((item) => item.foto || item.ref || item.obs)
+          .map((item) => (
+            <EvidenciaBloco
+              key={item.id}
+              title={`Outra (Estação/PPC) — ${item.ref || "sem REF"}`}
+              obs={item.obs}
+              fotos={item.foto ? [item.foto] : []}
+            />
+          ))}
+        <EvidenciaBloco
+          title="Outras fotos (Estação/PPC)"
+          obs={null}
+          fotos={[]}
+          {...blocoProps("outrasFotosEqEstacao")}
         />
       </section>
     </div>

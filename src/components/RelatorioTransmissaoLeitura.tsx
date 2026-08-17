@@ -186,6 +186,94 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
             fotos={item.foto ? [item.foto] : []}
           />
         ))}
+
+      <Secao
+        titulo="Cliente - (Entrada/Fachada)"
+        obs={payload?.eqClienteFachada.obs}
+        fotos={payload?.eqClienteFachada.fotos ?? []}
+      />
+      <Secao
+        titulo="Cliente - Ambiente (geral da sala)"
+        obs={payload?.eqClienteAmbiente.obs}
+        fotos={payload?.eqClienteAmbiente.fotos ?? []}
+      />
+      <Secao
+        titulo="(Rack ou Local)"
+        obs={payload?.eqClienteRack.obs}
+        fotos={payload?.eqClienteRack.fotos ?? []}
+      />
+      <Secao
+        titulo="DGO /DID; Roseta ou Pach panel"
+        obs={payload?.eqClienteDgo.obs}
+        fotos={payload?.eqClienteDgo.fotos ?? []}
+      />
+      <Secao
+        titulo="Equipamentos (No Cliente)"
+        obs={payload?.eqClienteEquipamentos.obs}
+        fotos={payload?.eqClienteEquipamentos.fotos ?? []}
+      />
+      <Secao
+        titulo="Etiqueta de Identificação"
+        obs={payload?.eqClienteEtiqueta.obs}
+        fotos={payload?.eqClienteEtiqueta.fotos ?? []}
+      />
+      <Secao
+        titulo="Identificação SGP no Cliente"
+        obs={payload?.eqClienteSgp.obs}
+        fotos={payload?.eqClienteSgp.fotos ?? []}
+      />
+      {(payload?.outrasFotosEqCliente ?? [])
+        .filter((item) => item.foto || item.ref || item.obs)
+        .map((item) => (
+          <Secao
+            key={item.id}
+            titulo={`Outra (Equip. cliente) — ${item.ref || "sem REF"}`}
+            obs={item.obs}
+            fotos={item.foto ? [item.foto] : []}
+          />
+        ))}
+      {payload?.relatorioEstacao ? (
+        <>
+          {payload.estacaoEntregaAcesso ? (
+            <Campo label="Estação Entrega de Acesso" value={payload.estacaoEntregaAcesso} />
+          ) : null}
+          <Secao
+            titulo="Estação - (Foto geral da estação/PPC)"
+            obs={payload.eqEstacaoGeral.obs}
+            fotos={payload.eqEstacaoGeral.fotos ?? []}
+          />
+          <Secao
+            titulo="(Rack ou Local Instalação)"
+            obs={payload.eqEstacaoRack.obs}
+            fotos={payload.eqEstacaoRack.fotos ?? []}
+          />
+          <Secao
+            titulo="Equipamento instalado (Na estação/PPC)"
+            obs={payload.eqEstacaoEquipamento.obs}
+            fotos={payload.eqEstacaoEquipamento.fotos ?? []}
+          />
+          <Secao
+            titulo="Etiqueta de identificação"
+            obs={payload.eqEstacaoEtiqueta.obs}
+            fotos={payload.eqEstacaoEtiqueta.fotos ?? []}
+          />
+          <Secao
+            titulo="DGO / DID / ROUTER (Conexão)"
+            obs={payload.eqEstacaoDgo.obs}
+            fotos={payload.eqEstacaoDgo.fotos ?? []}
+          />
+          {(payload.outrasFotosEqEstacao ?? [])
+            .filter((item) => item.foto || item.ref || item.obs)
+            .map((item) => (
+              <Secao
+                key={item.id}
+                titulo={`Outra (Estação/PPC) — ${item.ref || "sem REF"}`}
+                obs={item.obs}
+                fotos={item.foto ? [item.foto] : []}
+              />
+            ))}
+        </>
+      ) : null}
     </div>
   );
 }

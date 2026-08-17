@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, Bell, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
+import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import {
   ChoiceButton,
   RelatorioAbaFixa,
@@ -28,6 +29,7 @@ import {
   uploadRelatorioPhoto,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
+  type RelatorioFotoGrupoKeyEq,
   type RelatorioPayload,
   type RelatorioStatus,
   type RelatorioTransmissao,
@@ -64,6 +66,67 @@ function outrasParaPayload(items: OutraFotoState[]): RelatorioPayload["outrasFot
     foto: item.stored,
     obs: item.obs,
   }));
+}
+
+function outrasFromPayload(
+  items: RelatorioPayload["outrasFotos"] | undefined,
+): OutraFotoState[] {
+  const mapped = (items ?? []).map((item) => ({
+    id: item.id || crypto.randomUUID(),
+    ref: item.ref,
+    file: null as EvidencePhotoRef | null,
+    stored: item.foto,
+    obs: item.obs,
+  }));
+  return mapped.length > 0 ? mapped : [emptyOutraFoto()];
+}
+
+type FotoGrupoUi = { slots: FotoSlot[]; obs: string };
+
+const EQ_GRUPO_KEYS: RelatorioFotoGrupoKeyEq[] = [
+  "eqClienteFachada",
+  "eqClienteAmbiente",
+  "eqClienteRack",
+  "eqClienteDgo",
+  "eqClienteEquipamentos",
+  "eqClienteEtiqueta",
+  "eqClienteSgp",
+  "eqEstacaoGeral",
+  "eqEstacaoRack",
+  "eqEstacaoEquipamento",
+  "eqEstacaoEtiqueta",
+  "eqEstacaoDgo",
+];
+
+function emptyEqGrupos(): Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi> {
+  return {
+    eqClienteFachada: { slots: [newFotoSlot()], obs: "" },
+    eqClienteAmbiente: { slots: [newFotoSlot()], obs: "" },
+    eqClienteRack: { slots: [newFotoSlot()], obs: "" },
+    eqClienteDgo: { slots: [newFotoSlot()], obs: "" },
+    eqClienteEquipamentos: { slots: [newFotoSlot()], obs: "" },
+    eqClienteEtiqueta: { slots: [newFotoSlot()], obs: "" },
+    eqClienteSgp: { slots: [newFotoSlot()], obs: "" },
+    eqEstacaoGeral: { slots: [newFotoSlot()], obs: "" },
+    eqEstacaoRack: { slots: [newFotoSlot()], obs: "" },
+    eqEstacaoEquipamento: { slots: [newFotoSlot()], obs: "" },
+    eqEstacaoEtiqueta: { slots: [newFotoSlot()], obs: "" },
+    eqEstacaoDgo: { slots: [newFotoSlot()], obs: "" },
+  };
+}
+
+function eqGruposFromPayload(
+  payload: RelatorioPayload,
+): Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi> {
+  const next = emptyEqGrupos();
+  for (const key of EQ_GRUPO_KEYS) {
+    const grupo = payload[key];
+    next[key] = {
+      slots: slotsFromStored(grupo?.fotos ?? [], 1),
+      obs: grupo?.obs ?? "",
+    };
+  }
+  return next;
 }
 
 function RelatorioPage() {
@@ -119,6 +182,11 @@ function RelatorioPage() {
   const [rcEntradaExterna, setRcEntradaExterna] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcEntradaExternaObs, setRcEntradaExternaObs] = useState("");
   const [outrasRc, setOutrasRc] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
+  const [eqGrupos, setEqGrupos] = useState<Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi>>(emptyEqGrupos);
+  const [outrasEqCliente, setOutrasEqCliente] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
+  const [relatorioEstacao, setRelatorioEstacao] = useState<"sim" | "nao">("nao");
+  const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
+  const [outrasEqEstacao, setOutrasEqEstacao] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -152,6 +220,58 @@ function RelatorioPage() {
       rcEntradaInterna: { fotos: fotosDosSlots(rcEntradaInterna), obs: rcEntradaInternaObs },
       rcEntradaExterna: { fotos: fotosDosSlots(rcEntradaExterna), obs: rcEntradaExternaObs },
       outrasFotosRc: outrasParaPayload(outrasRc),
+      eqClienteFachada: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteFachada.slots),
+        obs: eqGrupos.eqClienteFachada.obs,
+      },
+      eqClienteAmbiente: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteAmbiente.slots),
+        obs: eqGrupos.eqClienteAmbiente.obs,
+      },
+      eqClienteRack: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteRack.slots),
+        obs: eqGrupos.eqClienteRack.obs,
+      },
+      eqClienteDgo: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteDgo.slots),
+        obs: eqGrupos.eqClienteDgo.obs,
+      },
+      eqClienteEquipamentos: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteEquipamentos.slots),
+        obs: eqGrupos.eqClienteEquipamentos.obs,
+      },
+      eqClienteEtiqueta: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteEtiqueta.slots),
+        obs: eqGrupos.eqClienteEtiqueta.obs,
+      },
+      eqClienteSgp: {
+        fotos: fotosDosSlots(eqGrupos.eqClienteSgp.slots),
+        obs: eqGrupos.eqClienteSgp.obs,
+      },
+      outrasFotosEqCliente: outrasParaPayload(outrasEqCliente),
+      relatorioEstacao: relatorioEstacao === "sim",
+      estacaoEntregaAcesso,
+      eqEstacaoGeral: {
+        fotos: fotosDosSlots(eqGrupos.eqEstacaoGeral.slots),
+        obs: eqGrupos.eqEstacaoGeral.obs,
+      },
+      eqEstacaoRack: {
+        fotos: fotosDosSlots(eqGrupos.eqEstacaoRack.slots),
+        obs: eqGrupos.eqEstacaoRack.obs,
+      },
+      eqEstacaoEquipamento: {
+        fotos: fotosDosSlots(eqGrupos.eqEstacaoEquipamento.slots),
+        obs: eqGrupos.eqEstacaoEquipamento.obs,
+      },
+      eqEstacaoEtiqueta: {
+        fotos: fotosDosSlots(eqGrupos.eqEstacaoEtiqueta.slots),
+        obs: eqGrupos.eqEstacaoEtiqueta.obs,
+      },
+      eqEstacaoDgo: {
+        fotos: fotosDosSlots(eqGrupos.eqEstacaoDgo.slots),
+        obs: eqGrupos.eqEstacaoDgo.obs,
+      },
+      outrasFotosEqEstacao: outrasParaPayload(outrasEqEstacao),
     };
   }, [
     tipo,
@@ -190,6 +310,11 @@ function RelatorioPage() {
     rcEntradaExterna,
     rcEntradaExternaObs,
     outrasRc,
+    eqGrupos,
+    outrasEqCliente,
+    relatorioEstacao,
+    estacaoEntregaAcesso,
+    outrasEqEstacao,
   ]);
 
   const persistDraft = useCallback(
@@ -275,6 +400,11 @@ function RelatorioPage() {
       rcEntradaInterna,
       rcEntradaExterna,
       outrasRc,
+      eqGrupos,
+      outrasEqCliente,
+      relatorioEstacao,
+      estacaoEntregaAcesso,
+      outrasEqEstacao,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -312,14 +442,7 @@ function RelatorioPage() {
     setPosicaoObs(p.posicaoConexaoEstacao?.obs ?? "");
     setEtiqueta(slotsFromStored(p.etiquetaIdentificacao?.fotos ?? [], 1));
     setEtiquetaObs(p.etiquetaIdentificacao?.obs ?? "");
-    const outrasCarregadas = (p.outrasFotos ?? []).map((item) => ({
-      id: item.id || crypto.randomUUID(),
-      ref: item.ref,
-      file: null as EvidencePhotoRef | null,
-      stored: item.foto,
-      obs: item.obs,
-    }));
-    setOutras(outrasCarregadas.length > 0 ? outrasCarregadas : [emptyOutraFoto()]);
+    setOutras(outrasFromPayload(p.outrasFotos));
     setTecnologiaAcesso(p.tecnologiaAcesso ?? "");
     setLancamentoCabosRC(p.lancamentoRc === true ? "sim" : p.lancamentoRc === false ? "nao" : "");
     setCabosRc(p.metragensCaboRc.length > 0 ? p.metragensCaboRc : [emptyCaboMetragem()]);
@@ -335,14 +458,12 @@ function RelatorioPage() {
     setRcEntradaInternaObs(p.rcEntradaInterna?.obs ?? "");
     setRcEntradaExterna(slotsFromStored(p.rcEntradaExterna?.fotos ?? [], 1));
     setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
-    const outrasRcCarregadas = (p.outrasFotosRc ?? []).map((item) => ({
-      id: item.id || crypto.randomUUID(),
-      ref: item.ref,
-      file: null as EvidencePhotoRef | null,
-      stored: item.foto,
-      obs: item.obs,
-    }));
-    setOutrasRc(outrasRcCarregadas.length > 0 ? outrasRcCarregadas : [emptyOutraFoto()]);
+    setOutrasRc(outrasFromPayload(p.outrasFotosRc));
+    setEqGrupos(eqGruposFromPayload(p));
+    setOutrasEqCliente(outrasFromPayload(p.outrasFotosEqCliente));
+    setRelatorioEstacao(p.relatorioEstacao === true ? "sim" : "nao");
+    setEstacaoEntregaAcesso(p.estacaoEntregaAcesso ?? "");
+    setOutrasEqEstacao(outrasFromPayload(p.outrasFotosEqEstacao));
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       window.setTimeout(() => {
@@ -480,7 +601,7 @@ function RelatorioPage() {
 
   const handleOutraPhoto = (
     setter: React.Dispatch<React.SetStateAction<OutraFotoState[]>>,
-    payloadKey: "outrasFotos" | "outrasFotosRc",
+    payloadKey: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
     itemId: string,
     file: EvidencePhotoRef,
   ) => {
@@ -502,6 +623,22 @@ function RelatorioPage() {
     setter((prev) => prev.map((item) => (item.id === caboId ? { ...item, ...patch } : item)));
   };
 
+  const setEqGrupoSlots = (
+    key: RelatorioFotoGrupoKeyEq,
+  ): React.Dispatch<React.SetStateAction<FotoSlot[]>> => {
+    return (action) => {
+      setEqGrupos((prev) => {
+        const current = prev[key].slots;
+        const next = typeof action === "function" ? action(current) : action;
+        return { ...prev, [key]: { ...prev[key], slots: next } };
+      });
+    };
+  };
+
+  const setEqGrupoObs = (key: RelatorioFotoGrupoKeyEq) => (obs: string) => {
+    setEqGrupos((prev) => ({ ...prev, [key]: { ...prev[key], obs } }));
+  };
+
   const grupoSetters: Record<
     RelatorioFotoGrupoKey,
     React.Dispatch<React.SetStateAction<FotoSlot[]>>
@@ -520,6 +657,18 @@ function RelatorioPage() {
     rcPlaquetaIdentificacao: setRcPlaqueta,
     rcEntradaInterna: setRcEntradaInterna,
     rcEntradaExterna: setRcEntradaExterna,
+    eqClienteFachada: setEqGrupoSlots("eqClienteFachada"),
+    eqClienteAmbiente: setEqGrupoSlots("eqClienteAmbiente"),
+    eqClienteRack: setEqGrupoSlots("eqClienteRack"),
+    eqClienteDgo: setEqGrupoSlots("eqClienteDgo"),
+    eqClienteEquipamentos: setEqGrupoSlots("eqClienteEquipamentos"),
+    eqClienteEtiqueta: setEqGrupoSlots("eqClienteEtiqueta"),
+    eqClienteSgp: setEqGrupoSlots("eqClienteSgp"),
+    eqEstacaoGeral: setEqGrupoSlots("eqEstacaoGeral"),
+    eqEstacaoRack: setEqGrupoSlots("eqEstacaoRack"),
+    eqEstacaoEquipamento: setEqGrupoSlots("eqEstacaoEquipamento"),
+    eqEstacaoEtiqueta: setEqGrupoSlots("eqEstacaoEtiqueta"),
+    eqEstacaoDgo: setEqGrupoSlots("eqEstacaoDgo"),
   };
 
   const headerOk = useMemo(
@@ -566,6 +715,7 @@ function RelatorioPage() {
   const mostrarFormularioCampo = tipo === "empresarial" || tipo === "implantacao";
   const mostrarRedeAcesso = tipo === "implantacao" || (tipo === "empresarial" && abaCampo === "RE");
   const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
+  const mostrarEquipamento = tipo === "empresarial" && abaCampo === "equipamento";
   const voltarInicio = () => {
     canAutosaveRef.current = false;
     setStep(1);
@@ -959,6 +1109,127 @@ function RelatorioPage() {
                   onOutraPhoto={(itemId, file) =>
                     handleOutraPhoto(setOutrasRc, "outrasFotosRc", itemId, file)
                   }
+                />
+              ) : mostrarEquipamento ? (
+                <RelatorioEquipamento
+                  readOnly={readOnly}
+                  gruposCliente={[
+                    {
+                      grupoKey: "eqClienteFachada",
+                      title: "Cliente - (Entrada/Fachada)",
+                      slots: eqGrupos.eqClienteFachada.slots,
+                      onChange: setEqGrupoSlots("eqClienteFachada"),
+                      obs: eqGrupos.eqClienteFachada.obs,
+                      onObsChange: setEqGrupoObs("eqClienteFachada"),
+                    },
+                    {
+                      grupoKey: "eqClienteAmbiente",
+                      title: "Cliente - Ambiente (geral da sala)",
+                      slots: eqGrupos.eqClienteAmbiente.slots,
+                      onChange: setEqGrupoSlots("eqClienteAmbiente"),
+                      obs: eqGrupos.eqClienteAmbiente.obs,
+                      onObsChange: setEqGrupoObs("eqClienteAmbiente"),
+                    },
+                    {
+                      grupoKey: "eqClienteRack",
+                      title: "(Rack ou Local)",
+                      slots: eqGrupos.eqClienteRack.slots,
+                      onChange: setEqGrupoSlots("eqClienteRack"),
+                      obs: eqGrupos.eqClienteRack.obs,
+                      onObsChange: setEqGrupoObs("eqClienteRack"),
+                    },
+                    {
+                      grupoKey: "eqClienteDgo",
+                      title: "DGO /DID; Roseta ou Pach panel",
+                      slots: eqGrupos.eqClienteDgo.slots,
+                      onChange: setEqGrupoSlots("eqClienteDgo"),
+                      obs: eqGrupos.eqClienteDgo.obs,
+                      onObsChange: setEqGrupoObs("eqClienteDgo"),
+                    },
+                    {
+                      grupoKey: "eqClienteEquipamentos",
+                      title: "Equipamentos (No Cliente)",
+                      slots: eqGrupos.eqClienteEquipamentos.slots,
+                      onChange: setEqGrupoSlots("eqClienteEquipamentos"),
+                      obs: eqGrupos.eqClienteEquipamentos.obs,
+                      onObsChange: setEqGrupoObs("eqClienteEquipamentos"),
+                    },
+                    {
+                      grupoKey: "eqClienteEtiqueta",
+                      title: "Etiqueta de Identificação",
+                      slots: eqGrupos.eqClienteEtiqueta.slots,
+                      onChange: setEqGrupoSlots("eqClienteEtiqueta"),
+                      obs: eqGrupos.eqClienteEtiqueta.obs,
+                      onObsChange: setEqGrupoObs("eqClienteEtiqueta"),
+                    },
+                    {
+                      grupoKey: "eqClienteSgp",
+                      title: "Identificação SGP no Cliente",
+                      slots: eqGrupos.eqClienteSgp.slots,
+                      onChange: setEqGrupoSlots("eqClienteSgp"),
+                      obs: eqGrupos.eqClienteSgp.obs,
+                      onObsChange: setEqGrupoObs("eqClienteSgp"),
+                    },
+                  ]}
+                  outrasCliente={outrasEqCliente}
+                  onOutrasClienteChange={setOutrasEqCliente}
+                  onOutraClientePhoto={(itemId, file) =>
+                    handleOutraPhoto(setOutrasEqCliente, "outrasFotosEqCliente", itemId, file)
+                  }
+                  relatorioEstacao={relatorioEstacao}
+                  onRelatorioEstacao={setRelatorioEstacao}
+                  estacaoEntregaAcesso={estacaoEntregaAcesso}
+                  onEstacaoEntregaAcesso={setEstacaoEntregaAcesso}
+                  gruposEstacao={[
+                    {
+                      grupoKey: "eqEstacaoGeral",
+                      title: "Estação - (Foto geral da estação/PPC)",
+                      slots: eqGrupos.eqEstacaoGeral.slots,
+                      onChange: setEqGrupoSlots("eqEstacaoGeral"),
+                      obs: eqGrupos.eqEstacaoGeral.obs,
+                      onObsChange: setEqGrupoObs("eqEstacaoGeral"),
+                    },
+                    {
+                      grupoKey: "eqEstacaoRack",
+                      title: "(Rack ou Local Instalação)",
+                      slots: eqGrupos.eqEstacaoRack.slots,
+                      onChange: setEqGrupoSlots("eqEstacaoRack"),
+                      obs: eqGrupos.eqEstacaoRack.obs,
+                      onObsChange: setEqGrupoObs("eqEstacaoRack"),
+                    },
+                    {
+                      grupoKey: "eqEstacaoEquipamento",
+                      title: "Equipamento instalado (Na estação/PPC)",
+                      slots: eqGrupos.eqEstacaoEquipamento.slots,
+                      onChange: setEqGrupoSlots("eqEstacaoEquipamento"),
+                      obs: eqGrupos.eqEstacaoEquipamento.obs,
+                      onObsChange: setEqGrupoObs("eqEstacaoEquipamento"),
+                    },
+                    {
+                      grupoKey: "eqEstacaoEtiqueta",
+                      title: "Etiqueta de identificação",
+                      slots: eqGrupos.eqEstacaoEtiqueta.slots,
+                      onChange: setEqGrupoSlots("eqEstacaoEtiqueta"),
+                      obs: eqGrupos.eqEstacaoEtiqueta.obs,
+                      onObsChange: setEqGrupoObs("eqEstacaoEtiqueta"),
+                    },
+                    {
+                      grupoKey: "eqEstacaoDgo",
+                      title: "DGO / DID / ROUTER (Conexão)",
+                      slots: eqGrupos.eqEstacaoDgo.slots,
+                      onChange: setEqGrupoSlots("eqEstacaoDgo"),
+                      obs: eqGrupos.eqEstacaoDgo.obs,
+                      onObsChange: setEqGrupoObs("eqEstacaoDgo"),
+                    },
+                  ]}
+                  outrasEstacao={outrasEqEstacao}
+                  onOutrasEstacaoChange={setOutrasEqEstacao}
+                  onOutraEstacaoPhoto={(itemId, file) =>
+                    handleOutraPhoto(setOutrasEqEstacao, "outrasFotosEqEstacao", itemId, file)
+                  }
+                  onGrupoPhoto={(grupoKey, slotId, file) => {
+                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
+                  }}
                 />
               ) : tipo === "empresarial" ? (
                 <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">

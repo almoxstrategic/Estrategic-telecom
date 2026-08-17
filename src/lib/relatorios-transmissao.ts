@@ -47,7 +47,30 @@ export type RelatorioFotoGrupoKeyRc =
   | "rcEntradaInterna"
   | "rcEntradaExterna";
 
-export type RelatorioFotoGrupoKey = RelatorioFotoGrupoKeyRe | RelatorioFotoGrupoKeyRc;
+export type RelatorioFotoGrupoKeyEqCliente =
+  | "eqClienteFachada"
+  | "eqClienteAmbiente"
+  | "eqClienteRack"
+  | "eqClienteDgo"
+  | "eqClienteEquipamentos"
+  | "eqClienteEtiqueta"
+  | "eqClienteSgp";
+
+export type RelatorioFotoGrupoKeyEqEstacao =
+  | "eqEstacaoGeral"
+  | "eqEstacaoRack"
+  | "eqEstacaoEquipamento"
+  | "eqEstacaoEtiqueta"
+  | "eqEstacaoDgo";
+
+export type RelatorioFotoGrupoKeyEq =
+  | RelatorioFotoGrupoKeyEqCliente
+  | RelatorioFotoGrupoKeyEqEstacao;
+
+export type RelatorioFotoGrupoKey =
+  | RelatorioFotoGrupoKeyRe
+  | RelatorioFotoGrupoKeyRc
+  | RelatorioFotoGrupoKeyEq;
 
 export type RelatorioPayload = {
   lancamentoRe: boolean | null;
@@ -71,6 +94,22 @@ export type RelatorioPayload = {
   rcEntradaInterna: FotoGrupoPayload;
   rcEntradaExterna: FotoGrupoPayload;
   outrasFotosRc: OutraFotoPayload[];
+  eqClienteFachada: FotoGrupoPayload;
+  eqClienteAmbiente: FotoGrupoPayload;
+  eqClienteRack: FotoGrupoPayload;
+  eqClienteDgo: FotoGrupoPayload;
+  eqClienteEquipamentos: FotoGrupoPayload;
+  eqClienteEtiqueta: FotoGrupoPayload;
+  eqClienteSgp: FotoGrupoPayload;
+  outrasFotosEqCliente: OutraFotoPayload[];
+  relatorioEstacao: boolean | null;
+  estacaoEntregaAcesso: string;
+  eqEstacaoGeral: FotoGrupoPayload;
+  eqEstacaoRack: FotoGrupoPayload;
+  eqEstacaoEquipamento: FotoGrupoPayload;
+  eqEstacaoEtiqueta: FotoGrupoPayload;
+  eqEstacaoDgo: FotoGrupoPayload;
+  outrasFotosEqEstacao: OutraFotoPayload[];
 };
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
@@ -144,6 +183,22 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     rcEntradaInterna: emptyFotoGrupo(),
     rcEntradaExterna: emptyFotoGrupo(),
     outrasFotosRc: [],
+    eqClienteFachada: emptyFotoGrupo(),
+    eqClienteAmbiente: emptyFotoGrupo(),
+    eqClienteRack: emptyFotoGrupo(),
+    eqClienteDgo: emptyFotoGrupo(),
+    eqClienteEquipamentos: emptyFotoGrupo(),
+    eqClienteEtiqueta: emptyFotoGrupo(),
+    eqClienteSgp: emptyFotoGrupo(),
+    outrasFotosEqCliente: [],
+    relatorioEstacao: false,
+    estacaoEntregaAcesso: "",
+    eqEstacaoGeral: emptyFotoGrupo(),
+    eqEstacaoRack: emptyFotoGrupo(),
+    eqEstacaoEquipamento: emptyFotoGrupo(),
+    eqEstacaoEtiqueta: emptyFotoGrupo(),
+    eqEstacaoDgo: emptyFotoGrupo(),
+    outrasFotosEqEstacao: [],
   };
 }
 
@@ -238,6 +293,22 @@ function parsePayload(raw: unknown): RelatorioPayload {
     rcEntradaInterna: parseFotoGrupo(base.rcEntradaInterna, src.rcEntradaInterna),
     rcEntradaExterna: parseFotoGrupo(base.rcEntradaExterna, src.rcEntradaExterna),
     outrasFotosRc: parseOutrasFotos(src.outrasFotosRc),
+    eqClienteFachada: parseFotoGrupo(base.eqClienteFachada, src.eqClienteFachada),
+    eqClienteAmbiente: parseFotoGrupo(base.eqClienteAmbiente, src.eqClienteAmbiente),
+    eqClienteRack: parseFotoGrupo(base.eqClienteRack, src.eqClienteRack),
+    eqClienteDgo: parseFotoGrupo(base.eqClienteDgo, src.eqClienteDgo),
+    eqClienteEquipamentos: parseFotoGrupo(base.eqClienteEquipamentos, src.eqClienteEquipamentos),
+    eqClienteEtiqueta: parseFotoGrupo(base.eqClienteEtiqueta, src.eqClienteEtiqueta),
+    eqClienteSgp: parseFotoGrupo(base.eqClienteSgp, src.eqClienteSgp),
+    outrasFotosEqCliente: parseOutrasFotos(src.outrasFotosEqCliente),
+    relatorioEstacao: src.relatorioEstacao ?? false,
+    estacaoEntregaAcesso: src.estacaoEntregaAcesso ?? "",
+    eqEstacaoGeral: parseFotoGrupo(base.eqEstacaoGeral, src.eqEstacaoGeral),
+    eqEstacaoRack: parseFotoGrupo(base.eqEstacaoRack, src.eqEstacaoRack),
+    eqEstacaoEquipamento: parseFotoGrupo(base.eqEstacaoEquipamento, src.eqEstacaoEquipamento),
+    eqEstacaoEtiqueta: parseFotoGrupo(base.eqEstacaoEtiqueta, src.eqEstacaoEtiqueta),
+    eqEstacaoDgo: parseFotoGrupo(base.eqEstacaoDgo, src.eqEstacaoDgo),
+    outrasFotosEqEstacao: parseOutrasFotos(src.outrasFotosEqEstacao),
   };
 }
 
@@ -562,7 +633,9 @@ export type RelatorioFotoCategoria =
   | "metragensCabo"
   | "outrasFotos"
   | "metragensCaboRc"
-  | "outrasFotosRc";
+  | "outrasFotosRc"
+  | "outrasFotosEqCliente"
+  | "outrasFotosEqEstacao";
 
 export function appendStoredPhotoToPayload(
   payload: RelatorioPayload,
@@ -579,7 +652,12 @@ export function appendStoredPhotoToPayload(
     else list.push({ ...emptyCaboMetragem(), fotoInicio: stored });
     return { ...payload, [categoria]: list };
   }
-  if (categoria === "outrasFotos" || categoria === "outrasFotosRc") {
+  if (
+    categoria === "outrasFotos" ||
+    categoria === "outrasFotosRc" ||
+    categoria === "outrasFotosEqCliente" ||
+    categoria === "outrasFotosEqEstacao"
+  ) {
     return {
       ...payload,
       [categoria]: [

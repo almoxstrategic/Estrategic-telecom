@@ -298,89 +298,113 @@ export function RelatorioRedeAcesso({
           />
         ))}
 
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-base font-bold">Outras fotos</h2>
-          {outras.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
-          ) : (
-            outras.map((item, index) => (
-              <div key={item.id} className="space-y-3 rounded-xl border border-border p-4">
-                <label className="mb-1.5 block text-sm font-semibold">REF:</label>
-                <input
-                  type="text"
-                  value={item.ref}
-                  onChange={(e) =>
-                    onOutrasChange((prev) =>
-                      prev.map((row) => (row.id === item.id ? { ...row, ref: e.target.value } : row)),
-                    )
-                  }
-                  className={inputClass()}
-                  disabled={readOnly}
-                />
-                {item.stored ? (
-                  <div>
-                    <ExpandableImage src={item.stored.url} alt={item.ref || "Outra foto"} />
-                    {readOnly ? null : (
-                      <button
-                        type="button"
-                        className="mt-1 text-xs text-primary"
-                        onClick={() =>
-                          onOutrasChange((prev) =>
-                            prev.map((row) =>
-                              row.id === item.id ? { ...row, stored: null, file: null } : row,
-                            ),
-                          )
-                        }
-                      >
-                        Trocar foto
-                      </button>
-                    )}
-                  </div>
-                ) : readOnly ? (
-                  <p className="text-sm text-muted-foreground">Sem foto.</p>
-                ) : (
-                  <PhotoUpload
-                    label="Foto"
-                    suffix={index === 0 ? "inicio" : "fim"}
-                    value={null}
-                    onChange={(file) => {
-                      if (file) onOutraPhoto(item.id, file);
-                    }}
-                  />
-                )}
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-                  <textarea
-                    value={item.obs}
-                    onChange={(e) =>
-                      onOutrasChange((prev) =>
-                        prev.map((row) => (row.id === item.id ? { ...row, obs: e.target.value } : row)),
-                      )
-                    }
-                    rows={2}
-                    disabled={readOnly}
-                    className={inputClass()}
-                  />
-                </div>
-              </div>
-            ))
-          )}
-          {readOnly ? null : (
-            <button
-              type="button"
-              onClick={() =>
-                onOutrasChange((prev) => [
-                  ...prev,
-                  { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
-                ])
-              }
-              className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
-            >
-              <Plus className="h-4 w-4" /> Adicionar mais fotos
-            </button>
-          )}
-        </div>
+        <RelatorioOutrasFotos
+          title="Outras fotos"
+          outras={outras}
+          onOutrasChange={onOutrasChange}
+          onOutraPhoto={onOutraPhoto}
+          readOnly={readOnly}
+        />
       </div>
     </EvidencePhotoPasteProvider>
+  );
+}
+
+export function RelatorioOutrasFotos({
+  title = "Outras fotos",
+  outras,
+  onOutrasChange,
+  onOutraPhoto,
+  readOnly,
+}: {
+  title?: string;
+  outras: OutraFotoState[];
+  onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
+  onOutraPhoto: (itemId: string, file: EvidencePhotoRef) => void;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-bold">{title}</h2>
+      {outras.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
+      ) : (
+        outras.map((item, index) => (
+          <div key={item.id} className="space-y-3 rounded-xl border border-border p-4">
+            <label className="mb-1.5 block text-sm font-semibold">REF:</label>
+            <input
+              type="text"
+              value={item.ref}
+              onChange={(e) =>
+                onOutrasChange((prev) =>
+                  prev.map((row) => (row.id === item.id ? { ...row, ref: e.target.value } : row)),
+                )
+              }
+              className={inputClass()}
+              disabled={readOnly}
+            />
+            {item.stored ? (
+              <div>
+                <ExpandableImage src={item.stored.url} alt={item.ref || "Outra foto"} />
+                {readOnly ? null : (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs text-primary"
+                    onClick={() =>
+                      onOutrasChange((prev) =>
+                        prev.map((row) =>
+                          row.id === item.id ? { ...row, stored: null, file: null } : row,
+                        ),
+                      )
+                    }
+                  >
+                    Trocar foto
+                  </button>
+                )}
+              </div>
+            ) : readOnly ? (
+              <p className="text-sm text-muted-foreground">Sem foto.</p>
+            ) : (
+              <PhotoUpload
+                label="Foto"
+                suffix={index === 0 ? "inicio" : "fim"}
+                value={null}
+                onChange={(file) => {
+                  if (file) onOutraPhoto(item.id, file);
+                }}
+              />
+            )}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+              <textarea
+                value={item.obs}
+                onChange={(e) =>
+                  onOutrasChange((prev) =>
+                    prev.map((row) => (row.id === item.id ? { ...row, obs: e.target.value } : row)),
+                  )
+                }
+                rows={2}
+                disabled={readOnly}
+                className={inputClass()}
+              />
+            </div>
+          </div>
+        ))
+      )}
+      {readOnly ? null : (
+        <button
+          type="button"
+          onClick={() =>
+            onOutrasChange((prev) => [
+              ...prev,
+              { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "" },
+            ])
+          }
+          className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+        >
+          <Plus className="h-4 w-4" /> Adicionar mais fotos
+        </button>
+      )}
+    </div>
   );
 }
