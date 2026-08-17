@@ -123,6 +123,24 @@ function CadastroPage() {
           className="mt-10 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm"
         >
           <div>
+            <label htmlFor="cadastro-poderes" className="mb-1.5 block text-sm font-semibold">
+              Poderes
+            </label>
+            <select
+              id="cadastro-poderes"
+              value={poderes}
+              onChange={(e) => setPoderes(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              required
+            >
+              {ROLE_SELECT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="mb-1.5 block text-sm font-semibold">Nome</label>
             <input
               type="text"
@@ -166,28 +184,6 @@ function CadastroPage() {
               className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
-          </div>
-          <div>
-            <label htmlFor="cadastro-poderes" className="mb-1.5 block text-sm font-semibold">
-              Poderes
-            </label>
-            <select
-              id="cadastro-poderes"
-              value={poderes}
-              onChange={(e) => setPoderes(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              required
-            >
-              {ROLE_SELECT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Técnico = evidência IAT · Transmissão = relatório de lançamento · Admin/Gerente =
-              painel completo · COP = painel somente leitura
-            </p>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Login</label>
