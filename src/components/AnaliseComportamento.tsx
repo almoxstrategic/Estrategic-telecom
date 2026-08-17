@@ -1683,6 +1683,12 @@ export function AnaliseComportamento() {
 
   const isModoImprodutivo = statusFiltro === "IMPRODUTIVO";
   const corDestaque = isModoImprodutivo ? "text-red-600" : "text-green-600";
+  const kpiCardClass =
+    "flex h-full min-w-[200px] flex-1 flex-col justify-between gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm";
+  const kpiCardClickableClass = `${kpiCardClass} cursor-pointer transition hover:border-primary/40 hover:shadow-md`;
+  const kpiCardTitleClass = "flex h-10 shrink-0 items-start gap-2";
+  const kpiCardValueClass = `h-9 shrink-0 text-base font-bold leading-snug sm:text-lg ${corDestaque}`;
+  const kpiCardSubClass = "min-h-8 text-xs leading-snug text-muted-foreground";
   const tituloTop10 = isModoImprodutivo
     ? "Top 10 Cód. Quebras"
     : "Top 10 Cód. Produtivos";
@@ -1912,66 +1918,58 @@ export function AnaliseComportamento() {
       ) : (
         <>
           <div className="flex flex-wrap items-stretch gap-4">
-            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2">
+            <div className={kpiCardClass}>
+              <div className={kpiCardTitleClass}>
                 <Clock className={`h-5 w-5 shrink-0 ${corDestaque}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   {isModoImprodutivo
                     ? "Janela Improdutiva (Macro)"
                     : "Janela Produtiva (Macro)"}
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {janelaImprodutivaMacro
                   ? formatarJanelaHorario(janelaImprodutivaMacro.janela)
                   : "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {janelaImprodutivaMacro
-                    ? isModoImprodutivo
-                      ? `maior índice de quebras - ${fracaoSobrePeriodo(janelaImprodutivaMacro.quantidade)}`
-                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobrePeriodo(janelaImprodutivaMacro.quantidade)}`
-                    : isModoImprodutivo
-                      ? "maior índice de quebras"
-                      : `maior volume de ${labelVolumeCurto}`}
-                </p>
-              </div>
+              <p className={kpiCardSubClass}>
+                {janelaImprodutivaMacro
+                  ? isModoImprodutivo
+                    ? `maior índice de quebras - ${fracaoSobrePeriodo(janelaImprodutivaMacro.quantidade)}`
+                    : `maior volume de ${labelVolumeCurto} - ${fracaoSobrePeriodo(janelaImprodutivaMacro.quantidade)}`
+                  : isModoImprodutivo
+                    ? "maior índice de quebras"
+                    : `maior volume de ${labelVolumeCurto}`}
+              </p>
             </div>
 
-            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2">
+            <div className={kpiCardClass}>
+              <div className={kpiCardTitleClass}>
                 <Clock className={`h-5 w-5 shrink-0 ${corDestaque}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   {isModoImprodutivo
                     ? "Janela Improdutiva (Micro)"
                     : "Janela Produtiva (Micro)"}
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {janelaImprodutivaMicro
                   ? formatarJanelaHorario(janelaImprodutivaMicro.janela)
                   : "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {janelaImprodutivaMicro
-                    ? isModoImprodutivo
-                      ? `maior índice de quebras - ${fracaoSobrePeriodo(janelaImprodutivaMicro.quantidade)}`
-                      : `maior volume de ${labelVolumeCurto} - ${fracaoSobrePeriodo(janelaImprodutivaMicro.quantidade)}`
-                    : isModoImprodutivo
-                      ? "maior índice de quebras"
-                      : `maior volume de ${labelVolumeCurto}`}
-                </p>
-              </div>
+              <p className={kpiCardSubClass}>
+                {janelaImprodutivaMicro
+                  ? isModoImprodutivo
+                    ? `maior índice de quebras - ${fracaoSobrePeriodo(janelaImprodutivaMicro.quantidade)}`
+                    : `maior volume de ${labelVolumeCurto} - ${fracaoSobrePeriodo(janelaImprodutivaMicro.quantidade)}`
+                  : isModoImprodutivo
+                    ? "maior índice de quebras"
+                    : `maior volume de ${labelVolumeCurto}`}
+              </p>
             </div>
 
             <div
-              className="flex min-w-[200px] flex-1 cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md"
+              className={kpiCardClickableClass}
               role="button"
               tabIndex={0}
               onClick={() =>
@@ -1985,30 +1983,26 @@ export function AnaliseComportamento() {
               }}
               title="Abrir detalhamento por dia da semana"
             >
-              <div className="flex items-center gap-2">
+              <div className={kpiCardTitleClass}>
                 <CalendarDays className={`h-5 w-5 shrink-0 ${corDestaque}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   Dia (Maior %)
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {diaMaiorTaxa?.dia ?? "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {diaMaiorTaxa
-                    ? isModoImprodutivo
-                      ? `${formatPct(diaMaiorTaxa.taxa)} de quebra - ${formatQuantidade(diaMaiorTaxa.alvo)} de ${formatQuantidade(diaMaiorTaxa.totalDia)}`
-                      : `${formatPct(diaMaiorTaxa.taxa)} de aprovação - ${formatQuantidade(diaMaiorTaxa.alvo)} de ${formatQuantidade(diaMaiorTaxa.totalDia)}`
-                    : "Sem dados no período"}
-                </p>
-              </div>
+              <p className={`${kpiCardSubClass} tabular-nums`}>
+                {diaMaiorTaxa
+                  ? isModoImprodutivo
+                    ? `${formatPct(diaMaiorTaxa.taxa)} de quebra - ${formatQuantidade(diaMaiorTaxa.alvo)} de ${formatQuantidade(diaMaiorTaxa.totalDia)}`
+                    : `${formatPct(diaMaiorTaxa.taxa)} de aprovação - ${formatQuantidade(diaMaiorTaxa.alvo)} de ${formatQuantidade(diaMaiorTaxa.totalDia)}`
+                  : "Sem dados no período"}
+              </p>
             </div>
 
             <div
-              className="flex min-w-[200px] flex-1 cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md"
+              className={kpiCardClickableClass}
               role="button"
               tabIndex={0}
               onClick={() =>
@@ -2022,95 +2016,79 @@ export function AnaliseComportamento() {
               }}
               title="Abrir detalhamento por dia da semana"
             >
-              <div className="flex items-center gap-2">
+              <div className={kpiCardTitleClass}>
                 <CalendarDays className={`h-5 w-5 shrink-0 ${corDestaque}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   Dia (Maior volume)
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {diaMaiorVolume?.dia ?? "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {diaMaiorVolume
-                    ? `${formatPct(diaMaiorVolume.pct)} do volume total - ${formatQuantidade(diaMaiorVolume.alvo)} de ${formatQuantidade(diaMaiorVolume.totalGeral)}`
-                    : "Sem dados no período"}
-                </p>
-              </div>
+              <p className={`${kpiCardSubClass} tabular-nums`}>
+                {diaMaiorVolume
+                  ? `${formatPct(diaMaiorVolume.pct)} do volume total - ${formatQuantidade(diaMaiorVolume.alvo)} de ${formatQuantidade(diaMaiorVolume.totalGeral)}`
+                  : "Sem dados no período"}
+              </p>
             </div>
 
-            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2">
+            <div className={kpiCardClass}>
+              <div className={kpiCardTitleClass}>
                 {turnoMaiorFadiga?.turno === "Manhã" ? (
                   <Sunrise className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 ) : (
                   <Sunset className={`h-5 w-5 shrink-0 ${corDestaque}`} />
                 )}
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   Turno
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {turnoMaiorFadiga?.turno ?? "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {turnoMaiorFadiga
-                    ? isModoImprodutivo
-                      ? `${formatPct(turnoMaiorFadiga.taxa)} de reprovação - ${fracaoSobrePeriodo(turnoMaiorFadiga.quebras)}`
-                      : `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${fracaoSobrePeriodo(turnoMaiorFadiga.quebras)}`
-                    : "Sem horário de início-fim"}
-                </p>
-              </div>
+              <p className={`${kpiCardSubClass} tabular-nums`}>
+                {turnoMaiorFadiga
+                  ? isModoImprodutivo
+                    ? `${formatPct(turnoMaiorFadiga.taxa)} de reprovação - ${fracaoSobrePeriodo(turnoMaiorFadiga.quebras)}`
+                    : `${formatQuantidade(turnoMaiorFadiga.quebras)} ${labelVolumeTurno} - ${fracaoSobrePeriodo(turnoMaiorFadiga.quebras)}`
+                  : "Sem horário de início-fim"}
+              </p>
             </div>
 
-            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2">
+            <div className={kpiCardClass}>
+              <div className={kpiCardTitleClass}>
                 <AlertTriangle className={`h-5 w-5 shrink-0 ${corDestaque}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   {tituloCardCodigo}
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {cardCodigoExibido
                   ? `Cód. ${cardCodigoExibido.codigo} - ${formatPct(cardCodigoExibido.pct)}`
                   : "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {cardCodigoExibido
-                    ? `recorrência - ${fracaoSobrePeriodo(cardCodigoExibido.quantidade)}`
-                    : "recorrência"}
-                </p>
-              </div>
+              <p className={kpiCardSubClass}>
+                {cardCodigoExibido
+                  ? `recorrência - ${fracaoSobrePeriodo(cardCodigoExibido.quantidade)}`
+                  : "recorrência"}
+              </p>
             </div>
 
-            <div className="flex min-w-[200px] flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2">
+            <div className={kpiCardClass}>
+              <div className={kpiCardTitleClass}>
                 <Target className={`h-5 w-5 shrink-0 ${corDestaque}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium leading-tight text-muted-foreground">
                   Tipo
                 </span>
               </div>
-              <div
-                className={`mt-3 text-base font-bold leading-snug sm:text-lg ${corDestaque}`}
-              >
+              <div className={kpiCardValueClass}>
                 {tipoOfensorMacro?.motivo ?? "—"}
               </div>
-              <div className="mt-auto">
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {tipoOfensorMacro
-                    ? `categoria com maior índice - ${fracaoSobrePeriodo(tipoOfensorMacro.quantidade)}`
-                    : "categoria com maior índice"}
-                </p>
-              </div>
+              <p className={kpiCardSubClass}>
+                {tipoOfensorMacro
+                  ? `categoria com maior índice - ${fracaoSobrePeriodo(tipoOfensorMacro.quantidade)}`
+                  : "categoria com maior índice"}
+              </p>
             </div>
           </div>
 
@@ -2903,119 +2881,140 @@ export function AnaliseComportamento() {
             className="flex max-h-[90vh] w-[95vw] max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-              <div className="min-w-0 flex-1">
-                <h2
-                  id="modal-dia-semana-titulo"
-                  className="text-lg font-bold text-foreground"
+            <div className="border-b border-border px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2
+                    id="modal-dia-semana-titulo"
+                    className="text-lg font-bold text-foreground"
+                  >
+                    Detalhamento por Dia da Semana
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Visão diária do período · Esc ou fora para fechar
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fecharModalDia}
+                  className="rounded-md p-1 text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
+                  aria-label="Fechar"
                 >
-                  Detalhamento por Dia da Semana
-                </h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Visão diária do período · Esc ou fora para fechar
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="modal-dia-ano"
-                      className="shrink-0 text-sm font-medium"
-                    >
-                      Ano:
-                    </Label>
-                    <Select
-                      value={modalAno !== null ? String(modalAno) : "todos"}
-                      disabled={anosDisponiveis.length === 0}
-                      onValueChange={(v) => {
-                        if (v === "todos") {
-                          setModalAno(null);
-                          setModalMes(null);
-                          return;
-                        }
-                        const novoAno = Number(v);
-                        const mesesDoAno = competencias
-                          .filter((ym) => Math.floor(ym / 100) === novoAno)
-                          .map((ym) => ym % 100)
-                          .sort((a, b) => a - b);
-                        setModalAno(novoAno);
-                        setModalMes(mesesDoAno[mesesDoAno.length - 1] ?? null);
-                      }}
-                    >
-                      <SelectTrigger id="modal-dia-ano" className="w-[120px]">
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {anosDisponiveis.map((a) => (
-                          <SelectItem key={a} value={String(a)}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="modal-dia-mes"
-                      className="shrink-0 text-sm font-medium"
-                    >
-                      Mês:
-                    </Label>
-                    <Select
-                      value={modalMes !== null ? String(modalMes) : "todos"}
-                      disabled={
-                        modalAno === null || mesesDisponiveisModal.length === 0
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mb-6 mt-4 grid w-full grid-cols-1 gap-4 sm:grid-cols-4">
+                <div className="flex flex-col gap-1">
+                  <Label
+                    htmlFor="modal-dia-ano"
+                    className="text-xs font-medium uppercase tracking-wide text-gray-500"
+                  >
+                    Ano
+                  </Label>
+                  <Select
+                    value={modalAno !== null ? String(modalAno) : "todos"}
+                    disabled={anosDisponiveis.length === 0}
+                    onValueChange={(v) => {
+                      if (v === "todos") {
+                        setModalAno(null);
+                        setModalMes(null);
+                        return;
                       }
-                      onValueChange={(v) => {
-                        if (v === "todos") {
-                          setModalMes(null);
-                          return;
-                        }
-                        setModalMes(Number(v));
-                      }}
+                      const novoAno = Number(v);
+                      const mesesDoAno = competencias
+                        .filter((ym) => Math.floor(ym / 100) === novoAno)
+                        .map((ym) => ym % 100)
+                        .sort((a, b) => a - b);
+                      setModalAno(novoAno);
+                      setModalMes(mesesDoAno[mesesDoAno.length - 1] ?? null);
+                    }}
+                  >
+                    <SelectTrigger
+                      id="modal-dia-ano"
+                      className="h-10 w-full rounded-md border border-gray-300 bg-white"
                     >
-                      <SelectTrigger id="modal-dia-mes" className="w-[140px]">
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {mesesDisponiveisModal.map((m) => (
-                          <SelectItem key={m} value={String(m)}>
-                            {mesLabel(m)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {anosDisponiveis.map((a) => (
+                        <SelectItem key={a} value={String(a)}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="modal-dia-status"
-                      className="shrink-0 text-sm font-medium"
-                    >
-                      Status:
-                    </Label>
-                    <Select
-                      value={modalStatus}
-                      onValueChange={(v) =>
-                        setModalStatus(v as StatusContratoFiltro)
+                <div className="flex flex-col gap-1">
+                  <Label
+                    htmlFor="modal-dia-mes"
+                    className="text-xs font-medium uppercase tracking-wide text-gray-500"
+                  >
+                    Mês
+                  </Label>
+                  <Select
+                    value={modalMes !== null ? String(modalMes) : "todos"}
+                    disabled={
+                      modalAno === null || mesesDisponiveisModal.length === 0
+                    }
+                    onValueChange={(v) => {
+                      if (v === "todos") {
+                        setModalMes(null);
+                        return;
                       }
+                      setModalMes(Number(v));
+                    }}
+                  >
+                    <SelectTrigger
+                      id="modal-dia-mes"
+                      className="h-10 w-full rounded-md border border-gray-300 bg-white"
                     >
-                      <SelectTrigger id="modal-dia-status" className="w-[160px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="IMPRODUTIVO">Improdutiva</SelectItem>
-                        <SelectItem value="PRODUTIVO">Produtiva</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {mesesDisponiveisModal.map((m) => (
+                        <SelectItem key={m} value={String(m)}>
+                          {mesLabel(m)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
+                <div className="flex flex-col gap-1">
+                  <Label
+                    htmlFor="modal-dia-status"
+                    className="text-xs font-medium uppercase tracking-wide text-gray-500"
+                  >
+                    Status
+                  </Label>
+                  <Select
+                    value={modalStatus}
+                    onValueChange={(v) =>
+                      setModalStatus(v as StatusContratoFiltro)
+                    }
+                  >
+                    <SelectTrigger
+                      id="modal-dia-status"
+                      className="h-10 w-full rounded-md border border-gray-300 bg-white"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IMPRODUTIVO">Improdutiva</SelectItem>
+                      <SelectItem value="PRODUTIVO">Produtiva</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex h-full flex-col justify-end">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="ml-auto gap-1.5"
+                    className="h-10 w-full gap-1.5"
                     onClick={limparFiltrosModalDia}
                   >
                     <FilterX className="h-4 w-4" />
@@ -3023,14 +3022,6 @@ export function AnaliseComportamento() {
                   </Button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={fecharModalDia}
-                className="rounded-md p-1 text-muted-foreground transition hover:bg-gray-100 hover:text-foreground"
-                aria-label="Fechar"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
