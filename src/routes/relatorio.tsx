@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissao";
@@ -95,6 +95,35 @@ function outrasFromPayload(
     obsAdmin: readObsAdmin(item),
   }));
   return mapped.length > 0 ? mapped : [emptyOutraFoto()];
+}
+
+function formatDataObra(value: string) {
+  if (!value.trim()) return "";
+  const d = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("pt-BR");
+}
+
+function DadoObraCampo({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  const vazio = !value.trim();
+  return (
+    <div className={className}>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p
+        className={`mt-0.5 text-sm ${vazio ? "font-normal text-gray-400" : "font-semibold text-foreground"}`}
+      >
+        {vazio ? "Não informado" : value}
+      </p>
+    </div>
+  );
 }
 
 type FotoGrupoUi = { slots: FotoSlot[]; obs: string; obsAdmin: string };
@@ -210,6 +239,7 @@ function RelatorioPage() {
   const [outrasEqEstacao, setOutrasEqEstacao] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [dadosExpandidos, setDadosExpandidos] = useState(false);
   const canAutosaveRef = useRef(false);
   const lastAppliedUpdatedAtRef = useRef<string | null>(null);
   const lastSavedUpdatedAtRef = useRef<string | null>(null);
@@ -948,56 +978,32 @@ function RelatorioPage() {
           }}
           className="space-y-5"
         >
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4 shadow-sm">
             <h2 className="text-base font-bold">Dados da obra</h2>
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">OS/WF</label>
-              <input
-                type="text"
-                value={osWf}
-                readOnly
-                disabled
-                aria-readonly="true"
-                title="Número do contrato definido pelo gestor"
-                className={`${inputClass()} bg-muted`}
-              />
+            <div className="space-y-2">
+              <DadoObraCampo label="OS/WF" value={osWf} />
+              <DadoObraCampo label="Cliente" value={cliente} />
             </div>
-            {(
-              [
-                ["Cliente", cliente, setCliente, "Nome do cliente"],
-                ["Endereço", endereco, setEndereco, "Rua, número"],
-                ["Cidade", cidade, setCidade, "Cidade"],
-                ["Equipe/Empreiteira", equipe, setEquipe, "Equipe responsável"],
-                ["Responsável", responsavel, setResponsavel, "Nome do responsável"],
-              ] as const
-            ).map(([label, value, setter, placeholder]) => (
-              <div key={label}>
-                <label className="mb-1.5 block text-sm font-semibold">{label}</label>
-                <input
-                  type="text"
-                  value={value}
-                  onChange={(e) => setter(e.target.value)}
-                  onBlur={() => {
-                    if (canAutosaveRef.current) void persistDraft();
-                  }}
-                  placeholder={placeholder}
-                  className={inputClass()}
-                  disabled={readOnly}
-                />
+            <button
+              type="button"
+              onClick={() => setDadosExpandidos((aberto) => !aberto)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary"
+              aria-expanded={dadosExpandidos}
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${dadosExpandidos ? "rotate-180" : ""}`}
+              />
+              {dadosExpandidos ? "Ver menos detalhes" : "Ver todos os detalhes da obra"}
+            </button>
+            {dadosExpandidos ? (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-muted/50 p-3">
+                <DadoObraCampo label="Endereço" value={endereco} className="col-span-2" />
+                <DadoObraCampo label="Cidade" value={cidade} />
+                <DadoObraCampo label="Equipe/Empreiteira" value={equipe} />
+                <DadoObraCampo label="Responsável" value={responsavel} />
+                <DadoObraCampo label="Data de início" value={formatDataObra(dataInicio)} />
               </div>
-            ))}
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">
-                Data de início da execução
-              </label>
-              <input
-                type="date"
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                disabled={readOnly}
-                className={inputClass()}
-              />
-            </div>
+            ) : null}
           </div>
 
           <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
