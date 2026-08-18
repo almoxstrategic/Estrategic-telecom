@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { EditarContratoOsDialog } from "@/components/EditarContratoOsDialog";
-import { ExpandableImage } from "@/components/ExpandableImage";
+import {
+  FOTO_SLOT_CLASS,
+  FotoLabel,
+  RelatorioFotoComControles,
+} from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { ABAS_CAMPO, type AbaCampo } from "@/components/RelatorioRedeAcesso";
+import { ABAS_CAMPO, ChoiceButton, type AbaCampo } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
+  deleteRelatorioPhoto,
   labelTecnicosAtribuidos,
   removeExtraById,
   removeFotoGrupoAt,
@@ -77,33 +82,38 @@ export function StatusBadge({ status }: { status: RelatorioStatus }) {
 function Photos({
   fotos,
   labels,
+  canEdit,
   onRemovePhoto,
+  onReplacePhoto,
 }: {
   fotos: StoredPhoto[];
   labels?: string[];
+  canEdit?: boolean;
   onRemovePhoto?: (index: number) => void;
+  onReplacePhoto?: (index: number, file: EvidencePhotoRef) => void;
 }) {
-  if (!fotos.length) return null;
+  if (!fotos.length) {
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <FotoLabel>{labels?.[0]}</FotoLabel>
+          <div className={FOTO_SLOT_CLASS}>Sem foto</div>
+        </div>
+      </div>
+    );
+  }
   const duasColunas = Boolean(labels?.length) || fotos.length <= 2;
   return (
     <div className={`grid gap-2 ${duasColunas ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
       {fotos.map((foto, index) => (
-        <div key={`${foto.path}-${index}`} className="relative flex min-w-0 flex-col gap-1">
-          {labels?.[index] ? <p className="text-sm font-bold">{labels[index]}</p> : null}
-          {onRemovePhoto && index >= 1 ? (
-            <button
-              type="button"
-              onClick={() => onRemovePhoto(index)}
-              className="absolute right-1 top-7 z-10 rounded-lg bg-white/90 p-1 text-destructive shadow hover:bg-destructive/10"
-              aria-label="Excluir foto extra"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          ) : null}
-          <ExpandableImage
+        <div key={`${foto.path}-${index}`} className="flex min-w-0 flex-col gap-1">
+          <FotoLabel>{labels?.[index]}</FotoLabel>
+          <RelatorioFotoComControles
             src={foto.url}
             alt={labels?.[index] || "Evidência"}
-            className="h-40 w-full rounded-md object-cover"
+            canEdit={canEdit}
+            onDelete={onRemovePhoto ? () => onRemovePhoto(index) : undefined}
+            onReplace={onReplacePhoto ? (file) => onReplacePhoto(index, file) : undefined}
           />
         </div>
       ))}
@@ -114,41 +124,39 @@ function Photos({
 function CaboFotos({
   inicio,
   fim,
+  canEdit,
+  onRemoveCampo,
+  onReplaceCampo,
 }: {
   inicio: StoredPhoto | null;
   fim: StoredPhoto | null;
+  canEdit?: boolean;
+  onRemoveCampo?: (campo: "fotoInicio" | "fotoFim") => void;
+  onReplaceCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
 }) {
-  if (!inicio && !fim) return null;
   return (
     <div className="grid w-full grid-cols-2 gap-2">
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-sm font-bold">Foto Inicial</p>
-        {inicio ? (
-          <ExpandableImage
-            src={inicio.url}
-            alt="Foto Inicial"
-            className="h-40 w-full rounded-md object-cover"
-          />
-        ) : (
-          <div className="flex h-40 w-full items-center justify-center rounded-md border border-dashed border-border bg-muted/40 text-xs text-muted-foreground">
-            Sem foto
-          </div>
-        )}
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-sm font-bold">Foto Final</p>
-        {fim ? (
-          <ExpandableImage
-            src={fim.url}
-            alt="Foto Final"
-            className="h-40 w-full rounded-md object-cover"
-          />
-        ) : (
-          <div className="flex h-40 w-full items-center justify-center rounded-md border border-dashed border-border bg-muted/40 text-xs text-muted-foreground">
-            Sem foto
-          </div>
-        )}
-      </div>
+      {(
+        [
+          ["Foto Inicial", inicio, "fotoInicio"],
+          ["Foto Final", fim, "fotoFim"],
+        ] as const
+      ).map(([label, foto, campo]) => (
+        <div key={campo} className="flex min-w-0 flex-col gap-1">
+          <FotoLabel>{label}</FotoLabel>
+          {foto ? (
+            <RelatorioFotoComControles
+              src={foto.url}
+              alt={label}
+              canEdit={canEdit}
+              onDelete={onRemoveCampo ? () => onRemoveCampo(campo) : undefined}
+              onReplace={onReplaceCampo ? (file) => onReplaceCampo(campo, file) : undefined}
+            />
+          ) : (
+            <div className={FOTO_SLOT_CLASS}>Sem foto</div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -228,6 +236,9 @@ function EvidenciaBloco({
   onObsChange,
   onRemove,
   onRemovePhoto,
+  onReplacePhoto,
+  onRemoveCaboCampo,
+  onReplaceCaboCampo,
 }: {
   title: string;
   obs?: string | null;
@@ -240,33 +251,47 @@ function EvidenciaBloco({
   onObsChange?: (value: string) => void;
   onRemove?: () => void;
   onRemovePhoto?: (index: number) => void;
+  onReplacePhoto?: (index: number, file: EvidencePhotoRef) => void;
+  onRemoveCaboCampo?: (campo: "fotoInicio" | "fotoFim") => void;
+  onReplaceCaboCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
 }) {
   if (!fotos.length && !caboFotos?.inicio && !caboFotos?.fim && !obs && !canEdit && !onObsChange) {
     return null;
   }
   return (
     <div className="flex h-full flex-col rounded-xl border border-border/80 bg-muted/20 p-4">
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
-          {onRemove ? (
-            <button
-              type="button"
-              onClick={onRemove}
-              className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-              aria-label={`Excluir ${title}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
+      <div className="flex items-start justify-between gap-2">
+        <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+            aria-label={`Excluir ${title}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-3 flex-1">
         {caboFotos ? (
-          <CaboFotos inicio={caboFotos.inicio} fim={caboFotos.fim} />
+          <CaboFotos
+            inicio={caboFotos.inicio}
+            fim={caboFotos.fim}
+            canEdit={canEdit}
+            onRemoveCampo={onRemoveCaboCampo}
+            onReplaceCampo={onReplaceCaboCampo}
+          />
         ) : (
-          <Photos fotos={fotos} onRemovePhoto={onRemovePhoto} />
+          <Photos
+            fotos={fotos}
+            canEdit={canEdit}
+            onRemovePhoto={onRemovePhoto}
+            onReplacePhoto={onReplacePhoto}
+          />
         )}
       </div>
-      <div className="mt-auto space-y-3 pt-4">
+      <div className="mt-auto w-full space-y-3 pt-4">
         <ObsEditavel value={obs ?? ""} onChange={onObsChange} />
         {canEdit && onAdd ? (
           <div className={uploading ? "pointer-events-none opacity-60" : undefined}>
@@ -286,13 +311,19 @@ function EvidenciaBloco({
   );
 }
 
-function MetragemDesabilitada({ title }: { title: string }) {
+function mensagemMetragemDesabilitada(lancamento: boolean | null | undefined) {
+  return lancamento === false
+    ? "Sem lançamento de cabos nesta OS"
+    : "Existência de cabo ainda não informada pelo técnico";
+}
+
+function MetragemDesabilitada({ title, mensagem }: { title: string; mensagem: string }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center rounded-xl border border-border bg-gray-100 p-6 opacity-60">
+    <div className="pointer-events-none flex h-full flex-col items-center justify-center rounded-xl border border-border bg-gray-100 p-6 opacity-60">
       <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
       <div className="flex min-h-[100px] items-center justify-center">
         <span className="rounded-full bg-white px-3 py-1.5 text-center text-sm font-semibold text-gray-700">
-          Sem lançamento de cabos nesta OS
+          {mensagem}
         </span>
       </div>
     </div>
@@ -305,10 +336,37 @@ function simNao(value: boolean | null | undefined) {
   return "—";
 }
 
+function LancamentoCabosControle({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: boolean | null | undefined;
+  disabled: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-gray-500">{label}</p>
+      <div className="flex max-w-sm gap-2">
+        <ChoiceButton active={value === true} disabled={disabled} onClick={() => onChange(true)}>
+          SIM
+        </ChoiceButton>
+        <ChoiceButton active={value === false} disabled={disabled} onClick={() => onChange(false)}>
+          NÃO
+        </ChoiceButton>
+      </div>
+    </div>
+  );
+}
+
 export function RelatorioDetalhe({
   row,
   canEditPhotos,
   onAddPhoto,
+  onReplacePhoto,
   uploadingCategoria,
   onUpdatePayload,
   canEditCadastro = false,
@@ -317,6 +375,11 @@ export function RelatorioDetalhe({
   row: RelatorioTransmissao;
   canEditPhotos: boolean;
   onAddPhoto: (categoria: RelatorioFotoCategoria, file: EvidencePhotoRef) => void;
+  onReplacePhoto?: (
+    categoria: RelatorioFotoCategoria,
+    file: EvidencePhotoRef,
+    meta: { index?: number; caboId?: string; campo?: "fotoInicio" | "fotoFim"; outraId?: string },
+  ) => void;
   uploadingCategoria: RelatorioFotoCategoria | null;
   onUpdatePayload?: (payload: RelatorioPayload) => void;
   canEditCadastro?: boolean;
@@ -388,8 +451,15 @@ export function RelatorioDetalhe({
           canEditPhotos
             ? (index) => {
                 if (!payload) return;
+                const old = payload[key].fotos[index];
                 patchPayload({ ...payload, [key]: removeFotoGrupoAt(payload[key], index) });
+                void deleteRelatorioPhoto(old?.path);
               }
+            : undefined
+        }
+        onReplacePhoto={
+          canEditPhotos && onReplacePhoto
+            ? (index, file) => onReplacePhoto(key, file, { index })
             : undefined
         }
         {...blocoProps(key)}
@@ -430,6 +500,26 @@ export function RelatorioDetalhe({
             }
           : undefined
       }
+      onRemoveCaboCampo={
+        canEditPhotos
+          ? (campo) => {
+              if (!payload) return;
+              const old = cabo[campo];
+              patchPayload({
+                ...payload,
+                [categoria]: payload[categoria].map((item) =>
+                  item.id === cabo.id ? { ...item, [campo]: null } : item,
+                ),
+              });
+              void deleteRelatorioPhoto(old?.path);
+            }
+          : undefined
+      }
+      onReplaceCaboCampo={
+        canEditPhotos && onReplacePhoto
+          ? (campo, file) => onReplacePhoto(categoria, file, { caboId: cabo.id, campo })
+          : undefined
+      }
       {...blocoProps(categoria)}
     />
   );
@@ -463,7 +553,27 @@ export function RelatorioDetalhe({
           ? () => {
               if (!payload) return;
               patchPayload({ ...payload, [categoria]: removeExtraById(payload[categoria], item.id) });
+              void deleteRelatorioPhoto(item.foto?.path);
             }
+          : undefined
+      }
+      onRemovePhoto={
+        canEditPhotos
+          ? () => {
+              if (!payload) return;
+              patchPayload({
+                ...payload,
+                [categoria]: payload[categoria].map((rowItem) =>
+                  rowItem.id === item.id ? { ...rowItem, foto: null } : rowItem,
+                ),
+              });
+              void deleteRelatorioPhoto(item.foto?.path);
+            }
+          : undefined
+      }
+      onReplacePhoto={
+        canEditPhotos && onReplacePhoto
+          ? (_index, file) => onReplacePhoto(categoria, file, { outraId: item.id })
           : undefined
       }
     />
@@ -557,15 +667,21 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "RE" ? (
         <div className="space-y-6">
-          <MetaField label="Lançamento cabos (RE)" value={simNao(payload?.lancamentoRe)} />
+          <LancamentoCabosControle
+            label="Lançamento cabos (RE)"
+            value={payload?.lancamentoRe}
+            disabled={!canEditPhotos}
+            onChange={(next) => {
+              if (!payload) return;
+              patchPayload({ ...payload, lancamentoRe: next });
+            }}
+          />
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Postes e metragem
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
-              {payload?.lancamentoRe === false ? (
-                <MetragemDesabilitada title="Metragem de cabo (RE)" />
-              ) : (
+              {payload?.lancamentoRe === true ? (
                 <>
                   {cabos.length === 0 && canEditPhotos ? (
                     <EvidenciaBloco
@@ -584,6 +700,11 @@ export function RelatorioDetalhe({
                     ),
                   )}
                 </>
+              ) : (
+                <MetragemDesabilitada
+                  title="Metragem de cabo (RE)"
+                  mensagem={mensagemMetragemDesabilitada(payload?.lancamentoRe)}
+                />
               )}
               {renderGrupo("Poste de conexão", "posteConexao")}
             </div>
@@ -631,13 +752,21 @@ export function RelatorioDetalhe({
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetaField label="Tecnologia de Acesso" value={payload?.tecnologiaAcesso || "—"} />
-            <MetaField label="Lançamento cabos (RC)" value={simNao(payload?.lancamentoRc)} />
+            <div className="sm:col-span-2 lg:col-span-2">
+              <LancamentoCabosControle
+                label="Lançamento cabos (RC)"
+                value={payload?.lancamentoRc}
+                disabled={!canEditPhotos}
+                onChange={(next) => {
+                  if (!payload) return;
+                  patchPayload({ ...payload, lancamentoRc: next });
+                }}
+              />
+            </div>
           </div>
           <section className="space-y-3">
             <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
-              {payload?.lancamentoRc === false ? (
-                <MetragemDesabilitada title="Metragem de cabo (RC)" />
-              ) : (
+              {payload?.lancamentoRc === true ? (
                 <>
                   {cabosRc.length === 0 && canEditPhotos ? (
                     <EvidenciaBloco
@@ -656,6 +785,11 @@ export function RelatorioDetalhe({
                     ),
                   )}
                 </>
+              ) : (
+                <MetragemDesabilitada
+                  title="Metragem de cabo (RC)"
+                  mensagem={mensagemMetragemDesabilitada(payload?.lancamentoRc)}
+                />
               )}
               {(
                 [

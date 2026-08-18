@@ -1,8 +1,8 @@
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { ExpandableImage } from "@/components/ExpandableImage";
+import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import type { EvidencePhotoRef } from "@/lib/types";
-import type { StoredPhoto } from "@/lib/relatorios-transmissao";
+import { deleteRelatorioPhoto, type StoredPhoto } from "@/lib/relatorios-transmissao";
 
 export type FotoSlot = {
   id: string;
@@ -15,9 +15,9 @@ export function newFotoSlot(): FotoSlot {
 }
 
 export function slotsFromStored(fotos: StoredPhoto[], minSlots: number): FotoSlot[] {
-  const slots = fotos.map((stored) => ({
+  const slots: FotoSlot[] = fotos.map((stored) => ({
     id: crypto.randomUUID(),
-    file: null as EvidencePhotoRef | null,
+    file: null,
     stored,
   }));
   while (slots.length < minSlots) slots.push(newFotoSlot());
@@ -59,11 +59,13 @@ export function RelatorioFotosBloco({
 
   const removerSlot = (index: number) => {
     if (index < minSlots) return;
+    const removed = slots[index];
+    void deleteRelatorioPhoto(removed?.stored?.path);
     onChange(slots.filter((_, i) => i !== index));
   };
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div>
         <h2 className="text-base font-bold">{title}</h2>
         {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
@@ -92,25 +94,22 @@ export function RelatorioFotosBloco({
               />
             ) : slot.stored ? (
               <div>
-                <div className="mb-2 flex items-center justify-between pr-8">
-                  <div className="text-sm font-semibold">Foto {index + 1}</div>
-                  {readOnly ? null : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateSlot(slot.id, { stored: null, file: null });
-                        onPickPhoto?.(slot.id, null);
-                      }}
-                      className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      aria-label="Remover foto"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
+                <div className="mb-1 pr-8">
+                  <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
                 </div>
-                <div className="overflow-hidden rounded-xl border border-border">
-                  <ExpandableImage src={slot.stored.url} alt={`Foto ${index + 1}`} />
-                </div>
+                <RelatorioFotoComControles
+                  src={slot.stored.url}
+                  alt={`Foto ${index + 1}`}
+                  canEdit={!readOnly}
+                  onDelete={() => {
+                    void deleteRelatorioPhoto(slot.stored?.path);
+                    handlePick(slot.id, null);
+                  }}
+                  onReplace={(file) => {
+                    void deleteRelatorioPhoto(slot.stored?.path);
+                    handlePick(slot.id, file);
+                  }}
+                />
               </div>
             ) : readOnly ? (
               <p className="text-sm text-muted-foreground">Sem foto {index + 1}.</p>
@@ -126,26 +125,28 @@ export function RelatorioFotosBloco({
         );
       })}
 
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-        <textarea
-          value={obs}
-          onChange={(e) => onObsChange(e.target.value)}
-          rows={3}
-          disabled={readOnly}
-          className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
-        />
-      </div>
+      <div className="mt-auto w-full space-y-3">
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+          <textarea
+            value={obs}
+            onChange={(e) => onObsChange(e.target.value)}
+            rows={3}
+            disabled={readOnly}
+            className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+          />
+        </div>
 
-      {readOnly ? null : (
-        <button
-          type="button"
-          onClick={() => onChange([...slots, newFotoSlot()])}
-          className="inline-flex items-center gap-2 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
-        >
-          <Plus className="h-4 w-4" /> Adicionar mais fotos
-        </button>
-      )}
+        {readOnly ? null : (
+          <button
+            type="button"
+            onClick={() => onChange([...slots, newFotoSlot()])}
+            className="inline-flex items-center gap-2 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+          >
+            <Plus className="h-4 w-4" /> Adicionar mais fotos
+          </button>
+        )}
+      </div>
     </div>
   );
 }

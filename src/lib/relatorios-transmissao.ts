@@ -1006,9 +1006,52 @@ export function removeExtraById<T extends { id: string }>(items: T[], id: string
   return items.filter((item) => item.id !== id);
 }
 
+export async function deleteRelatorioPhoto(path: string | null | undefined): Promise<void> {
+  if (!path) return;
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.storage.from("evidencias-fotos").remove([path]);
+  if (error) console.warn("Falha ao remover foto do storage:", error.message);
+}
+
+export function replaceFotoGrupoAt(
+  grupo: FotoGrupoPayload,
+  index: number,
+  stored: StoredPhoto,
+): FotoGrupoPayload {
+  const fotos = grupo.fotos.map((foto, i) => (i === index ? stored : foto));
+  return { ...grupo, fotos };
+}
+
 export function removeFotoGrupoAt(grupo: FotoGrupoPayload, index: number): FotoGrupoPayload {
-  if (index < 1) return grupo;
+  if (index < 0) return grupo;
   return { ...grupo, fotos: grupo.fotos.filter((_, i) => i !== index) };
+}
+
+export function subscribeRelatorioTransmissaoById(
+  id: string,
+  onUpdate: (row: RelatorioTransmissao) => void,
+): () => void {
+  const supabase = getSupabaseClient();
+  const channel = supabase
+    .channel(`relatorio_sync_${id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "relatorios_transmissao",
+        filter: `id=eq.${id}`,
+      },
+      (payload) => {
+        if (!payload.new || typeof payload.new !== "object") return;
+        onUpdate(mapRow(payload.new as DbRow));
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 }
 
 export function subscribeRelatoriosTransmissao(

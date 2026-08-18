@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
-import { ExpandableImage } from "@/components/ExpandableImage";
+import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioFotosBloco, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import type { EvidencePhotoRef } from "@/lib/types";
-import type {
-  CaboMetragemPayload,
-  RelatorioFotoGrupoKey,
-  StoredPhoto,
+import {
+  deleteRelatorioPhoto,
+  type CaboMetragemPayload,
+  type RelatorioFotoGrupoKey,
+  type StoredPhoto,
 } from "@/lib/relatorios-transmissao";
 
 export type AbaCampo = "RE" | "RC" | "equipamento" | "teste-optico" | "teste-potencia";
@@ -158,7 +159,7 @@ export function RelatorioRedeAcesso({
   ) => void;
   outras: OutraFotoState[];
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
-  onOutraPhoto: (itemId: string, file: EvidencePhotoRef) => void;
+  onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   showObsAdmin?: boolean;
 }) {
   const mostrarMetragem = lancamentoRe === "sim";
@@ -188,20 +189,21 @@ export function RelatorioRedeAcesso({
           </div>
         </div>
 
+        <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
         {metragemDesabilitada ? (
-          <div className="pointer-events-none rounded-2xl border border-border bg-gray-100 p-5 opacity-60 shadow-sm">
+          <div className="pointer-events-none flex h-full flex-col rounded-2xl border border-border bg-gray-100 p-5 opacity-60 shadow-sm">
             <h2 className="text-base font-bold">Metragem de cabo</h2>
-            <div className="flex min-h-[120px] items-center justify-center">
+            <div className="flex min-h-[120px] flex-1 items-center justify-center">
               <span className="rounded-full bg-white px-3 py-1.5 text-center text-sm font-semibold text-gray-700">
                 Sem lançamento de cabos nesta OS
               </span>
             </div>
           </div>
         ) : mostrarMetragem ? (
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-bold">Metragem de cabo</h2>
             {cabos.map((cabo, index) => (
-              <div key={cabo.id} className="relative space-y-3 rounded-xl border border-border p-4">
+              <div key={cabo.id} className="relative flex flex-col space-y-3 rounded-xl border border-border p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold">Cabo {index + 1}</p>
                   {!readOnly && index >= 1 && onRemoveCabo ? (
@@ -237,27 +239,30 @@ export function RelatorioRedeAcesso({
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <p className="text-sm font-bold">Foto Inicial</p>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <FotoLabel>Foto Inicial</FotoLabel>
                     {cabo.fotoInicio ? (
-                      <div className="overflow-hidden rounded-xl border">
-                        <ExpandableImage src={cabo.fotoInicio.url} alt="Foto Inicial" />
-                        {readOnly ? null : (
-                          <button
-                            type="button"
-                            className="w-full py-2 text-xs text-primary"
-                            onClick={() => onCaboPhoto(cabo.id, "fotoInicio", null)}
-                          >
-                            Trocar foto
-                          </button>
-                        )}
-                      </div>
+                      <RelatorioFotoComControles
+                        src={cabo.fotoInicio.url}
+                        alt="Foto Inicial"
+                        canEdit={!readOnly}
+                        onDelete={() => {
+                          void deleteRelatorioPhoto(cabo.fotoInicio?.path);
+                          onCaboPhoto(cabo.id, "fotoInicio", null);
+                        }}
+                        onReplace={(file) => {
+                          void deleteRelatorioPhoto(cabo.fotoInicio?.path);
+                          onCaboPhoto(cabo.id, "fotoInicio", file);
+                        }}
+                      />
                     ) : readOnly ? (
                       <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
                     ) : (
                       <PhotoUpload
                         label="Foto Inicial"
                         suffix="inicio"
+                        hideLabel
+                        compact
                         value={null}
                         onChange={(file) => {
                           if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
@@ -265,27 +270,30 @@ export function RelatorioRedeAcesso({
                       />
                     )}
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <p className="text-sm font-bold">Foto Final</p>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <FotoLabel>Foto Final</FotoLabel>
                     {cabo.fotoFim ? (
-                      <div className="overflow-hidden rounded-xl border">
-                        <ExpandableImage src={cabo.fotoFim.url} alt="Foto Final" />
-                        {readOnly ? null : (
-                          <button
-                            type="button"
-                            className="w-full py-2 text-xs text-primary"
-                            onClick={() => onCaboPhoto(cabo.id, "fotoFim", null)}
-                          >
-                            Trocar foto
-                          </button>
-                        )}
-                      </div>
+                      <RelatorioFotoComControles
+                        src={cabo.fotoFim.url}
+                        alt="Foto Final"
+                        canEdit={!readOnly}
+                        onDelete={() => {
+                          void deleteRelatorioPhoto(cabo.fotoFim?.path);
+                          onCaboPhoto(cabo.id, "fotoFim", null);
+                        }}
+                        onReplace={(file) => {
+                          void deleteRelatorioPhoto(cabo.fotoFim?.path);
+                          onCaboPhoto(cabo.id, "fotoFim", file);
+                        }}
+                      />
                     ) : readOnly ? (
                       <p className="text-sm text-muted-foreground">Sem foto final.</p>
                     ) : (
                       <PhotoUpload
                         label="Foto Final"
                         suffix="fim"
+                        hideLabel
+                        compact
                         value={null}
                         onChange={(file) => {
                           if (file) onCaboPhoto(cabo.id, "fotoFim", file);
@@ -294,7 +302,7 @@ export function RelatorioRedeAcesso({
                     )}
                   </div>
                 </div>
-                <div>
+                <div className="mt-auto w-full">
                   <label className="mb-1.5 block text-sm font-semibold">OBS</label>
                   <textarea
                     value={cabo.obs}
@@ -332,6 +340,7 @@ export function RelatorioRedeAcesso({
             onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
           />
         ))}
+        </div>
 
         <RelatorioOutrasFotos
           title="Outras fotos"
@@ -356,11 +365,12 @@ export function RelatorioOutrasFotos({
   title?: string;
   outras: OutraFotoState[];
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
-  onOutraPhoto: (itemId: string, file: EvidencePhotoRef) => void;
+  onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   readOnly: boolean;
   showObsAdmin?: boolean;
 }) {
-  const removerItem = (id: string) => {
+  const removerItem = (id: string, path?: string) => {
+    void deleteRelatorioPhoto(path);
     onOutrasChange((prev) => {
       const index = prev.findIndex((row) => row.id === id);
       if (index < 1) return prev;
@@ -369,17 +379,17 @@ export function RelatorioOutrasFotos({
   };
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-bold">{title}</h2>
       {outras.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
       ) : (
         outras.map((item, index) => (
-          <div key={item.id} className="relative space-y-3 rounded-xl border border-border p-4">
+          <div key={item.id} className="relative flex flex-col space-y-3 rounded-xl border border-border p-4">
             {!readOnly && index >= 1 ? (
               <button
                 type="button"
-                onClick={() => removerItem(item.id)}
+                onClick={() => removerItem(item.id, item.stored?.path)}
                 className="absolute right-3 top-3 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
                 aria-label={`Excluir foto extra ${index + 1}`}
               >
@@ -398,38 +408,36 @@ export function RelatorioOutrasFotos({
               className={inputClass()}
               disabled={readOnly}
             />
+            <FotoLabel>Foto</FotoLabel>
             {item.stored ? (
-              <div>
-                <ExpandableImage src={item.stored.url} alt={item.ref || "Outra foto"} />
-                {readOnly ? null : (
-                  <button
-                    type="button"
-                    className="mt-1 text-xs text-primary"
-                    onClick={() =>
-                      onOutrasChange((prev) =>
-                        prev.map((row) =>
-                          row.id === item.id ? { ...row, stored: null, file: null } : row,
-                        ),
-                      )
-                    }
-                  >
-                    Trocar foto
-                  </button>
-                )}
-              </div>
+              <RelatorioFotoComControles
+                src={item.stored.url}
+                alt={item.ref || "Outra foto"}
+                canEdit={!readOnly}
+                onDelete={() => {
+                  void deleteRelatorioPhoto(item.stored?.path);
+                  onOutraPhoto(item.id, null);
+                }}
+                onReplace={(file) => {
+                  void deleteRelatorioPhoto(item.stored?.path);
+                  onOutraPhoto(item.id, file);
+                }}
+              />
             ) : readOnly ? (
               <p className="text-sm text-muted-foreground">Sem foto.</p>
             ) : (
               <PhotoUpload
                 label="Foto"
                 suffix={index === 0 ? "inicio" : "fim"}
+                hideLabel
+                compact
                 value={null}
                 onChange={(file) => {
                   if (file) onOutraPhoto(item.id, file);
                 }}
               />
             )}
-            <div>
+            <div className="mt-auto w-full">
               <label className="mb-1.5 block text-sm font-semibold">OBS</label>
               <textarea
                 value={item.obs}

@@ -31,6 +31,7 @@ import {
   patchRelatorioDraft,
   readObsAdmin,
   removeExtraById,
+  subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
@@ -210,6 +211,10 @@ function RelatorioPage() {
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canAutosaveRef = useRef(false);
+  const lastAppliedUpdatedAtRef = useRef<string | null>(null);
+  const lastSavedUpdatedAtRef = useRef<string | null>(null);
+  const persistingRef = useRef(false);
+  const enableAutosaveTimerRef = useRef<number | null>(null);
 
   const buildPayload = useCallback((): RelatorioPayload => {
     if (tipo !== "empresarial" && tipo !== "implantacao") {
@@ -373,10 +378,11 @@ function RelatorioPage() {
     async (payloadOverride?: RelatorioPayload) => {
       if (!currentReportId || (status !== "em_aberto" && status !== "pendente")) return;
       setSaveHint("saving");
+      persistingRef.current = true;
       try {
         // Auto-save colaborativo: patchRelatorioDraft busca o JSONB atual e faz
         // merge/append dos arrays (cabos, fotos) para não apagar o trabalho dos colegas.
-        await patchRelatorioDraft(currentReportId, {
+        const saved = await patchRelatorioDraft(currentReportId, {
           cliente,
           endereco,
           cidade,
@@ -386,10 +392,14 @@ function RelatorioPage() {
           tipo_execucao: tipo || null,
           payload: payloadOverride ?? buildPayload(),
         });
+        lastSavedUpdatedAtRef.current = saved.updated_at;
+        lastAppliedUpdatedAtRef.current = saved.updated_at;
         setSaveHint("saved");
       } catch (err) {
         console.error(err);
         setSaveHint("error");
+      } finally {
+        persistingRef.current = false;
       }
     },
     [
@@ -464,8 +474,9 @@ function RelatorioPage() {
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
   );
 
-  const applyRelatorio = (row: RelatorioTransmissao) => {
+  const applyRelatorio = (row: RelatorioTransmissao, opts?: { fromRemote?: boolean }) => {
     canAutosaveRef.current = false;
+    lastAppliedUpdatedAtRef.current = row.updated_at;
     const p = row.payload ?? emptyRelatorioPayload();
     setCurrentReportId(row.id);
     setOsWf(row.os_wf);
@@ -544,11 +555,22 @@ function RelatorioPage() {
     setOutrasEqEstacao(outrasFromPayload(p.outrasFotosEqEstacao));
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
-      window.setTimeout(() => {
-        canAutosaveRef.current = true;
-      }, 800);
+      if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
+      enableAutosaveTimerRef.current = window.setTimeout(
+        () => {
+          canAutosaveRef.current = true;
+          enableAutosaveTimerRef.current = null;
+        },
+        opts?.fromRemote ? 2000 : 800,
+      );
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (tipo === "implantacao") {
@@ -587,6 +609,22 @@ function RelatorioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportIdFromUrl, user?.id]);
 
+  useEffect(() => {
+    if (!currentReportId) return;
+    return subscribeRelatorioTransmissaoById(currentReportId, (fresh) => {
+      if (persistingRef.current) return;
+      if (
+        fresh.updated_at === lastAppliedUpdatedAtRef.current ||
+        fresh.updated_at === lastSavedUpdatedAtRef.current
+      ) {
+        return;
+      }
+      applyRelatorio(fresh, { fromRemote: true });
+    });
+    // applyRelatorio is local
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentReportId]);
+
   const uploadFotoImediato = async (
     file: EvidencePhotoRef,
     tag: string,
@@ -611,9 +649,18 @@ function RelatorioPage() {
     file: EvidencePhotoRef | null,
   ) => {
     if (!file) {
-      setter((prev) =>
-        prev.map((slot) => (slot.id === slotId ? { ...slot, stored: null, file: null } : slot)),
-      );
+      let nextSlots: FotoSlot[] = [];
+      setter((prev) => {
+        nextSlots = prev.map((slot) =>
+          slot.id === slotId ? { ...slot, stored: null, file: null } : slot,
+        );
+        return nextSlots;
+      });
+      const grupo = buildPayload()[grupoKey];
+      void persistDraft({
+        ...buildPayload(),
+        [grupoKey]: { ...grupo, fotos: fotosDosSlots(nextSlots) },
+      });
       return;
     }
     void uploadFotoImediato(file, `${grupoKey}-${slotId.slice(0, 8)}`, (stored) => {
@@ -640,7 +687,12 @@ function RelatorioPage() {
     file: EvidencePhotoRef | null,
   ) => {
     if (!file) {
-      setter((prev) => prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item)));
+      let nextCabos: CaboMetragemPayload[] = [];
+      setter((prev) => {
+        nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item));
+        return nextCabos;
+      });
+      void persistDraft({ ...buildPayload(), [payloadKey]: nextCabos });
       return;
     }
     void uploadFotoImediato(file, `${payloadKey}-${campo}-${caboId.slice(0, 8)}`, (stored) => {
@@ -657,8 +709,19 @@ function RelatorioPage() {
     setter: React.Dispatch<React.SetStateAction<OutraFotoState[]>>,
     payloadKey: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
     itemId: string,
-    file: EvidencePhotoRef,
+    file: EvidencePhotoRef | null,
   ) => {
+    if (!file) {
+      let next: OutraFotoState[] = [];
+      setter((prev) => {
+        next = prev.map((row) =>
+          row.id === itemId ? { ...row, stored: null, file: null } : row,
+        );
+        return next;
+      });
+      void persistDraft({ ...buildPayload(), [payloadKey]: outrasParaPayload(next) });
+      return;
+    }
     void uploadFotoImediato(file, `${payloadKey}-${itemId.slice(0, 8)}`, (stored) => {
       let next: OutraFotoState[] = [];
       setter((prev) => {

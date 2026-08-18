@@ -22,7 +22,7 @@ function PhotoGrid({ fotos }: { fotos: StoredPhoto[] }) {
     <div className="grid grid-cols-2 gap-2">
       {fotos.map((foto) => (
         <div key={foto.path} className="overflow-hidden rounded-lg border">
-          <ExpandableImage src={foto.url} alt="Evidência" className="h-28" />
+          <ExpandableImage src={foto.url} alt="Evidência" />
         </div>
       ))}
     </div>

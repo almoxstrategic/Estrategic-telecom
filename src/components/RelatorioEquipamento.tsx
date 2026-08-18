@@ -32,7 +32,7 @@ export function RelatorioEquipamento({
   gruposCliente: GrupoFotoCampo[];
   outrasCliente: OutraFotoState[];
   onOutrasClienteChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
-  onOutraClientePhoto: (itemId: string, file: EvidencePhotoRef) => void;
+  onOutraClientePhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   relatorioEstacao: "sim" | "nao";
   onRelatorioEstacao: (value: "sim" | "nao") => void;
   estacaoEntregaAcesso: string;
@@ -40,7 +40,7 @@ export function RelatorioEquipamento({
   gruposEstacao: GrupoFotoCampo[];
   outrasEstacao: OutraFotoState[];
   onOutrasEstacaoChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
-  onOutraEstacaoPhoto: (itemId: string, file: EvidencePhotoRef) => void;
+  onOutraEstacaoPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   onGrupoPhoto: (
     grupoKey: RelatorioFotoGrupoKey,
     slotId: string,
@@ -51,20 +51,22 @@ export function RelatorioEquipamento({
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
         <h2 className="text-base font-bold">Equipamentos no Cliente</h2>
-        {gruposCliente.map((grupo) => (
-          <RelatorioFotosBloco
-            key={grupo.grupoKey}
-            title={grupo.title}
-            hint={grupo.hint}
-            slots={grupo.slots}
-            onChange={grupo.onChange}
-            obs={grupo.obs}
-            onObsChange={grupo.onObsChange}
-            minSlots={grupo.minSlots}
-            readOnly={readOnly}
-            onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
-          />
-        ))}
+        <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+          {gruposCliente.map((grupo) => (
+            <RelatorioFotosBloco
+              key={grupo.grupoKey}
+              title={grupo.title}
+              hint={grupo.hint}
+              slots={grupo.slots}
+              onChange={grupo.onChange}
+              obs={grupo.obs}
+              onObsChange={grupo.onObsChange}
+              minSlots={grupo.minSlots}
+              readOnly={readOnly}
+              onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+            />
+          ))}
+        </div>
         <RelatorioOutrasFotos
           title="Outras fotos"
           outras={outrasCliente}
@@ -115,6 +117,7 @@ export function RelatorioEquipamento({
                 className={inputClass()}
               />
             </div>
+            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
             {gruposEstacao.map((grupo) => (
               <RelatorioFotosBloco
                 key={grupo.grupoKey}
@@ -129,6 +132,7 @@ export function RelatorioEquipamento({
                 onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
               />
             ))}
+            </div>
             <RelatorioOutrasFotos
               title="Outras fotos"
               outras={outrasEstacao}

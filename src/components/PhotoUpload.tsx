@@ -13,12 +13,16 @@ export function PhotoUpload({
   value,
   onChange,
   onBeforePick,
+  hideLabel = false,
+  compact = false,
 }: {
   label: string;
   suffix: "inicio" | "fim";
   value: EvidencePhotoRef | null;
   onChange: (photo: EvidencePhotoRef | null) => void;
   onBeforePick?: () => void;
+  hideLabel?: boolean;
+  compact?: boolean;
 }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -73,14 +77,16 @@ export function PhotoUpload({
 
   return (
     <div>
-      <div className="mb-2 text-sm font-semibold text-foreground">{label}</div>
+      {hideLabel ? null : (
+        <div className="mb-1 h-5 text-sm font-bold text-foreground">{label}</div>
+      )}
       {busy ? (
-        <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-muted text-sm text-muted-foreground">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-md border border-border bg-muted text-sm text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
           Otimizando imagem...
         </div>
       ) : value ? (
-        <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
+        <div className="relative overflow-hidden rounded-md border border-border bg-muted">
           <ExpandableImage src={value.previewUrl} alt={label} />
           <button
             type="button"
@@ -108,9 +114,9 @@ export function PhotoUpload({
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border-2 border-dashed border-border bg-surface p-4">
-          <div className="mb-3 flex flex-col items-center justify-center gap-1 py-2 text-muted-foreground">
-            <ImageIcon className="h-8 w-8" />
+        <div className="flex h-48 flex-col justify-center rounded-md border-2 border-dashed border-border bg-surface p-3">
+          <div className="mb-2 flex flex-col items-center justify-center gap-1 text-muted-foreground">
+            <ImageIcon className="h-7 w-7" />
             <span className="text-xs">Nenhuma imagem selecionada</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -148,10 +154,12 @@ export function PhotoUpload({
         className="hidden"
         onChange={(e) => void handleFile(e.target.files?.[0])}
       />
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
-        {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio.
-      </p>
+      {compact ? null : (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
+          {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio.
+        </p>
+      )}
     </div>
   );
 }

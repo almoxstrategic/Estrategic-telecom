@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, FileDown, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,12 +14,14 @@ import { useApp } from "@/lib/app-store";
 import { hasPainelFullAccess } from "@/lib/roles";
 import {
   appendStoredPhotoToPayload,
+  deleteRelatorioPhoto,
   excluirRelatorioTransmissao,
   fecharRelatorioTransmissao,
   fetchRelatorioTransmissaoById,
   patchRelatorioPayloadAdmin,
+  replaceFotoGrupoAt,
   sinalizarPendenciaRelatorio,
-  subscribeRelatoriosTransmissao,
+  subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   type RelatorioFotoCategoria,
   type RelatorioTransmissao,
@@ -50,6 +52,8 @@ function AdminLancamentoDetalhePage() {
   const [uploadingCategoria, setUploadingCategoria] = useState<RelatorioFotoCategoria | null>(
     null,
   );
+  const lastAppliedUpdatedAtRef = useRef<string | null>(null);
+  const applyingRemoteRef = useRef(false);
 
   const voltarParaLista = useCallback(() => {
     void navigate({ to: "/admin/transmissao" });
@@ -61,6 +65,7 @@ function AdminLancamentoDetalhePage() {
       else setRefreshing(true);
       try {
         const fresh = await fetchRelatorioTransmissaoById(id);
+        lastAppliedUpdatedAtRef.current = fresh.updated_at;
         setRow(fresh);
         return fresh;
       } catch (err) {
@@ -81,10 +86,13 @@ function AdminLancamentoDetalhePage() {
   }, [carregar]);
 
   useEffect(() => {
-    return subscribeRelatoriosTransmissao(() => {
-      void carregar(true);
+    return subscribeRelatorioTransmissaoById(id, (fresh) => {
+      if (applyingRemoteRef.current) return;
+      if (fresh.updated_at === lastAppliedUpdatedAtRef.current) return;
+      lastAppliedUpdatedAtRef.current = fresh.updated_at;
+      setRow(fresh);
     });
-  }, [carregar]);
+  }, [id]);
 
   const onAprovar = async () => {
     if (!row) return;
@@ -141,24 +149,88 @@ function AdminLancamentoDetalhePage() {
     try {
       const stored = await uploadRelatorioPhoto(user.id, file.file, `admin-${categoria}`);
       const nextPayload = appendStoredPhotoToPayload(row.payload, categoria, stored);
+      applyingRemoteRef.current = true;
       const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
+      lastAppliedUpdatedAtRef.current = saved.updated_at;
       setRow(saved);
       toast.success("Foto anexada ao relatório.");
     } catch (err) {
       toast.error((err as Error).message || "Não foi possível anexar a foto.");
     } finally {
+      applyingRemoteRef.current = false;
+      setUploadingCategoria(null);
+    }
+  };
+
+  const onAdminReplacePhoto = async (
+    categoria: RelatorioFotoCategoria,
+    file: EvidencePhotoRef,
+    meta: { index?: number; caboId?: string; campo?: "fotoInicio" | "fotoFim"; outraId?: string },
+  ) => {
+    if (!row || !user?.id) return;
+    setUploadingCategoria(categoria);
+    try {
+      const stored = await uploadRelatorioPhoto(user.id, file.file, `admin-replace-${categoria}`);
+      let nextPayload = row.payload;
+      let oldPath: string | undefined;
+      if (categoria === "metragensCabo" || categoria === "metragensCaboRc") {
+        nextPayload = {
+          ...row.payload,
+          [categoria]: row.payload[categoria].map((item) => {
+            if (item.id !== meta.caboId) return item;
+            if (meta.campo === "fotoInicio") oldPath = item.fotoInicio?.path;
+            if (meta.campo === "fotoFim") oldPath = item.fotoFim?.path;
+            return meta.campo ? { ...item, [meta.campo]: stored } : item;
+          }),
+        };
+      } else if (
+        categoria === "outrasFotos" ||
+        categoria === "outrasFotosRc" ||
+        categoria === "outrasFotosEqCliente" ||
+        categoria === "outrasFotosEqEstacao"
+      ) {
+        nextPayload = {
+          ...row.payload,
+          [categoria]: row.payload[categoria].map((item) => {
+            if (item.id !== meta.outraId) return item;
+            oldPath = item.foto?.path;
+            return { ...item, foto: stored };
+          }),
+        };
+      } else if (typeof meta.index === "number") {
+        const grupo = row.payload[categoria];
+        oldPath = grupo.fotos[meta.index]?.path;
+        nextPayload = {
+          ...row.payload,
+          [categoria]: replaceFotoGrupoAt(grupo, meta.index, stored),
+        };
+      }
+      applyingRemoteRef.current = true;
+      const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
+      lastAppliedUpdatedAtRef.current = saved.updated_at;
+      setRow(saved);
+      void deleteRelatorioPhoto(oldPath);
+      toast.success("Foto substituída.");
+    } catch (err) {
+      toast.error((err as Error).message || "Não foi possível substituir a foto.");
+    } finally {
+      applyingRemoteRef.current = false;
       setUploadingCategoria(null);
     }
   };
 
   const onUpdatePayload = async (nextPayload: RelatorioTransmissao["payload"]) => {
     if (!row) return;
+    applyingRemoteRef.current = true;
     setRow({ ...row, payload: nextPayload });
     try {
       const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
+      lastAppliedUpdatedAtRef.current = saved.updated_at;
       setRow(saved);
     } catch (err) {
       toast.error((err as Error).message || "Não foi possível salvar a alteração.");
+    } finally {
+      applyingRemoteRef.current = false;
     }
   };
 
@@ -231,6 +303,9 @@ function AdminLancamentoDetalhePage() {
               canEditCadastro={canAudit}
               onCadastroSaved={setRow}
               onAddPhoto={(categoria, file) => void onAdminAddPhoto(categoria, file)}
+              onReplacePhoto={(categoria, file, meta) =>
+                void onAdminReplacePhoto(categoria, file, meta)
+              }
               uploadingCategoria={uploadingCategoria}
               onUpdatePayload={(nextPayload) => void onUpdatePayload(nextPayload)}
             />
