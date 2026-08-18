@@ -228,6 +228,8 @@ function AdminLancamentoDetalhePage() {
             <RelatorioDetalhe
               row={row}
               canEditPhotos={canAudit}
+              canEditCadastro={canAudit}
+              onCadastroSaved={setRow}
               onAddPhoto={(categoria, file) => void onAdminAddPhoto(categoria, file)}
               uploadingCategoria={uploadingCategoria}
               onUpdatePayload={(nextPayload) => void onUpdatePayload(nextPayload)}

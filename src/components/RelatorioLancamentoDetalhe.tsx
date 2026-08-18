@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { EditarContratoOsDialog } from "@/components/EditarContratoOsDialog";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ABAS_CAMPO, type AbaCampo } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
@@ -191,12 +193,27 @@ function ObsEditavel({
 }
 
 function MetaField({ label, value }: { label: string; value: string }) {
+  const empty = value === "Não informado";
   return (
     <div className="min-w-0">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-0.5 font-medium text-gray-900">{value}</p>
+      <p className={empty ? "mt-0.5 font-normal text-gray-400" : "mt-0.5 font-medium text-gray-900"}>
+        {value}
+      </p>
     </div>
   );
+}
+
+function displayCadastral(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "Não informado";
+}
+
+function formatDateCadastral(value: string | null | undefined) {
+  if (!value) return "Não informado";
+  const d = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "Não informado";
+  return d.toLocaleDateString("pt-BR");
 }
 
 function EvidenciaBloco({
@@ -294,14 +311,19 @@ export function RelatorioDetalhe({
   onAddPhoto,
   uploadingCategoria,
   onUpdatePayload,
+  canEditCadastro = false,
+  onCadastroSaved,
 }: {
   row: RelatorioTransmissao;
   canEditPhotos: boolean;
   onAddPhoto: (categoria: RelatorioFotoCategoria, file: EvidencePhotoRef) => void;
   uploadingCategoria: RelatorioFotoCategoria | null;
   onUpdatePayload?: (payload: RelatorioPayload) => void;
+  canEditCadastro?: boolean;
+  onCadastroSaved?: (saved: RelatorioTransmissao) => void;
 }) {
   const [abaAtiva, setAbaAtiva] = useState<AbaCampo>("RE");
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const isEmpresarial = row.tipo_execucao === "empresarial";
   const abasVisiveis = isEmpresarial
     ? ABAS_CAMPO
@@ -455,20 +477,54 @@ export function RelatorioDetalhe({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-white p-5 shadow-sm md:p-6">
+      <div className="relative rounded-2xl border border-border bg-white p-5 shadow-sm md:p-6">
+        {canEditCadastro ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="absolute right-4 top-4 text-muted-foreground"
+            onClick={() => setModalEdicaoAberto(true)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar Dados
+          </Button>
+        ) : null}
         <p className="text-sm text-gray-500">Endereço</p>
-        <p className="mt-0.5 text-lg font-medium text-gray-900">
-          {row.endereco || "—"} · {row.cidade || "—"}
+        <p className="mt-0.5 pr-28 text-lg font-medium">
+          <span className={row.endereco?.trim() ? "text-gray-900" : "font-normal text-gray-400"}>
+            {displayCadastral(row.endereco)}
+          </span>
+          <span className="text-gray-400"> · </span>
+          <span className={row.cidade?.trim() ? "text-gray-900" : "font-normal text-gray-400"}>
+            {displayCadastral(row.cidade)}
+          </span>
         </p>
         <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 lg:grid-cols-5">
-          <MetaField label="Cliente" value={row.cliente || "—"} />
-          <MetaField label="Responsável" value={row.responsavel || "—"} />
-          <MetaField label="Equipe" value={row.equipe_empreiteira || "—"} />
-          <MetaField label="Técnicos" value={labelTecnicosAtribuidos(row)} />
-          <MetaField label="Início" value={formatDate(row.data_inicio_execucao)} />
+          <MetaField label="Cliente" value={displayCadastral(row.cliente)} />
+          <MetaField label="Responsável" value={displayCadastral(row.responsavel)} />
+          <MetaField label="Empreiteira" value={displayCadastral(row.equipe_empreiteira)} />
+          <MetaField
+            label="Equipe"
+            value={
+              row.tecnicos_atribuidos.length
+                ? labelTecnicosAtribuidos(row)
+                : "Não informado"
+            }
+          />
+          <MetaField label="Início" value={formatDateCadastral(row.data_inicio_execucao)} />
           <MetaField label="Tipo" value={tipoLabel(row.tipo_execucao)} />
         </div>
       </div>
+
+      {canEditCadastro ? (
+        <EditarContratoOsDialog
+          open={modalEdicaoAberto}
+          onOpenChange={setModalEdicaoAberto}
+          row={row}
+          onSaved={(saved) => onCadastroSaved?.(saved)}
+        />
+      ) : null}
 
       {row.status === "pendente" ? (
         <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">

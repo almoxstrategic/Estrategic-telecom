@@ -898,6 +898,57 @@ export async function patchRelatorioPayloadAdmin(
   return mapRow(data as DbRow);
 }
 
+export async function patchRelatorioCadastroAdmin(
+  id: string,
+  input: {
+    cliente: string;
+    endereco: string;
+    cidade: string;
+    equipeEmpreiteira: string;
+    dataInicioExecucao: string;
+    tecnicos: { id: string; nome: string }[];
+  },
+): Promise<RelatorioTransmissao> {
+  const unique = new Map<string, { id: string; nome: string }>();
+  for (const tecnico of input.tecnicos) {
+    if (tecnico.id) unique.set(tecnico.id, tecnico);
+  }
+  const tecnicos = [...unique.values()];
+  if (tecnicos.length === 0) {
+    throw new Error("Selecione ao menos um técnico na equipe.");
+  }
+
+  const updateRow = {
+    cliente: input.cliente.trim() || "",
+    endereco: input.endereco.trim() || "",
+    cidade: input.cidade.trim() || "",
+    equipe_empreiteira: input.equipeEmpreiteira.trim() || "",
+    data_inicio_execucao: input.dataInicioExecucao.trim() || null,
+    tecnico_id: tecnicos[0].id,
+    tecnicos_atribuidos: tecnicos.map((t) => t.id),
+    tecnicos_nomes: tecnicos.map((t) => t.nome),
+  };
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("relatorios_transmissao")
+    .update(updateRow)
+    .eq("id", id)
+    .select(SELECT_COLS)
+    .single();
+  if (error) {
+    const fallback = await supabase
+      .from("relatorios_transmissao")
+      .update(updateRow)
+      .eq("id", id)
+      .select(SELECT_COLS_PLAIN)
+      .single();
+    if (fallback.error) throw fallback.error;
+    return mapRow(fallback.data as DbRow);
+  }
+  return mapRow(data as DbRow);
+}
+
 export async function excluirRelatorioTransmissao(id: string): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("relatorios_transmissao").delete().eq("id", id);
