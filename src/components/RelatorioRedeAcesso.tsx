@@ -22,6 +22,11 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "teste-potencia", label: "Teste Potência" },
 ];
 
+export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
+  { id: "RE", label: "Rede Acesso (RE)" },
+  { id: "teste-potencia", label: "Teste Potência" },
+];
+
 export type OutraFotoState = {
   id: string;
   ref: string;
@@ -96,13 +101,15 @@ export function ChoiceButton({
 export function RelatorioAbasCampo({
   abaAtiva,
   onChange,
+  abas = ABAS_CAMPO,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
+  abas?: { id: AbaCampo; label: string }[];
 }) {
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Seções do relatório">
-      {ABAS_CAMPO.map((aba) => {
+      {abas.map((aba) => {
         const ativa = abaAtiva === aba.id;
         return (
           <button

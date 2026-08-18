@@ -10,9 +10,10 @@ import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import {
   ChoiceButton,
-  RelatorioAbaFixa,
   RelatorioAbasCampo,
   RelatorioRedeAcesso,
+  ABAS_CAMPO,
+  ABAS_CAMPO_IMPLANTACAO,
   emptyOutraFoto,
   inputClass,
   type AbaCampo,
@@ -618,9 +619,8 @@ function RelatorioPage() {
   }, []);
 
   useEffect(() => {
-    if (tipo === "implantacao") {
-      setAbaCampo("RE");
-    }
+    if (tipo !== "implantacao") return;
+    setAbaCampo((atual) => (atual === "RE" || atual === "teste-potencia" ? atual : "RE"));
   }, [tipo]);
 
   useEffect(() => {
@@ -885,11 +885,13 @@ function RelatorioPage() {
 
   const readOnly = status === "avisado" || status === "fechado";
   const mostrarFormularioCampo = tipo === "empresarial" || tipo === "implantacao";
-  const mostrarRedeAcesso = tipo === "implantacao" || (tipo === "empresarial" && abaCampo === "RE");
+  const mostrarRedeAcesso =
+    (tipo === "empresarial" || tipo === "implantacao") && abaCampo === "RE";
   const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
   const mostrarEquipamento = tipo === "empresarial" && abaCampo === "equipamento";
   const mostrarTesteOptico = tipo === "empresarial" && abaCampo === "teste-optico";
-  const mostrarTestePotencia = tipo === "empresarial" && abaCampo === "teste-potencia";
+  const mostrarTestePotencia =
+    (tipo === "empresarial" || tipo === "implantacao") && abaCampo === "teste-potencia";
   const nomesOutros = tecnicosAtribuidos
     .map((id, index) => (id === user?.id ? "" : tecnicosNomes[index] ?? ""))
     .map((nome) => nome.trim())
@@ -1051,11 +1053,11 @@ function RelatorioPage() {
 
           {mostrarFormularioCampo ? (
             <>
-              {tipo === "empresarial" ? (
-                <RelatorioAbasCampo abaAtiva={abaCampo} onChange={setAbaCampo} />
-              ) : (
-                <RelatorioAbaFixa label="Rede Acesso (RE)" />
-              )}
+              <RelatorioAbasCampo
+                abaAtiva={abaCampo}
+                onChange={setAbaCampo}
+                abas={tipo === "empresarial" ? ABAS_CAMPO : ABAS_CAMPO_IMPLANTACAO}
+              />
 
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso

@@ -8,7 +8,7 @@ import {
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
-import { ABAS_CAMPO, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
+import { ABAS_CAMPO, ABAS_CAMPO_IMPLANTACAO, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
@@ -450,17 +450,23 @@ export function RelatorioDetalhe({
   const [abaAtiva, setAbaAtiva] = useState<AbaCampo>("RE");
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const isEmpresarial = row.tipo_execucao === "empresarial";
+  const isImplantacao = row.tipo_execucao === "implantacao";
   const abasVisiveis = isEmpresarial
     ? ABAS_CAMPO
-    : ABAS_CAMPO.filter((aba) => aba.id === "RE");
+    : isImplantacao
+      ? ABAS_CAMPO_IMPLANTACAO
+      : ABAS_CAMPO.filter((aba) => aba.id === "RE");
 
   useEffect(() => {
     setAbaAtiva("RE");
   }, [row.id]);
 
   useEffect(() => {
-    if (!isEmpresarial) setAbaAtiva("RE");
-  }, [isEmpresarial]);
+    if (isEmpresarial) return;
+    setAbaAtiva((atual) =>
+      atual === "RE" || (isImplantacao && atual === "teste-potencia") ? atual : "RE",
+    );
+  }, [isEmpresarial, isImplantacao]);
 
   const payload = row.payload;
   const cabos = payload?.metragensCabo ?? [];

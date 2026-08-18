@@ -121,8 +121,10 @@ export function emptyTesteOpticoItem(): TesteOpticoItemPayload {
   return { id: crypto.randomUUID(), dbm: "", foto: null, obs: "", obsAdmin: "" };
 }
 
-export function emptyTesteOtdrItem(): TesteOtdrItemPayload {
-  return { id: crypto.randomUUID(), distancia: "", foto: null, obs: "", obsAdmin: "" };
+const DEFAULT_OTDR_IDS = ["otdr-1", "otdr-2"] as const;
+
+export function emptyTesteOtdrItem(id?: string): TesteOtdrItemPayload {
+  return { id: id ?? crypto.randomUUID(), distancia: "", foto: null, obs: "", obsAdmin: "" };
 }
 
 export function emptyTesteOptico(): TesteOpticoPayload {
@@ -139,7 +141,9 @@ export function emptyTesteOptico(): TesteOpticoPayload {
 }
 
 export function emptyTestePotencia(): TestePotenciaPayload {
-  return { otdr: [emptyTesteOtdrItem()] };
+  return {
+    otdr: [emptyTesteOtdrItem(DEFAULT_OTDR_IDS[0]), emptyTesteOtdrItem(DEFAULT_OTDR_IDS[1])],
+  };
 }
 
 export type RelatorioPayload = {
@@ -444,7 +448,9 @@ function parseTesteOtdrItems(raw: unknown): TesteOtdrItemPayload[] {
         };
       })
     : [];
-  return list.length > 0 ? list : [emptyTesteOtdrItem()];
+  return list.length > 0
+    ? list
+    : [emptyTesteOtdrItem(DEFAULT_OTDR_IDS[0]), emptyTesteOtdrItem(DEFAULT_OTDR_IDS[1])];
 }
 
 function parseTesteOptico(raw: unknown): TesteOpticoPayload {
