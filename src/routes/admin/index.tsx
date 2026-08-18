@@ -327,7 +327,7 @@ function AdminHome() {
           </section>
         ) : showOperacional && activeTab === "Lançamentos" ? (
           <section className={MODULE_GRID_CLASS}>
-            <Link to="/admin/lancamentos" className="block w-full">
+            <Link to="/admin/transmissao" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-700">
                   <ClipboardList className="h-6 w-6" />

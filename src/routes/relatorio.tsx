@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell, Save } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissao";
+import { Badge } from "@/components/ui/badge";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import {
@@ -25,7 +27,7 @@ import {
   emptyCaboMetragem,
   emptyRelatorioPayload,
   fetchRelatorioTransmissaoById,
-  iniciarOuRetomarRelatorio,
+  isTecnicoAtribuido,
   patchRelatorioDraft,
   readObsAdmin,
   removeExtraById,
@@ -148,8 +150,9 @@ function RelatorioPage() {
   const { id: reportIdFromUrl } = Route.useSearch();
   const [step, setStep] = useState<1 | 2>(1);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
-  const [osWfInput, setOsWfInput] = useState("");
   const [osWf, setOsWf] = useState("");
+  const [tecnicosAtribuidos, setTecnicosAtribuidos] = useState<string[]>([]);
+  const [tecnicosNomes, setTecnicosNomes] = useState<string[]>([]);
   const [status, setStatus] = useState<RelatorioStatus>("em_aberto");
   const [motivoPendencia, setMotivoPendencia] = useState<string | null>(null);
   const [loadingById, setLoadingById] = useState(Boolean(reportIdFromUrl));
@@ -204,7 +207,6 @@ function RelatorioPage() {
   const [relatorioEstacao, setRelatorioEstacao] = useState<"sim" | "nao">("nao");
   const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
   const [outrasEqEstacao, setOutrasEqEstacao] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
-  const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canAutosaveRef = useRef(false);
@@ -372,6 +374,8 @@ function RelatorioPage() {
       if (!currentReportId || (status !== "em_aberto" && status !== "pendente")) return;
       setSaveHint("saving");
       try {
+        // Auto-save colaborativo: patchRelatorioDraft busca o JSONB atual e faz
+        // merge/append dos arrays (cabos, fotos) para não apagar o trabalho dos colegas.
         await patchRelatorioDraft(currentReportId, {
           cliente,
           endereco,
@@ -465,6 +469,8 @@ function RelatorioPage() {
     const p = row.payload ?? emptyRelatorioPayload();
     setCurrentReportId(row.id);
     setOsWf(row.os_wf);
+    setTecnicosAtribuidos(row.tecnicos_atribuidos ?? [row.tecnico_id]);
+    setTecnicosNomes(row.tecnicos_nomes ?? (row.tecnico_nome ? [row.tecnico_nome] : []));
     setStatus(row.status);
     setMotivoPendencia(row.motivo_pendencia);
     setCliente(row.cliente);
@@ -556,8 +562,8 @@ function RelatorioPage() {
       try {
         const row = await fetchRelatorioTransmissaoById(reportIdFromUrl);
         if (cancelled) return;
-        if (row.tecnico_id !== user.id) {
-          toast.error("Este relatório não pertence à sua conta.");
+        if (!isTecnicoAtribuido(row, user.id)) {
+          toast.error("Esta OS não está atribuída à sua conta.");
           return;
         }
         applyRelatorio(row);
@@ -574,30 +580,6 @@ function RelatorioPage() {
     // applyRelatorio is local and uses setters — load once per id/user
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportIdFromUrl, user?.id]);
-
-  const onIniciar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user?.id) return;
-    const os = osWfInput.trim();
-    if (!os) {
-      toast.error("Digite a OS/WF.");
-      return;
-    }
-    setStarting(true);
-    try {
-      const { relatorio, retomado } = await iniciarOuRetomarRelatorio(user.id, os);
-      applyRelatorio(relatorio);
-      toast.success(
-        retomado
-          ? "Relatório em aberto encontrado. Continuando de onde parou."
-          : "Relatório iniciado. O preenchimento já aparece no painel admin.",
-      );
-    } catch (err) {
-      toast.error((err as Error).message || "Não foi possível iniciar o relatório.");
-    } finally {
-      setStarting(false);
-    }
-  };
 
   const uploadFotoImediato = async (
     file: EvidencePhotoRef,
@@ -792,14 +774,10 @@ function RelatorioPage() {
   const mostrarRedeAcesso = tipo === "implantacao" || (tipo === "empresarial" && abaCampo === "RE");
   const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
   const mostrarEquipamento = tipo === "empresarial" && abaCampo === "equipamento";
-  const voltarInicio = () => {
-    canAutosaveRef.current = false;
-    setStep(1);
-    setCurrentReportId(null);
-    setOsWfInput("");
-    setMotivoPendencia(null);
-    setSaveHint("idle");
-  };
+  const nomesOutros = tecnicosAtribuidos
+    .map((id, index) => (id === user?.id ? "" : tecnicosNomes[index] ?? ""))
+    .map((nome) => nome.trim())
+    .filter(Boolean);
 
   if (loadingById) {
     return (
@@ -826,34 +804,11 @@ function RelatorioPage() {
           <header className="mb-6">
             <h1 className="text-2xl font-black tracking-tight">Relatório de campo</h1>
             <p className="text-sm text-muted-foreground">
-              Informe a OS/WF para iniciar ou retomar um relatório em aberto.
+              Selecione uma OS despachada para você. O gestor inicia o contrato; a equipe
+              preenche o mesmo relatório em conjunto.
             </p>
           </header>
-          <form
-            onSubmit={onIniciar}
-            className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
-          >
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">Digite a OS/WF</label>
-              <input
-                type="text"
-                value={osWfInput}
-                onChange={(e) => setOsWfInput(e.target.value)}
-                placeholder="Ex: WF-12345"
-                className={inputClass()}
-                required
-                autoFocus
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={starting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-4 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover disabled:opacity-60"
-            >
-              <Save className="h-5 w-5" />
-              {starting ? "Abrindo..." : "Iniciar/Salvar Relatório"}
-            </button>
-          </form>
+          {user?.id ? <MeusRelatoriosTransmissao tecnicoId={user.id} /> : null}
         </main>
       </div>
     );
@@ -863,18 +818,22 @@ function RelatorioPage() {
     <div className="min-h-screen bg-surface">
       <AppHeader />
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">
-        <button
-          type="button"
-          onClick={voltarInicio}
+        <Link
+          to="/relatorio"
           className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Trocar OS/WF
-        </button>
+          <ArrowLeft className="h-4 w-4" /> Voltar às OS
+        </Link>
 
         <header className="mb-6 flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">Relatório {osWf}</h1>
-            <p className="text-sm text-muted-foreground">
+            {tecnicosAtribuidos.length > 1 ? (
+              <Badge className="mt-2 bg-sky-600 text-white hover:bg-sky-600">
+                OS Colaborativa — {nomesOutros.length ? nomesOutros.join(", ") : "equipe"}
+              </Badge>
+            ) : null}
+            <p className="mt-2 text-sm text-muted-foreground">
               {readOnly
                 ? "Somente visualização — este relatório já foi avisado ou fechado."
                 : status === "pendente"

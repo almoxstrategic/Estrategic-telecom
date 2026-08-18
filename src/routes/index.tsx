@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FileText, Ruler } from "lucide-react";
+import { Ruler } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissao";
 import { useApp } from "@/lib/app-store";
@@ -26,41 +26,28 @@ function HomePage() {
       <AppHeader />
       <main className="mx-auto max-w-2xl px-5 pb-10 pt-6">
         <section className="mb-6">
-          <h1 className="text-2xl font-black tracking-tight">Escolha um módulo para iniciar</h1>
+          <h1 className="text-2xl font-black tracking-tight">
+            {isTransmissao ? "Transmissão" : "Escolha um módulo para iniciar"}
+          </h1>
         </section>
 
-        <section className="grid grid-cols-1 gap-4">
-          {isTransmissao ? (
-            <Link to="/relatorio" className="block">
-              <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
-                  <FileText className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-foreground">Preparar relatório</div>
-                  <div className="text-xs text-muted-foreground">
-                    Iniciar um novo relatório de campo
-                  </div>
+        {isTransmissao && user?.id ? (
+          <MeusRelatoriosTransmissao tecnicoId={user.id} />
+        ) : (
+          <Link to="/metragem" className="block">
+            <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
+                <Ruler className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-bold text-foreground">Evidência de Metragem</div>
+                <div className="text-xs text-muted-foreground">
+                  Registre foto de início e fim da WO
                 </div>
               </div>
-            </Link>
-          ) : (
-            <Link to="/metragem" className="block">
-              <div className="relative flex h-40 flex-col justify-between rounded-2xl border border-primary/20 bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
-                  <Ruler className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-foreground">Evidência de Metragem</div>
-                  <div className="text-xs text-muted-foreground">
-                    Registre foto de início e fim da WO
-                  </div>
-                </div>
-              </div>
-            </Link>
-          )}
-        </section>
-        {isTransmissao && user?.id ? <MeusRelatoriosTransmissao tecnicoId={user.id} /> : null}
+            </div>
+          </Link>
+        )}
       </main>
     </div>
   );

@@ -24,6 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   fetchMeusRelatoriosTransmissao,
+  labelTecnicosAtribuidos,
   type RelatorioTransmissao,
 } from "@/lib/relatorios-transmissao";
 
@@ -85,6 +86,11 @@ function RelatorioListCard({
       <p className="mt-2 text-sm text-muted-foreground">
         Início da execução: {formatDate(row.data_inicio_execucao)}
       </p>
+      {row.tecnicos_atribuidos.length > 1 ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Equipe: {labelTecnicosAtribuidos(row)}
+        </p>
+      ) : null}
       {isPendencia ? (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
@@ -217,10 +223,15 @@ export function MeusRelatoriosTransmissao({ tecnicoId }: { tecnicoId: string }) 
   );
 
   return (
-    <section className="mt-8">
+    <section>
       <div className="mb-3 flex items-center gap-2">
         <ClipboardList className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-bold">Meus Relatórios</h2>
+        <div>
+          <h2 className="text-lg font-bold">OS Disponíveis</h2>
+          <p className="text-xs text-muted-foreground">
+            Somente contratos despachados para você
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="andamento">
@@ -243,7 +254,7 @@ export function MeusRelatoriosTransmissao({ tecnicoId }: { tecnicoId: string }) 
           <Lista
             loading={loading}
             rows={emAndamento}
-            empty="Nenhum relatório em andamento."
+            empty="Nenhuma OS atribuída a você no momento."
             modo="continuar"
           />
         </TabsContent>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
+  labelTecnicosAtribuidos,
   removeExtraById,
   removeFotoGrupoAt,
   type CaboMetragemPayload,
@@ -463,7 +464,7 @@ export function RelatorioDetalhe({
           <MetaField label="Cliente" value={row.cliente || "—"} />
           <MetaField label="Responsável" value={row.responsavel || "—"} />
           <MetaField label="Equipe" value={row.equipe_empreiteira || "—"} />
-          <MetaField label="Técnico" value={row.tecnico_nome ?? "—"} />
+          <MetaField label="Técnicos" value={labelTecnicosAtribuidos(row)} />
           <MetaField label="Início" value={formatDate(row.data_inicio_execucao)} />
           <MetaField label="Tipo" value={tipoLabel(row.tipo_execucao)} />
         </div>

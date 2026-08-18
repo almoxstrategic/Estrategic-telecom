@@ -130,6 +130,8 @@ export function emptyCaboMetragem(): CaboMetragemPayload {
 export type RelatorioTransmissao = {
   id: string;
   tecnico_id: string;
+  tecnicos_atribuidos: string[];
+  tecnicos_nomes: string[];
   os_wf: string;
   cliente: string;
   endereco: string;
@@ -148,6 +150,32 @@ export type RelatorioTransmissao = {
   updated_at: string;
   tecnico_nome?: string;
 };
+
+export function isTecnicoAtribuido(row: RelatorioTransmissao, userId: string): boolean {
+  const ids = row.tecnicos_atribuidos.length ? row.tecnicos_atribuidos : [row.tecnico_id];
+  return ids.includes(userId);
+}
+
+export function labelTecnicosAtribuidos(row: RelatorioTransmissao): string {
+  const nomes = row.tecnicos_nomes.filter((nome) => nome.trim());
+  if (nomes.length) return nomes.join(", ");
+  return row.tecnico_nome?.trim() || "—";
+}
+
+export function outrosTecnicosNomes(
+  row: RelatorioTransmissao,
+  userId: string,
+  userNome?: string | null,
+): string[] {
+  const ids = row.tecnicos_atribuidos.length ? row.tecnicos_atribuidos : [row.tecnico_id];
+  const fromIds = ids
+    .map((id, index) => (id === userId ? "" : row.tecnicos_nomes[index] ?? ""))
+    .map((nome) => nome.trim())
+    .filter(Boolean);
+  if (fromIds.length) return fromIds;
+  const eu = userNome?.trim();
+  return row.tecnicos_nomes.filter((nome) => nome.trim() && nome.trim() !== eu);
+}
 
 export type RelatorioDraftPatch = {
   cliente?: string;
@@ -333,9 +361,147 @@ function parsePayload(raw: unknown): RelatorioPayload {
   };
 }
 
+const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
+  "posteConexao",
+  "caixaEmenda",
+  "plaquetaIdentificacao",
+  "novoAterramentoPoste",
+  "aterramentoTerrometro",
+  "posicaoConexaoEstacao",
+  "etiquetaIdentificacao",
+  "sobraTecnica",
+  "rcPosteConexao",
+  "rcCaixaEmenda",
+  "rcTerminacaoCabo",
+  "rcPlaquetaIdentificacao",
+  "rcEntradaInterna",
+  "rcEntradaExterna",
+  "eqClienteFachada",
+  "eqClienteAmbiente",
+  "eqClienteRack",
+  "eqClienteDgo",
+  "eqClienteEquipamentos",
+  "eqClienteEtiqueta",
+  "eqClienteSgp",
+  "eqEstacaoGeral",
+  "eqEstacaoRack",
+  "eqEstacaoEquipamento",
+  "eqEstacaoEtiqueta",
+  "eqEstacaoDgo",
+];
+
+function mergeById<T extends { id: string }>(
+  server: T[],
+  local: T[],
+  mergeItem: (fromServer: T, fromLocal: T) => T,
+): T[] {
+  const map = new Map<string, T>();
+  const order: string[] = [];
+  for (const item of server) {
+    if (!map.has(item.id)) order.push(item.id);
+    map.set(item.id, item);
+  }
+  for (const item of local) {
+    const prev = map.get(item.id);
+    if (!prev) {
+      order.push(item.id);
+      map.set(item.id, item);
+      continue;
+    }
+    map.set(item.id, mergeItem(prev, item));
+  }
+  return order.map((id) => map.get(id)!);
+}
+
+function mergeFotosByPath(server: StoredPhoto[], local: StoredPhoto[]): StoredPhoto[] {
+  const map = new Map<string, StoredPhoto>();
+  for (const foto of [...server, ...local]) {
+    const key = foto.path || foto.url;
+    if (key) map.set(key, foto);
+  }
+  return [...map.values()];
+}
+
+function mergeCabo(server: CaboMetragemPayload, local: CaboMetragemPayload): CaboMetragemPayload {
+  return {
+    ...server,
+    tipoCabo: local.tipoCabo || server.tipoCabo,
+    metragem: local.metragem || server.metragem,
+    fotoInicio: local.fotoInicio ?? server.fotoInicio,
+    fotoFim: local.fotoFim ?? server.fotoFim,
+    obs: local.obs || server.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeOutra(server: OutraFotoPayload, local: OutraFotoPayload): OutraFotoPayload {
+  return {
+    ...server,
+    ref: local.ref || server.ref,
+    foto: local.foto ?? server.foto,
+    obs: local.obs || server.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeFotoGrupo(server: FotoGrupoPayload, local: FotoGrupoPayload): FotoGrupoPayload {
+  return {
+    fotos: mergeFotosByPath(server.fotos, local.fotos),
+    obs: local.obs || server.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+/**
+ * Merge colaborativo de JSONB: arrays de caixinhas/fotos são unidos por id/path
+ * (append). Itens remotos não presentes no rascunho local não são apagados,
+ * para o auto-save de um técnico não sobrescrever o de outro.
+ */
+export function mergeRelatorioPayload(
+  server: RelatorioPayload,
+  local: RelatorioPayload,
+): RelatorioPayload {
+  const grupos = Object.fromEntries(
+    FOTO_GRUPO_KEYS.map((key) => [key, mergeFotoGrupo(server[key], local[key])]),
+  ) as Pick<RelatorioPayload, RelatorioFotoGrupoKey>;
+
+  return {
+    ...server,
+    ...local,
+    lancamentoRe: local.lancamentoRe ?? server.lancamentoRe,
+    lancamentoRc: local.lancamentoRc ?? server.lancamentoRc,
+    relatorioEstacao: local.relatorioEstacao ?? server.relatorioEstacao,
+    tecnologiaAcesso: local.tecnologiaAcesso || server.tecnologiaAcesso,
+    estacaoEntregaAcesso: local.estacaoEntregaAcesso || server.estacaoEntregaAcesso,
+    metragensCabo: mergeById(server.metragensCabo, local.metragensCabo, mergeCabo),
+    metragensCaboRc: mergeById(server.metragensCaboRc, local.metragensCaboRc, mergeCabo),
+    outrasFotos: mergeById(server.outrasFotos, local.outrasFotos, mergeOutra),
+    outrasFotosRc: mergeById(server.outrasFotosRc, local.outrasFotosRc, mergeOutra),
+    outrasFotosEqCliente: mergeById(
+      server.outrasFotosEqCliente,
+      local.outrasFotosEqCliente,
+      mergeOutra,
+    ),
+    outrasFotosEqEstacao: mergeById(
+      server.outrasFotosEqEstacao,
+      local.outrasFotosEqEstacao,
+      mergeOutra,
+    ),
+    ...grupos,
+  };
+}
+
+function preferFilled(local: string | undefined, server: string): string | undefined {
+  if (local === undefined) return undefined;
+  if (!local.trim() && server.trim()) return server;
+  return local;
+}
+
 type DbRow = {
   id: string;
   tecnico_id: string;
+  tecnicos_atribuidos?: string[] | null;
+  tecnicos_nomes?: string[] | null;
   os_wf: string;
   cliente: string | null;
   endereco: string | null;
@@ -356,9 +522,21 @@ type DbRow = {
 };
 
 function mapRow(row: DbRow): RelatorioTransmissao {
+  const tecnicos_atribuidos =
+    Array.isArray(row.tecnicos_atribuidos) && row.tecnicos_atribuidos.length
+      ? row.tecnicos_atribuidos
+      : [row.tecnico_id];
+  const tecnicos_nomes =
+    Array.isArray(row.tecnicos_nomes) && row.tecnicos_nomes.length
+      ? row.tecnicos_nomes
+      : row.profiles?.nome
+        ? [row.profiles.nome]
+        : [];
   return {
     id: row.id,
     tecnico_id: row.tecnico_id,
+    tecnicos_atribuidos,
+    tecnicos_nomes,
     os_wf: row.os_wf,
     cliente: row.cliente ?? "",
     endereco: row.endereco ?? "",
@@ -375,14 +553,20 @@ function mapRow(row: DbRow): RelatorioTransmissao {
     fechado_at: row.fechado_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
-    tecnico_nome: row.profiles?.nome,
+    tecnico_nome: tecnicos_nomes.filter(Boolean).join(", ") || row.profiles?.nome,
   };
 }
 
 const SELECT_COLS =
-  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
+  "id, tecnico_id, tecnicos_atribuidos, tecnicos_nomes, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
 
 const SELECT_COLS_PLAIN =
+  "id, tecnico_id, tecnicos_atribuidos, tecnicos_nomes, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
+
+const SELECT_COLS_LEGACY =
+  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
+
+const SELECT_COLS_LEGACY_PLAIN =
   "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
 
 export async function uploadRelatorioPhoto(
@@ -404,25 +588,26 @@ export async function uploadRelatorioPhoto(
   return { path, url: getStoragePublicUrl(path) };
 }
 
+async function selectRelatorioById(id: string) {
+  const supabase = getSupabaseClient();
+  const attempts = [SELECT_COLS, SELECT_COLS_PLAIN, SELECT_COLS_LEGACY, SELECT_COLS_LEGACY_PLAIN];
+  let lastError: { message: string } | null = null;
+  for (const cols of attempts) {
+    const { data, error } = await supabase
+      .from("relatorios_transmissao")
+      .select(cols)
+      .eq("id", id)
+      .single();
+    if (!error && data) return mapRow(data as DbRow);
+    lastError = error;
+  }
+  throw lastError ?? new Error("Relatório não encontrado.");
+}
+
 export async function fetchRelatorioTransmissaoById(
   id: string,
 ): Promise<RelatorioTransmissao> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("relatorios_transmissao")
-    .select(SELECT_COLS)
-    .eq("id", id)
-    .single();
-  if (error) {
-    const fallback = await supabase
-      .from("relatorios_transmissao")
-      .select(SELECT_COLS_PLAIN)
-      .eq("id", id)
-      .single();
-    if (fallback.error) throw fallback.error;
-    return mapRow(fallback.data as DbRow);
-  }
-  return mapRow(data as DbRow);
+  return selectRelatorioById(id);
 }
 
 export async function findRelatorioAbertoPorOsWf(
@@ -465,26 +650,42 @@ export async function findRelatorioFechadoPorOsWf(osWf: string): Promise<boolean
   return Boolean(data);
 }
 
-export async function iniciarOuRetomarRelatorio(
-  tecnicoId: string,
-  osWf: string,
-): Promise<{ relatorio: RelatorioTransmissao; retomado: boolean }> {
-  const os = osWf.trim();
-  if (!os) throw new Error("Informe a OS/WF.");
-
-  const existente = await findRelatorioAbertoPorOsWf(os);
-  if (existente) {
-    return { relatorio: existente, retomado: true };
+export async function despacharRelatorioTransmissao(input: {
+  osWf: string;
+  cliente: string;
+  endereco: string;
+  tecnicos: { id: string; nome: string }[];
+}): Promise<RelatorioTransmissao> {
+  const os = input.osWf.trim();
+  const cliente = input.cliente.trim();
+  const endereco = input.endereco.trim();
+  if (!os) throw new Error("Informe o número do contrato (OS).");
+  if (!cliente) throw new Error("Informe o cliente.");
+  if (!endereco) throw new Error("Informe o endereço.");
+  const unique = new Map<string, { id: string; nome: string }>();
+  for (const tecnico of input.tecnicos) {
+    if (tecnico.id) unique.set(tecnico.id, tecnico);
+  }
+  const tecnicos = [...unique.values()];
+  if (tecnicos.length === 0) {
+    throw new Error("Selecione ao menos um técnico de transmissão.");
   }
 
+  if (await findRelatorioAbertoPorOsWf(os)) {
+    throw new Error("Já existe uma OS em aberto com este número.");
+  }
   if (await findRelatorioFechadoPorOsWf(os)) {
     throw new Error("Esta OS/WF já foi fechada. Peça ao admin para reabrir se necessário.");
   }
 
   const supabase = getSupabaseClient();
   const insertRow = {
-    tecnico_id: tecnicoId,
+    tecnico_id: tecnicos[0].id,
+    tecnicos_atribuidos: tecnicos.map((t) => t.id),
+    tecnicos_nomes: tecnicos.map((t) => t.nome),
     os_wf: os,
+    cliente,
+    endereco,
     status: "em_aberto" as const,
     payload: emptyRelatorioPayload(),
   };
@@ -501,19 +702,38 @@ export async function iniciarOuRetomarRelatorio(
       .select(SELECT_COLS_PLAIN)
       .single();
     if (fallback.error) throw fallback.error;
-    return { relatorio: mapRow(fallback.data as DbRow), retomado: false };
+    return mapRow(fallback.data as DbRow);
   }
-  return { relatorio: mapRow(data as DbRow), retomado: false };
+  return mapRow(data as DbRow);
 }
 
 export async function patchRelatorioDraft(
   id: string,
   patch: RelatorioDraftPatch,
 ): Promise<RelatorioTransmissao> {
+  const latest = await fetchRelatorioTransmissaoById(id);
+  const merged: RelatorioDraftPatch = {
+    ...patch,
+    cliente: preferFilled(patch.cliente, latest.cliente),
+    endereco: preferFilled(patch.endereco, latest.endereco),
+    cidade: preferFilled(patch.cidade, latest.cidade),
+    equipe_empreiteira: preferFilled(patch.equipe_empreiteira, latest.equipe_empreiteira),
+    responsavel: preferFilled(patch.responsavel, latest.responsavel),
+    payload: patch.payload
+      ? mergeRelatorioPayload(latest.payload, patch.payload)
+      : undefined,
+  };
+  if (patch.data_inicio_execucao === "" || patch.data_inicio_execucao === null) {
+    merged.data_inicio_execucao = latest.data_inicio_execucao || null;
+  }
+  if (patch.tipo_execucao === null && latest.tipo_execucao) {
+    merged.tipo_execucao = latest.tipo_execucao;
+  }
+
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("relatorios_transmissao")
-    .update(patch)
+    .update(merged)
     .eq("id", id)
     .neq("status", "fechado")
     .select(SELECT_COLS)
@@ -521,7 +741,7 @@ export async function patchRelatorioDraft(
   if (error) {
     const fallback = await supabase
       .from("relatorios_transmissao")
-      .update(patch)
+      .update(merged)
       .eq("id", id)
       .neq("status", "fechado")
       .select(SELECT_COLS_PLAIN)
@@ -569,23 +789,45 @@ export async function fetchMeusRelatoriosTransmissao(
   tecnicoId: string,
 ): Promise<RelatorioTransmissao[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  const assigned = (rows: RelatorioTransmissao[]) =>
+    rows.filter(
+      (row) =>
+        row.tecnicos_atribuidos.includes(tecnicoId) || row.tecnico_id === tecnicoId,
+    );
+
+  const withArray = await supabase
     .from("relatorios_transmissao")
     .select(SELECT_COLS)
+    .contains("tecnicos_atribuidos", [tecnicoId])
+    .order("updated_at", { ascending: false });
+  if (!withArray.error) {
+    return assigned((withArray.data ?? []).map((row) => mapRow(row as DbRow)));
+  }
+
+  const fallback = await supabase
+    .from("relatorios_transmissao")
+    .select(SELECT_COLS_LEGACY)
     .eq("tecnico_id", tecnicoId)
     .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row) => mapRow(row as DbRow));
+  if (fallback.error) throw fallback.error;
+  return assigned((fallback.data ?? []).map((row) => mapRow(row as DbRow)));
 }
 
 export async function fetchRelatoriosTransmissaoAdmin(): Promise<RelatorioTransmissao[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("relatorios_transmissao")
     .select(SELECT_COLS)
     .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row) => mapRow(row as DbRow));
+  if (!primary.error) {
+    return (primary.data ?? []).map((row) => mapRow(row as DbRow));
+  }
+  const fallback = await supabase
+    .from("relatorios_transmissao")
+    .select(SELECT_COLS_LEGACY)
+    .order("updated_at", { ascending: false });
+  if (fallback.error) throw fallback.error;
+  return (fallback.data ?? []).map((row) => mapRow(row as DbRow));
 }
 
 export async function fecharRelatorioTransmissao(id: string): Promise<void> {
