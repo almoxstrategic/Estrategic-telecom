@@ -7,6 +7,7 @@ import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissa
 import { Badge } from "@/components/ui/badge";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
+import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import {
   ChoiceButton,
   RelatorioAbaFixa,
@@ -26,6 +27,8 @@ import {
   avisarConclusaoRelatorio,
   emptyCaboMetragem,
   emptyRelatorioPayload,
+  emptyTesteOptico,
+  emptyTestePotencia,
   fetchRelatorioTransmissaoById,
   isTecnicoAtribuido,
   patchRelatorioDraft,
@@ -40,6 +43,8 @@ import {
   type RelatorioStatus,
   type RelatorioTransmissao,
   type StoredPhoto,
+  type TesteOpticoPayload,
+  type TestePotenciaPayload,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
 
@@ -237,6 +242,8 @@ function RelatorioPage() {
   const [relatorioEstacao, setRelatorioEstacao] = useState<"sim" | "nao">("nao");
   const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
   const [outrasEqEstacao, setOutrasEqEstacao] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
+  const [testeOptico, setTesteOptico] = useState<TesteOpticoPayload>(() => emptyTesteOptico());
+  const [testePotencia, setTestePotencia] = useState<TestePotenciaPayload>(() => emptyTestePotencia());
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [dadosExpandidos, setDadosExpandidos] = useState(false);
@@ -358,6 +365,8 @@ function RelatorioPage() {
         eqGrupos.eqEstacaoDgo.obsAdmin,
       ),
       outrasFotosEqEstacao: outrasParaPayload(outrasEqEstacao),
+      testeOptico,
+      testePotencia,
     };
   }, [
     tipo,
@@ -402,6 +411,8 @@ function RelatorioPage() {
     relatorioEstacao,
     estacaoEntregaAcesso,
     outrasEqEstacao,
+    testeOptico,
+    testePotencia,
   ]);
 
   const persistDraft = useCallback(
@@ -499,6 +510,8 @@ function RelatorioPage() {
       relatorioEstacao,
       estacaoEntregaAcesso,
       outrasEqEstacao,
+      testeOptico,
+      testePotencia,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -583,6 +596,8 @@ function RelatorioPage() {
     setRelatorioEstacao(p.relatorioEstacao === true ? "sim" : "nao");
     setEstacaoEntregaAcesso(p.estacaoEntregaAcesso ?? "");
     setOutrasEqEstacao(outrasFromPayload(p.outrasFotosEqEstacao));
+    setTesteOptico(p.testeOptico ?? emptyTesteOptico());
+    setTestePotencia(p.testePotencia ?? emptyTestePotencia());
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
@@ -873,6 +888,8 @@ function RelatorioPage() {
   const mostrarRedeAcesso = tipo === "implantacao" || (tipo === "empresarial" && abaCampo === "RE");
   const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
   const mostrarEquipamento = tipo === "empresarial" && abaCampo === "equipamento";
+  const mostrarTesteOptico = tipo === "empresarial" && abaCampo === "teste-optico";
+  const mostrarTestePotencia = tipo === "empresarial" && abaCampo === "teste-potencia";
   const nomesOutros = tecnicosAtribuidos
     .map((id, index) => (id === user?.id ? "" : tecnicosNomes[index] ?? ""))
     .map((nome) => nome.trim())
@@ -1406,10 +1423,36 @@ function RelatorioPage() {
                     handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
                   }}
                 />
-              ) : tipo === "empresarial" ? (
-                <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
-                  Campos em definição.
-                </div>
+              ) : mostrarTesteOptico ? (
+                <RelatorioTesteOptico
+                  readOnly={readOnly}
+                  value={testeOptico}
+                  onChange={(next, opts) => {
+                    setTesteOptico(next);
+                    if (opts?.immediate) {
+                      void persistDraft({ ...buildPayload(), testeOptico: next });
+                    }
+                  }}
+                  onUploadPhoto={async (file) => {
+                    if (!user?.id) throw new Error("Sessão inválida.");
+                    return uploadRelatorioPhoto(user.id, file.file, "teste-optico");
+                  }}
+                />
+              ) : mostrarTestePotencia ? (
+                <RelatorioTestePotencia
+                  readOnly={readOnly}
+                  value={testePotencia}
+                  onChange={(next, opts) => {
+                    setTestePotencia(next);
+                    if (opts?.immediate) {
+                      void persistDraft({ ...buildPayload(), testePotencia: next });
+                    }
+                  }}
+                  onUploadPhoto={async (file) => {
+                    if (!user?.id) throw new Error("Sessão inválida.");
+                    return uploadRelatorioPhoto(user.id, file.file, "teste-potencia");
+                  }}
+                />
               ) : null}
             </>
           ) : null}

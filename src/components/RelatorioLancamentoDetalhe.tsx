@@ -7,6 +7,7 @@ import {
   RelatorioFotoComControles,
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { ABAS_CAMPO, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
   emptyCaboMetragem,
+  emptyTesteOptico,
+  emptyTestePotencia,
   labelTecnicosAtribuidos,
   removeExtraById,
   removeFotoGrupoAt,
@@ -428,6 +431,7 @@ export function RelatorioDetalhe({
   onUpdatePayload,
   canEditCadastro = false,
   onCadastroSaved,
+  onUploadPhoto,
 }: {
   row: RelatorioTransmissao;
   canEditPhotos: boolean;
@@ -441,6 +445,7 @@ export function RelatorioDetalhe({
   onUpdatePayload?: (payload: RelatorioPayload) => void;
   canEditCadastro?: boolean;
   onCadastroSaved?: (saved: RelatorioTransmissao) => void;
+  onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
 }) {
   const [abaAtiva, setAbaAtiva] = useState<AbaCampo>("RE");
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
@@ -992,10 +997,28 @@ export function RelatorioDetalhe({
         </div>
       ) : null}
 
-      {abaAtiva === "teste-optico" || abaAtiva === "teste-potencia" ? (
-        <p className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-          Campos em definição.
-        </p>
+      {abaAtiva === "teste-optico" ? (
+        <RelatorioTesteOptico
+          readOnly={!canEditPhotos}
+          value={payload?.testeOptico ?? emptyTesteOptico()}
+          onChange={(next) => {
+            if (!payload) return;
+            patchPayload({ ...payload, testeOptico: next });
+          }}
+          onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
+        />
+      ) : null}
+
+      {abaAtiva === "teste-potencia" ? (
+        <RelatorioTestePotencia
+          readOnly={!canEditPhotos}
+          value={payload?.testePotencia ?? emptyTestePotencia()}
+          onChange={(next) => {
+            if (!payload) return;
+            patchPayload({ ...payload, testePotencia: next });
+          }}
+          onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
+        />
       ) : null}
     </div>
   );

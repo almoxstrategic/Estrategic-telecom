@@ -308,6 +308,10 @@ function AdminLancamentoDetalhePage() {
               }
               uploadingCategoria={uploadingCategoria}
               onUpdatePayload={(nextPayload) => void onUpdatePayload(nextPayload)}
+              onUploadPhoto={async (file) => {
+                if (!user?.id) throw new Error("Sessão inválida.");
+                return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
+              }}
             />
           </EvidencePhotoPasteProvider>
         ) : (
