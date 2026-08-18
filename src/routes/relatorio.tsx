@@ -469,7 +469,13 @@ function RelatorioPage() {
     const p = row.payload ?? emptyRelatorioPayload();
     setCurrentReportId(row.id);
     setOsWf(row.os_wf);
-    setTecnicosAtribuidos(row.tecnicos_atribuidos ?? [row.tecnico_id]);
+    setTecnicosAtribuidos(
+      row.tecnicos_atribuidos.length
+        ? row.tecnicos_atribuidos
+        : row.tecnico_id
+          ? [row.tecnico_id]
+          : [],
+    );
     setTecnicosNomes(row.tecnicos_nomes ?? (row.tecnico_nome ? [row.tecnico_nome] : []));
     setStatus(row.status);
     setMotivoPendencia(row.motivo_pendencia);
@@ -883,7 +889,15 @@ function RelatorioPage() {
             <h2 className="text-base font-bold">Dados da obra</h2>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">OS/WF</label>
-              <input type="text" value={osWf} readOnly className={`${inputClass()} bg-muted`} />
+              <input
+                type="text"
+                value={osWf}
+                readOnly
+                disabled
+                aria-readonly="true"
+                title="Número do contrato definido pelo gestor"
+                className={`${inputClass()} bg-muted`}
+              />
             </div>
             {(
               [

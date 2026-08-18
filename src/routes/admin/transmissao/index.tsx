@@ -100,6 +100,27 @@ function RelatorioCard({ row }: { row: RelatorioTransmissao }) {
   );
 }
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="text-xs font-medium text-destructive" role="alert">
+      {message}
+    </p>
+  );
+}
+
+function OptionalHint() {
+  return <span className="font-normal text-muted-foreground">(opcional)</span>;
+}
+
+function RequiredMark() {
+  return (
+    <span className="text-destructive" aria-hidden="true">
+      *
+    </span>
+  );
+}
+
 function NovaOsDialog({
   open,
   onOpenChange,
@@ -112,26 +133,43 @@ function NovaOsDialog({
   const [osWf, setOsWf] = useState("");
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [empreiteira, setEmpreiteira] = useState("");
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
+  const [dataInicio, setDataInicio] = useState("");
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ osWf?: string; equipe?: string }>({});
 
   useEffect(() => {
     if (!open) return;
     setOsWf("");
     setCliente("");
     setEndereco("");
+    setCidade("");
+    setEmpreiteira("");
     setTecnicos([]);
+    setDataInicio("");
     setSaving(false);
+    setErrors({});
   }, [open]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextErrors: { osWf?: string; equipe?: string } = {};
+    if (!osWf.trim()) nextErrors.osWf = "Informe a OS/WF.";
+    if (tecnicos.length === 0) nextErrors.equipe = "Selecione ao menos um técnico na equipe.";
+    setErrors(nextErrors);
+    if (nextErrors.osWf || nextErrors.equipe) return;
+
     setSaving(true);
     try {
       const row = await despacharRelatorioTransmissao({
         osWf,
         cliente,
         endereco,
+        cidade,
+        equipeEmpreiteira: empreiteira,
+        dataInicioExecucao: dataInicio,
         tecnicos: tecnicos.map((t) => ({ id: t.id, nome: t.nome })),
       });
       toast.success("OS despachada. Os técnicos já podem preencher o relatório.");
@@ -146,49 +184,104 @@ function NovaOsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova OS / Contrato</DialogTitle>
           <DialogDescription>
-            Informe os dados do contrato e atribua os técnicos de transmissão que vão
-            preencher o relatório em conjunto.
+            Preencha a OS/WF e atribua a equipe. Os demais dados podem ser completados depois
+            pelo gestor ou pelos técnicos.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+        <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="os-contrato">Número do Contrato (OS)</Label>
+            <Label htmlFor="os-contrato">
+              OS/WF <RequiredMark />
+            </Label>
             <Input
               id="os-contrato"
               value={osWf}
-              onChange={(e) => setOsWf(e.target.value)}
+              onChange={(e) => {
+                setOsWf(e.target.value);
+                if (errors.osWf) setErrors((prev) => ({ ...prev, osWf: undefined }));
+              }}
               placeholder="Ex: WF-12345"
-              required
+              aria-invalid={Boolean(errors.osWf)}
+              aria-required="true"
+              className={errors.osWf ? "border-destructive focus-visible:ring-destructive" : undefined}
               autoFocus
             />
+            <FieldError message={errors.osWf} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="os-cliente">Cliente</Label>
+            <Label htmlFor="os-cliente">
+              Cliente <OptionalHint />
+            </Label>
             <Input
               id="os-cliente"
               value={cliente}
               onChange={(e) => setCliente(e.target.value)}
               placeholder="Nome do cliente"
-              required
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="os-endereco">Endereço</Label>
+            <Label htmlFor="os-endereco">
+              Endereço <OptionalHint />
+            </Label>
             <Input
               id="os-endereco"
               value={endereco}
               onChange={(e) => setEndereco(e.target.value)}
               placeholder="Endereço da obra"
-              required
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Técnicos de Transmissão</Label>
-            <TecnicoTransmissaoMultiSelect value={tecnicos} onChange={setTecnicos} />
+            <Label htmlFor="os-cidade">
+              Cidade <OptionalHint />
+            </Label>
+            <Input
+              id="os-cidade"
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
+              placeholder="Cidade"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="os-empreiteira">
+              Empreiteira <OptionalHint />
+            </Label>
+            <Input
+              id="os-empreiteira"
+              value={empreiteira}
+              onChange={(e) => setEmpreiteira(e.target.value)}
+              placeholder="Empreiteira responsável"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              Equipe <RequiredMark />
+            </Label>
+            <TecnicoTransmissaoMultiSelect
+              value={tecnicos}
+              invalid={Boolean(errors.equipe)}
+              onChange={(next) => {
+                setTecnicos(next);
+                if (errors.equipe && next.length > 0) {
+                  setErrors((prev) => ({ ...prev, equipe: undefined }));
+                }
+              }}
+            />
+            <FieldError message={errors.equipe} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="os-data-inicio">
+              Data de início da execução <OptionalHint />
+            </Label>
+            <Input
+              id="os-data-inicio"
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

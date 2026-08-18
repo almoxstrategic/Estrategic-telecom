@@ -129,7 +129,7 @@ export function emptyCaboMetragem(): CaboMetragemPayload {
 
 export type RelatorioTransmissao = {
   id: string;
-  tecnico_id: string;
+  tecnico_id: string | null;
   tecnicos_atribuidos: string[];
   tecnicos_nomes: string[];
   os_wf: string;
@@ -152,14 +152,15 @@ export type RelatorioTransmissao = {
 };
 
 export function isTecnicoAtribuido(row: RelatorioTransmissao, userId: string): boolean {
-  const ids = row.tecnicos_atribuidos.length ? row.tecnicos_atribuidos : [row.tecnico_id];
-  return ids.includes(userId);
+  if (row.tecnicos_atribuidos.length) return row.tecnicos_atribuidos.includes(userId);
+  return row.tecnico_id === userId;
 }
 
 export function labelTecnicosAtribuidos(row: RelatorioTransmissao): string {
   const nomes = row.tecnicos_nomes.filter((nome) => nome.trim());
   if (nomes.length) return nomes.join(", ");
-  return row.tecnico_nome?.trim() || "—";
+  if (row.tecnico_nome?.trim()) return row.tecnico_nome.trim();
+  return "Sem atribuição";
 }
 
 export function outrosTecnicosNomes(
@@ -167,7 +168,11 @@ export function outrosTecnicosNomes(
   userId: string,
   userNome?: string | null,
 ): string[] {
-  const ids = row.tecnicos_atribuidos.length ? row.tecnicos_atribuidos : [row.tecnico_id];
+  const ids = row.tecnicos_atribuidos.length
+    ? row.tecnicos_atribuidos
+    : row.tecnico_id
+      ? [row.tecnico_id]
+      : [];
   const fromIds = ids
     .map((id, index) => (id === userId ? "" : row.tecnicos_nomes[index] ?? ""))
     .map((nome) => nome.trim())
@@ -499,7 +504,7 @@ function preferFilled(local: string | undefined, server: string): string | undef
 
 type DbRow = {
   id: string;
-  tecnico_id: string;
+  tecnico_id: string | null;
   tecnicos_atribuidos?: string[] | null;
   tecnicos_nomes?: string[] | null;
   os_wf: string;
@@ -522,10 +527,11 @@ type DbRow = {
 };
 
 function mapRow(row: DbRow): RelatorioTransmissao {
-  const tecnicos_atribuidos =
-    Array.isArray(row.tecnicos_atribuidos) && row.tecnicos_atribuidos.length
-      ? row.tecnicos_atribuidos
-      : [row.tecnico_id];
+  const tecnicos_atribuidos = Array.isArray(row.tecnicos_atribuidos)
+    ? row.tecnicos_atribuidos.filter(Boolean)
+    : row.tecnico_id
+      ? [row.tecnico_id]
+      : [];
   const tecnicos_nomes =
     Array.isArray(row.tecnicos_nomes) && row.tecnicos_nomes.length
       ? row.tecnicos_nomes
@@ -654,21 +660,25 @@ export async function despacharRelatorioTransmissao(input: {
   osWf: string;
   cliente: string;
   endereco: string;
+  cidade: string;
+  equipeEmpreiteira: string;
+  dataInicioExecucao: string;
   tecnicos: { id: string; nome: string }[];
 }): Promise<RelatorioTransmissao> {
   const os = input.osWf.trim();
   const cliente = input.cliente.trim();
   const endereco = input.endereco.trim();
-  if (!os) throw new Error("Informe o número do contrato (OS).");
-  if (!cliente) throw new Error("Informe o cliente.");
-  if (!endereco) throw new Error("Informe o endereço.");
+  const cidade = input.cidade.trim();
+  const equipeEmpreiteira = input.equipeEmpreiteira.trim();
+  const dataInicio = input.dataInicioExecucao.trim();
+  if (!os) throw new Error("Informe a OS/WF.");
   const unique = new Map<string, { id: string; nome: string }>();
   for (const tecnico of input.tecnicos) {
     if (tecnico.id) unique.set(tecnico.id, tecnico);
   }
   const tecnicos = [...unique.values()];
   if (tecnicos.length === 0) {
-    throw new Error("Selecione ao menos um técnico de transmissão.");
+    throw new Error("Selecione ao menos um técnico na equipe.");
   }
 
   if (await findRelatorioAbertoPorOsWf(os)) {
@@ -684,8 +694,11 @@ export async function despacharRelatorioTransmissao(input: {
     tecnicos_atribuidos: tecnicos.map((t) => t.id),
     tecnicos_nomes: tecnicos.map((t) => t.nome),
     os_wf: os,
-    cliente,
-    endereco,
+    cliente: cliente || "",
+    endereco: endereco || "",
+    cidade: cidade || "",
+    equipe_empreiteira: equipeEmpreiteira || "",
+    data_inicio_execucao: dataInicio || null,
     status: "em_aberto" as const,
     payload: emptyRelatorioPayload(),
   };

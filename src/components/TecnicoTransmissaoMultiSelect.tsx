@@ -23,12 +23,16 @@ type TecnicoTransmissaoMultiSelectProps = {
   value: TecnicoProfile[];
   onChange: (tecnicos: TecnicoProfile[]) => void;
   disabled?: boolean;
+  placeholder?: string;
+  invalid?: boolean;
 };
 
 export function TecnicoTransmissaoMultiSelect({
   value,
   onChange,
   disabled = false,
+  placeholder = "Selecionar equipe…",
+  invalid = false,
 }: TecnicoTransmissaoMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -78,11 +82,15 @@ export function TecnicoTransmissaoMultiSelect({
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
-            className="w-full justify-between font-normal"
+            aria-invalid={invalid}
+            className={cn(
+              "w-full justify-between font-normal",
+              invalid && "border-destructive focus-visible:ring-destructive",
+            )}
           >
             <span className={cn("truncate", value.length === 0 && "text-muted-foreground")}>
               {value.length === 0
-                ? "Selecionar técnicos de transmissão…"
+                ? placeholder
                 : `${value.length} técnico${value.length === 1 ? "" : "s"} selecionado${value.length === 1 ? "" : "s"}`}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
