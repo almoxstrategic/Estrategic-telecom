@@ -75,6 +75,73 @@ export type RelatorioFotoGrupoKey =
   | RelatorioFotoGrupoKeyRc
   | RelatorioFotoGrupoKeyEq;
 
+export type TesteOpticoFaixaPayload = {
+  dbm: string;
+  fotos: StoredPhoto[];
+  obs: string;
+  obsAdmin: string;
+};
+
+export type TesteOpticoItemPayload = {
+  id: string;
+  dbm: string;
+  foto: StoredPhoto | null;
+  obs: string;
+  obsAdmin: string;
+};
+
+export type TesteOpticoPayload = {
+  cliente: {
+    nm1550: TesteOpticoFaixaPayload;
+    nm1330: TesteOpticoFaixaPayload;
+  };
+  estacao: {
+    nm1550: TesteOpticoItemPayload[];
+    nm1330: TesteOpticoItemPayload[];
+  };
+};
+
+export type TesteOtdrItemPayload = {
+  id: string;
+  distancia: string;
+  foto: StoredPhoto | null;
+  obs: string;
+  obsAdmin: string;
+};
+
+export type TestePotenciaPayload = {
+  otdr: TesteOtdrItemPayload[];
+};
+
+export function emptyTesteOpticoFaixa(): TesteOpticoFaixaPayload {
+  return { dbm: "", fotos: [], obs: "", obsAdmin: "" };
+}
+
+export function emptyTesteOpticoItem(): TesteOpticoItemPayload {
+  return { id: crypto.randomUUID(), dbm: "", foto: null, obs: "", obsAdmin: "" };
+}
+
+export function emptyTesteOtdrItem(): TesteOtdrItemPayload {
+  return { id: crypto.randomUUID(), distancia: "", foto: null, obs: "", obsAdmin: "" };
+}
+
+export function emptyTesteOptico(): TesteOpticoPayload {
+  return {
+    cliente: {
+      nm1550: emptyTesteOpticoFaixa(),
+      nm1330: emptyTesteOpticoFaixa(),
+    },
+    estacao: {
+      nm1550: [emptyTesteOpticoItem()],
+      nm1330: [emptyTesteOpticoItem()],
+    },
+  };
+}
+
+export function emptyTestePotencia(): TestePotenciaPayload {
+  return { otdr: [emptyTesteOtdrItem()] };
+}
+
 export type RelatorioPayload = {
   lancamentoRe: boolean | null;
   metragensCabo: CaboMetragemPayload[];
@@ -113,6 +180,8 @@ export type RelatorioPayload = {
   eqEstacaoEtiqueta: FotoGrupoPayload;
   eqEstacaoDgo: FotoGrupoPayload;
   outrasFotosEqEstacao: OutraFotoPayload[];
+  testeOptico: TesteOpticoPayload;
+  testePotencia: TestePotenciaPayload;
 };
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
@@ -244,6 +313,8 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     eqEstacaoEtiqueta: emptyFotoGrupo(),
     eqEstacaoDgo: emptyFotoGrupo(),
     outrasFotosEqEstacao: [],
+    testeOptico: emptyTesteOptico(),
+    testePotencia: emptyTestePotencia(),
   };
 }
 
@@ -322,6 +393,79 @@ function parseFotoGrupo(
   };
 }
 
+function parseStoredPhoto(raw: unknown): StoredPhoto | null {
+  if (!raw || typeof raw !== "object") return null;
+  const foto = raw as Partial<StoredPhoto>;
+  if (!foto.url && !foto.path) return null;
+  return { url: foto.url ?? "", path: foto.path ?? "" };
+}
+
+function parseFotosList(raw: unknown): StoredPhoto[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(parseStoredPhoto).filter((foto): foto is StoredPhoto => Boolean(foto));
+}
+
+function parseTesteOpticoFaixa(raw: unknown): TesteOpticoFaixaPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoFaixaPayload>;
+  return {
+    dbm: src.dbm ?? "",
+    fotos: parseFotosList(src.fotos),
+    obs: src.obs ?? "",
+    obsAdmin: readObsAdmin(src),
+  };
+}
+
+function parseTesteOpticoItems(raw: unknown): TesteOpticoItemPayload[] {
+  const list = Array.isArray(raw)
+    ? raw.map((item) => {
+        const src = (item ?? {}) as Partial<TesteOpticoItemPayload>;
+        return {
+          id: src.id || crypto.randomUUID(),
+          dbm: src.dbm ?? "",
+          foto: parseStoredPhoto(src.foto),
+          obs: src.obs ?? "",
+          obsAdmin: readObsAdmin(src),
+        };
+      })
+    : [];
+  return list.length > 0 ? list : [emptyTesteOpticoItem()];
+}
+
+function parseTesteOtdrItems(raw: unknown): TesteOtdrItemPayload[] {
+  const list = Array.isArray(raw)
+    ? raw.map((item) => {
+        const src = (item ?? {}) as Partial<TesteOtdrItemPayload>;
+        return {
+          id: src.id || crypto.randomUUID(),
+          distancia: src.distancia ?? "",
+          foto: parseStoredPhoto(src.foto),
+          obs: src.obs ?? "",
+          obsAdmin: readObsAdmin(src),
+        };
+      })
+    : [];
+  return list.length > 0 ? list : [emptyTesteOtdrItem()];
+}
+
+function parseTesteOptico(raw: unknown): TesteOpticoPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoPayload>;
+  return {
+    cliente: {
+      nm1550: parseTesteOpticoFaixa(src.cliente?.nm1550),
+      nm1330: parseTesteOpticoFaixa(src.cliente?.nm1330),
+    },
+    estacao: {
+      nm1550: parseTesteOpticoItems(src.estacao?.nm1550),
+      nm1330: parseTesteOpticoItems(src.estacao?.nm1330),
+    },
+  };
+}
+
+function parseTestePotencia(raw: unknown): TestePotenciaPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TestePotenciaPayload>;
+  return { otdr: parseTesteOtdrItems(src.otdr) };
+}
+
 function parsePayload(raw: unknown): RelatorioPayload {
   const base = emptyRelatorioPayload();
   if (!raw || typeof raw !== "object") return base;
@@ -366,6 +510,8 @@ function parsePayload(raw: unknown): RelatorioPayload {
     eqEstacaoEtiqueta: parseFotoGrupo(base.eqEstacaoEtiqueta, src.eqEstacaoEtiqueta),
     eqEstacaoDgo: parseFotoGrupo(base.eqEstacaoDgo, src.eqEstacaoDgo),
     outrasFotosEqEstacao: parseOutrasFotos(src.outrasFotosEqEstacao),
+    testeOptico: parseTesteOptico(src.testeOptico),
+    testePotencia: parseTestePotencia(src.testePotencia),
   };
 }
 
@@ -452,12 +598,62 @@ function mergeOutra(server: OutraFotoPayload, local: OutraFotoPayload): OutraFot
   };
 }
 
-function mergeFotoGrupo(server: FotoGrupoPayload, local: FotoGrupoPayload): FotoGrupoPayload {
+function mergeTesteOpticoFaixa(
+  server: TesteOpticoFaixaPayload,
+  local: TesteOpticoFaixaPayload,
+): TesteOpticoFaixaPayload {
   return {
-    fotos: mergeFotosByPath(server.fotos, local.fotos),
-    obs: local.obs || server.obs,
+    dbm: local.dbm,
+    fotos: local.fotos,
+    obs: local.obs,
     obsAdmin: local.obsAdmin || server.obsAdmin,
   };
+}
+
+function mergeTesteOpticoItem(
+  server: TesteOpticoItemPayload,
+  local: TesteOpticoItemPayload,
+): TesteOpticoItemPayload {
+  return {
+    ...server,
+    dbm: local.dbm,
+    foto: local.foto,
+    obs: local.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeTesteOtdrItem(
+  server: TesteOtdrItemPayload,
+  local: TesteOtdrItemPayload,
+): TesteOtdrItemPayload {
+  return {
+    ...server,
+    distancia: local.distancia,
+    foto: local.foto,
+    obs: local.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeTesteOptico(server: TesteOpticoPayload, local: TesteOpticoPayload): TesteOpticoPayload {
+  return {
+    cliente: {
+      nm1550: mergeTesteOpticoFaixa(server.cliente.nm1550, local.cliente.nm1550),
+      nm1330: mergeTesteOpticoFaixa(server.cliente.nm1330, local.cliente.nm1330),
+    },
+    estacao: {
+      nm1550: mergeById(server.estacao.nm1550, local.estacao.nm1550, mergeTesteOpticoItem),
+      nm1330: mergeById(server.estacao.nm1330, local.estacao.nm1330, mergeTesteOpticoItem),
+    },
+  };
+}
+
+function mergeTestePotencia(
+  server: TestePotenciaPayload,
+  local: TestePotenciaPayload,
+): TestePotenciaPayload {
+  return { otdr: mergeById(server.otdr, local.otdr, mergeTesteOtdrItem) };
 }
 
 /**
@@ -495,6 +691,8 @@ export function mergeRelatorioPayload(
       local.outrasFotosEqEstacao,
       mergeOutra,
     ),
+    testeOptico: mergeTesteOptico(server.testeOptico, local.testeOptico),
+    testePotencia: mergeTestePotencia(server.testePotencia, local.testePotencia),
     ...grupos,
   };
 }
