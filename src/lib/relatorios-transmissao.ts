@@ -293,7 +293,10 @@ function parseCabos(raw: unknown): CaboMetragemPayload[] {
 }
 
 function parseOutrasFotos(raw: unknown): OutraFotoPayload[] {
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) {
+    if (raw && typeof raw === "object") return parseOutrasFotos([raw]);
+    return [];
+  }
   return raw.map((item) => {
     const foto = (item ?? {}) as Partial<OutraFotoPayload>;
     return {
@@ -442,7 +445,7 @@ function mergeCabo(server: CaboMetragemPayload, local: CaboMetragemPayload): Cab
 function mergeOutra(server: OutraFotoPayload, local: OutraFotoPayload): OutraFotoPayload {
   return {
     ...server,
-    ref: local.ref || server.ref,
+    ref: local.ref,
     foto: local.foto ?? server.foto,
     obs: local.obs || server.obs,
     obsAdmin: local.obsAdmin || server.obsAdmin,

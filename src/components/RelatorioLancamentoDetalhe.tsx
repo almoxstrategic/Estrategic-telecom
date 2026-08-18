@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { EditarContratoOsDialog } from "@/components/EditarContratoOsDialog";
 import {
   FOTO_SLOT_CLASS,
@@ -7,13 +7,14 @@ import {
   RelatorioFotoComControles,
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { ABAS_CAMPO, ChoiceButton, type AbaCampo } from "@/components/RelatorioRedeAcesso";
+import { ABAS_CAMPO, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
+  emptyCaboMetragem,
   labelTecnicosAtribuidos,
   removeExtraById,
   removeFotoGrupoAt,
@@ -200,6 +201,40 @@ function ObsEditavel({
   );
 }
 
+function RefTituloEditavel({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange?: (value: string) => void;
+}) {
+  const [local, setLocal] = useState(value);
+
+  useEffect(() => {
+    setLocal(value);
+  }, [value]);
+
+  useDebouncedEffect(
+    () => {
+      if (onChange && local !== value) onChange(local);
+    },
+    [local],
+    500,
+    Boolean(onChange),
+  );
+
+  return (
+    <RefTituloInput
+      value={local}
+      onChange={onChange ? setLocal : undefined}
+      onBlur={() => {
+        if (onChange && local !== value) onChange(local);
+      }}
+      disabled={!onChange}
+    />
+  );
+}
+
 function MetaField({ label, value }: { label: string; value: string }) {
   const empty = value === "Não informado";
   return (
@@ -239,6 +274,7 @@ function EvidenciaBloco({
   onReplacePhoto,
   onRemoveCaboCampo,
   onReplaceCaboCampo,
+  onTitleChange,
 }: {
   title: string;
   obs?: string | null;
@@ -254,14 +290,19 @@ function EvidenciaBloco({
   onReplacePhoto?: (index: number, file: EvidencePhotoRef) => void;
   onRemoveCaboCampo?: (campo: "fotoInicio" | "fotoFim") => void;
   onReplaceCaboCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
+  onTitleChange?: (value: string) => void;
 }) {
-  if (!fotos.length && !caboFotos?.inicio && !caboFotos?.fim && !obs && !canEdit && !onObsChange) {
+  if (!fotos.length && !caboFotos?.inicio && !caboFotos?.fim && !obs && !canEdit && !onObsChange && !onTitleChange) {
     return null;
   }
   return (
     <div className="flex h-full flex-col rounded-xl border border-border/80 bg-muted/20 p-4">
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+        {onTitleChange ? (
+          <RefTituloEditavel value={title} onChange={onTitleChange} />
+        ) : (
+          <h4 className="text-sm font-semibold text-gray-900">{title || "Outra foto"}</h4>
+        )}
         {onRemove ? (
           <button
             type="button"
@@ -293,7 +334,7 @@ function EvidenciaBloco({
       </div>
       <div className="mt-auto w-full space-y-3 pt-4">
         <ObsEditavel value={obs ?? ""} onChange={onObsChange} />
-        {canEdit && onAdd ? (
+        {canEdit && onAdd && !(caboFotos && Boolean(caboFotos.inicio) && Boolean(caboFotos.fim)) ? (
           <div className={uploading ? "pointer-events-none opacity-60" : undefined}>
             <PhotoUpload
               key={uploadKey}
@@ -309,6 +350,22 @@ function EvidenciaBloco({
       </div>
     </div>
   );
+}
+
+function BotaoAdicionar({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 px-3 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5"
+    >
+      <Plus className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
+function emptyOutraFoto(): RelatorioPayload["outrasFotos"][number] {
+  return { id: crypto.randomUUID(), ref: "", foto: null, obs: "", obsAdmin: "" };
 }
 
 function mensagemMetragemDesabilitada(lancamento: boolean | null | undefined) {
@@ -431,6 +488,16 @@ export function RelatorioDetalhe({
     onUpdatePayload?.(next);
   };
 
+  const adicionarOutra = (
+    categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
+  ) => {
+    if (!payload) return;
+    patchPayload({
+      ...payload,
+      [categoria]: [...payload[categoria], emptyOutraFoto()],
+    });
+  };
+
   const renderGrupo = (title: string, key: RelatorioFotoGrupoKey) => {
     const grupo = payload?.[key];
     return (
@@ -521,20 +588,39 @@ export function RelatorioDetalhe({
           : undefined
       }
       {...blocoProps(categoria)}
+      onAdd={
+        canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
+          ? (file) => {
+              const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
+              onReplacePhoto(categoria, file, { caboId: cabo.id, campo });
+            }
+          : undefined
+      }
     />
   );
 
   const renderOutra = (
     item: RelatorioPayload["outrasFotos"][number],
-    index: number,
     categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
-    titulo: string,
   ) => (
     <EvidenciaBloco
       key={item.id}
-      title={titulo}
+      title={item.ref}
       obs={item.obs}
       fotos={item.foto ? [item.foto] : []}
+      onTitleChange={
+        canEditPhotos
+          ? (ref) => {
+              if (!payload) return;
+              patchPayload({
+                ...payload,
+                [categoria]: payload[categoria].map((rowItem) =>
+                  rowItem.id === item.id ? { ...rowItem, ref } : rowItem,
+                ),
+              });
+            }
+          : undefined
+      }
       onObsChange={
         canEditPhotos
           ? (obs) => {
@@ -549,10 +635,13 @@ export function RelatorioDetalhe({
           : undefined
       }
       onRemove={
-        canEditPhotos && index >= 1
+        canEditPhotos
           ? () => {
               if (!payload) return;
-              patchPayload({ ...payload, [categoria]: removeExtraById(payload[categoria], item.id) });
+              patchPayload({
+                ...payload,
+                [categoria]: payload[categoria].filter((rowItem) => rowItem.id !== item.id),
+              });
               void deleteRelatorioPhoto(item.foto?.path);
             }
           : undefined
@@ -576,8 +665,41 @@ export function RelatorioDetalhe({
           ? (_index, file) => onReplacePhoto(categoria, file, { outraId: item.id })
           : undefined
       }
+      canEdit={canEditPhotos}
+      onAdd={
+        canEditPhotos && onReplacePhoto && !item.foto
+          ? (file) => onReplacePhoto(categoria, file, { outraId: item.id })
+          : undefined
+      }
+      uploadKey={`${row.id}-${categoria}-${item.id}`}
+      uploading={uploadingCategoria === categoria}
     />
   );
+
+  const renderOutrasSecao = (
+    categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
+    heading: string,
+  ) => {
+    const items = payload?.[categoria] ?? [];
+    const visiveis = canEditPhotos
+      ? items
+      : items.filter((item) => item.foto || item.ref || item.obs || item.obsAdmin);
+    return (
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{heading}</h3>
+        {visiveis.length ? (
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+            {visiveis.map((item) => renderOutra(item, categoria))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
+        )}
+        {canEditPhotos ? (
+          <BotaoAdicionar label="Adicionar mais fotos" onClick={() => adicionarOutra(categoria)} />
+        ) : null}
+      </section>
+    );
+  };
 
   const mostrarEstacao =
     Boolean(payload?.relatorioEstacao) ||
@@ -673,7 +795,14 @@ export function RelatorioDetalhe({
             disabled={!canEditPhotos}
             onChange={(next) => {
               if (!payload) return;
-              patchPayload({ ...payload, lancamentoRe: next });
+              patchPayload({
+                ...payload,
+                lancamentoRe: next,
+                metragensCabo:
+                  next && payload.metragensCabo.length === 0
+                    ? [emptyCaboMetragem()]
+                    : payload.metragensCabo,
+              });
             }}
           />
           <section className="space-y-3">
@@ -682,15 +811,7 @@ export function RelatorioDetalhe({
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
               {payload?.lancamentoRe === true ? (
-                <>
-                  {cabos.length === 0 && canEditPhotos ? (
-                    <EvidenciaBloco
-                      title="Metragem de cabo (RE)"
-                      obs={null}
-                      fotos={[]}
-                      {...blocoProps("metragensCabo")}
-                    />
-                  ) : null}
+                <div className="flex h-full flex-col gap-3">
                   {cabos.map((cabo, index) =>
                     renderCabo(
                       cabo,
@@ -699,7 +820,19 @@ export function RelatorioDetalhe({
                       `Cabo ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`,
                     ),
                   )}
-                </>
+                  {canEditPhotos ? (
+                    <BotaoAdicionar
+                      label="Adicionar cabo"
+                      onClick={() => {
+                        if (!payload) return;
+                        patchPayload({
+                          ...payload,
+                          metragensCabo: [...payload.metragensCabo, emptyCaboMetragem()],
+                        });
+                      }}
+                    />
+                  ) : null}
+                </div>
               ) : (
                 <MetragemDesabilitada
                   title="Metragem de cabo (RE)"
@@ -732,18 +865,8 @@ export function RelatorioDetalhe({
                   ["Etiqueta na estação/PPC", "etiquetaIdentificacao"],
                 ] as const
               ).map(([title, key]) => renderGrupo(title, key))}
-              {(payload?.outrasFotos ?? []).map((item, index) =>
-                item.foto || item.ref || item.obs || item.obsAdmin
-                  ? renderOutra(item, index, "outrasFotos", `Outra — ${item.ref || "sem REF"}`)
-                  : null,
-              )}
-              <EvidenciaBloco
-                title="Outras fotos"
-                obs={null}
-                fotos={[]}
-                {...blocoProps("outrasFotos")}
-              />
             </div>
+            {renderOutrasSecao("outrasFotos", "Outras fotos")}
           </section>
         </div>
       ) : null}
@@ -759,7 +882,14 @@ export function RelatorioDetalhe({
                 disabled={!canEditPhotos}
                 onChange={(next) => {
                   if (!payload) return;
-                  patchPayload({ ...payload, lancamentoRc: next });
+                  patchPayload({
+                    ...payload,
+                    lancamentoRc: next,
+                    metragensCaboRc:
+                      next && payload.metragensCaboRc.length === 0
+                        ? [emptyCaboMetragem()]
+                        : payload.metragensCaboRc,
+                  });
                 }}
               />
             </div>
@@ -767,15 +897,7 @@ export function RelatorioDetalhe({
           <section className="space-y-3">
             <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
               {payload?.lancamentoRc === true ? (
-                <>
-                  {cabosRc.length === 0 && canEditPhotos ? (
-                    <EvidenciaBloco
-                      title="Metragem de cabo (RC)"
-                      obs={null}
-                      fotos={[]}
-                      {...blocoProps("metragensCaboRc")}
-                    />
-                  ) : null}
+                <div className="flex h-full flex-col gap-3">
                   {cabosRc.map((cabo, index) =>
                     renderCabo(
                       cabo,
@@ -784,7 +906,19 @@ export function RelatorioDetalhe({
                       `Cabo RC ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`,
                     ),
                   )}
-                </>
+                  {canEditPhotos ? (
+                    <BotaoAdicionar
+                      label="Adicionar cabo"
+                      onClick={() => {
+                        if (!payload) return;
+                        patchPayload({
+                          ...payload,
+                          metragensCaboRc: [...payload.metragensCaboRc, emptyCaboMetragem()],
+                        });
+                      }}
+                    />
+                  ) : null}
+                </div>
               ) : (
                 <MetragemDesabilitada
                   title="Metragem de cabo (RC)"
@@ -801,18 +935,8 @@ export function RelatorioDetalhe({
                   ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
                 ] as const
               ).map(([title, key]) => renderGrupo(title, key))}
-              {(payload?.outrasFotosRc ?? []).map((item, index) =>
-                item.foto || item.ref || item.obs || item.obsAdmin
-                  ? renderOutra(item, index, "outrasFotosRc", `Outra (RC) — ${item.ref || "sem REF"}`)
-                  : null,
-              )}
-              <EvidenciaBloco
-                title="Outras fotos (RC)"
-                obs={null}
-                fotos={[]}
-                {...blocoProps("outrasFotosRc")}
-              />
             </div>
+            {renderOutrasSecao("outrasFotosRc", "Outras fotos")}
           </section>
         </div>
       ) : null}
@@ -835,23 +959,8 @@ export function RelatorioDetalhe({
                   ["Identificação SGP no Cliente", "eqClienteSgp"],
                 ] as const
               ).map(([title, key]) => renderGrupo(title, key))}
-              {(payload?.outrasFotosEqCliente ?? []).map((item, index) =>
-                item.foto || item.ref || item.obs || item.obsAdmin
-                  ? renderOutra(
-                      item,
-                      index,
-                      "outrasFotosEqCliente",
-                      `Outra (Equip. cliente) — ${item.ref || "sem REF"}`,
-                    )
-                  : null,
-              )}
-              <EvidenciaBloco
-                title="Outras fotos (Equip. cliente)"
-                obs={null}
-                fotos={[]}
-                {...blocoProps("outrasFotosEqCliente")}
-              />
             </div>
+            {renderOutrasSecao("outrasFotosEqCliente", "Outras fotos")}
           </section>
           {mostrarEstacao ? (
             <section className="space-y-3">
@@ -872,23 +981,8 @@ export function RelatorioDetalhe({
                     ["DGO / DID / ROUTER (Conexão)", "eqEstacaoDgo"],
                   ] as const
                 ).map(([title, key]) => renderGrupo(title, key))}
-                {(payload?.outrasFotosEqEstacao ?? []).map((item, index) =>
-                  item.foto || item.ref || item.obs || item.obsAdmin
-                    ? renderOutra(
-                        item,
-                        index,
-                        "outrasFotosEqEstacao",
-                        `Outra (Estação/PPC) — ${item.ref || "sem REF"}`,
-                      )
-                    : null,
-                )}
-                <EvidenciaBloco
-                  title="Outras fotos (Estação/PPC)"
-                  obs={null}
-                  fotos={[]}
-                  {...blocoProps("outrasFotosEqEstacao")}
-                />
               </div>
+              {renderOutrasSecao("outrasFotosEqEstacao", "Outras fotos")}
             </section>
           ) : (
             <p className="text-sm text-muted-foreground">

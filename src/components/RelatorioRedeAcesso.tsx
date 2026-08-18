@@ -39,6 +39,33 @@ export function inputClass() {
   return "w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted";
 }
 
+export const REF_TITULO_PLACEHOLDER = "Ex: Foto do quadro de energia (opcional)";
+
+export function RefTituloInput({
+  value,
+  onChange,
+  onBlur,
+  disabled = false,
+}: {
+  value: string;
+  onChange?: (value: string) => void;
+  onBlur?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange?.(e.target.value)}
+      onBlur={onBlur}
+      placeholder={REF_TITULO_PLACEHOLDER}
+      disabled={disabled}
+      aria-label="Referência da foto"
+      className="h-9 min-w-0 flex-1 border-0 border-b border-transparent bg-transparent px-0.5 text-sm font-semibold text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground focus:border-primary/50 disabled:cursor-default disabled:opacity-80"
+    />
+  );
+}
+
 export function ChoiceButton({
   active,
   children,
@@ -371,88 +398,90 @@ export function RelatorioOutrasFotos({
 }) {
   const removerItem = (id: string, path?: string) => {
     void deleteRelatorioPhoto(path);
-    onOutrasChange((prev) => {
-      const index = prev.findIndex((row) => row.id === id);
-      if (index < 1) return prev;
-      return prev.filter((row) => row.id !== id);
-    });
+    onOutrasChange((prev) => prev.filter((row) => row.id !== id));
   };
 
   return (
-    <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="space-y-4">
       <h2 className="text-base font-bold">{title}</h2>
       {outras.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
       ) : (
-        outras.map((item, index) => (
-          <div key={item.id} className="relative flex flex-col space-y-3 rounded-xl border border-border p-4">
-            {!readOnly && index >= 1 ? (
-              <button
-                type="button"
-                onClick={() => removerItem(item.id, item.stored?.path)}
-                className="absolute right-3 top-3 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-                aria-label={`Excluir foto extra ${index + 1}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null}
-            <label className="mb-1.5 block text-sm font-semibold">REF:</label>
-            <input
-              type="text"
-              value={item.ref}
-              onChange={(e) =>
-                onOutrasChange((prev) =>
-                  prev.map((row) => (row.id === item.id ? { ...row, ref: e.target.value } : row)),
-                )
-              }
-              className={inputClass()}
-              disabled={readOnly}
-            />
-            <FotoLabel>Foto</FotoLabel>
-            {item.stored ? (
-              <RelatorioFotoComControles
-                src={item.stored.url}
-                alt={item.ref || "Outra foto"}
-                canEdit={!readOnly}
-                onDelete={() => {
-                  void deleteRelatorioPhoto(item.stored?.path);
-                  onOutraPhoto(item.id, null);
-                }}
-                onReplace={(file) => {
-                  void deleteRelatorioPhoto(item.stored?.path);
-                  onOutraPhoto(item.id, file);
-                }}
-              />
-            ) : readOnly ? (
-              <p className="text-sm text-muted-foreground">Sem foto.</p>
-            ) : (
-              <PhotoUpload
-                label="Foto"
-                suffix={index === 0 ? "inicio" : "fim"}
-                hideLabel
-                compact
-                value={null}
-                onChange={(file) => {
-                  if (file) onOutraPhoto(item.id, file);
-                }}
-              />
-            )}
-            <div className="mt-auto w-full">
-              <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-              <textarea
-                value={item.obs}
-                onChange={(e) =>
-                  onOutrasChange((prev) =>
-                    prev.map((row) => (row.id === item.id ? { ...row, obs: e.target.value } : row)),
-                  )
-                }
-                rows={2}
-                disabled={readOnly}
-                className={inputClass()}
-              />
+        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+          {outras.map((item, index) => (
+            <div
+              key={item.id}
+              className="relative flex h-full flex-col space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start gap-2">
+                <RefTituloInput
+                  value={item.ref}
+                  disabled={readOnly}
+                  onChange={(ref) =>
+                    onOutrasChange((prev) =>
+                      prev.map((row) => (row.id === item.id ? { ...row, ref } : row)),
+                    )
+                  }
+                />
+                {readOnly ? null : (
+                  <button
+                    type="button"
+                    onClick={() => removerItem(item.id, item.stored?.path)}
+                    className="shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                    aria-label={`Excluir foto extra ${index + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex-1">
+                <FotoLabel>Foto</FotoLabel>
+                {item.stored ? (
+                  <RelatorioFotoComControles
+                    src={item.stored.url}
+                    alt={item.ref || "Outra foto"}
+                    canEdit={!readOnly}
+                    onDelete={() => {
+                      void deleteRelatorioPhoto(item.stored?.path);
+                      onOutraPhoto(item.id, null);
+                    }}
+                    onReplace={(file) => {
+                      void deleteRelatorioPhoto(item.stored?.path);
+                      onOutraPhoto(item.id, file);
+                    }}
+                  />
+                ) : readOnly ? (
+                  <p className="text-sm text-muted-foreground">Sem foto.</p>
+                ) : (
+                  <PhotoUpload
+                    label="Foto"
+                    suffix={index === 0 ? "inicio" : "fim"}
+                    hideLabel
+                    compact
+                    value={null}
+                    onChange={(file) => {
+                      if (file) onOutraPhoto(item.id, file);
+                    }}
+                  />
+                )}
+              </div>
+              <div className="mt-auto w-full">
+                <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+                <textarea
+                  value={item.obs}
+                  onChange={(e) =>
+                    onOutrasChange((prev) =>
+                      prev.map((row) => (row.id === item.id ? { ...row, obs: e.target.value } : row)),
+                    )
+                  }
+                  rows={2}
+                  disabled={readOnly}
+                  className={inputClass()}
+                />
+              </div>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
       {readOnly ? null : (
         <button
@@ -463,7 +492,7 @@ export function RelatorioOutrasFotos({
               { id: crypto.randomUUID(), ref: "", file: null, stored: null, obs: "", obsAdmin: "" },
             ])
           }
-          className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 px-3 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5"
         >
           <Plus className="h-4 w-4" /> Adicionar mais fotos
         </button>
