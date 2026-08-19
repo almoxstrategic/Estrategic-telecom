@@ -5,7 +5,6 @@ import {
   ATEN_EMENDA,
   ATEN_KM,
   PERDA_CONEXAO,
-  calcularAtenuacaoFibra,
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
   formatarDb,
@@ -66,6 +65,28 @@ export function RelatorioTestePotenciaAtenuacao({
   );
 }
 
+function formatarDecimalPtBr(valor: number): string {
+  return valor.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function campoEmBranco(raw: unknown): boolean {
+  return String(raw ?? "").trim() === "";
+}
+
+function numeroFibraDoItem(raw: unknown): number | null {
+  if (!raw || typeof raw !== "object") return null;
+  const n = (raw as { numeroFibra?: unknown }).numeroFibra;
+  if (typeof n === "number" && Number.isFinite(n) && n >= 1) return Math.trunc(n);
+  if (typeof n === "string" && n.trim()) {
+    const parsed = Number(n.replace(",", "."));
+    if (Number.isFinite(parsed) && parsed >= 1) return Math.trunc(parsed);
+  }
+  return null;
+}
+
 function dbmTexto(raw: unknown): string {
   if (!raw || typeof raw !== "object") return "";
   const obj = raw as { dbm?: unknown; dBm?: unknown };
@@ -86,17 +107,25 @@ function janelaEstacao(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
   return janela === "1550" ? testeOptico.estacao?.nm1550 : testeOptico.estacao?.nm1330;
 }
 
+function piTextoDoPonto(
+  testeOptico: TesteOpticoPayload,
+  janela: JanelaNm,
+  ponto: PontoMedicao,
+): string {
+  const origem =
+    ponto === "cliente"
+      ? janelaCliente(testeOptico, janela)
+      : janelaEstacao(testeOptico, janela);
+  return dbmTexto(listaOuItem(origem)[0]);
+}
+
 /** Pi e Po vêm da mesma localidade (cliente ou estação), 1:1 com o card. */
 function piDoPonto(
   testeOptico: TesteOpticoPayload,
   janela: JanelaNm,
   ponto: PontoMedicao,
 ): number | null {
-  const origem =
-    ponto === "cliente"
-      ? janelaCliente(testeOptico, janela)
-      : janelaEstacao(testeOptico, janela);
-  return parseNumeroCampo(dbmTexto(listaOuItem(origem)[0]));
+  return parseNumeroCampo(piTextoDoPonto(testeOptico, janela, ponto));
 }
 
 /** Po = medições no ponto do card. */
@@ -109,16 +138,12 @@ function fibrasDoPonto(
     ponto === "cliente"
       ? janelaCliente(testeOptico, janela)
       : janelaEstacao(testeOptico, janela);
-  const informado =
-    ponto === "cliente"
-      ? testeOptico.cliente?.numeroFibra
-      : testeOptico.estacao?.numeroFibra;
   return listaOuItem(origem).map((item, index) => {
-    const numero =
-      informado != null && informado >= 1 ? informado : index + 1;
+    const informado = numeroFibraDoItem(item);
+    const numeroDaFibra = informado || index + 1;
     return {
-      numero: String(numero).padStart(2, "0"),
-      numeroFibra: numero,
+      numero: String(numeroDaFibra).padStart(2, "0"),
+      numeroFibra: numeroDaFibra,
       potenciaMedida: dbmTexto(item),
     };
   });
@@ -142,6 +167,7 @@ function JanelaCard({
   totalConexoes: number;
 }) {
   const pi = piDoPonto(testeOptico, janela, ponto);
+  const referenciaPi = piTextoDoPonto(testeOptico, janela, ponto);
   const fibras = fibrasDoPonto(testeOptico, janela, ponto);
   const janelaNm = `${janela} nm`;
   const origemPo = ponto === "cliente" ? "No Cliente" : "Na Estação";
@@ -185,21 +211,24 @@ function JanelaCard({
         </p>
         <div className="hidden gap-4 px-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-4">
           <span>Fibra Nº</span>
-          <span>Potência Medida - Po (dBm)</span>
-          <span>Atenuação (dB)</span>
+          <span>Po (dBm)</span>
+          <span>Po - Pi (dB)</span>
           <span>Status</span>
         </div>
         <div className="divide-y divide-border">
-          {fibras.map((fibra, index) => (
+          {fibras.map((fibra, index) => {
+            const numeroDaFibra = fibra.numeroFibra || index + 1;
+            return (
             <LinhaFibra
               key={`${janela}-${ponto}-${index}`}
-              numero={fibra.numero}
-              numeroFibra={fibra.numeroFibra}
+              numero={String(numeroDaFibra).padStart(2, "0")}
+              numeroFibra={numeroDaFibra}
               potenciaMedida={fibra.potenciaMedida}
-              pi={pi}
+              referenciaPi={referenciaPi}
               valorMinimoAdmissivel={valorMinimoAdmissivel}
             />
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
@@ -210,24 +239,30 @@ function LinhaFibra({
   numero,
   numeroFibra,
   potenciaMedida,
-  pi,
+  referenciaPi,
   valorMinimoAdmissivel,
 }: {
   numero: string;
   numeroFibra: number;
   potenciaMedida: string;
-  pi: number | null;
+  referenciaPi: string;
   valorMinimoAdmissivel: number | null;
 }) {
-  const po = parseNumeroCampo(potenciaMedida);
-  const atenuacao = calcularAtenuacaoFibra(potenciaMedida, pi);
+  const poEmBranco = campoEmBranco(potenciaMedida);
+  const piEmBranco = campoEmBranco(referenciaPi);
+  const valPo = parseFloat(String(potenciaMedida || "0").replace(",", ".")) || 0;
+  const valPi = parseFloat(String(referenciaPi || "0").replace(",", ".")) || 0;
+  const atenuacao = valPo - valPi;
+  const pendente = poEmBranco || piEmBranco;
   const status =
-    po == null || pi == null || valorMinimoAdmissivel == null
+    pendente || valorMinimoAdmissivel == null
       ? null
-      : po >= valorMinimoAdmissivel
+      : valPo >= valorMinimoAdmissivel
         ? "aprovado"
         : "reprovado";
   const colorCode = corFibraPorNumero(numeroFibra);
+  const poFormatado = formatarDecimalPtBr(valPo);
+  const atenuacaoFormatada = `${formatarDecimalPtBr(atenuacao)} dB`;
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">
@@ -246,18 +281,18 @@ function LinhaFibra({
         </div>
       </div>
       <div className="min-w-0">
-        <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Potência Medida - Po (dBm)</p>
+        <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Po (dBm)</p>
         <input
-          value={textoOuTraco(po == null ? "" : formatarDb(po, 2))}
+          value={textoOuTraco(poEmBranco ? "" : poFormatado)}
           readOnly
           tabIndex={-1}
           className={`${inputClass()} cursor-default bg-muted`}
         />
       </div>
       <div className="min-w-0">
-        <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Atenuação (dB)</p>
+        <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Po - Pi (dB)</p>
         <p className={`${inputClass()} cursor-default bg-muted tabular-nums`}>
-          {atenuacao == null ? "—" : `${formatarDb(atenuacao, 2)} dB`}
+          {pendente ? "—" : atenuacaoFormatada}
         </p>
       </div>
       <div className="flex min-h-[48px] items-center md:min-h-0">
