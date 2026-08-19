@@ -205,6 +205,16 @@ export function emptyTesteOptico(): TesteOpticoPayload {
   };
 }
 
+export function testeOpticoEstacaoAtivo(
+  estacao: TesteOpticoPayload["estacao"] | null | undefined,
+): boolean {
+  if (!estacao) return false;
+  if (estacao.numeroFibra != null && estacao.numeroFibra >= 1) return true;
+  const dbm1550 = String(estacao.nm1550?.[0]?.dbm ?? "").trim();
+  const dbm1330 = String(estacao.nm1330?.[0]?.dbm ?? "").trim();
+  return Boolean(dbm1550 || dbm1330);
+}
+
 export function emptyTestePotencia(): TestePotenciaPayload {
   return {
     comprimentoTrechoKm: "",

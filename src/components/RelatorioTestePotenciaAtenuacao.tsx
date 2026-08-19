@@ -10,6 +10,7 @@ import {
   formatarDb,
   parseNumeroCampo,
   textoOuTraco,
+  testeOpticoEstacaoAtivo,
   totalConexoesCalculado,
   totalEmendasCalculado,
   type QuantidadesRedePayload,
@@ -46,10 +47,12 @@ export function RelatorioTestePotenciaAtenuacao({
   );
   const totalConexoes = totalConexoesCalculado(totalEmendas);
 
+  const mostrarEstacao = testeOpticoEstacaoAtivo(testeOptico.estacao);
+
   return (
     <div className="space-y-4">
       <LegendaCoresFibra />
-      {CARDS.map((card) => (
+      {CARDS.filter((card) => card.ponto !== "estacao" || mostrarEstacao).map((card) => (
         <JanelaCard
           key={card.titulo}
           titulo={card.titulo}

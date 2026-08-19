@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   FOTO_SLOT_CLASS,
@@ -10,6 +11,8 @@ import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
   emptyTesteOtdrItem,
+  emptyTesteOpticoItem,
+  testeOpticoEstacaoAtivo,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
   type TesteOpticoItemPayload,
@@ -284,19 +287,33 @@ function BlocoTesteOpticoEstacao({
   readOnly,
   onChange,
   onUploadPhoto,
+  onRemover,
 }: {
   value: TesteOpticoPayload["estacao"];
   readOnly: boolean;
   onChange: (next: TesteOpticoPayload["estacao"], opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
+  onRemover?: () => void;
 }) {
   const nm1550 = value.nm1550[0];
   const nm1330 = value.nm1330[0];
   if (!nm1550 || !nm1330) return null;
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold">Teste Óptico (Na Estação)</h2>
+    <div className="relative space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-base font-bold">Teste Óptico (Na Estação)</h2>
+        {readOnly || !onRemover ? null : (
+          <button
+            type="button"
+            onClick={onRemover}
+            className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+            aria-label="Remover teste óptico na estação"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
       <CampoNumeroFibra
         value={value.numeroFibra}
         disabled={readOnly}
@@ -339,6 +356,29 @@ export function RelatorioTesteOptico({
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
   readOnly: boolean;
 }) {
+  const [mostrarEstacao, setMostrarEstacao] = useState(() => testeOpticoEstacaoAtivo(value.estacao));
+
+  useEffect(() => {
+    if (testeOpticoEstacaoAtivo(value.estacao)) setMostrarEstacao(true);
+  }, [value.estacao]);
+
+  const removerEstacao = () => {
+    void deleteRelatorioPhoto(value.estacao.nm1550[0]?.foto?.path);
+    void deleteRelatorioPhoto(value.estacao.nm1330[0]?.foto?.path);
+    setMostrarEstacao(false);
+    onChange(
+      {
+        ...value,
+        estacao: {
+          numeroFibra: null,
+          nm1550: [emptyTesteOpticoItem()],
+          nm1330: [emptyTesteOpticoItem()],
+        },
+      },
+      { immediate: true },
+    );
+  };
+
   return (
     <div className="space-y-5">
       <BlocoTesteOpticoCliente
@@ -347,12 +387,20 @@ export function RelatorioTesteOptico({
         onUploadPhoto={onUploadPhoto}
         onChange={(cliente, opts) => onChange({ ...value, cliente }, opts)}
       />
-      <BlocoTesteOpticoEstacao
-        value={value.estacao}
-        readOnly={readOnly}
-        onUploadPhoto={onUploadPhoto}
-        onChange={(estacao, opts) => onChange({ ...value, estacao }, opts)}
-      />
+      {mostrarEstacao ? (
+        <BlocoTesteOpticoEstacao
+          value={value.estacao}
+          readOnly={readOnly}
+          onUploadPhoto={onUploadPhoto}
+          onChange={(estacao, opts) => onChange({ ...value, estacao }, opts)}
+          onRemover={readOnly ? undefined : removerEstacao}
+        />
+      ) : readOnly ? null : (
+        <BotaoAdicionar
+          label="Adicionar Teste Óptico (Na Estação)"
+          onClick={() => setMostrarEstacao(true)}
+        />
+      )}
     </div>
   );
 }
