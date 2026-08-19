@@ -65,13 +65,6 @@ export function RelatorioTestePotenciaAtenuacao({
   );
 }
 
-function formatarDecimalPtBr(valor: number): string {
-  return valor.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 function campoEmBranco(raw: unknown): boolean {
   return String(raw ?? "").trim() === "";
 }
@@ -178,7 +171,6 @@ function JanelaCard({
   const referenciaPi = piTextoDoPonto(testeOptico, janela, ponto);
   const fibras = fibrasDoPonto(testeOptico, janela, ponto);
   const janelaNm = `${janela} nm`;
-  const origemPo = ponto === "cliente" ? "No Cliente" : "Na Estação";
   const atenMaxima = useMemo(
     () => calcularAtenuacaoMaxima(km, totalEmendas, totalConexoes),
     [km, totalEmendas, totalConexoes],
@@ -216,7 +208,7 @@ function JanelaCard({
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Fibras</h3>
         <p className="text-xs text-muted-foreground">
-          Potência medida (Po) importada do Teste Óptico ({origemPo}).
+          Potência medida (Po) gerada automaticamente pela Atenuação Máxima.
         </p>
         <div className="hidden gap-4 px-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-4">
           <span>Fibra Nº</span>
@@ -232,7 +224,7 @@ function JanelaCard({
               key={`${janela}-${ponto}-${index}`}
               numero={String(numeroDaFibra).padStart(2, "0")}
               numeroFibra={numeroDaFibra}
-              potenciaMedida={fibra.potenciaMedida}
+              atenMaxima={atenMaxima}
               referenciaPi={referenciaPi}
               valorMinimoAdmissivel={valorMinimoAdmissivel}
             />
@@ -247,31 +239,35 @@ function JanelaCard({
 function LinhaFibra({
   numero,
   numeroFibra,
-  potenciaMedida,
+  atenMaxima,
   referenciaPi,
   valorMinimoAdmissivel,
 }: {
   numero: string;
   numeroFibra: number;
-  potenciaMedida: string;
+  atenMaxima: number;
   referenciaPi: string;
   valorMinimoAdmissivel: number | null;
 }) {
-  const poEmBranco = campoEmBranco(potenciaMedida);
   const piEmBranco = campoEmBranco(referenciaPi);
-  const valPo = parseFloat(String(potenciaMedida || "0").replace(",", ".")) || 0;
+  const valPo = -Math.abs(atenMaxima);
   const valPi = parseFloat(String(referenciaPi || "0").replace(",", ".")) || 0;
   const atenuacao = valPo - valPi;
-  const pendente = poEmBranco || piEmBranco;
   const status =
-    pendente || valorMinimoAdmissivel == null
+    piEmBranco || valorMinimoAdmissivel == null
       ? null
       : valPo >= valorMinimoAdmissivel
         ? "aprovado"
         : "reprovado";
   const colorCode = corFibraPorNumero(numeroFibra);
-  const poFormatado = formatarDecimalPtBr(valPo);
-  const atenuacaoFormatada = `${formatarDecimalPtBr(atenuacao)} dB`;
+  const poFormatado = valPo.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const atenuacaoFormatada = `${atenuacao.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} dB`;
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">
@@ -292,7 +288,7 @@ function LinhaFibra({
       <div className="min-w-0">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Po (dBm)</p>
         <input
-          value={textoOuTraco(poEmBranco ? "" : poFormatado)}
+          value={poFormatado}
           readOnly
           tabIndex={-1}
           className={`${inputClass()} cursor-default bg-muted`}
@@ -301,7 +297,7 @@ function LinhaFibra({
       <div className="min-w-0">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Po - Pi (dB)</p>
         <p className={`${inputClass()} cursor-default bg-muted tabular-nums`}>
-          {pendente ? "—" : atenuacaoFormatada}
+          {piEmBranco ? "—" : atenuacaoFormatada}
         </p>
       </div>
       <div className="flex min-h-[48px] items-center md:min-h-0">
