@@ -14,10 +14,19 @@ import {
   totalConexoesCalculado,
   totalEmendasCalculado,
   type QuantidadesRedePayload,
-  type TesteOpticoFaixaPayload,
   type TesteOpticoPayload,
   type TestePotenciaPayload,
 } from "@/lib/relatorios-transmissao";
+
+type JanelaNm = "1550" | "1330";
+type PontoMedicao = "cliente" | "estacao";
+
+const CARDS: { janela: JanelaNm; ponto: PontoMedicao; titulo: string }[] = [
+  { janela: "1550", ponto: "cliente", titulo: "TESTE DE POTÊNCIA - 1550nm (No Cliente)" },
+  { janela: "1330", ponto: "cliente", titulo: "TESTE DE POTÊNCIA - 1330nm (No Cliente)" },
+  { janela: "1550", ponto: "estacao", titulo: "TESTE DE POTÊNCIA - 1550nm (Na Estação)" },
+  { janela: "1330", ponto: "estacao", titulo: "TESTE DE POTÊNCIA - 1330nm (Na Estação)" },
+];
 
 export function RelatorioTestePotenciaAtenuacao({
   testeOptico,
@@ -31,8 +40,6 @@ export function RelatorioTestePotenciaAtenuacao({
   redeCliente: QuantidadesRedePayload;
 }) {
   const km = parseNumeroCampo(testeOtdr.comprimentoTrechoKm ?? "") ?? 0;
-  const pi1550 = parseNumeroCampo(testeOptico.estacao.nm1550[0]?.dbm ?? "") ?? 0;
-  const pi1330 = parseNumeroCampo(testeOptico.estacao.nm1330[0]?.dbm ?? "") ?? 0;
   const totalEmendas = totalEmendasCalculado(
     redeAcesso.qtdCaixasEmenda,
     redeCliente.qtdCaixasEmenda,
@@ -41,49 +48,92 @@ export function RelatorioTestePotenciaAtenuacao({
 
   return (
     <div className="space-y-4">
-      <JanelaCard
-        titulo="TESTE DE POTÊNCIA - 1550nm"
-        janelaNm="1550 nm"
-        km={km}
-        pi={pi1550}
-        faixaCliente={testeOptico.cliente.nm1550}
-        totalEmendas={totalEmendas}
-        totalConexoes={totalConexoes}
-      />
-      <JanelaCard
-        titulo="TESTE DE POTÊNCIA - 1330nm"
-        janelaNm="1330 nm"
-        km={km}
-        pi={pi1330}
-        faixaCliente={testeOptico.cliente.nm1330}
-        totalEmendas={totalEmendas}
-        totalConexoes={totalConexoes}
-      />
+      {CARDS.map((card) => (
+        <JanelaCard
+          key={card.titulo}
+          titulo={card.titulo}
+          janela={card.janela}
+          ponto={card.ponto}
+          km={km}
+          testeOptico={testeOptico}
+          totalEmendas={totalEmendas}
+          totalConexoes={totalConexoes}
+        />
+      ))}
     </div>
   );
 }
 
-function fibrasDeCliente(faixa: TesteOpticoFaixaPayload) {
-  return [{ numero: "01", potenciaMedida: faixa.dbm ?? "" }];
+function dbmTexto(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const obj = raw as { dbm?: unknown; dBm?: unknown };
+  const valor = obj.dbm ?? obj.dBm;
+  return valor == null ? "" : String(valor);
+}
+
+function listaOuItem(raw: unknown): unknown[] {
+  if (raw == null) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
+function janelaCliente(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
+  return janela === "1550" ? testeOptico.cliente?.nm1550 : testeOptico.cliente?.nm1330;
+}
+
+function janelaEstacao(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
+  return janela === "1550" ? testeOptico.estacao?.nm1550 : testeOptico.estacao?.nm1330;
+}
+
+/** Pi e Po vêm da mesma localidade (cliente ou estação), 1:1 com o card. */
+function piDoPonto(
+  testeOptico: TesteOpticoPayload,
+  janela: JanelaNm,
+  ponto: PontoMedicao,
+): number | null {
+  const origem =
+    ponto === "cliente"
+      ? janelaCliente(testeOptico, janela)
+      : janelaEstacao(testeOptico, janela);
+  return parseNumeroCampo(dbmTexto(listaOuItem(origem)[0]));
+}
+
+/** Po = medições no ponto do card. */
+function fibrasDoPonto(
+  testeOptico: TesteOpticoPayload,
+  janela: JanelaNm,
+  ponto: PontoMedicao,
+) {
+  const origem =
+    ponto === "cliente"
+      ? janelaCliente(testeOptico, janela)
+      : janelaEstacao(testeOptico, janela);
+  return listaOuItem(origem).map((item, index) => ({
+    numero: String(index + 1).padStart(2, "0"),
+    potenciaMedida: dbmTexto(item),
+  }));
 }
 
 function JanelaCard({
   titulo,
-  janelaNm,
+  janela,
+  ponto,
   km,
-  pi,
-  faixaCliente,
+  testeOptico,
   totalEmendas,
   totalConexoes,
 }: {
   titulo: string;
-  janelaNm: string;
+  janela: JanelaNm;
+  ponto: PontoMedicao;
   km: number;
-  pi: number;
-  faixaCliente: TesteOpticoFaixaPayload;
+  testeOptico: TesteOpticoPayload;
   totalEmendas: number;
   totalConexoes: number;
 }) {
+  const pi = piDoPonto(testeOptico, janela, ponto);
+  const fibras = fibrasDoPonto(testeOptico, janela, ponto);
+  const janelaNm = `${janela} nm`;
+  const origemPo = ponto === "cliente" ? "No Cliente" : "Na Estação";
   const atenMaxima = useMemo(
     () => calcularAtenuacaoMaxima(km, totalEmendas, totalConexoes),
     [km, totalEmendas, totalConexoes],
@@ -92,7 +142,6 @@ function JanelaCard({
     () => calcularMinimoAdmissivel(pi, atenMaxima),
     [pi, atenMaxima],
   );
-  const fibras = useMemo(() => fibrasDeCliente(faixaCliente), [faixaCliente]);
 
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -101,13 +150,21 @@ function JanelaCard({
         <CampoImportado label="Comprimento do Trecho (km)" value={formatarKm(km)} />
         <CampoImportado label="Nº de Emendas" value={String(totalEmendas)} />
         <CampoImportado label="Nº de Conexões" value={String(totalConexoes)} />
-        <CampoImportado label="Referência do Instrumento (Pi) em dBm" value={formatarDb(pi, 2)} />
+        <CampoImportado
+          label="Referência do Instrumento (Pi) em dBm"
+          value={pi == null ? "" : formatarDb(pi, 2)}
+        />
       </div>
-      <ValoresReferencia janelaNm={janelaNm} valorMinimoAdmissivel={valorMinimoAdmissivel} />
+      <ValoresReferencia
+        janelaNm={janelaNm}
+        valorMinimoAdmissivel={
+          valorMinimoAdmissivel == null ? "—" : formatarDb(valorMinimoAdmissivel, 2)
+        }
+      />
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Fibras</h3>
         <p className="text-xs text-muted-foreground">
-          Potência medida (Po) importada do Teste Óptico (No Cliente).
+          Potência medida (Po) importada do Teste Óptico ({origemPo}).
         </p>
         <div className="hidden gap-4 px-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-4">
           <span>Fibra Nº</span>
@@ -118,7 +175,7 @@ function JanelaCard({
         <div className="divide-y divide-border">
           {fibras.map((fibra) => (
             <LinhaFibra
-              key={fibra.numero}
+              key={`${janela}-${ponto}-${fibra.numero}`}
               numero={fibra.numero}
               potenciaMedida={fibra.potenciaMedida}
               pi={pi}
@@ -139,13 +196,17 @@ function LinhaFibra({
 }: {
   numero: string;
   potenciaMedida: string;
-  pi: number;
-  valorMinimoAdmissivel: number;
+  pi: number | null;
+  valorMinimoAdmissivel: number | null;
 }) {
   const po = parseNumeroCampo(potenciaMedida);
   const atenuacao = calcularAtenuacaoFibra(potenciaMedida, pi);
   const status =
-    po == null ? null : po >= valorMinimoAdmissivel ? "aprovado" : "reprovado";
+    po == null || pi == null || valorMinimoAdmissivel == null
+      ? null
+      : po >= valorMinimoAdmissivel
+        ? "aprovado"
+        : "reprovado";
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">
@@ -181,7 +242,7 @@ function ValoresReferencia({
   valorMinimoAdmissivel,
 }: {
   janelaNm: string;
-  valorMinimoAdmissivel: number;
+  valorMinimoAdmissivel: string;
 }) {
   return (
     <table className="mb-4 w-full border-collapse text-xs text-gray-700 md:text-sm">
@@ -200,7 +261,7 @@ function ValoresReferencia({
               <span className="font-semibold text-red-600">Po</span>:
             </>
           }
-          valor={formatarDb(valorMinimoAdmissivel, 2)}
+          valor={valorMinimoAdmissivel}
           unidade="dBm"
           destaque
         />

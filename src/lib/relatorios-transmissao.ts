@@ -147,14 +147,18 @@ export function calcularAtenuacaoMaxima(km: number, emendas: number, conexoes: n
   );
 }
 
-export function calcularMinimoAdmissivel(pi: number, atenuacaoMax: number): number {
-  return numeroOuZero(pi) - numeroOuZero(atenuacaoMax);
+export function calcularMinimoAdmissivel(pi: number | null, atenuacaoMax: number): number | null {
+  if (pi == null || !Number.isFinite(pi)) return null;
+  return pi - numeroOuZero(atenuacaoMax);
 }
 
-export function calcularAtenuacaoFibra(potenciaMedida: string, pi: number): number | null {
+export function calcularAtenuacaoFibra(
+  potenciaMedida: string,
+  pi: number | null,
+): number | null {
   const po = parseNumeroCampo(potenciaMedida);
-  if (po == null) return null;
-  return po - numeroOuZero(pi);
+  if (po == null || pi == null || !Number.isFinite(pi)) return null;
+  return po - pi;
 }
 
 export function formatarDb(valor: number, casas = 3): string {
@@ -524,7 +528,7 @@ function parseFotosList(raw: unknown): StoredPhoto[] {
 function parseTesteOpticoFaixa(raw: unknown): TesteOpticoFaixaPayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoFaixaPayload>;
   return {
-    dbm: src.dbm ?? "",
+    dbm: src.dbm ?? (src as { dBm?: string }).dBm ?? "",
     fotos: parseFotosList(src.fotos),
     obs: src.obs ?? "",
     obsAdmin: readObsAdmin(src),
@@ -537,7 +541,7 @@ function parseTesteOpticoItems(raw: unknown): TesteOpticoItemPayload[] {
         const src = (item ?? {}) as Partial<TesteOpticoItemPayload>;
         return {
           id: src.id || crypto.randomUUID(),
-          dbm: src.dbm ?? "",
+          dbm: src.dbm ?? (src as { dBm?: string }).dBm ?? "",
           foto: parseStoredPhoto(src.foto),
           obs: src.obs ?? "",
           obsAdmin: readObsAdmin(src),
