@@ -19,6 +19,7 @@ import {
   type TesteOpticoPayload,
   type TesteOtdrItemPayload,
   type TestePotenciaPayload,
+  type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
 
 type ChangeOpts = { immediate?: boolean };
@@ -367,16 +368,26 @@ export function RelatorioTesteOptico({
 }
 
 export function RelatorioTestePotencia({
-  value,
-  onChange,
+  tipoExecucao,
+  valueEmpresarial,
+  valueImplantacao,
+  onChangeEmpresarial,
+  onChangeImplantacao,
   onUploadPhoto,
   readOnly,
 }: {
-  value: TestePotenciaPayload;
-  onChange: (next: TestePotenciaPayload, opts?: ChangeOpts) => void;
+  tipoExecucao: TipoExecucao;
+  valueEmpresarial: TestePotenciaPayload;
+  valueImplantacao: TestePotenciaPayload;
+  onChangeEmpresarial: (next: TestePotenciaPayload, opts?: ChangeOpts) => void;
+  onChangeImplantacao: (next: TestePotenciaPayload, opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
   readOnly: boolean;
 }) {
+  const isImplantacao = tipoExecucao === "implantacao";
+  const value = isImplantacao ? valueImplantacao : valueEmpresarial;
+  const onChange = isImplantacao ? onChangeImplantacao : onChangeEmpresarial;
+
   const patchItem = (id: string, patch: Partial<TesteOtdrItemPayload>, opts?: ChangeOpts) => {
     onChange(
       { otdr: value.otdr.map((item) => (item.id === id ? { ...item, ...patch } : item)) },

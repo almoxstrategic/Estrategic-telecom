@@ -1017,11 +1017,17 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "teste-potencia" ? (
         <RelatorioTestePotencia
+          tipoExecucao={isImplantacao ? "implantacao" : "empresarial"}
           readOnly={!canEditPhotos}
-          value={payload?.testePotencia ?? emptyTestePotencia()}
-          onChange={(next) => {
+          valueEmpresarial={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
+          valueImplantacao={payload?.testePotenciaImplantacao ?? emptyTestePotencia()}
+          onChangeEmpresarial={(next) => {
             if (!payload) return;
-            patchPayload({ ...payload, testePotencia: next });
+            patchPayload({ ...payload, testePotenciaEmpresarial: next });
+          }}
+          onChangeImplantacao={(next) => {
+            if (!payload) return;
+            patchPayload({ ...payload, testePotenciaImplantacao: next });
           }}
           onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
         />

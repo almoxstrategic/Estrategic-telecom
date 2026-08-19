@@ -244,7 +244,12 @@ function RelatorioPage() {
   const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
   const [outrasEqEstacao, setOutrasEqEstacao] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [testeOptico, setTesteOptico] = useState<TesteOpticoPayload>(() => emptyTesteOptico());
-  const [testePotencia, setTestePotencia] = useState<TestePotenciaPayload>(() => emptyTestePotencia());
+  const [testePotenciaEmpresarial, setTestePotenciaEmpresarial] = useState<TestePotenciaPayload>(
+    () => emptyTestePotencia(),
+  );
+  const [testePotenciaImplantacao, setTestePotenciaImplantacao] = useState<TestePotenciaPayload>(
+    () => emptyTestePotencia(),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [dadosExpandidos, setDadosExpandidos] = useState(false);
@@ -367,7 +372,8 @@ function RelatorioPage() {
       ),
       outrasFotosEqEstacao: outrasParaPayload(outrasEqEstacao),
       testeOptico,
-      testePotencia,
+      testePotenciaEmpresarial,
+      testePotenciaImplantacao,
     };
   }, [
     tipo,
@@ -413,7 +419,8 @@ function RelatorioPage() {
     estacaoEntregaAcesso,
     outrasEqEstacao,
     testeOptico,
-    testePotencia,
+    testePotenciaEmpresarial,
+    testePotenciaImplantacao,
   ]);
 
   const persistDraft = useCallback(
@@ -512,7 +519,8 @@ function RelatorioPage() {
       estacaoEntregaAcesso,
       outrasEqEstacao,
       testeOptico,
-      testePotencia,
+      testePotenciaEmpresarial,
+      testePotenciaImplantacao,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -598,7 +606,8 @@ function RelatorioPage() {
     setEstacaoEntregaAcesso(p.estacaoEntregaAcesso ?? "");
     setOutrasEqEstacao(outrasFromPayload(p.outrasFotosEqEstacao));
     setTesteOptico(p.testeOptico ?? emptyTesteOptico());
-    setTestePotencia(p.testePotencia ?? emptyTestePotencia());
+    setTestePotenciaEmpresarial(p.testePotenciaEmpresarial ?? emptyTestePotencia());
+    setTestePotenciaImplantacao(p.testePotenciaImplantacao ?? emptyTestePotencia());
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
@@ -1442,17 +1451,29 @@ function RelatorioPage() {
                 />
               ) : mostrarTestePotencia ? (
                 <RelatorioTestePotencia
+                  tipoExecucao={tipo === "implantacao" ? "implantacao" : "empresarial"}
                   readOnly={readOnly}
-                  value={testePotencia}
-                  onChange={(next, opts) => {
-                    setTestePotencia(next);
+                  valueEmpresarial={testePotenciaEmpresarial}
+                  valueImplantacao={testePotenciaImplantacao}
+                  onChangeEmpresarial={(next, opts) => {
+                    setTestePotenciaEmpresarial(next);
                     if (opts?.immediate) {
-                      void persistDraft({ ...buildPayload(), testePotencia: next });
+                      void persistDraft({ ...buildPayload(), testePotenciaEmpresarial: next });
+                    }
+                  }}
+                  onChangeImplantacao={(next, opts) => {
+                    setTestePotenciaImplantacao(next);
+                    if (opts?.immediate) {
+                      void persistDraft({ ...buildPayload(), testePotenciaImplantacao: next });
                     }
                   }}
                   onUploadPhoto={async (file) => {
                     if (!user?.id) throw new Error("Sessão inválida.");
-                    return uploadRelatorioPhoto(user.id, file.file, "teste-potencia");
+                    const tag =
+                      tipo === "implantacao"
+                        ? "teste-potencia-implantacao"
+                        : "teste-potencia-empresarial";
+                    return uploadRelatorioPhoto(user.id, file.file, tag);
                   }}
                 />
               ) : null}

@@ -185,7 +185,8 @@ export type RelatorioPayload = {
   eqEstacaoDgo: FotoGrupoPayload;
   outrasFotosEqEstacao: OutraFotoPayload[];
   testeOptico: TesteOpticoPayload;
-  testePotencia: TestePotenciaPayload;
+  testePotenciaEmpresarial: TestePotenciaPayload;
+  testePotenciaImplantacao: TestePotenciaPayload;
 };
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
@@ -318,7 +319,8 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     eqEstacaoDgo: emptyFotoGrupo(),
     outrasFotosEqEstacao: [],
     testeOptico: emptyTesteOptico(),
-    testePotencia: emptyTestePotencia(),
+    testePotenciaEmpresarial: emptyTestePotencia(),
+    testePotenciaImplantacao: emptyTestePotencia(),
   };
 }
 
@@ -472,7 +474,32 @@ function parseTestePotencia(raw: unknown): TestePotenciaPayload {
   return { otdr: parseTesteOtdrItems(src.otdr) };
 }
 
-function parsePayload(raw: unknown): RelatorioPayload {
+function parseTestesPotenciaSeparados(
+  src: Partial<RelatorioPayload> & { testePotencia?: unknown },
+  tipoExecucao?: TipoExecucao | null,
+): Pick<RelatorioPayload, "testePotenciaEmpresarial" | "testePotenciaImplantacao"> {
+  const temEmpresarial = src.testePotenciaEmpresarial != null;
+  const temImplantacao = src.testePotenciaImplantacao != null;
+  if (temEmpresarial || temImplantacao) {
+    return {
+      testePotenciaEmpresarial: parseTestePotencia(src.testePotenciaEmpresarial),
+      testePotenciaImplantacao: parseTestePotencia(src.testePotenciaImplantacao),
+    };
+  }
+  const legado = parseTestePotencia(src.testePotencia);
+  if (tipoExecucao === "implantacao") {
+    return {
+      testePotenciaEmpresarial: emptyTestePotencia(),
+      testePotenciaImplantacao: legado,
+    };
+  }
+  return {
+    testePotenciaEmpresarial: legado,
+    testePotenciaImplantacao: emptyTestePotencia(),
+  };
+}
+
+function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): RelatorioPayload {
   const base = emptyRelatorioPayload();
   if (!raw || typeof raw !== "object") return base;
   const src = raw as Partial<RelatorioPayload>;
@@ -517,7 +544,10 @@ function parsePayload(raw: unknown): RelatorioPayload {
     eqEstacaoDgo: parseFotoGrupo(base.eqEstacaoDgo, src.eqEstacaoDgo),
     outrasFotosEqEstacao: parseOutrasFotos(src.outrasFotosEqEstacao),
     testeOptico: parseTesteOptico(src.testeOptico),
-    testePotencia: parseTestePotencia(src.testePotencia),
+    ...parseTestesPotenciaSeparados(
+      src as Partial<RelatorioPayload> & { testePotencia?: unknown },
+      tipoExecucao,
+    ),
   };
 }
 
@@ -633,6 +663,14 @@ function mergeTesteOtdrItem(
   server: TesteOtdrItemPayload,
   local: TesteOtdrItemPayload,
 ): TesteOtdrItemPayload {
+  const localVazio =
+    !local.distancia.trim() && !local.foto && !local.obs.trim() && !local.obsAdmin.trim();
+  const serverPreenchido = Boolean(
+    server.distancia.trim() || server.foto || server.obs.trim() || server.obsAdmin.trim(),
+  );
+  if (localVazio && serverPreenchido) {
+    return server;
+  }
   return {
     ...server,
     distancia: local.distancia,
@@ -698,7 +736,14 @@ export function mergeRelatorioPayload(
       mergeOutra,
     ),
     testeOptico: mergeTesteOptico(server.testeOptico, local.testeOptico),
-    testePotencia: mergeTestePotencia(server.testePotencia, local.testePotencia),
+    testePotenciaEmpresarial: mergeTestePotencia(
+      server.testePotenciaEmpresarial,
+      local.testePotenciaEmpresarial,
+    ),
+    testePotenciaImplantacao: mergeTestePotencia(
+      server.testePotenciaImplantacao,
+      local.testePotenciaImplantacao,
+    ),
     ...grupos,
   };
 }
@@ -759,7 +804,7 @@ function mapRow(row: DbRow): RelatorioTransmissao {
     data_inicio_execucao: row.data_inicio_execucao ?? "",
     tipo_execucao: row.tipo_execucao,
     status: row.status,
-    payload: parsePayload(row.payload),
+    payload: parsePayload(row.payload, row.tipo_execucao),
     motivo_pendencia: row.motivo_pendencia ?? null,
     data_pendencia: row.data_pendencia ?? null,
     avisado_at: row.avisado_at,
