@@ -464,7 +464,7 @@ export function RelatorioDetalhe({
   useEffect(() => {
     if (isEmpresarial) return;
     setAbaAtiva((atual) =>
-      atual === "RE" || (isImplantacao && atual === "teste-potencia") ? atual : "RE",
+      atual === "RE" || (isImplantacao && atual === "teste-otdr") ? atual : "RE",
     );
   }, [isEmpresarial, isImplantacao]);
 
@@ -1015,7 +1015,7 @@ export function RelatorioDetalhe({
         />
       ) : null}
 
-      {abaAtiva === "teste-potencia" ? (
+      {abaAtiva === "teste-otdr" ? (
         <RelatorioTestePotencia
           tipoExecucao={isImplantacao ? "implantacao" : "empresarial"}
           readOnly={!canEditPhotos}
@@ -1031,6 +1031,10 @@ export function RelatorioDetalhe({
           }}
           onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
         />
+      ) : null}
+
+      {abaAtiva === "teste-potencia" ? (
+        <div className="rounded-xl border border-border/80 bg-muted/20 p-4" />
       ) : null}
     </div>
   );

@@ -13,19 +13,26 @@ import {
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
 
-export type AbaCampo = "RE" | "RC" | "equipamento" | "teste-optico" | "teste-potencia";
+export type AbaCampo =
+  | "RE"
+  | "RC"
+  | "equipamento"
+  | "teste-optico"
+  | "teste-otdr"
+  | "teste-potencia";
 
 export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "RE", label: "Rede Acesso (RE)" },
   { id: "RC", label: "Rede Cliente (RC)" },
   { id: "equipamento", label: "Equipamento" },
   { id: "teste-optico", label: "Teste Óptico" },
-  { id: "teste-potencia", label: "Teste Potência" },
+  { id: "teste-otdr", label: "Teste OTDR" },
+  { id: "teste-potencia", label: "Teste de Potência" },
 ];
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
   { id: "RE", label: "Rede Acesso (RE)" },
-  { id: "teste-potencia", label: "Teste Potência" },
+  { id: "teste-otdr", label: "Teste OTDR" },
 ];
 
 export type OutraFotoState = {
@@ -166,7 +173,10 @@ export function RelatorioAbasCampo({
   abas?: { id: AbaCampo; label: string }[];
 }) {
   return (
-    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Seções do relatório">
+    <nav
+      className="flex flex-wrap justify-center gap-2"
+      aria-label="Seções do relatório"
+    >
       {abas.map((aba) => {
         const ativa = abaAtiva === aba.id;
         return (
@@ -174,7 +184,7 @@ export function RelatorioAbasCampo({
             key={aba.id}
             type="button"
             onClick={() => onChange(aba.id)}
-            className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold whitespace-nowrap transition ${
+            className={`w-auto rounded-full border px-3 py-1.5 text-center text-xs font-semibold md:text-sm transition ${
               ativa
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card text-muted-foreground hover:bg-muted"

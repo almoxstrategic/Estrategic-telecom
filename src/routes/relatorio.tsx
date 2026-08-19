@@ -626,7 +626,7 @@ function RelatorioPage() {
 
   useEffect(() => {
     if (tipo !== "implantacao") return;
-    setAbaCampo((atual) => (atual === "RE" || atual === "teste-potencia" ? atual : "RE"));
+    setAbaCampo((atual) => (atual === "RE" || atual === "teste-otdr" ? atual : "RE"));
   }, [tipo]);
 
   useEffect(() => {
@@ -896,8 +896,9 @@ function RelatorioPage() {
   const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
   const mostrarEquipamento = tipo === "empresarial" && abaCampo === "equipamento";
   const mostrarTesteOptico = tipo === "empresarial" && abaCampo === "teste-optico";
-  const mostrarTestePotencia =
-    (tipo === "empresarial" || tipo === "implantacao") && abaCampo === "teste-potencia";
+  const mostrarTesteOtdr =
+    (tipo === "empresarial" || tipo === "implantacao") && abaCampo === "teste-otdr";
+  const mostrarTestePotencia = tipo === "empresarial" && abaCampo === "teste-potencia";
   const nomesOutros = tecnicosAtribuidos
     .map((id, index) => (id === user?.id ? "" : tecnicosNomes[index] ?? ""))
     .map((nome) => nome.trim())
@@ -1426,7 +1427,7 @@ function RelatorioPage() {
                     return uploadRelatorioPhoto(user.id, file.file, "teste-optico");
                   }}
                 />
-              ) : mostrarTestePotencia ? (
+              ) : mostrarTesteOtdr ? (
                 <RelatorioTestePotencia
                   tipoExecucao={tipo === "implantacao" ? "implantacao" : "empresarial"}
                   readOnly={readOnly}
@@ -1453,6 +1454,8 @@ function RelatorioPage() {
                     return uploadRelatorioPhoto(user.id, file.file, tag);
                   }}
                 />
+              ) : mostrarTestePotencia ? (
+                <div className="rounded-2xl border border-border bg-card p-5 shadow-sm" />
               ) : null}
             </>
           ) : null}
