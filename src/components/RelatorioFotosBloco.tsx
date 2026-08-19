@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
@@ -27,6 +28,7 @@ export function slotsFromStored(fotos: StoredPhoto[], minSlots: number): FotoSlo
 export function RelatorioFotosBloco({
   title,
   hint,
+  headerExtra,
   slots,
   onChange,
   obs,
@@ -37,6 +39,7 @@ export function RelatorioFotosBloco({
 }: {
   title: string;
   hint?: string;
+  headerExtra?: ReactNode;
   slots: FotoSlot[];
   onChange: (slots: FotoSlot[]) => void;
   obs: string;
@@ -70,6 +73,7 @@ export function RelatorioFotosBloco({
         <h2 className="text-base font-bold">{title}</h2>
         {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
       </div>
+      {headerExtra}
 
       {slots.map((slot, index) => {
         const podeExcluir = !readOnly && index >= minSlots;

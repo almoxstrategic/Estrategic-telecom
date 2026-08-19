@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
+import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
 import {
   RelatorioAbasCampo,
   RelatorioRedeAcesso,
@@ -27,9 +28,11 @@ import type { EvidencePhotoRef } from "@/lib/types";
 import {
   avisarConclusaoRelatorio,
   emptyCaboMetragem,
+  emptyQuantidadesRede,
   emptyRelatorioPayload,
   emptyTesteOptico,
   emptyTestePotencia,
+  emptyTestePotenciaJanela,
   fetchRelatorioTransmissaoById,
   isTecnicoAtribuido,
   patchRelatorioDraft,
@@ -41,10 +44,12 @@ import {
   type RelatorioFotoGrupoKey,
   type RelatorioFotoGrupoKeyEq,
   type RelatorioPayload,
+  type QuantidadesRedePayload,
   type RelatorioStatus,
   type RelatorioTransmissao,
   type StoredPhoto,
   type TesteOpticoPayload,
+  type TestePotenciaJanelaPayload,
   type TestePotenciaPayload,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
@@ -219,6 +224,8 @@ function RelatorioPage() {
   const [etiqueta, setEtiqueta] = useState<FotoSlot[]>([newFotoSlot()]);
   const [etiquetaObs, setEtiquetaObs] = useState("");
   const [outras, setOutras] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
+  const [redeAcesso, setRedeAcesso] = useState<QuantidadesRedePayload>(() => emptyQuantidadesRede());
+  const [redeCliente, setRedeCliente] = useState<QuantidadesRedePayload>(() => emptyQuantidadesRede());
   const [obsAdminGrupos, setObsAdminGrupos] = useState<
     Partial<Record<RelatorioFotoGrupoKey, string>>
   >({});
@@ -249,6 +256,12 @@ function RelatorioPage() {
   );
   const [testePotenciaImplantacao, setTestePotenciaImplantacao] = useState<TestePotenciaPayload>(
     () => emptyTestePotencia(),
+  );
+  const [testePotencia1550, setTestePotencia1550] = useState<TestePotenciaJanelaPayload>(
+    () => emptyTestePotenciaJanela(),
+  );
+  const [testePotencia1330, setTestePotencia1330] = useState<TestePotenciaJanelaPayload>(
+    () => emptyTestePotenciaJanela(),
   );
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -284,6 +297,7 @@ function RelatorioPage() {
       etiquetaIdentificacao: grupoPayload(etiqueta, etiquetaObs, obsAdminGrupos.etiquetaIdentificacao),
       sobraTecnica: grupoPayload(sobra, sobraObs, obsAdminGrupos.sobraTecnica),
       outrasFotos: outrasParaPayload(outras),
+      redeAcesso,
       tecnologiaAcesso,
       lancamentoRc:
         lancamentoCabosRC === "sim" ? true : lancamentoCabosRC === "nao" ? false : null,
@@ -307,6 +321,7 @@ function RelatorioPage() {
         obsAdminGrupos.rcEntradaExterna,
       ),
       outrasFotosRc: outrasParaPayload(outrasRc),
+      redeCliente,
       eqClienteFachada: grupoPayload(
         eqGrupos.eqClienteFachada.slots,
         eqGrupos.eqClienteFachada.obs,
@@ -374,6 +389,8 @@ function RelatorioPage() {
       testeOptico,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
+      testePotencia1550,
+      testePotencia1330,
     };
   }, [
     tipo,
@@ -396,6 +413,7 @@ function RelatorioPage() {
     sobra,
     sobraObs,
     outras,
+    redeAcesso,
     obsAdminGrupos,
     tecnologiaAcesso,
     lancamentoCabosRC,
@@ -413,6 +431,7 @@ function RelatorioPage() {
     rcEntradaExterna,
     rcEntradaExternaObs,
     outrasRc,
+    redeCliente,
     eqGrupos,
     outrasEqCliente,
     relatorioEstacao,
@@ -421,6 +440,8 @@ function RelatorioPage() {
     testeOptico,
     testePotenciaEmpresarial,
     testePotenciaImplantacao,
+    testePotencia1550,
+    testePotencia1330,
   ]);
 
   const persistDraft = useCallback(
@@ -494,6 +515,7 @@ function RelatorioPage() {
       posicao,
       etiqueta,
       outras,
+      redeAcesso,
       tecnologiaAcesso,
       lancamentoCabosRC,
       cabosRc,
@@ -510,6 +532,7 @@ function RelatorioPage() {
       rcEntradaInterna,
       rcEntradaExterna,
       outrasRc,
+      redeCliente,
       eqGrupos,
       outrasEqCliente,
       relatorioEstacao,
@@ -518,6 +541,8 @@ function RelatorioPage() {
       testeOptico,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
+      testePotencia1550,
+      testePotencia1330,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -565,6 +590,7 @@ function RelatorioPage() {
     setEtiqueta(slotsFromStored(p.etiquetaIdentificacao?.fotos ?? [], 1));
     setEtiquetaObs(p.etiquetaIdentificacao?.obs ?? "");
     setOutras(outrasFromPayload(p.outrasFotos));
+    setRedeAcesso(p.redeAcesso ?? emptyQuantidadesRede());
     setObsAdminGrupos({
       posteConexao: readObsAdmin(p.posteConexao),
       caixaEmenda: readObsAdmin(p.caixaEmenda),
@@ -597,6 +623,7 @@ function RelatorioPage() {
     setRcEntradaExterna(slotsFromStored(p.rcEntradaExterna?.fotos ?? [], 1));
     setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
     setOutrasRc(outrasFromPayload(p.outrasFotosRc));
+    setRedeCliente(p.redeCliente ?? emptyQuantidadesRede());
     setEqGrupos(eqGruposFromPayload(p));
     setOutrasEqCliente(outrasFromPayload(p.outrasFotosEqCliente));
     setRelatorioEstacao(p.relatorioEstacao === true ? "sim" : "nao");
@@ -605,6 +632,8 @@ function RelatorioPage() {
     setTesteOptico(p.testeOptico ?? emptyTesteOptico());
     setTestePotenciaEmpresarial(p.testePotenciaEmpresarial ?? emptyTestePotencia());
     setTestePotenciaImplantacao(p.testePotenciaImplantacao ?? emptyTestePotencia());
+    setTestePotencia1550(p.testePotencia1550 ?? emptyTestePotenciaJanela());
+    setTestePotencia1330(p.testePotencia1330 ?? emptyTestePotenciaJanela());
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
@@ -1084,6 +1113,15 @@ function RelatorioPage() {
                       onObsChange: setCaixaObs,
                       obsAdmin: obsAdminGrupos.caixaEmenda ?? "",
                       onObsAdminChange: patchObsAdminGrupo("caixaEmenda"),
+                      ...(tipo === "empresarial"
+                        ? {
+                            quantidade: redeAcesso.qtdCaixasEmenda,
+                            quantidadeLabel: "Quantidade de Caixas de Emenda",
+                            quantidadePlaceholder: "Ex: 4",
+                            onQuantidadeChange: (qtdCaixasEmenda: number | null) =>
+                              setRedeAcesso((prev) => ({ ...prev, qtdCaixasEmenda })),
+                          }
+                        : {}),
                     },
                     {
                       grupoKey: "plaquetaIdentificacao",
@@ -1215,6 +1253,11 @@ function RelatorioPage() {
                       onObsChange: setRcCaixaObs,
                       obsAdmin: obsAdminGrupos.rcCaixaEmenda ?? "",
                       onObsAdminChange: patchObsAdminGrupo("rcCaixaEmenda"),
+                      quantidade: redeCliente.qtdCaixasEmenda,
+                      quantidadeLabel: "Quantidade de Caixas de Emenda",
+                      quantidadePlaceholder: "Ex: 1",
+                      onQuantidadeChange: (qtdCaixasEmenda) =>
+                        setRedeCliente((prev) => ({ ...prev, qtdCaixasEmenda })),
                     },
                     {
                       grupoKey: "rcTerminacaoCabo",
@@ -1455,7 +1498,25 @@ function RelatorioPage() {
                   }}
                 />
               ) : mostrarTestePotencia ? (
-                <div className="rounded-2xl border border-border bg-card p-5 shadow-sm" />
+                <RelatorioTestePotenciaAtenuacao
+                  readOnly={readOnly}
+                  testeOptico={testeOptico}
+                  otdr={testePotenciaEmpresarial}
+                  value1550={testePotencia1550}
+                  value1330={testePotencia1330}
+                  onChange1550={(next, opts) => {
+                    setTestePotencia1550(next);
+                    if (opts?.immediate) {
+                      void persistDraft({ ...buildPayload(), testePotencia1550: next });
+                    }
+                  }}
+                  onChange1330={(next, opts) => {
+                    setTestePotencia1330(next);
+                    if (opts?.immediate) {
+                      void persistDraft({ ...buildPayload(), testePotencia1330: next });
+                    }
+                  }}
+                />
               ) : null}
             </>
           ) : null}

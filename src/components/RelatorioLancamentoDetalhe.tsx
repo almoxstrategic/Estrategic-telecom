@@ -8,7 +8,8 @@ import {
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
-import { ABAS_CAMPO, ABAS_CAMPO_IMPLANTACAO, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
+import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
+import { ABAS_CAMPO, ABAS_CAMPO_IMPLANTACAO, CampoQuantidade, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
@@ -16,8 +17,10 @@ import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
   emptyCaboMetragem,
+  emptyQuantidadesRede,
   emptyTesteOptico,
   emptyTestePotencia,
+  emptyTestePotenciaJanela,
   labelTecnicosAtribuidos,
   removeExtraById,
   removeFotoGrupoAt,
@@ -278,6 +281,10 @@ function EvidenciaBloco({
   onRemoveCaboCampo,
   onReplaceCaboCampo,
   onTitleChange,
+  quantidade,
+  quantidadeLabel,
+  quantidadePlaceholder,
+  onQuantidadeChange,
 }: {
   title: string;
   obs?: string | null;
@@ -294,8 +301,21 @@ function EvidenciaBloco({
   onRemoveCaboCampo?: (campo: "fotoInicio" | "fotoFim") => void;
   onReplaceCaboCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
   onTitleChange?: (value: string) => void;
+  quantidade?: number | null;
+  quantidadeLabel?: string;
+  quantidadePlaceholder?: string;
+  onQuantidadeChange?: (value: number | null) => void;
 }) {
-  if (!fotos.length && !caboFotos?.inicio && !caboFotos?.fim && !obs && !canEdit && !onObsChange && !onTitleChange) {
+  if (
+    !fotos.length &&
+    !caboFotos?.inicio &&
+    !caboFotos?.fim &&
+    !obs &&
+    !canEdit &&
+    !onObsChange &&
+    !onTitleChange &&
+    quantidadeLabel == null
+  ) {
     return null;
   }
   return (
@@ -317,6 +337,15 @@ function EvidenciaBloco({
           </button>
         ) : null}
       </div>
+      {quantidadeLabel ? (
+        <CampoQuantidade
+          label={quantidadeLabel}
+          placeholder={quantidadePlaceholder ?? "Ex: 0"}
+          value={quantidade ?? null}
+          onChange={onQuantidadeChange}
+          disabled={!onQuantidadeChange}
+        />
+      ) : null}
       <div className="mt-3 flex-1">
         {caboFotos ? (
           <CaboFotos
@@ -511,12 +540,49 @@ export function RelatorioDetalhe({
 
   const renderGrupo = (title: string, key: RelatorioFotoGrupoKey) => {
     const grupo = payload?.[key];
+    const qtd =
+      isEmpresarial && payload
+        ? key === "caixaEmenda"
+          ? {
+              quantidade: payload.redeAcesso?.qtdCaixasEmenda ?? null,
+              quantidadeLabel: "Quantidade de Caixas de Emenda",
+              quantidadePlaceholder: "Ex: 4",
+              onQuantidadeChange: canEditPhotos
+                ? (qtdCaixasEmenda: number | null) =>
+                    patchPayload({
+                      ...payload,
+                      redeAcesso: {
+                        ...(payload.redeAcesso ?? emptyQuantidadesRede()),
+                        qtdCaixasEmenda,
+                      },
+                    })
+                : undefined,
+            }
+          : key === "rcCaixaEmenda"
+            ? {
+                quantidade: payload.redeCliente?.qtdCaixasEmenda ?? null,
+                quantidadeLabel: "Quantidade de Caixas de Emenda",
+                quantidadePlaceholder: "Ex: 1",
+                onQuantidadeChange: canEditPhotos
+                  ? (qtdCaixasEmenda: number | null) =>
+                      patchPayload({
+                        ...payload,
+                        redeCliente: {
+                          ...(payload.redeCliente ?? emptyQuantidadesRede()),
+                          qtdCaixasEmenda,
+                        },
+                      })
+                  : undefined,
+              }
+            : {}
+        : {};
     return (
       <EvidenciaBloco
         key={key}
         title={title}
         obs={grupo?.obs}
         fotos={grupo?.fotos ?? []}
+        {...qtd}
         onObsChange={
           canEditPhotos
             ? (obs) => {
@@ -1034,7 +1100,21 @@ export function RelatorioDetalhe({
       ) : null}
 
       {abaAtiva === "teste-potencia" ? (
-        <div className="rounded-xl border border-border/80 bg-muted/20 p-4" />
+        <RelatorioTestePotenciaAtenuacao
+          readOnly={!canEditPhotos}
+          testeOptico={payload?.testeOptico ?? emptyTesteOptico()}
+          otdr={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
+          value1550={payload?.testePotencia1550 ?? emptyTestePotenciaJanela()}
+          value1330={payload?.testePotencia1330 ?? emptyTestePotenciaJanela()}
+          onChange1550={(next) => {
+            if (!payload) return;
+            patchPayload({ ...payload, testePotencia1550: next });
+          }}
+          onChange1330={(next) => {
+            if (!payload) return;
+            patchPayload({ ...payload, testePotencia1330: next });
+          }}
+        />
       ) : null}
     </div>
   );

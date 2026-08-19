@@ -219,7 +219,55 @@ export type GrupoFotoCampo = {
   obsAdmin?: string;
   onObsAdminChange?: (obs: string) => void;
   grupoKey: RelatorioFotoGrupoKey;
+  quantidade?: number | null;
+  quantidadeLabel?: string;
+  quantidadePlaceholder?: string;
+  onQuantidadeChange?: (value: number | null) => void;
 };
+
+export function CampoQuantidade({
+  label,
+  placeholder,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  placeholder: string;
+  value: number | null;
+  onChange?: (value: number | null) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  return (
+    <div className="mb-4">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        placeholder={placeholder}
+        value={value ?? ""}
+        disabled={disabled || !onChange}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === "") {
+            onChange?.(null);
+            return;
+          }
+          const n = Number(raw);
+          if (!Number.isFinite(n) || n < 0) return;
+          onChange?.(Math.trunc(n));
+        }}
+        className={inputClass()}
+      />
+    </div>
+  );
+}
 
 export function RelatorioRedeAcesso({
   readOnly,
@@ -433,6 +481,17 @@ export function RelatorioRedeAcesso({
             key={grupo.grupoKey}
             title={grupo.title}
             hint={grupo.hint}
+            headerExtra={
+              grupo.quantidadeLabel ? (
+                <CampoQuantidade
+                  label={grupo.quantidadeLabel}
+                  placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
+                  value={grupo.quantidade ?? null}
+                  onChange={grupo.onQuantidadeChange}
+                  disabled={readOnly}
+                />
+              ) : null
+            }
             slots={grupo.slots}
             onChange={grupo.onChange}
             obs={grupo.obs}

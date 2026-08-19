@@ -113,6 +113,60 @@ export type TestePotenciaPayload = {
   otdr: TesteOtdrItemPayload[];
 };
 
+export const ATEN_KM = 0.22;
+export const ATEN_EMENDA = 0.1;
+export const PERDA_CONEXAO = 0.5;
+
+export type TestePotenciaJanelaPayload = {
+  emendas: string;
+  conexoes: string;
+};
+
+export function emptyTestePotenciaJanela(): TestePotenciaJanelaPayload {
+  return { emendas: "", conexoes: "" };
+}
+
+export function parseNumeroCampo(raw: string): number | null {
+  const texto = raw.trim().replace(/\s/g, "").replace(",", ".");
+  if (!texto || texto === "-" || texto === "+" || texto === "." || texto === "-.") return null;
+  const n = Number(texto);
+  return Number.isFinite(n) ? n : null;
+}
+
+function numeroOuZero(raw: string): number {
+  return parseNumeroCampo(raw) ?? 0;
+}
+
+export function calcularAtenuacaoMaxima(km: string, emendas: string, conexoes: string): number {
+  return (
+    numeroOuZero(km) * ATEN_KM +
+    numeroOuZero(emendas) * ATEN_EMENDA +
+    numeroOuZero(conexoes) * PERDA_CONEXAO
+  );
+}
+
+export function calcularMinimoAdmissivel(pi: string, atenuacaoMax: number): number | null {
+  const referencia = parseNumeroCampo(pi);
+  if (referencia == null) return null;
+  return referencia - atenuacaoMax;
+}
+
+export function calcularAtenuacaoFibra(potenciaMedida: string, pi: string): number | null {
+  const po = parseNumeroCampo(potenciaMedida);
+  const referencia = parseNumeroCampo(pi);
+  if (po == null || referencia == null) return null;
+  return po - referencia;
+}
+
+export function formatarDb(valor: number): string {
+  return valor.toFixed(3);
+}
+
+export function textoOuTraco(raw: string | null | undefined): string {
+  const texto = raw?.trim() ?? "";
+  return texto ? texto : "—";
+}
+
 export function emptyTesteOpticoFaixa(): TesteOpticoFaixaPayload {
   return { dbm: "", fotos: [], obs: "", obsAdmin: "" };
 }
@@ -146,6 +200,10 @@ export function emptyTestePotencia(): TestePotenciaPayload {
   };
 }
 
+export type QuantidadesRedePayload = {
+  qtdCaixasEmenda: number | null;
+};
+
 export type RelatorioPayload = {
   lancamentoRe: boolean | null;
   metragensCabo: CaboMetragemPayload[];
@@ -158,6 +216,7 @@ export type RelatorioPayload = {
   etiquetaIdentificacao: FotoGrupoPayload;
   sobraTecnica: FotoGrupoPayload;
   outrasFotos: OutraFotoPayload[];
+  redeAcesso: QuantidadesRedePayload;
   tecnologiaAcesso: string;
   lancamentoRc: boolean | null;
   metragensCaboRc: CaboMetragemPayload[];
@@ -168,6 +227,7 @@ export type RelatorioPayload = {
   rcEntradaInterna: FotoGrupoPayload;
   rcEntradaExterna: FotoGrupoPayload;
   outrasFotosRc: OutraFotoPayload[];
+  redeCliente: QuantidadesRedePayload;
   eqClienteFachada: FotoGrupoPayload;
   eqClienteAmbiente: FotoGrupoPayload;
   eqClienteRack: FotoGrupoPayload;
@@ -187,6 +247,8 @@ export type RelatorioPayload = {
   testeOptico: TesteOpticoPayload;
   testePotenciaEmpresarial: TestePotenciaPayload;
   testePotenciaImplantacao: TestePotenciaPayload;
+  testePotencia1550: TestePotenciaJanelaPayload;
+  testePotencia1330: TestePotenciaJanelaPayload;
 };
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
@@ -278,6 +340,10 @@ function emptyFotoGrupo(): FotoGrupoPayload {
   return { fotos: [], obs: "", obsAdmin: "" };
 }
 
+export function emptyQuantidadesRede(): QuantidadesRedePayload {
+  return { qtdCaixasEmenda: null };
+}
+
 export function emptyRelatorioPayload(): RelatorioPayload {
   return {
     lancamentoRe: null,
@@ -291,6 +357,7 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     etiquetaIdentificacao: emptyFotoGrupo(),
     sobraTecnica: emptyFotoGrupo(),
     outrasFotos: [],
+    redeAcesso: emptyQuantidadesRede(),
     tecnologiaAcesso: "",
     lancamentoRc: null,
     metragensCaboRc: [],
@@ -301,6 +368,7 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     rcEntradaInterna: emptyFotoGrupo(),
     rcEntradaExterna: emptyFotoGrupo(),
     outrasFotosRc: [],
+    redeCliente: emptyQuantidadesRede(),
     eqClienteFachada: emptyFotoGrupo(),
     eqClienteAmbiente: emptyFotoGrupo(),
     eqClienteRack: emptyFotoGrupo(),
@@ -320,6 +388,8 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     testeOptico: emptyTesteOptico(),
     testePotenciaEmpresarial: emptyTestePotencia(),
     testePotenciaImplantacao: emptyTestePotencia(),
+    testePotencia1550: emptyTestePotenciaJanela(),
+    testePotencia1330: emptyTestePotenciaJanela(),
   };
 }
 
@@ -383,6 +453,20 @@ function parseOutrasFotos(raw: unknown): OutraFotoPayload[] {
       obsAdmin: readObsAdmin(foto),
     };
   });
+}
+
+function parseQtdInteiro(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = typeof raw === "number" ? raw : Number(String(raw).replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.trunc(n);
+}
+
+function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload>;
+  return {
+    qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
+  };
 }
 
 function parseFotoGrupo(
@@ -473,6 +557,14 @@ function parseTestePotencia(raw: unknown): TestePotenciaPayload {
   return { otdr: parseTesteOtdrItems(src.otdr) };
 }
 
+function parseTestePotenciaJanela(raw: unknown): TestePotenciaJanelaPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TestePotenciaJanelaPayload>;
+  return {
+    emendas: src.emendas ?? "",
+    conexoes: src.conexoes ?? "",
+  };
+}
+
 function parseTestesPotenciaSeparados(
   src: Partial<RelatorioPayload> & { testePotencia?: unknown },
   tipoExecucao?: TipoExecucao | null,
@@ -516,6 +608,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     etiquetaIdentificacao: parseFotoGrupo(base.etiquetaIdentificacao, src.etiquetaIdentificacao),
     sobraTecnica: parseFotoGrupo(base.sobraTecnica, src.sobraTecnica),
     outrasFotos: parseOutrasFotos(src.outrasFotos),
+    redeAcesso: parseQuantidadesRede(src.redeAcesso),
     tecnologiaAcesso: src.tecnologiaAcesso ?? "",
     lancamentoRc: src.lancamentoRc ?? null,
     metragensCaboRc: parseCabosList(src.metragensCaboRc),
@@ -526,6 +619,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     rcEntradaInterna: parseFotoGrupo(base.rcEntradaInterna, src.rcEntradaInterna),
     rcEntradaExterna: parseFotoGrupo(base.rcEntradaExterna, src.rcEntradaExterna),
     outrasFotosRc: parseOutrasFotos(src.outrasFotosRc),
+    redeCliente: parseQuantidadesRede(src.redeCliente),
     eqClienteFachada: parseFotoGrupo(base.eqClienteFachada, src.eqClienteFachada),
     eqClienteAmbiente: parseFotoGrupo(base.eqClienteAmbiente, src.eqClienteAmbiente),
     eqClienteRack: parseFotoGrupo(base.eqClienteRack, src.eqClienteRack),
@@ -547,6 +641,8 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
       src as Partial<RelatorioPayload> & { testePotencia?: unknown },
       tipoExecucao,
     ),
+    testePotencia1550: parseTestePotenciaJanela(src.testePotencia1550),
+    testePotencia1330: parseTestePotenciaJanela(src.testePotencia1330),
   };
 }
 
@@ -699,6 +795,31 @@ function mergeTestePotencia(
   return { otdr: mergeById(server.otdr, local.otdr, mergeTesteOtdrItem) };
 }
 
+function campoOuServidor(local: string, server: string): string {
+  if (!local.trim() && server.trim()) return server;
+  return local;
+}
+
+function mergeQuantidadesRede(
+  server: QuantidadesRedePayload,
+  local: QuantidadesRedePayload,
+): QuantidadesRedePayload {
+  return {
+    qtdCaixasEmenda:
+      local.qtdCaixasEmenda === undefined ? server.qtdCaixasEmenda : local.qtdCaixasEmenda,
+  };
+}
+
+function mergeTestePotenciaJanela(
+  server: TestePotenciaJanelaPayload,
+  local: TestePotenciaJanelaPayload,
+): TestePotenciaJanelaPayload {
+  return {
+    emendas: campoOuServidor(local.emendas, server.emendas),
+    conexoes: campoOuServidor(local.conexoes, server.conexoes),
+  };
+}
+
 /**
  * Merge colaborativo de JSONB: arrays de caixinhas/fotos são unidos por id/path
  * (append). Itens remotos não presentes no rascunho local não são apagados,
@@ -724,6 +845,8 @@ export function mergeRelatorioPayload(
     metragensCaboRc: mergeById(server.metragensCaboRc, local.metragensCaboRc, mergeCabo),
     outrasFotos: mergeById(server.outrasFotos, local.outrasFotos, mergeOutra),
     outrasFotosRc: mergeById(server.outrasFotosRc, local.outrasFotosRc, mergeOutra),
+    redeAcesso: mergeQuantidadesRede(server.redeAcesso, local.redeAcesso),
+    redeCliente: mergeQuantidadesRede(server.redeCliente, local.redeCliente),
     outrasFotosEqCliente: mergeById(
       server.outrasFotosEqCliente,
       local.outrasFotosEqCliente,
@@ -743,6 +866,8 @@ export function mergeRelatorioPayload(
       server.testePotenciaImplantacao,
       local.testePotenciaImplantacao,
     ),
+    testePotencia1550: mergeTestePotenciaJanela(server.testePotencia1550, local.testePotencia1550),
+    testePotencia1330: mergeTestePotenciaJanela(server.testePotencia1330, local.testePotencia1330),
     ...grupos,
   };
 }
