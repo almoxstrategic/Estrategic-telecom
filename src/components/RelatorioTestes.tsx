@@ -390,7 +390,7 @@ export function RelatorioTestePotencia({
 
   const patchItem = (id: string, patch: Partial<TesteOtdrItemPayload>, opts?: ChangeOpts) => {
     onChange(
-      { otdr: value.otdr.map((item) => (item.id === id ? { ...item, ...patch } : item)) },
+      { ...value, otdr: value.otdr.map((item) => (item.id === id ? { ...item, ...patch } : item)) },
       opts,
     );
   };
@@ -408,6 +408,23 @@ export function RelatorioTestePotencia({
   return (
     <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-bold">Teste OTDR</h2>
+      <div>
+        <label className="mb-1.5 block text-sm font-semibold" htmlFor="comprimento-trecho-otdr">
+          Comprimento do trecho óptico testado (km):
+        </label>
+        <input
+          id="comprimento-trecho-otdr"
+          type="number"
+          min={0}
+          step={0.001}
+          inputMode="decimal"
+          placeholder="Ex: 1.932"
+          value={value.comprimentoTrechoKm ?? ""}
+          disabled={readOnly}
+          onChange={(e) => onChange({ ...value, comprimentoTrechoKm: e.target.value })}
+          className={inputClass()}
+        />
+      </div>
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         {value.otdr.map((item, index) => (
           <div
@@ -422,7 +439,7 @@ export function RelatorioTestePotencia({
                   onClick={() => {
                     void deleteRelatorioPhoto(item.foto?.path);
                     onChange(
-                      { otdr: value.otdr.filter((row) => row.id !== item.id) },
+                      { ...value, otdr: value.otdr.filter((row) => row.id !== item.id) },
                       { immediate: true },
                     );
                   }}
@@ -470,7 +487,7 @@ export function RelatorioTestePotencia({
         <BotaoAdicionar
           label="Adicionar mais teste"
           onClick={() =>
-            onChange({ otdr: [...value.otdr, emptyTesteOtdrItem()] }, { immediate: true })
+            onChange({ ...value, otdr: [...value.otdr, emptyTesteOtdrItem()] }, { immediate: true })
           }
         />
       )}

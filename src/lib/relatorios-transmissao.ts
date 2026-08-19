@@ -110,6 +110,7 @@ export type TesteOtdrItemPayload = {
 };
 
 export type TestePotenciaPayload = {
+  comprimentoTrechoKm: string;
   otdr: TesteOtdrItemPayload[];
 };
 
@@ -136,10 +137,6 @@ export function parseNumeroCampo(raw: string): number | null {
 function numeroOuZero(raw: string | number | null | undefined): number {
   if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
   return parseNumeroCampo(String(raw ?? "")) ?? 0;
-}
-
-export function metrosParaKm(distanciaMetros: string | null | undefined): number {
-  return numeroOuZero(distanciaMetros) / 1000;
 }
 
 export function calcularAtenuacaoMaxima(km: number, emendas: number, conexoes: number): number {
@@ -203,6 +200,7 @@ export function emptyTesteOptico(): TesteOpticoPayload {
 
 export function emptyTestePotencia(): TestePotenciaPayload {
   return {
+    comprimentoTrechoKm: "",
     otdr: [emptyTesteOtdrItem(DEFAULT_OTDR_IDS[0]), emptyTesteOtdrItem(DEFAULT_OTDR_IDS[1])],
   };
 }
@@ -567,6 +565,12 @@ function parseTesteOtdrItems(raw: unknown): TesteOtdrItemPayload[] {
     : [emptyTesteOtdrItem(DEFAULT_OTDR_IDS[0]), emptyTesteOtdrItem(DEFAULT_OTDR_IDS[1])];
 }
 
+function parseComprimentoTrechoKm(raw: unknown): string {
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+  if (typeof raw === "string") return raw;
+  return "";
+}
+
 function parseTesteOptico(raw: unknown): TesteOpticoPayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoPayload>;
   return {
@@ -581,9 +585,12 @@ function parseTesteOptico(raw: unknown): TesteOpticoPayload {
   };
 }
 
-function parseTestePotencia(raw: unknown): TestePotenciaPayload {
+function parseTestePotencia(raw: unknown, kmFallback = ""): TestePotenciaPayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TestePotenciaPayload>;
-  return { otdr: parseTesteOtdrItems(src.otdr) };
+  return {
+    comprimentoTrechoKm: parseComprimentoTrechoKm(src.comprimentoTrechoKm) || kmFallback,
+    otdr: parseTesteOtdrItems(src.otdr),
+  };
 }
 
 function parseTestePotenciaJanela(raw: unknown): TestePotenciaJanelaPayload {
@@ -595,18 +602,22 @@ function parseTestePotenciaJanela(raw: unknown): TestePotenciaJanelaPayload {
 }
 
 function parseTestesPotenciaSeparados(
-  src: Partial<RelatorioPayload> & { testePotencia?: unknown },
+  src: Partial<RelatorioPayload> & {
+    testePotencia?: unknown;
+    testeOptico?: { comprimentoTrechoKm?: unknown };
+  },
   tipoExecucao?: TipoExecucao | null,
 ): Pick<RelatorioPayload, "testePotenciaEmpresarial" | "testePotenciaImplantacao"> {
+  const kmLegado = parseComprimentoTrechoKm(src.testeOptico?.comprimentoTrechoKm);
   const temEmpresarial = src.testePotenciaEmpresarial != null;
   const temImplantacao = src.testePotenciaImplantacao != null;
   if (temEmpresarial || temImplantacao) {
     return {
-      testePotenciaEmpresarial: parseTestePotencia(src.testePotenciaEmpresarial),
+      testePotenciaEmpresarial: parseTestePotencia(src.testePotenciaEmpresarial, kmLegado),
       testePotenciaImplantacao: parseTestePotencia(src.testePotenciaImplantacao),
     };
   }
-  const legado = parseTestePotencia(src.testePotencia);
+  const legado = parseTestePotencia(src.testePotencia, kmLegado);
   if (tipoExecucao === "implantacao") {
     return {
       testePotenciaEmpresarial: emptyTestePotencia(),
@@ -832,7 +843,13 @@ function mergeTestePotencia(
   server: TestePotenciaPayload,
   local: TestePotenciaPayload,
 ): TestePotenciaPayload {
-  return { otdr: mergeById(server.otdr, local.otdr, mergeTesteOtdrItem) };
+  return {
+    comprimentoTrechoKm: campoOuServidor(
+      local.comprimentoTrechoKm ?? "",
+      server.comprimentoTrechoKm ?? "",
+    ),
+    otdr: mergeById(server.otdr, local.otdr, mergeTesteOtdrItem),
+  };
 }
 
 function campoOuServidor(local: string, server: string): string {

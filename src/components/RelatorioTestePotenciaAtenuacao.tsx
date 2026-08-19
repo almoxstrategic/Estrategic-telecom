@@ -1,12 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { inputClass } from "@/components/RelatorioRedeAcesso";
 import {
+  ATEN_EMENDA,
+  ATEN_KM,
+  PERDA_CONEXAO,
   calcularAtenuacaoFibra,
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
   formatarDb,
   formatarKm,
-  metrosParaKm,
   parseNumeroCampo,
   textoOuTraco,
   totalConexoesCalculado,
@@ -19,16 +21,16 @@ import {
 
 export function RelatorioTestePotenciaAtenuacao({
   testeOptico,
-  otdr,
+  testeOtdr,
   redeAcesso,
   redeCliente,
 }: {
   testeOptico: TesteOpticoPayload;
-  otdr: TestePotenciaPayload;
+  testeOtdr: TestePotenciaPayload;
   redeAcesso: QuantidadesRedePayload;
   redeCliente: QuantidadesRedePayload;
 }) {
-  const km = metrosParaKm(otdr.otdr[0]?.distancia);
+  const km = parseNumeroCampo(testeOtdr.comprimentoTrechoKm ?? "") ?? 0;
   const pi1550 = parseNumeroCampo(testeOptico.estacao.nm1550[0]?.dbm ?? "") ?? 0;
   const pi1330 = parseNumeroCampo(testeOptico.estacao.nm1330[0]?.dbm ?? "") ?? 0;
   const totalEmendas = totalEmendasCalculado(
@@ -41,6 +43,7 @@ export function RelatorioTestePotenciaAtenuacao({
     <div className="space-y-4">
       <JanelaCard
         titulo="TESTE DE POTÊNCIA - 1550nm"
+        janelaNm="1550 nm"
         km={km}
         pi={pi1550}
         faixaCliente={testeOptico.cliente.nm1550}
@@ -49,6 +52,7 @@ export function RelatorioTestePotenciaAtenuacao({
       />
       <JanelaCard
         titulo="TESTE DE POTÊNCIA - 1330nm"
+        janelaNm="1330 nm"
         km={km}
         pi={pi1330}
         faixaCliente={testeOptico.cliente.nm1330}
@@ -65,6 +69,7 @@ function fibrasDeCliente(faixa: TesteOpticoFaixaPayload) {
 
 function JanelaCard({
   titulo,
+  janelaNm,
   km,
   pi,
   faixaCliente,
@@ -72,6 +77,7 @@ function JanelaCard({
   totalConexoes,
 }: {
   titulo: string;
+  janelaNm: string;
   km: number;
   pi: number;
   faixaCliente: TesteOpticoFaixaPayload;
@@ -97,14 +103,7 @@ function JanelaCard({
         <CampoImportado label="Nº de Conexões" value={String(totalConexoes)} />
         <CampoImportado label="Referência do Instrumento (Pi) em dBm" value={formatarDb(pi, 2)} />
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Callout tom="cinza" rotulo="Atenuação Máxima">
-          {formatarDb(atenMaxima, 3)} dB
-        </Callout>
-        <Callout tom="verde" rotulo="Valor Mínimo Admissível (Po)">
-          {formatarDb(valorMinimoAdmissivel, 2)} dBm
-        </Callout>
-      </div>
+      <ValoresReferencia janelaNm={janelaNm} valorMinimoAdmissivel={valorMinimoAdmissivel} />
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Fibras</h3>
         <p className="text-xs text-muted-foreground">
@@ -177,6 +176,59 @@ function LinhaFibra({
   );
 }
 
+function ValoresReferencia({
+  janelaNm,
+  valorMinimoAdmissivel,
+}: {
+  janelaNm: string;
+  valorMinimoAdmissivel: number;
+}) {
+  return (
+    <table className="mb-4 w-full border-collapse text-xs text-gray-700 md:text-sm">
+      <tbody>
+        <LinhaRef
+          rotulo={`ATENUAÇÃO DA FIBRA NA JANELA ÓPTICA DE ${janelaNm}:`}
+          valor={ATEN_KM.toFixed(2)}
+          unidade="dB/Km"
+        />
+        <LinhaRef rotulo="ATENUAÇÃO POR EMENDA:" valor={ATEN_EMENDA.toFixed(2)} unidade="dB" />
+        <LinhaRef rotulo="PERDA POR CONEXÃO:" valor={PERDA_CONEXAO.toFixed(2)} unidade="dB" />
+        <LinhaRef
+          rotulo={
+            <>
+              Valor Mínimo Admissível para a Potência Medida{" "}
+              <span className="font-semibold text-red-600">Po</span>:
+            </>
+          }
+          valor={formatarDb(valorMinimoAdmissivel, 2)}
+          unidade="dBm"
+          destaque
+        />
+      </tbody>
+    </table>
+  );
+}
+
+function LinhaRef({
+  rotulo,
+  valor,
+  unidade,
+  destaque = false,
+}: {
+  rotulo: ReactNode;
+  valor: string;
+  unidade: string;
+  destaque?: boolean;
+}) {
+  return (
+    <tr className={`border border-gray-300 ${destaque ? "bg-yellow-100" : "bg-white"}`}>
+      <td className="px-3 py-2">{rotulo}</td>
+      <td className="w-24 px-3 py-2 text-center font-semibold tabular-nums">{valor}</td>
+      <td className="w-20 px-3 py-2 text-gray-600">{unidade}</td>
+    </tr>
+  );
+}
+
 function CampoImportado({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex h-full flex-col justify-end">
@@ -190,27 +242,6 @@ function CampoImportado({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-[10px] leading-tight text-gray-400 md:text-xs">
         Importado automaticamente
       </p>
-    </div>
-  );
-}
-
-function Callout({
-  rotulo,
-  tom,
-  children,
-}: {
-  rotulo: string;
-  tom: "cinza" | "verde";
-  children: string;
-}) {
-  return (
-    <div
-      className={`flex min-h-[80px] flex-col justify-center rounded-lg p-4 ${
-        tom === "verde" ? "bg-emerald-50 text-emerald-900" : "bg-muted text-foreground"
-      }`}
-    >
-      <p className="text-xs font-medium opacity-80">{rotulo}</p>
-      <p className="mt-0.5 text-xl font-bold tabular-nums">{children}</p>
     </div>
   );
 }

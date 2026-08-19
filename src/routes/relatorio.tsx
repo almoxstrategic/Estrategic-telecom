@@ -1487,7 +1487,7 @@ function RelatorioPage() {
               ) : mostrarTestePotencia ? (
                 <RelatorioTestePotenciaAtenuacao
                   testeOptico={testeOptico}
-                  otdr={testePotenciaEmpresarial}
+                  testeOtdr={testePotenciaEmpresarial}
                   redeAcesso={redeAcesso}
                   redeCliente={redeCliente}
                 />

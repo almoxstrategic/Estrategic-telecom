@@ -1101,7 +1101,7 @@ export function RelatorioDetalhe({
       {abaAtiva === "teste-potencia" ? (
         <RelatorioTestePotenciaAtenuacao
           testeOptico={payload?.testeOptico ?? emptyTesteOptico()}
-          otdr={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
+          testeOtdr={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
           redeAcesso={payload?.redeAcesso ?? emptyQuantidadesRede()}
           redeCliente={payload?.redeCliente ?? emptyQuantidadesRede()}
         />
