@@ -92,10 +92,12 @@ export type TesteOpticoItemPayload = {
 
 export type TesteOpticoPayload = {
   cliente: {
+    numeroFibra: number | null;
     nm1550: TesteOpticoFaixaPayload;
     nm1330: TesteOpticoFaixaPayload;
   };
   estacao: {
+    numeroFibra: number | null;
     nm1550: TesteOpticoItemPayload[];
     nm1330: TesteOpticoItemPayload[];
   };
@@ -192,10 +194,12 @@ export function emptyTesteOtdrItem(id?: string): TesteOtdrItemPayload {
 export function emptyTesteOptico(): TesteOpticoPayload {
   return {
     cliente: {
+      numeroFibra: null,
       nm1550: emptyTesteOpticoFaixa(),
       nm1330: emptyTesteOpticoFaixa(),
     },
     estacao: {
+      numeroFibra: null,
       nm1550: [emptyTesteOpticoItem()],
       nm1330: [emptyTesteOpticoItem()],
     },
@@ -493,6 +497,12 @@ function parseQtdInteiro(raw: unknown): number | null {
   return Math.trunc(n);
 }
 
+function parseNumeroFibra(raw: unknown): number | null {
+  const n = parseQtdInteiro(raw);
+  if (n == null || n < 1) return null;
+  return n;
+}
+
 function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload>;
   return {
@@ -579,10 +589,12 @@ function parseTesteOptico(raw: unknown): TesteOpticoPayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoPayload>;
   return {
     cliente: {
+      numeroFibra: parseNumeroFibra(src.cliente?.numeroFibra),
       nm1550: parseTesteOpticoFaixa(src.cliente?.nm1550),
       nm1330: parseTesteOpticoFaixa(src.cliente?.nm1330),
     },
     estacao: {
+      numeroFibra: parseNumeroFibra(src.estacao?.numeroFibra),
       nm1550: parseTesteOpticoItems(src.estacao?.nm1550),
       nm1330: parseTesteOpticoItems(src.estacao?.nm1330),
     },
@@ -833,10 +845,18 @@ function mergeTesteOtdrItem(
 function mergeTesteOptico(server: TesteOpticoPayload, local: TesteOpticoPayload): TesteOpticoPayload {
   return {
     cliente: {
+      numeroFibra:
+        local.cliente.numeroFibra === undefined
+          ? server.cliente.numeroFibra
+          : local.cliente.numeroFibra,
       nm1550: mergeTesteOpticoFaixa(server.cliente.nm1550, local.cliente.nm1550),
       nm1330: mergeTesteOpticoFaixa(server.cliente.nm1330, local.cliente.nm1330),
     },
     estacao: {
+      numeroFibra:
+        local.estacao.numeroFibra === undefined
+          ? server.estacao.numeroFibra
+          : local.estacao.numeroFibra,
       nm1550: mergeById(server.estacao.nm1550, local.estacao.nm1550, mergeTesteOpticoItem),
       nm1330: mergeById(server.estacao.nm1330, local.estacao.nm1330, mergeTesteOpticoItem),
     },

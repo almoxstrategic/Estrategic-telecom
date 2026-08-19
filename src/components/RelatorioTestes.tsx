@@ -291,6 +291,42 @@ function TesteEstacaoColuna({
   );
 }
 
+function CampoNumeroFibra({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="max-w-xs">
+      <label className="mb-1.5 block text-sm font-semibold">Nº Fibra:</label>
+      <input
+        type="number"
+        min={1}
+        step={1}
+        inputMode="numeric"
+        placeholder="Ex: 1"
+        value={value ?? ""}
+        disabled={disabled}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === "") {
+            onChange(null);
+            return;
+          }
+          const n = Number(raw);
+          if (!Number.isFinite(n) || n < 1) return;
+          onChange(Math.trunc(n));
+        }}
+        className={inputClass()}
+      />
+    </div>
+  );
+}
+
 export function RelatorioTesteOptico({
   value,
   onChange,
@@ -306,6 +342,13 @@ export function RelatorioTesteOptico({
     <div className="space-y-5">
       <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-bold">Teste Óptico (No Cliente)</h2>
+        <CampoNumeroFibra
+          value={value.cliente.numeroFibra}
+          disabled={readOnly}
+          onChange={(numeroFibra) =>
+            onChange({ ...value, cliente: { ...value.cliente, numeroFibra } })
+          }
+        />
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
           <TesteClienteColuna
             titulo="1550nm"
@@ -336,6 +379,13 @@ export function RelatorioTesteOptico({
 
       <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-bold">Teste Óptico (Na Estação)</h2>
+        <CampoNumeroFibra
+          value={value.estacao.numeroFibra}
+          disabled={readOnly}
+          onChange={(numeroFibra) =>
+            onChange({ ...value, estacao: { ...value.estacao, numeroFibra } })
+          }
+        />
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
           <TesteEstacaoColuna
             titulo="1550nm"

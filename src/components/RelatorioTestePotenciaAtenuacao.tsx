@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { inputClass } from "@/components/RelatorioRedeAcesso";
-import { FIBER_COLORS, corFibraPorIndice } from "@/lib/fiber-colors";
+import { FIBER_COLORS, corFibraPorNumero } from "@/lib/fiber-colors";
 import {
   ATEN_EMENDA,
   ATEN_KM,
@@ -109,10 +109,19 @@ function fibrasDoPonto(
     ponto === "cliente"
       ? janelaCliente(testeOptico, janela)
       : janelaEstacao(testeOptico, janela);
-  return listaOuItem(origem).map((item, index) => ({
-    numero: String(index + 1).padStart(2, "0"),
-    potenciaMedida: dbmTexto(item),
-  }));
+  const informado =
+    ponto === "cliente"
+      ? testeOptico.cliente?.numeroFibra
+      : testeOptico.estacao?.numeroFibra;
+  return listaOuItem(origem).map((item, index) => {
+    const numero =
+      informado != null && informado >= 1 ? informado : index + 1;
+    return {
+      numero: String(numero).padStart(2, "0"),
+      numeroFibra: numero,
+      potenciaMedida: dbmTexto(item),
+    };
+  });
 }
 
 function JanelaCard({
@@ -177,9 +186,9 @@ function JanelaCard({
         <div className="divide-y divide-border">
           {fibras.map((fibra, index) => (
             <LinhaFibra
-              key={`${janela}-${ponto}-${fibra.numero}`}
-              index={index}
+              key={`${janela}-${ponto}-${index}`}
               numero={fibra.numero}
+              numeroFibra={fibra.numeroFibra}
               potenciaMedida={fibra.potenciaMedida}
               pi={pi}
               valorMinimoAdmissivel={valorMinimoAdmissivel}
@@ -192,14 +201,14 @@ function JanelaCard({
 }
 
 function LinhaFibra({
-  index,
   numero,
+  numeroFibra,
   potenciaMedida,
   pi,
   valorMinimoAdmissivel,
 }: {
-  index: number;
   numero: string;
+  numeroFibra: number;
   potenciaMedida: string;
   pi: number | null;
   valorMinimoAdmissivel: number | null;
@@ -212,7 +221,7 @@ function LinhaFibra({
       : po >= valorMinimoAdmissivel
         ? "aprovado"
         : "reprovado";
-  const colorCode = corFibraPorIndice(index);
+  const colorCode = corFibraPorNumero(numeroFibra);
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">

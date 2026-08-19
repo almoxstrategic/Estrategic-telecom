@@ -16,3 +16,8 @@ export const FIBER_COLORS = [
 export function corFibraPorIndice(index: number) {
   return FIBER_COLORS[((index % 12) + 12) % 12];
 }
+
+/** Número da fibra no campo (1 = VD, 3 = BR). */
+export function corFibraPorNumero(numero: number) {
+  return corFibraPorIndice(Math.trunc(numero) - 1);
+}
