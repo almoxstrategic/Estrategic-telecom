@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
@@ -45,7 +45,7 @@ export function inputClass() {
   return "w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted";
 }
 
-export const REF_TITULO_PLACEHOLDER = "Ex: Foto do quadro de energia (opcional)";
+export const REF_TITULO_PLACEHOLDER = "Ex: Foto do quadro de energia";
 
 export function RefTituloInput({
   value,
@@ -58,17 +58,23 @@ export function RefTituloInput({
   onBlur?: () => void;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange?.(e.target.value)}
-      onBlur={onBlur}
-      placeholder={REF_TITULO_PLACEHOLDER}
-      disabled={disabled}
-      aria-label="Referência da foto"
-      className="h-9 min-w-0 flex-1 border-0 border-b border-transparent bg-transparent px-0.5 text-sm font-semibold text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground focus:border-primary/50 disabled:cursor-default disabled:opacity-80"
-    />
+    <div className="min-w-0 flex-1">
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
+        Referência (REF)
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        onBlur={onBlur}
+        placeholder={REF_TITULO_PLACEHOLDER}
+        disabled={disabled}
+        className={inputClass()}
+      />
+    </div>
   );
 }
 
@@ -472,7 +478,7 @@ export function RelatorioOutrasFotos({
               key={item.id}
               className="relative flex h-full flex-col space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-start justify-between gap-2">
                 <RefTituloInput
                   value={item.ref}
                   disabled={readOnly}
@@ -486,7 +492,7 @@ export function RelatorioOutrasFotos({
                   <button
                     type="button"
                     onClick={() => removerItem(item.id, item.stored?.path)}
-                    className="shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                    className="mt-6 shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
                     aria-label={`Excluir foto extra ${index + 1}`}
                   >
                     <Trash2 className="h-4 w-4" />

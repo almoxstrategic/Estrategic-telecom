@@ -310,7 +310,7 @@ function EvidenciaBloco({
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+            className={`${onTitleChange ? "mt-6" : ""} shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10`}
             aria-label={`Excluir ${title}`}
           >
             <Trash2 className="h-4 w-4" />
