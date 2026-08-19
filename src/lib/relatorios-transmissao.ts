@@ -611,10 +611,9 @@ function parseTestesPotenciaSeparados(
 function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): RelatorioPayload {
   const base = emptyRelatorioPayload();
   if (!raw || typeof raw !== "object") return base;
-  const src = raw as Partial<RelatorioPayload>;
+  const src = raw as Partial<RelatorioPayload> & { testePotencia?: unknown };
   return {
     ...base,
-    ...src,
     lancamentoRe: src.lancamentoRe ?? null,
     metragensCabo: parseCabos(raw),
     posteConexao: parseFotoGrupo(base.posteConexao, src.posteConexao),
@@ -655,10 +654,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     eqEstacaoDgo: parseFotoGrupo(base.eqEstacaoDgo, src.eqEstacaoDgo),
     outrasFotosEqEstacao: parseOutrasFotos(src.outrasFotosEqEstacao),
     testeOptico: parseTesteOptico(src.testeOptico),
-    ...parseTestesPotenciaSeparados(
-      src as Partial<RelatorioPayload> & { testePotencia?: unknown },
-      tipoExecucao,
-    ),
+    ...parseTestesPotenciaSeparados(src, tipoExecucao),
     testePotencia1550: parseTestePotenciaJanela(src.testePotencia1550),
     testePotencia1330: parseTestePotenciaJanela(src.testePotencia1330),
   };
@@ -725,6 +721,16 @@ function mergeFotosByPath(server: StoredPhoto[], local: StoredPhoto[]): StoredPh
   return [...map.values()];
 }
 
+function mergeFotoGrupo(server: FotoGrupoPayload, local: FotoGrupoPayload): FotoGrupoPayload {
+  const fromServer = server ?? emptyFotoGrupo();
+  const fromLocal = local ?? emptyFotoGrupo();
+  return {
+    fotos: mergeFotosByPath(fromServer.fotos ?? [], fromLocal.fotos ?? []),
+    obs: fromLocal.obs || fromServer.obs,
+    obsAdmin: fromLocal.obsAdmin || fromServer.obsAdmin,
+  };
+}
+
 function mergeCabo(server: CaboMetragemPayload, local: CaboMetragemPayload): CaboMetragemPayload {
   return {
     ...server,
@@ -776,20 +782,25 @@ function mergeTesteOtdrItem(
   server: TesteOtdrItemPayload,
   local: TesteOtdrItemPayload,
 ): TesteOtdrItemPayload {
-  const localVazio =
-    !local.distancia.trim() && !local.foto && !local.obs.trim() && !local.obsAdmin.trim();
+  const localDist = String(local?.distancia ?? "");
+  const localObs = String(local?.obs ?? "");
+  const localObsAdmin = String(local?.obsAdmin ?? "");
+  const serverDist = String(server?.distancia ?? "");
+  const serverObs = String(server?.obs ?? "");
+  const serverObsAdmin = String(server?.obsAdmin ?? "");
+  const localVazio = !localDist.trim() && !local?.foto && !localObs.trim() && !localObsAdmin.trim();
   const serverPreenchido = Boolean(
-    server.distancia.trim() || server.foto || server.obs.trim() || server.obsAdmin.trim(),
+    serverDist.trim() || server?.foto || serverObs.trim() || serverObsAdmin.trim(),
   );
   if (localVazio && serverPreenchido) {
     return server;
   }
   return {
     ...server,
-    distancia: local.distancia,
-    foto: local.foto,
-    obs: local.obs,
-    obsAdmin: local.obsAdmin || server.obsAdmin,
+    distancia: localDist,
+    foto: local?.foto ?? null,
+    obs: localObs,
+    obsAdmin: localObsAdmin || serverObsAdmin,
   };
 }
 
@@ -819,12 +830,16 @@ function campoOuServidor(local: string, server: string): string {
 }
 
 function mergeQuantidadesRede(
-  server: QuantidadesRedePayload,
-  local: QuantidadesRedePayload,
+  server: QuantidadesRedePayload | undefined,
+  local: QuantidadesRedePayload | undefined,
 ): QuantidadesRedePayload {
+  const fromServer = server ?? emptyQuantidadesRede();
+  const fromLocal = local ?? emptyQuantidadesRede();
   return {
     qtdCaixasEmenda:
-      local.qtdCaixasEmenda === undefined ? server.qtdCaixasEmenda : local.qtdCaixasEmenda,
+      fromLocal.qtdCaixasEmenda === undefined
+        ? fromServer.qtdCaixasEmenda
+        : fromLocal.qtdCaixasEmenda,
   };
 }
 
@@ -847,45 +862,53 @@ export function mergeRelatorioPayload(
   server: RelatorioPayload,
   local: RelatorioPayload,
 ): RelatorioPayload {
+  const fromServer = parsePayload(server);
+  const fromLocal = parsePayload(local);
   const grupos = Object.fromEntries(
-    FOTO_GRUPO_KEYS.map((key) => [key, mergeFotoGrupo(server[key], local[key])]),
+    FOTO_GRUPO_KEYS.map((key) => [key, mergeFotoGrupo(fromServer[key], fromLocal[key])]),
   ) as Pick<RelatorioPayload, RelatorioFotoGrupoKey>;
 
   return {
-    ...server,
-    ...local,
-    lancamentoRe: local.lancamentoRe ?? server.lancamentoRe,
-    lancamentoRc: local.lancamentoRc ?? server.lancamentoRc,
-    relatorioEstacao: local.relatorioEstacao ?? server.relatorioEstacao,
-    tecnologiaAcesso: local.tecnologiaAcesso || server.tecnologiaAcesso,
-    estacaoEntregaAcesso: local.estacaoEntregaAcesso || server.estacaoEntregaAcesso,
-    metragensCabo: mergeById(server.metragensCabo, local.metragensCabo, mergeCabo),
-    metragensCaboRc: mergeById(server.metragensCaboRc, local.metragensCaboRc, mergeCabo),
-    outrasFotos: mergeById(server.outrasFotos, local.outrasFotos, mergeOutra),
-    outrasFotosRc: mergeById(server.outrasFotosRc, local.outrasFotosRc, mergeOutra),
-    redeAcesso: mergeQuantidadesRede(server.redeAcesso, local.redeAcesso),
-    redeCliente: mergeQuantidadesRede(server.redeCliente, local.redeCliente),
+    ...fromServer,
+    ...fromLocal,
+    lancamentoRe: fromLocal.lancamentoRe ?? fromServer.lancamentoRe,
+    lancamentoRc: fromLocal.lancamentoRc ?? fromServer.lancamentoRc,
+    relatorioEstacao: fromLocal.relatorioEstacao ?? fromServer.relatorioEstacao,
+    tecnologiaAcesso: fromLocal.tecnologiaAcesso || fromServer.tecnologiaAcesso,
+    estacaoEntregaAcesso: fromLocal.estacaoEntregaAcesso || fromServer.estacaoEntregaAcesso,
+    metragensCabo: mergeById(fromServer.metragensCabo, fromLocal.metragensCabo, mergeCabo),
+    metragensCaboRc: mergeById(fromServer.metragensCaboRc, fromLocal.metragensCaboRc, mergeCabo),
+    outrasFotos: mergeById(fromServer.outrasFotos, fromLocal.outrasFotos, mergeOutra),
+    outrasFotosRc: mergeById(fromServer.outrasFotosRc, fromLocal.outrasFotosRc, mergeOutra),
+    redeAcesso: mergeQuantidadesRede(fromServer.redeAcesso, fromLocal.redeAcesso),
+    redeCliente: mergeQuantidadesRede(fromServer.redeCliente, fromLocal.redeCliente),
     outrasFotosEqCliente: mergeById(
-      server.outrasFotosEqCliente,
-      local.outrasFotosEqCliente,
+      fromServer.outrasFotosEqCliente,
+      fromLocal.outrasFotosEqCliente,
       mergeOutra,
     ),
     outrasFotosEqEstacao: mergeById(
-      server.outrasFotosEqEstacao,
-      local.outrasFotosEqEstacao,
+      fromServer.outrasFotosEqEstacao,
+      fromLocal.outrasFotosEqEstacao,
       mergeOutra,
     ),
-    testeOptico: mergeTesteOptico(server.testeOptico, local.testeOptico),
+    testeOptico: mergeTesteOptico(fromServer.testeOptico, fromLocal.testeOptico),
     testePotenciaEmpresarial: mergeTestePotencia(
-      server.testePotenciaEmpresarial,
-      local.testePotenciaEmpresarial,
+      fromServer.testePotenciaEmpresarial,
+      fromLocal.testePotenciaEmpresarial,
     ),
     testePotenciaImplantacao: mergeTestePotencia(
-      server.testePotenciaImplantacao,
-      local.testePotenciaImplantacao,
+      fromServer.testePotenciaImplantacao,
+      fromLocal.testePotenciaImplantacao,
     ),
-    testePotencia1550: mergeTestePotenciaJanela(server.testePotencia1550, local.testePotencia1550),
-    testePotencia1330: mergeTestePotenciaJanela(server.testePotencia1330, local.testePotencia1330),
+    testePotencia1550: mergeTestePotenciaJanela(
+      fromServer.testePotencia1550,
+      fromLocal.testePotencia1550,
+    ),
+    testePotencia1330: mergeTestePotenciaJanela(
+      fromServer.testePotencia1330,
+      fromLocal.testePotencia1330,
+    ),
     ...grupos,
   };
 }
@@ -1119,27 +1142,92 @@ export async function despacharRelatorioTransmissao(input: {
   return mapRow(data as DbRow);
 }
 
+function logSupabaseError(context: string, error: unknown) {
+  const err = error as {
+    message?: string;
+    code?: string;
+    details?: string;
+    hint?: string;
+    status?: number;
+  };
+  console.error("Erro Supabase:", {
+    context,
+    message: err?.message ?? String(error),
+    code: err?.code,
+    details: err?.details,
+    hint: err?.hint,
+    status: err?.status,
+    error,
+  });
+}
+
+function omitUndefined<T extends Record<string, unknown>>(row: T): T {
+  return Object.fromEntries(
+    Object.entries(row).filter(([, value]) => value !== undefined),
+  ) as T;
+}
+
+function toDateColumn(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function jsonSafePayload(
+  payload: RelatorioPayload,
+  tipoExecucao?: TipoExecucao | null,
+): RelatorioPayload {
+  try {
+    const raw = JSON.parse(
+      JSON.stringify(payload, (_key, value) => {
+        if (value === undefined) return null;
+        if (typeof value === "number" && !Number.isFinite(value)) return null;
+        if (typeof File !== "undefined" && value instanceof File) return null;
+        if (typeof Blob !== "undefined" && value instanceof Blob) return null;
+        return value;
+      }),
+    );
+    return parsePayload(raw, tipoExecucao);
+  } catch (error) {
+    logSupabaseError("sanitizeRelatorioPayload", error);
+    return parsePayload(payload, tipoExecucao);
+  }
+}
+
 export async function patchRelatorioDraft(
   id: string,
   patch: RelatorioDraftPatch,
 ): Promise<RelatorioTransmissao> {
+  if (!id?.trim()) {
+    throw new Error("Relatório sem id válido — auto-save abortado.");
+  }
+
   const latest = await fetchRelatorioTransmissaoById(id);
-  const merged: RelatorioDraftPatch = {
-    ...patch,
+  let payload: RelatorioPayload | undefined;
+  if (patch.payload) {
+    try {
+      payload = jsonSafePayload(
+        mergeRelatorioPayload(latest.payload, patch.payload),
+        latest.tipo_execucao,
+      );
+    } catch (error) {
+      logSupabaseError("mergeRelatorioPayload", error);
+      payload = jsonSafePayload(patch.payload, latest.tipo_execucao);
+    }
+  }
+
+  const merged = omitUndefined({
     cliente: preferFilled(patch.cliente, latest.cliente),
     endereco: preferFilled(patch.endereco, latest.endereco),
     cidade: preferFilled(patch.cidade, latest.cidade),
     equipe_empreiteira: preferFilled(patch.equipe_empreiteira, latest.equipe_empreiteira),
     responsavel: preferFilled(patch.responsavel, latest.responsavel),
-    payload: patch.payload
-      ? mergeRelatorioPayload(latest.payload, patch.payload)
-      : undefined,
-  };
-  // Tipo de execução é definido só pelo gestor; rascunho do técnico não pode alterar.
-  delete (merged as { tipo_execucao?: unknown }).tipo_execucao;
-  if (patch.data_inicio_execucao === "" || patch.data_inicio_execucao === null) {
-    merged.data_inicio_execucao = latest.data_inicio_execucao || null;
-  }
+    data_inicio_execucao:
+      patch.data_inicio_execucao === undefined
+        ? undefined
+        : toDateColumn(patch.data_inicio_execucao) ?? toDateColumn(latest.data_inicio_execucao),
+    payload,
+  } as Record<string, unknown>);
 
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -1148,19 +1236,34 @@ export async function patchRelatorioDraft(
     .eq("id", id)
     .neq("status", "fechado")
     .select(SELECT_COLS)
-    .single();
-  if (error) {
-    const fallback = await supabase
-      .from("relatorios_transmissao")
-      .update(merged)
-      .eq("id", id)
-      .neq("status", "fechado")
-      .select(SELECT_COLS_PLAIN)
-      .single();
-    if (fallback.error) throw fallback.error;
-    return mapRow(fallback.data as DbRow);
+    .maybeSingle();
+  if (!error && data) return mapRow(data as DbRow);
+
+  if (error) logSupabaseError("patchRelatorioDraft.select", error);
+
+  const fallback = await supabase
+    .from("relatorios_transmissao")
+    .update(merged)
+    .eq("id", id)
+    .neq("status", "fechado")
+    .select(SELECT_COLS_PLAIN)
+    .maybeSingle();
+  if (fallback.error) {
+    logSupabaseError("patchRelatorioDraft.fallback", fallback.error);
+    throw fallback.error;
   }
-  return mapRow(data as DbRow);
+  if (!fallback.data) {
+    const blocked = {
+      message:
+        "Atualização bloqueada (0 linhas). Sessão, atribuição da OS ou RLS podem ter recusado o UPDATE.",
+      code: "PGRST116",
+      details: `id=${id}`,
+      hint: "Confirme se o técnico está em tecnicos_atribuidos ou em tecnico_id e se o status não está fechado.",
+    };
+    logSupabaseError("patchRelatorioDraft.zeroRows", blocked);
+    throw blocked;
+  }
+  return mapRow(fallback.data as DbRow);
 }
 
 export async function avisarConclusaoRelatorio(id: string): Promise<RelatorioTransmissao> {

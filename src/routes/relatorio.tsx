@@ -437,12 +437,11 @@ function RelatorioPage() {
 
   const persistDraft = useCallback(
     async (payloadOverride?: RelatorioPayload) => {
-      if (!currentReportId || (status !== "em_aberto" && status !== "pendente")) return;
+      if (!currentReportId?.trim() || !user?.id) return;
+      if (status !== "em_aberto" && status !== "pendente") return;
       setSaveHint("saving");
       persistingRef.current = true;
       try {
-        // Auto-save colaborativo: patchRelatorioDraft busca o JSONB atual e faz
-        // merge/append dos arrays (cabos, fotos) para não apagar o trabalho dos colegas.
         const saved = await patchRelatorioDraft(currentReportId, {
           cliente,
           endereco,
@@ -455,8 +454,8 @@ function RelatorioPage() {
         lastSavedUpdatedAtRef.current = saved.updated_at;
         lastAppliedUpdatedAtRef.current = saved.updated_at;
         setSaveHint("saved");
-      } catch (err) {
-        console.error(err);
+      } catch (error) {
+        console.error("Erro Supabase:", error);
         setSaveHint("error");
       } finally {
         persistingRef.current = false;
@@ -464,6 +463,7 @@ function RelatorioPage() {
     },
     [
       currentReportId,
+      user?.id,
       status,
       cliente,
       endereco,
