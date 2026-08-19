@@ -133,29 +133,40 @@ export function parseNumeroCampo(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function numeroOuZero(raw: string): number {
-  return parseNumeroCampo(raw) ?? 0;
+function numeroOuZero(raw: string | number | null | undefined): number {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+  return parseNumeroCampo(String(raw ?? "")) ?? 0;
 }
 
-export function calcularAtenuacaoMaxima(km: string, emendas: number, conexoes: number): number {
-  return numeroOuZero(km) * ATEN_KM + emendas * ATEN_EMENDA + conexoes * PERDA_CONEXAO;
+export function metrosParaKm(distanciaMetros: string | null | undefined): number {
+  return numeroOuZero(distanciaMetros) / 1000;
 }
 
-export function calcularMinimoAdmissivel(pi: string, atenuacaoMax: number): number | null {
-  const referencia = parseNumeroCampo(pi);
-  if (referencia == null) return null;
-  return referencia - atenuacaoMax;
+export function calcularAtenuacaoMaxima(km: number, emendas: number, conexoes: number): number {
+  return (
+    numeroOuZero(km) * ATEN_KM +
+    numeroOuZero(emendas) * ATEN_EMENDA +
+    numeroOuZero(conexoes) * PERDA_CONEXAO
+  );
 }
 
-export function calcularAtenuacaoFibra(potenciaMedida: string, pi: string): number | null {
+export function calcularMinimoAdmissivel(pi: number, atenuacaoMax: number): number {
+  return numeroOuZero(pi) - numeroOuZero(atenuacaoMax);
+}
+
+export function calcularAtenuacaoFibra(potenciaMedida: string, pi: number): number | null {
   const po = parseNumeroCampo(potenciaMedida);
-  const referencia = parseNumeroCampo(pi);
-  if (po == null || referencia == null) return null;
-  return po - referencia;
+  if (po == null) return null;
+  return po - numeroOuZero(pi);
 }
 
-export function formatarDb(valor: number): string {
-  return valor.toFixed(3);
+export function formatarDb(valor: number, casas = 3): string {
+  const n = Number.isFinite(valor) ? valor : 0;
+  return n.toFixed(casas);
+}
+
+export function formatarKm(km: number): string {
+  return `${formatarDb(km, 3)} km`;
 }
 
 export function textoOuTraco(raw: string | null | undefined): string {
