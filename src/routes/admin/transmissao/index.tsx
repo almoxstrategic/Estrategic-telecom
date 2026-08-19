@@ -4,6 +4,7 @@ import { ArrowLeft, ClipboardList, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { TecnicoTransmissaoMultiSelect } from "@/components/TecnicoTransmissaoMultiSelect";
+import { TipoExecucaoPicker } from "@/components/RelatorioRedeAcesso";
 import {
   formatDate,
   formatDateTimePendencia,
@@ -27,6 +28,7 @@ import {
   labelTecnicosAtribuidos,
   subscribeRelatoriosTransmissao,
   type RelatorioTransmissao,
+  type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
 import type { TecnicoProfile } from "@/lib/team-service";
 
@@ -137,8 +139,9 @@ function NovaOsDialog({
   const [empreiteira, setEmpreiteira] = useState("");
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [dataInicio, setDataInicio] = useState("");
+  const [tipoExecucao, setTipoExecucao] = useState<TipoExecucao | "">("");
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<{ osWf?: string; equipe?: string }>({});
+  const [errors, setErrors] = useState<{ osWf?: string; equipe?: string; tipo?: string }>({});
 
   useEffect(() => {
     if (!open) return;
@@ -149,17 +152,22 @@ function NovaOsDialog({
     setEmpreiteira("");
     setTecnicos([]);
     setDataInicio("");
+    setTipoExecucao("");
     setSaving(false);
     setErrors({});
   }, [open]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const nextErrors: { osWf?: string; equipe?: string } = {};
+    const nextErrors: { osWf?: string; equipe?: string; tipo?: string } = {};
     if (!osWf.trim()) nextErrors.osWf = "Informe a OS/WF.";
     if (tecnicos.length === 0) nextErrors.equipe = "Selecione ao menos um técnico na equipe.";
+    if (tipoExecucao !== "implantacao" && tipoExecucao !== "empresarial") {
+      nextErrors.tipo = "Selecione o tipo de execução.";
+    }
     setErrors(nextErrors);
-    if (nextErrors.osWf || nextErrors.equipe) return;
+    if (nextErrors.osWf || nextErrors.equipe || nextErrors.tipo) return;
+    if (tipoExecucao !== "implantacao" && tipoExecucao !== "empresarial") return;
 
     setSaving(true);
     try {
@@ -170,6 +178,7 @@ function NovaOsDialog({
         cidade,
         equipeEmpreiteira: empreiteira,
         dataInicioExecucao: dataInicio,
+        tipoExecucao,
         tecnicos: tecnicos.map((t) => ({ id: t.id, nome: t.nome })),
       });
       toast.success("OS despachada. Os técnicos já podem preencher o relatório.");
@@ -271,6 +280,20 @@ function NovaOsDialog({
               }}
             />
             <FieldError message={errors.equipe} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              Tipo de execução <RequiredMark />
+            </Label>
+            <TipoExecucaoPicker
+              value={tipoExecucao}
+              invalid={Boolean(errors.tipo)}
+              onChange={(next) => {
+                setTipoExecucao(next);
+                if (errors.tipo) setErrors((prev) => ({ ...prev, tipo: undefined }));
+              }}
+            />
+            <FieldError message={errors.tipo} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="os-data-inicio">

@@ -263,7 +263,6 @@ export type RelatorioDraftPatch = {
   equipe_empreiteira?: string;
   responsavel?: string;
   data_inicio_execucao?: string | null;
-  tipo_execucao?: TipoExecucao | null;
   payload?: RelatorioPayload;
 };
 
@@ -915,6 +914,7 @@ export async function despacharRelatorioTransmissao(input: {
   cidade: string;
   equipeEmpreiteira: string;
   dataInicioExecucao: string;
+  tipoExecucao: TipoExecucao;
   tecnicos: { id: string; nome: string }[];
 }): Promise<RelatorioTransmissao> {
   const os = input.osWf.trim();
@@ -931,6 +931,9 @@ export async function despacharRelatorioTransmissao(input: {
   const tecnicos = [...unique.values()];
   if (tecnicos.length === 0) {
     throw new Error("Selecione ao menos um técnico na equipe.");
+  }
+  if (input.tipoExecucao !== "implantacao" && input.tipoExecucao !== "empresarial") {
+    throw new Error("Selecione o tipo de execução.");
   }
 
   if (await findRelatorioAbertoPorOsWf(os)) {
@@ -951,6 +954,7 @@ export async function despacharRelatorioTransmissao(input: {
     cidade: cidade || "",
     equipe_empreiteira: equipeEmpreiteira || "",
     data_inicio_execucao: dataInicio || null,
+    tipo_execucao: input.tipoExecucao,
     status: "em_aberto" as const,
     payload: emptyRelatorioPayload(),
   };
@@ -988,11 +992,10 @@ export async function patchRelatorioDraft(
       ? mergeRelatorioPayload(latest.payload, patch.payload)
       : undefined,
   };
+  // Tipo de execução é definido só pelo gestor; rascunho do técnico não pode alterar.
+  delete (merged as { tipo_execucao?: unknown }).tipo_execucao;
   if (patch.data_inicio_execucao === "" || patch.data_inicio_execucao === null) {
     merged.data_inicio_execucao = latest.data_inicio_execucao || null;
-  }
-  if (patch.tipo_execucao === null && latest.tipo_execucao) {
-    merged.tipo_execucao = latest.tipo_execucao;
   }
 
   const supabase = getSupabaseClient();
@@ -1158,6 +1161,7 @@ export async function patchRelatorioCadastroAdmin(
     cidade: string;
     equipeEmpreiteira: string;
     dataInicioExecucao: string;
+    tipoExecucao: TipoExecucao;
     tecnicos: { id: string; nome: string }[];
   },
 ): Promise<RelatorioTransmissao> {
@@ -1169,6 +1173,9 @@ export async function patchRelatorioCadastroAdmin(
   if (tecnicos.length === 0) {
     throw new Error("Selecione ao menos um técnico na equipe.");
   }
+  if (input.tipoExecucao !== "implantacao" && input.tipoExecucao !== "empresarial") {
+    throw new Error("Selecione o tipo de execução.");
+  }
 
   const updateRow = {
     cliente: input.cliente.trim() || "",
@@ -1176,6 +1183,7 @@ export async function patchRelatorioCadastroAdmin(
     cidade: input.cidade.trim() || "",
     equipe_empreiteira: input.equipeEmpreiteira.trim() || "",
     data_inicio_execucao: input.dataInicioExecucao.trim() || null,
+    tipo_execucao: input.tipoExecucao,
     tecnico_id: tecnicos[0].id,
     tecnicos_atribuidos: tecnicos.map((t) => t.id),
     tecnicos_nomes: tecnicos.map((t) => t.nome),

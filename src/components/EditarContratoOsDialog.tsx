@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { TecnicoTransmissaoMultiSelect } from "@/components/TecnicoTransmissaoMultiSelect";
+import { TipoExecucaoPicker } from "@/components/RelatorioRedeAcesso";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import {
   patchRelatorioCadastroAdmin,
   type RelatorioTransmissao,
+  type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
 import { fetchTecnicosTransmissao, type TecnicoProfile } from "@/lib/team-service";
 
@@ -74,8 +76,10 @@ export function EditarContratoOsDialog({
   const [empreiteira, setEmpreiteira] = useState("");
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [dataInicio, setDataInicio] = useState("");
+  const [tipoExecucao, setTipoExecucao] = useState<TipoExecucao | "">("");
   const [saving, setSaving] = useState(false);
   const [equipeError, setEquipeError] = useState<string | undefined>();
+  const [tipoError, setTipoError] = useState<string | undefined>();
 
   useEffect(() => {
     if (!open) return;
@@ -84,8 +88,10 @@ export function EditarContratoOsDialog({
     setCidade(row.cidade ?? "");
     setEmpreiteira(row.equipe_empreiteira ?? "");
     setDataInicio(dateInputValue(row.data_inicio_execucao));
+    setTipoExecucao(row.tipo_execucao ?? "");
     setSaving(false);
     setEquipeError(undefined);
+    setTipoError(undefined);
 
     const seeded = equipeSeed(row);
     setTecnicos(seeded);
@@ -110,6 +116,10 @@ export function EditarContratoOsDialog({
       setEquipeError("Selecione ao menos um técnico na equipe.");
       return;
     }
+    if (tipoExecucao !== "implantacao" && tipoExecucao !== "empresarial") {
+      setTipoError("Selecione o tipo de execução.");
+      return;
+    }
     setSaving(true);
     try {
       const saved = await patchRelatorioCadastroAdmin(row.id, {
@@ -118,6 +128,7 @@ export function EditarContratoOsDialog({
         cidade,
         equipeEmpreiteira: empreiteira,
         dataInicioExecucao: dataInicio,
+        tipoExecucao,
         tecnicos: tecnicos.map((t) => ({ id: t.id, nome: t.nome })),
       });
       toast.success("Dados do contrato atualizados.");
@@ -208,6 +219,20 @@ export function EditarContratoOsDialog({
               }}
             />
             <FieldError message={equipeError} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              Tipo de execução <RequiredMark />
+            </Label>
+            <TipoExecucaoPicker
+              value={tipoExecucao}
+              invalid={Boolean(tipoError)}
+              onChange={(next) => {
+                setTipoExecucao(next);
+                setTipoError(undefined);
+              }}
+            />
+            <FieldError message={tipoError} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-os-data-inicio">

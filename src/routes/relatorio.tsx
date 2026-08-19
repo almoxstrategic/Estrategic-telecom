@@ -9,9 +9,9 @@ import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/Relato
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import {
-  ChoiceButton,
   RelatorioAbasCampo,
   RelatorioRedeAcesso,
+  TipoExecucaoPicker,
   ABAS_CAMPO,
   ABAS_CAMPO_IMPLANTACAO,
   emptyOutraFoto,
@@ -438,7 +438,6 @@ function RelatorioPage() {
           equipe_empreiteira: equipe,
           responsavel,
           data_inicio_execucao: dataInicio || null,
-          tipo_execucao: tipo || null,
           payload: payloadOverride ?? buildPayload(),
         });
         lastSavedUpdatedAtRef.current = saved.updated_at;
@@ -460,7 +459,6 @@ function RelatorioPage() {
       equipe,
       responsavel,
       dataInicio,
-      tipo,
       buildPayload,
     ],
   );
@@ -477,7 +475,6 @@ function RelatorioPage() {
       equipe,
       responsavel,
       dataInicio,
-      tipo,
       lancamentoRe,
       cabos,
       posteObs,
@@ -1036,28 +1033,8 @@ function RelatorioPage() {
 
           <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-bold">Tipo de execução</h2>
-            <div className="flex gap-2">
-              <ChoiceButton
-                active={tipo === "implantacao"}
-                onClick={() => {
-                  setTipo("implantacao");
-                  setAbaCampo("RE");
-                }}
-                disabled={readOnly}
-              >
-                Implantação
-              </ChoiceButton>
-              <ChoiceButton
-                active={tipo === "empresarial"}
-                onClick={() => {
-                  setTipo("empresarial");
-                  setAbaCampo("RE");
-                }}
-                disabled={readOnly}
-              >
-                Empresarial
-              </ChoiceButton>
-            </div>
+            <TipoExecucaoPicker value={tipo} locked />
+            <p className="text-xs text-muted-foreground">Definido pelo gestor. Somente visualização.</p>
           </div>
 
           {mostrarFormularioCampo ? (

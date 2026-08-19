@@ -10,6 +10,7 @@ import {
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
   type StoredPhoto,
+  type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
 
 export type AbaCampo = "RE" | "RC" | "equipamento" | "teste-optico" | "teste-potencia";
@@ -76,25 +77,76 @@ export function ChoiceButton({
   children,
   onClick,
   disabled = false,
+  locked = false,
 }: {
   active: boolean;
   children: ReactNode;
-  onClick: () => void;
+  onClick?: () => void;
   disabled?: boolean;
+  locked?: boolean;
 }) {
+  const bloqueado = disabled || locked;
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={disabled}
+      onClick={bloqueado ? undefined : onClick}
+      disabled={bloqueado}
       className={`flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
         active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-background text-foreground hover:bg-muted"
-      } disabled:cursor-not-allowed disabled:opacity-60`}
+          ? `border-primary bg-primary text-primary-foreground ${locked ? "disabled:opacity-100" : ""}`
+          : locked
+            ? "border-border bg-muted text-muted-foreground opacity-40"
+            : "border-border bg-background text-foreground hover:bg-muted"
+      } ${locked ? "pointer-events-none cursor-default" : ""} ${
+        bloqueado && !locked ? "disabled:cursor-not-allowed disabled:opacity-60" : ""
+      }`}
     >
       {children}
     </button>
+  );
+}
+
+export function TipoExecucaoPicker({
+  value,
+  onChange,
+  locked = false,
+  disabled = false,
+  invalid = false,
+}: {
+  value: TipoExecucao | "";
+  onChange?: (tipo: TipoExecucao) => void;
+  locked?: boolean;
+  disabled?: boolean;
+  invalid?: boolean;
+}) {
+  return (
+    <div
+      className={`flex gap-2 ${locked ? "pointer-events-none" : ""} ${
+        invalid ? "rounded-xl ring-1 ring-destructive" : ""
+      }`}
+      role="radiogroup"
+      aria-label="Tipo de execução"
+      aria-disabled={locked || disabled}
+      aria-required={!locked}
+      aria-invalid={invalid || undefined}
+    >
+      <ChoiceButton
+        active={value === "implantacao"}
+        locked={locked}
+        disabled={disabled}
+        onClick={() => onChange?.("implantacao")}
+      >
+        Implantação
+      </ChoiceButton>
+      <ChoiceButton
+        active={value === "empresarial"}
+        locked={locked}
+        disabled={disabled}
+        onClick={() => onChange?.("empresarial")}
+      >
+        Empresarial
+      </ChoiceButton>
+    </div>
   );
 }
 
