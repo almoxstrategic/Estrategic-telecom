@@ -128,7 +128,10 @@ export function emptyTestePotenciaJanela(): TestePotenciaJanelaPayload {
 }
 
 export function parseNumeroCampo(raw: string): number | null {
-  const texto = raw.trim().replace(/\s/g, "").replace(",", ".");
+  const texto = String(raw ?? "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(",", ".");
   if (!texto || texto === "-" || texto === "+" || texto === "." || texto === "-.") return null;
   const n = Number(texto);
   return Number.isFinite(n) ? n : null;
@@ -172,7 +175,7 @@ export function formatarKm(km: number): string {
 }
 
 export function textoOuTraco(raw: string | null | undefined): string {
-  const texto = raw?.trim() ?? "";
+  const texto = String(raw ?? "").trim();
   return texto ? texto : "—";
 }
 
@@ -205,14 +208,19 @@ export function emptyTesteOptico(): TesteOpticoPayload {
   };
 }
 
+function primeiroDbm(lista: unknown): string {
+  const item = Array.isArray(lista) ? lista[0] : lista;
+  if (!item || typeof item !== "object") return "";
+  const valor = (item as { dbm?: unknown; dBm?: unknown }).dbm ?? (item as { dBm?: unknown }).dBm;
+  return valor == null ? "" : String(valor).trim();
+}
+
 export function testeOpticoEstacaoAtivo(
   estacao: TesteOpticoPayload["estacao"] | null | undefined,
 ): boolean {
   if (!estacao) return false;
-  if (estacao.numeroFibra != null && estacao.numeroFibra >= 1) return true;
-  const dbm1550 = String(estacao.nm1550?.[0]?.dbm ?? "").trim();
-  const dbm1330 = String(estacao.nm1330?.[0]?.dbm ?? "").trim();
-  return Boolean(dbm1550 || dbm1330);
+  if (estacao.numeroFibra != null && Number(estacao.numeroFibra) >= 1) return true;
+  return Boolean(primeiroDbm(estacao.nm1550) || primeiroDbm(estacao.nm1330));
 }
 
 export function emptyTestePotencia(): TestePotenciaPayload {
@@ -1028,15 +1036,9 @@ export function mergeRelatorioPayload(
       fromLocal.outrasFotosEqEstacao,
       mergeOutra,
     ),
-    testeOptico: mergeTesteOptico(fromServer.testeOptico, fromLocal.testeOptico),
-    testePotenciaEmpresarial: mergeTestePotencia(
-      fromServer.testePotenciaEmpresarial,
-      fromLocal.testePotenciaEmpresarial,
-    ),
-    testePotenciaImplantacao: mergeTestePotencia(
-      fromServer.testePotenciaImplantacao,
-      fromLocal.testePotenciaImplantacao,
-    ),
+    testeOptico: fromLocal.testeOptico,
+    testePotenciaEmpresarial: fromLocal.testePotenciaEmpresarial,
+    testePotenciaImplantacao: fromLocal.testePotenciaImplantacao,
     testePotencia1550: mergeTestePotenciaJanela(
       fromServer.testePotencia1550,
       fromLocal.testePotencia1550,
@@ -1330,6 +1332,29 @@ function jsonSafePayload(
   }
 }
 
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 3,
+  delayMs = 700,
+  onRetry?: (attempt: number, error: unknown) => void,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        onRetry?.(attempt + 1, error);
+        await new Promise((resolve) => {
+          globalThis.setTimeout(resolve, delayMs * 2 ** attempt);
+        });
+      }
+    }
+  }
+  throw lastError;
+}
+
 export async function patchRelatorioDraft(
   id: string,
   patch: RelatorioDraftPatch,
@@ -1516,16 +1541,18 @@ export async function patchRelatorioPayloadAdmin(
   payload: RelatorioPayload,
 ): Promise<RelatorioTransmissao> {
   const supabase = getSupabaseClient();
+  const latest = await fetchRelatorioTransmissaoById(id);
+  const safePayload = jsonSafePayload(payload, latest.tipo_execucao);
   const { data, error } = await supabase
     .from("relatorios_transmissao")
-    .update({ payload })
+    .update({ payload: safePayload })
     .eq("id", id)
     .select(SELECT_COLS)
     .single();
   if (error) {
     const fallback = await supabase
       .from("relatorios_transmissao")
-      .update({ payload })
+      .update({ payload: safePayload })
       .eq("id", id)
       .select(SELECT_COLS_PLAIN)
       .single();

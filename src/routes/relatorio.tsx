@@ -9,6 +9,7 @@ import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/Relato
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
+import { RelatorioSyncStatus } from "@/components/RelatorioSyncStatus";
 import {
   RelatorioAbasCampo,
   RelatorioRedeAcesso,
@@ -36,6 +37,7 @@ import {
   isTecnicoAtribuido,
   janelaPotenciaDerivada,
   patchRelatorioDraft,
+  withRetry,
   readObsAdmin,
   removeExtraById,
   subscribeRelatorioTransmissaoById,
@@ -442,15 +444,21 @@ function RelatorioPage() {
       setSaveHint("saving");
       persistingRef.current = true;
       try {
-        const saved = await patchRelatorioDraft(currentReportId, {
-          cliente,
-          endereco,
-          cidade,
-          equipe_empreiteira: equipe,
-          responsavel,
-          data_inicio_execucao: dataInicio || null,
-          payload: payloadOverride ?? buildPayload(),
-        });
+        const saved = await withRetry(
+          () =>
+            patchRelatorioDraft(currentReportId, {
+              cliente,
+              endereco,
+              cidade,
+              equipe_empreiteira: equipe,
+              responsavel,
+              data_inicio_execucao: dataInicio || null,
+              payload: payloadOverride ?? buildPayload(),
+            }),
+          3,
+          700,
+          () => setSaveHint("error"),
+        );
         lastSavedUpdatedAtRef.current = saved.updated_at;
         lastAppliedUpdatedAtRef.current = saved.updated_at;
         setSaveHint("saved");
@@ -982,20 +990,26 @@ function RelatorioPage() {
                   : "Rascunho vivo — salvamento automático. O admin já enxerga este contrato."}
             </p>
           </div>
-          <span className="shrink-0 text-xs font-medium text-muted-foreground">
+          <span className="shrink-0">
             {readOnly
-              ? status === "fechado"
-                ? "Fechado"
-                : "Avisado"
-              : saveHint === "saving"
-                ? "Salvando..."
-                : saveHint === "saved"
-                  ? "Salvo"
-                  : saveHint === "error"
-                    ? "Falha ao salvar"
-                    : status === "pendente"
-                      ? "Pendência"
-                      : "Em aberto"}
+              ? (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {status === "fechado" ? "Fechado" : "Avisado"}
+                  </span>
+                )
+              : (
+                  <RelatorioSyncStatus
+                    status={
+                      saveHint === "saving"
+                        ? "saving"
+                        : saveHint === "error"
+                          ? "error"
+                          : saveHint === "saved"
+                            ? "saved"
+                            : "idle"
+                    }
+                  />
+                )}
           </span>
         </header>
 
@@ -1486,10 +1500,10 @@ function RelatorioPage() {
                 />
               ) : mostrarTestePotencia ? (
                 <RelatorioTestePotenciaAtenuacao
-                  testeOptico={testeOptico}
-                  testeOtdr={testePotenciaEmpresarial}
-                  redeAcesso={redeAcesso}
-                  redeCliente={redeCliente}
+                  testeOptico={testeOptico ?? emptyTesteOptico()}
+                  testeOtdr={testePotenciaEmpresarial ?? emptyTestePotencia()}
+                  redeAcesso={redeAcesso ?? emptyQuantidadesRede()}
+                  redeCliente={redeCliente ?? emptyQuantidadesRede()}
                 />
               ) : null}
             </>
@@ -1500,6 +1514,19 @@ function RelatorioPage() {
       {readOnly ? null : (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-5 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
           <div className="mx-auto max-w-2xl">
+            <div className="mb-2 flex justify-end">
+              <RelatorioSyncStatus
+                status={
+                  saveHint === "saving"
+                    ? "saving"
+                    : saveHint === "error"
+                      ? "error"
+                      : saveHint === "saved"
+                        ? "saved"
+                        : "idle"
+                }
+              />
+            </div>
             <button
               type="button"
               onClick={() => void onAvisar()}

@@ -4,6 +4,8 @@ import { ArrowLeft, CheckCircle2, FileDown, RefreshCw, Trash2 } from "lucide-rea
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
+import { RelatorioSyncStatus } from "@/components/RelatorioSyncStatus";
+import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import {
   RelatorioDetalhe,
   StatusBadge,
@@ -23,7 +25,9 @@ import {
   sinalizarPendenciaRelatorio,
   subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
+  withRetry,
   type RelatorioFotoCategoria,
+  type RelatorioPayload,
   type RelatorioTransmissao,
 } from "@/lib/relatorios-transmissao";
 import type { EvidencePhotoRef } from "@/lib/types";
@@ -54,6 +58,10 @@ function AdminLancamentoDetalhePage() {
   );
   const lastAppliedUpdatedAtRef = useRef<string | null>(null);
   const applyingRemoteRef = useRef(false);
+  const canAutosaveRef = useRef(false);
+  const pendingPayloadRef = useRef<RelatorioPayload | null>(null);
+  const [payloadTick, setPayloadTick] = useState(0);
+  const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const voltarParaLista = useCallback(() => {
     void navigate({ to: "/admin/transmissao" });
@@ -66,6 +74,7 @@ function AdminLancamentoDetalhePage() {
       try {
         const fresh = await fetchRelatorioTransmissaoById(id);
         lastAppliedUpdatedAtRef.current = fresh.updated_at;
+        canAutosaveRef.current = true;
         setRow(fresh);
         return fresh;
       } catch (err) {
@@ -219,19 +228,48 @@ function AdminLancamentoDetalhePage() {
     }
   };
 
-  const onUpdatePayload = async (nextPayload: RelatorioTransmissao["payload"]) => {
+  const persistAdminPayload = useCallback(
+    async (nextPayload: RelatorioPayload) => {
+      if (!row) return;
+      applyingRemoteRef.current = true;
+      setSaveHint("saving");
+      try {
+        const saved = await withRetry(
+          () => patchRelatorioPayloadAdmin(row.id, nextPayload),
+          3,
+          700,
+          () => setSaveHint("error"),
+        );
+        lastAppliedUpdatedAtRef.current = saved.updated_at;
+        setRow(saved);
+        setSaveHint("saved");
+      } catch (err) {
+        setSaveHint("error");
+        toast.error((err as Error).message || "Não foi possível salvar a alteração.");
+      } finally {
+        applyingRemoteRef.current = false;
+      }
+    },
+    [row],
+  );
+
+  useDebouncedEffect(
+    () => {
+      if (!canAutosaveRef.current) return;
+      const next = pendingPayloadRef.current;
+      if (!next) return;
+      void persistAdminPayload(next);
+    },
+    [payloadTick],
+    1500,
+    Boolean(canAudit && row && row.status !== "fechado"),
+  );
+
+  const onUpdatePayload = (nextPayload: RelatorioTransmissao["payload"]) => {
     if (!row) return;
-    applyingRemoteRef.current = true;
+    pendingPayloadRef.current = nextPayload;
     setRow({ ...row, payload: nextPayload });
-    try {
-      const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
-      lastAppliedUpdatedAtRef.current = saved.updated_at;
-      setRow(saved);
-    } catch (err) {
-      toast.error((err as Error).message || "Não foi possível salvar a alteração.");
-    } finally {
-      applyingRemoteRef.current = false;
-    }
+    setPayloadTick((tick) => tick + 1);
   };
 
   const podeAuditar =
@@ -264,7 +302,20 @@ function AdminLancamentoDetalhePage() {
               {refreshing ? "Atualizando dados..." : "Auditoria do relatório de campo"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            {canAudit && row && row.status !== "fechado" ? (
+              <RelatorioSyncStatus
+                status={
+                  saveHint === "saving"
+                    ? "saving"
+                    : saveHint === "error"
+                      ? "error"
+                      : saveHint === "saved"
+                        ? "saved"
+                        : "idle"
+                }
+              />
+            ) : null}
             {canAudit && row ? (
               <Button
                 type="button"
@@ -307,7 +358,7 @@ function AdminLancamentoDetalhePage() {
                 void onAdminReplacePhoto(categoria, file, meta)
               }
               uploadingCategoria={uploadingCategoria}
-              onUpdatePayload={(nextPayload) => void onUpdatePayload(nextPayload)}
+              onUpdatePayload={onUpdatePayload}
               onUploadPhoto={async (file) => {
                 if (!user?.id) throw new Error("Sessão inválida.");
                 return uploadRelatorioPhoto(user.id, file.file, "admin-teste");

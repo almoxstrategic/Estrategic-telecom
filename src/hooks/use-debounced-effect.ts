@@ -10,6 +10,17 @@ export function useDebouncedEffect(
   const fnRef = useRef(fn);
   fnRef.current = fn;
 
+  const serializedDeps = deps.map((dep) => {
+    if (dep !== null && typeof dep === "object") {
+      try {
+        return JSON.stringify(dep);
+      } catch {
+        return String(dep);
+      }
+    }
+    return dep;
+  });
+
   useEffect(() => {
     if (!enabled) return;
     const timer = window.setTimeout(() => {
@@ -17,5 +28,5 @@ export function useDebouncedEffect(
     }, delayMs);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, delayMs, enabled]);
+  }, [...serializedDeps, delayMs, enabled]);
 }

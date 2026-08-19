@@ -14,10 +14,13 @@ export const FIBER_COLORS = [
 ] as const;
 
 export function corFibraPorIndice(index: number) {
-  return FIBER_COLORS[((index % 12) + 12) % 12];
+  const i = Number.isFinite(index) ? Math.trunc(index) : 0;
+  return FIBER_COLORS[((i % 12) + 12) % 12];
 }
 
 /** Número da fibra no campo (1 = VD, 3 = BR). */
 export function corFibraPorNumero(numero: number) {
-  return corFibraPorIndice(Math.trunc(numero) - 1);
+  const n = Number(numero);
+  if (!Number.isFinite(n) || n < 1) return corFibraPorIndice(0);
+  return corFibraPorIndice(Math.trunc(n) - 1);
 }

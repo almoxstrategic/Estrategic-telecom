@@ -7,6 +7,9 @@ import {
   PERDA_CONEXAO,
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
+  emptyQuantidadesRede,
+  emptyTesteOptico,
+  emptyTestePotencia,
   formatarDb,
   parseNumeroCampo,
   textoOuTraco,
@@ -34,20 +37,19 @@ export function RelatorioTestePotenciaAtenuacao({
   redeAcesso,
   redeCliente,
 }: {
-  testeOptico: TesteOpticoPayload;
-  testeOtdr: TestePotenciaPayload;
-  redeAcesso: QuantidadesRedePayload;
-  redeCliente: QuantidadesRedePayload;
+  testeOptico?: TesteOpticoPayload | null;
+  testeOtdr?: TestePotenciaPayload | null;
+  redeAcesso?: QuantidadesRedePayload | null;
+  redeCliente?: QuantidadesRedePayload | null;
 }) {
-  const kmRaw = String(testeOtdr.comprimentoTrechoKm || "0").replace(",", ".");
-  const km = parseFloat(kmRaw) || 0;
-  const totalEmendas = totalEmendasCalculado(
-    redeAcesso.qtdCaixasEmenda,
-    redeCliente.qtdCaixasEmenda,
-  );
+  const optico = testeOptico ?? emptyTesteOptico();
+  const otdr = testeOtdr ?? emptyTestePotencia();
+  const re = redeAcesso ?? emptyQuantidadesRede();
+  const rc = redeCliente ?? emptyQuantidadesRede();
+  const km = numeroSeguro(String(otdr.comprimentoTrechoKm ?? "0").replace(",", "."), 0);
+  const totalEmendas = totalEmendasCalculado(re.qtdCaixasEmenda, rc.qtdCaixasEmenda);
   const totalConexoes = totalConexoesCalculado(totalEmendas);
-
-  const mostrarEstacao = testeOpticoEstacaoAtivo(testeOptico.estacao);
+  const mostrarEstacao = testeOpticoEstacaoAtivo(optico.estacao);
 
   return (
     <div className="space-y-4">
@@ -59,7 +61,7 @@ export function RelatorioTestePotenciaAtenuacao({
           janela={card.janela}
           ponto={card.ponto}
           km={km}
-          testeOptico={testeOptico}
+          testeOptico={optico}
           totalEmendas={totalEmendas}
           totalConexoes={totalConexoes}
         />
@@ -68,47 +70,28 @@ export function RelatorioTestePotenciaAtenuacao({
   );
 }
 
+function numeroSeguro(raw: unknown, fallback = 0): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  const n = parseFloat(String(raw ?? "").replace(",", "."));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatarPtBr(raw: unknown): string {
+  return numeroSeguro(raw).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function campoEmBranco(raw: unknown): boolean {
   return String(raw ?? "").trim() === "";
 }
 
-function numeroFibraDoItem(raw: unknown): number | null {
-  if (!raw || typeof raw !== "object") return null;
-  const n = (raw as { numeroFibra?: unknown }).numeroFibra;
-  if (typeof n === "number" && Number.isFinite(n) && n >= 1) return Math.trunc(n);
-  if (typeof n === "string" && n.trim()) {
-    const parsed = Number(n.replace(",", "."));
-    if (Number.isFinite(parsed) && parsed >= 1) return Math.trunc(parsed);
-  }
-  return null;
-}
-
-function dbmTexto(raw: unknown): string {
-  if (!raw || typeof raw !== "object") return "";
-  const obj = raw as { dbm?: unknown; dBm?: unknown };
-  const valor = obj.dbm ?? obj.dBm;
+function primeiroDbm(lista: unknown): string {
+  const item = Array.isArray(lista) ? lista[0] : lista;
+  if (!item || typeof item !== "object") return "";
+  const valor = (item as { dbm?: unknown; dBm?: unknown }).dbm ?? (item as { dBm?: unknown }).dBm;
   return valor == null ? "" : String(valor);
-}
-
-function listaOuItem(raw: unknown): unknown[] {
-  if (raw == null) return [];
-  return Array.isArray(raw) ? raw : [raw];
-}
-
-function janelaCliente(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
-  const lista = janela === "1550" ? testeOptico.cliente?.nm1550 : testeOptico.cliente?.nm1330;
-  return listaOuItem(lista).slice(0, 1).map((item) => ({
-    ...(typeof item === "object" && item ? item : {}),
-    numeroFibra: testeOptico.cliente?.numeroFibra,
-  }));
-}
-
-function janelaEstacao(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
-  const lista = janela === "1550" ? testeOptico.estacao?.nm1550 : testeOptico.estacao?.nm1330;
-  return listaOuItem(lista).slice(0, 1).map((item) => ({
-    ...(typeof item === "object" && item ? item : {}),
-    numeroFibra: testeOptico.estacao?.numeroFibra,
-  }));
 }
 
 function piTextoDoPonto(
@@ -116,41 +99,17 @@ function piTextoDoPonto(
   janela: JanelaNm,
   ponto: PontoMedicao,
 ): string {
-  const origem =
-    ponto === "cliente"
-      ? janelaCliente(testeOptico, janela)
-      : janelaEstacao(testeOptico, janela);
-  return dbmTexto(listaOuItem(origem)[0]);
+  const localidade = ponto === "cliente" ? testeOptico?.cliente : testeOptico?.estacao;
+  return janela === "1550" ? primeiroDbm(localidade?.nm1550) : primeiroDbm(localidade?.nm1330);
 }
 
-/** Pi e Po vêm da mesma localidade (cliente ou estação), 1:1 com o card. */
-function piDoPonto(
-  testeOptico: TesteOpticoPayload,
-  janela: JanelaNm,
-  ponto: PontoMedicao,
-): number | null {
-  return parseNumeroCampo(piTextoDoPonto(testeOptico, janela, ponto));
-}
-
-/** Po = medições no ponto do card. */
-function fibrasDoPonto(
-  testeOptico: TesteOpticoPayload,
-  janela: JanelaNm,
-  ponto: PontoMedicao,
-) {
-  const origem =
+function numeroFibraDoPonto(testeOptico: TesteOpticoPayload, ponto: PontoMedicao): number | null {
+  const bruto =
     ponto === "cliente"
-      ? janelaCliente(testeOptico, janela)
-      : janelaEstacao(testeOptico, janela);
-  return listaOuItem(origem).map((item, index) => {
-    const informado = numeroFibraDoItem(item);
-    const numeroDaFibra = informado || index + 1;
-    return {
-      numero: String(numeroDaFibra).padStart(2, "0"),
-      numeroFibra: numeroDaFibra,
-      potenciaMedida: dbmTexto(item),
-    };
-  });
+      ? testeOptico?.cliente?.numeroFibra
+      : testeOptico?.estacao?.numeroFibra;
+  const n = typeof bruto === "number" ? bruto : numeroSeguro(bruto, 0);
+  return n >= 1 ? Math.trunc(n) : null;
 }
 
 function JanelaCard({
@@ -170,13 +129,16 @@ function JanelaCard({
   totalEmendas: number;
   totalConexoes: number;
 }) {
-  const pi = piDoPonto(testeOptico, janela, ponto);
   const referenciaPi = piTextoDoPonto(testeOptico, janela, ponto);
-  const fibras = fibrasDoPonto(testeOptico, janela, ponto);
+  const pi = parseNumeroCampo(referenciaPi);
+  const numeroFibra = numeroFibraDoPonto(testeOptico, ponto);
   const janelaNm = `${janela} nm`;
+  const kmSeguro = numeroSeguro(km, 0);
+  const emendasSeguro = numeroSeguro(totalEmendas, 0);
+  const conexoesSeguro = numeroSeguro(totalConexoes, 0);
   const atenMaxima = useMemo(
-    () => calcularAtenuacaoMaxima(km, totalEmendas, totalConexoes),
-    [km, totalEmendas, totalConexoes],
+    () => calcularAtenuacaoMaxima(kmSeguro, emendasSeguro, conexoesSeguro),
+    [kmSeguro, emendasSeguro, conexoesSeguro],
   );
   const valorMinimoAdmissivel = useMemo(
     () => calcularMinimoAdmissivel(pi, atenMaxima),
@@ -189,13 +151,10 @@ function JanelaCard({
       <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-4">
         <CampoImportado
           label="Comprimento do Trecho (km)"
-          value={km.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }) + " km"}
+          value={`${formatarPtBr(kmSeguro)} km`}
         />
-        <CampoImportado label="Nº de Emendas" value={String(totalEmendas)} />
-        <CampoImportado label="Nº de Conexões" value={String(totalConexoes)} />
+        <CampoImportado label="Nº de Emendas" value={String(emendasSeguro)} />
+        <CampoImportado label="Nº de Conexões" value={String(conexoesSeguro)} />
         <CampoImportado
           label="Referência do Instrumento (Pi) em dBm"
           value={pi == null ? "" : formatarDb(pi, 2)}
@@ -220,19 +179,17 @@ function JanelaCard({
           <span>Status</span>
         </div>
         <div className="divide-y divide-border">
-          {fibras.map((fibra, index) => {
-            const numeroDaFibra = fibra.numeroFibra || index + 1;
-            return (
+          {numeroFibra == null ? (
+            <p className="py-3 text-sm text-muted-foreground">Nenhum teste registrado</p>
+          ) : (
             <LinhaFibra
-              key={`${janela}-${ponto}-${index}`}
-              numero={String(numeroDaFibra).padStart(2, "0")}
-              numeroFibra={numeroDaFibra}
+              numero={String(numeroFibra).padStart(2, "0")}
+              numeroFibra={numeroFibra}
               atenMaxima={atenMaxima}
               referenciaPi={referenciaPi}
               valorMinimoAdmissivel={valorMinimoAdmissivel}
             />
-            );
-          })}
+          )}
         </div>
       </div>
     </section>
@@ -253,8 +210,8 @@ function LinhaFibra({
   valorMinimoAdmissivel: number | null;
 }) {
   const piEmBranco = campoEmBranco(referenciaPi);
-  const valPo = -Math.abs(atenMaxima);
-  const valPi = parseFloat(String(referenciaPi || "0").replace(",", ".")) || 0;
+  const valPo = -Math.abs(numeroSeguro(atenMaxima, 0));
+  const valPi = numeroSeguro(String(referenciaPi || "0").replace(",", "."), 0);
   const atenuacao = valPo - valPi;
   const status =
     piEmBranco || valorMinimoAdmissivel == null
@@ -263,14 +220,8 @@ function LinhaFibra({
         ? "aprovado"
         : "reprovado";
   const colorCode = corFibraPorNumero(numeroFibra);
-  const poFormatado = valPo.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  const atenuacaoFormatada = `${atenuacao.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} dB`;
+  const poFormatado = formatarPtBr(valPo);
+  const atenuacaoFormatada = `${formatarPtBr(atenuacao)} dB`;
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">
@@ -320,7 +271,8 @@ function ValoresReferencia({
   atenMaxima: number;
   valorMinimoAdmissivel: string;
 }) {
-  const atenMaximaExibida = `-${Math.abs(atenMaxima).toFixed(2)}`;
+  const atenSegura = numeroSeguro(atenMaxima, 0);
+  const atenMaximaExibida = `-${Math.abs(atenSegura).toFixed(2)}`;
   return (
     <table className="mb-4 w-full border-collapse text-xs text-gray-700 md:text-sm">
       <tbody>
