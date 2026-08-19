@@ -76,8 +76,6 @@ export type RelatorioFotoGrupoKey =
   | RelatorioFotoGrupoKeyEq;
 
 export type TesteOpticoFaixaPayload = {
-  id: string;
-  numeroFibra: number | null;
   dbm: string;
   fotos: StoredPhoto[];
   obs: string;
@@ -85,22 +83,32 @@ export type TesteOpticoFaixaPayload = {
 };
 
 export type TesteOpticoItemPayload = {
-  id: string;
-  numeroFibra: number | null;
   dbm: string;
   foto: StoredPhoto | null;
   obs: string;
   obsAdmin: string;
 };
 
+export type TesteOpticoParClientePayload = {
+  id: string;
+  numeroFibra: number | null;
+  nm1550: TesteOpticoFaixaPayload;
+  nm1330: TesteOpticoFaixaPayload;
+};
+
+export type TesteOpticoParEstacaoPayload = {
+  id: string;
+  numeroFibra: number | null;
+  nm1550: TesteOpticoItemPayload;
+  nm1330: TesteOpticoItemPayload;
+};
+
 export type TesteOpticoPayload = {
   cliente: {
-    nm1550: TesteOpticoFaixaPayload[];
-    nm1330: TesteOpticoFaixaPayload[];
+    testes: TesteOpticoParClientePayload[];
   };
   estacao: {
-    nm1550: TesteOpticoItemPayload[];
-    nm1330: TesteOpticoItemPayload[];
+    testes: TesteOpticoParEstacaoPayload[];
   };
 };
 
@@ -180,11 +188,29 @@ export function textoOuTraco(raw: string | null | undefined): string {
 }
 
 export function emptyTesteOpticoFaixa(): TesteOpticoFaixaPayload {
-  return { id: crypto.randomUUID(), numeroFibra: null, dbm: "", fotos: [], obs: "", obsAdmin: "" };
+  return { dbm: "", fotos: [], obs: "", obsAdmin: "" };
 }
 
 export function emptyTesteOpticoItem(): TesteOpticoItemPayload {
-  return { id: crypto.randomUUID(), numeroFibra: null, dbm: "", foto: null, obs: "", obsAdmin: "" };
+  return { dbm: "", foto: null, obs: "", obsAdmin: "" };
+}
+
+export function emptyTesteOpticoParCliente(): TesteOpticoParClientePayload {
+  return {
+    id: crypto.randomUUID(),
+    numeroFibra: null,
+    nm1550: emptyTesteOpticoFaixa(),
+    nm1330: emptyTesteOpticoFaixa(),
+  };
+}
+
+export function emptyTesteOpticoParEstacao(): TesteOpticoParEstacaoPayload {
+  return {
+    id: crypto.randomUUID(),
+    numeroFibra: null,
+    nm1550: emptyTesteOpticoItem(),
+    nm1330: emptyTesteOpticoItem(),
+  };
 }
 
 const DEFAULT_OTDR_IDS = ["otdr-1", "otdr-2"] as const;
@@ -196,12 +222,10 @@ export function emptyTesteOtdrItem(id?: string): TesteOtdrItemPayload {
 export function emptyTesteOptico(): TesteOpticoPayload {
   return {
     cliente: {
-      nm1550: [emptyTesteOpticoFaixa()],
-      nm1330: [emptyTesteOpticoFaixa()],
+      testes: [emptyTesteOpticoParCliente()],
     },
     estacao: {
-      nm1550: [emptyTesteOpticoItem()],
-      nm1330: [emptyTesteOpticoItem()],
+      testes: [emptyTesteOpticoParEstacao()],
     },
   };
 }
@@ -535,52 +559,121 @@ function parseFotosList(raw: unknown): StoredPhoto[] {
   return raw.map(parseStoredPhoto).filter((foto): foto is StoredPhoto => Boolean(foto));
 }
 
-function parseTesteOpticoFaixa(
-  raw: unknown,
-  fallbackNumeroFibra: number | null = null,
-): TesteOpticoFaixaPayload {
-  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoFaixaPayload>;
+function parseTesteOpticoFaixa(raw: unknown): TesteOpticoFaixaPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoFaixaPayload> & {
+    dBm?: string;
+  };
   return {
-    id: src.id || crypto.randomUUID(),
-    numeroFibra: parseNumeroFibra(src.numeroFibra) ?? fallbackNumeroFibra,
-    dbm: src.dbm ?? (src as { dBm?: string }).dBm ?? "",
+    dbm: src.dbm ?? src.dBm ?? "",
     fotos: parseFotosList(src.fotos),
     obs: src.obs ?? "",
     obsAdmin: readObsAdmin(src),
   };
 }
 
-function parseTesteOpticoFaixas(
-  raw: unknown,
-  fallbackNumeroFibra: number | null = null,
-): TesteOpticoFaixaPayload[] {
-  if (Array.isArray(raw) && raw.length > 0) {
-    return raw.map((item) => parseTesteOpticoFaixa(item, fallbackNumeroFibra));
-  }
-  if (raw && typeof raw === "object") {
-    return [parseTesteOpticoFaixa(raw, fallbackNumeroFibra)];
-  }
-  return [emptyTesteOpticoFaixa()];
+function parseTesteOpticoItem(raw: unknown): TesteOpticoItemPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoItemPayload> & {
+    dBm?: string;
+  };
+  return {
+    dbm: src.dbm ?? src.dBm ?? "",
+    foto: parseStoredPhoto(src.foto),
+    obs: src.obs ?? "",
+    obsAdmin: readObsAdmin(src),
+  };
 }
 
-function parseTesteOpticoItems(
-  raw: unknown,
-  fallbackNumeroFibra: number | null = null,
-): TesteOpticoItemPayload[] {
-  const list = Array.isArray(raw)
-    ? raw.map((item) => {
-        const src = (item ?? {}) as Partial<TesteOpticoItemPayload>;
-        return {
-          id: src.id || crypto.randomUUID(),
-          numeroFibra: parseNumeroFibra(src.numeroFibra) ?? fallbackNumeroFibra,
-          dbm: src.dbm ?? (src as { dBm?: string }).dBm ?? "",
-          foto: parseStoredPhoto(src.foto),
-          obs: src.obs ?? "",
-          obsAdmin: readObsAdmin(src),
-        };
-      })
-    : [];
-  return list.length > 0 ? list : [emptyTesteOpticoItem()];
+function listaOuUnico(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") return [raw];
+  return [];
+}
+
+function idDeItem(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = (raw as { id?: unknown }).id;
+  return typeof id === "string" && id ? id : null;
+}
+
+function numeroFibraDeItem(raw: unknown, fallback: number | null): number | null {
+  if (!raw || typeof raw !== "object") return fallback;
+  return parseNumeroFibra((raw as { numeroFibra?: unknown }).numeroFibra) ?? fallback;
+}
+
+function parseParCliente(raw: unknown, fallbackNumeroFibra: number | null): TesteOpticoParClientePayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoParClientePayload> & {
+    id?: string;
+  };
+  return {
+    id: src.id || crypto.randomUUID(),
+    numeroFibra: parseNumeroFibra(src.numeroFibra) ?? fallbackNumeroFibra,
+    nm1550: parseTesteOpticoFaixa(src.nm1550),
+    nm1330: parseTesteOpticoFaixa(src.nm1330),
+  };
+}
+
+function parseParEstacao(raw: unknown, fallbackNumeroFibra: number | null): TesteOpticoParEstacaoPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoParEstacaoPayload> & {
+    id?: string;
+  };
+  return {
+    id: src.id || crypto.randomUUID(),
+    numeroFibra: parseNumeroFibra(src.numeroFibra) ?? fallbackNumeroFibra,
+    nm1550: parseTesteOpticoItem(src.nm1550),
+    nm1330: parseTesteOpticoItem(src.nm1330),
+  };
+}
+
+function parseParesCliente(raw: unknown): TesteOpticoParClientePayload[] {
+  const src = (raw && typeof raw === "object" ? raw : {}) as {
+    testes?: unknown;
+    numeroFibra?: unknown;
+    nm1550?: unknown;
+    nm1330?: unknown;
+  };
+  const fallback = parseNumeroFibra(src.numeroFibra);
+  if (Array.isArray(src.testes) && src.testes.length > 0) {
+    return src.testes.map((item) => parseParCliente(item, fallback));
+  }
+  const nm1550 = listaOuUnico(src.nm1550);
+  const nm1330 = listaOuUnico(src.nm1330);
+  const n = Math.max(nm1550.length, nm1330.length, 1);
+  return Array.from({ length: n }, (_, index) => {
+    const a = nm1550[index];
+    const b = nm1330[index];
+    return {
+      id: idDeItem(a) || idDeItem(b) || crypto.randomUUID(),
+      numeroFibra: numeroFibraDeItem(a, numeroFibraDeItem(b, fallback)),
+      nm1550: parseTesteOpticoFaixa(a),
+      nm1330: parseTesteOpticoFaixa(b),
+    };
+  });
+}
+
+function parseParesEstacao(raw: unknown): TesteOpticoParEstacaoPayload[] {
+  const src = (raw && typeof raw === "object" ? raw : {}) as {
+    testes?: unknown;
+    numeroFibra?: unknown;
+    nm1550?: unknown;
+    nm1330?: unknown;
+  };
+  const fallback = parseNumeroFibra(src.numeroFibra);
+  if (Array.isArray(src.testes) && src.testes.length > 0) {
+    return src.testes.map((item) => parseParEstacao(item, fallback));
+  }
+  const nm1550 = listaOuUnico(src.nm1550);
+  const nm1330 = listaOuUnico(src.nm1330);
+  const n = Math.max(nm1550.length, nm1330.length, 1);
+  return Array.from({ length: n }, (_, index) => {
+    const a = nm1550[index];
+    const b = nm1330[index];
+    return {
+      id: idDeItem(a) || idDeItem(b) || crypto.randomUUID(),
+      numeroFibra: numeroFibraDeItem(a, numeroFibraDeItem(b, fallback)),
+      nm1550: parseTesteOpticoItem(a),
+      nm1330: parseTesteOpticoItem(b),
+    };
+  });
 }
 
 function parseTesteOtdrItems(raw: unknown): TesteOtdrItemPayload[] {
@@ -608,21 +701,13 @@ function parseComprimentoTrechoKm(raw: unknown): string {
 }
 
 function parseTesteOptico(raw: unknown): TesteOpticoPayload {
-  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<TesteOpticoPayload> & {
-    cliente?: { numeroFibra?: unknown; nm1550?: unknown; nm1330?: unknown };
-    estacao?: { numeroFibra?: unknown; nm1550?: unknown; nm1330?: unknown };
+  const src = (raw && typeof raw === "object" ? raw : {}) as {
+    cliente?: unknown;
+    estacao?: unknown;
   };
-  const fibraCliente = parseNumeroFibra(src.cliente?.numeroFibra);
-  const fibraEstacao = parseNumeroFibra(src.estacao?.numeroFibra);
   return {
-    cliente: {
-      nm1550: parseTesteOpticoFaixas(src.cliente?.nm1550, fibraCliente),
-      nm1330: parseTesteOpticoFaixas(src.cliente?.nm1330, fibraCliente),
-    },
-    estacao: {
-      nm1550: parseTesteOpticoItems(src.estacao?.nm1550, fibraEstacao),
-      nm1330: parseTesteOpticoItems(src.estacao?.nm1330, fibraEstacao),
-    },
+    cliente: { testes: parseParesCliente(src.cliente) },
+    estacao: { testes: parseParesEstacao(src.estacao) },
   };
 }
 
@@ -821,9 +906,6 @@ function mergeTesteOpticoFaixa(
   local: TesteOpticoFaixaPayload,
 ): TesteOpticoFaixaPayload {
   return {
-    ...server,
-    numeroFibra:
-      local.numeroFibra === undefined ? server.numeroFibra : local.numeroFibra,
     dbm: local.dbm,
     fotos: local.fotos,
     obs: local.obs,
@@ -836,13 +918,34 @@ function mergeTesteOpticoItem(
   local: TesteOpticoItemPayload,
 ): TesteOpticoItemPayload {
   return {
-    ...server,
-    numeroFibra:
-      local.numeroFibra === undefined ? server.numeroFibra : local.numeroFibra,
     dbm: local.dbm,
     foto: local.foto,
     obs: local.obs,
     obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeParCliente(
+  server: TesteOpticoParClientePayload,
+  local: TesteOpticoParClientePayload,
+): TesteOpticoParClientePayload {
+  return {
+    ...server,
+    numeroFibra: local.numeroFibra === undefined ? server.numeroFibra : local.numeroFibra,
+    nm1550: mergeTesteOpticoFaixa(server.nm1550, local.nm1550),
+    nm1330: mergeTesteOpticoFaixa(server.nm1330, local.nm1330),
+  };
+}
+
+function mergeParEstacao(
+  server: TesteOpticoParEstacaoPayload,
+  local: TesteOpticoParEstacaoPayload,
+): TesteOpticoParEstacaoPayload {
+  return {
+    ...server,
+    numeroFibra: local.numeroFibra === undefined ? server.numeroFibra : local.numeroFibra,
+    nm1550: mergeTesteOpticoItem(server.nm1550, local.nm1550),
+    nm1330: mergeTesteOpticoItem(server.nm1330, local.nm1330),
   };
 }
 
@@ -875,12 +978,10 @@ function mergeTesteOtdrItem(
 function mergeTesteOptico(server: TesteOpticoPayload, local: TesteOpticoPayload): TesteOpticoPayload {
   return {
     cliente: {
-      nm1550: mergeById(server.cliente.nm1550, local.cliente.nm1550, mergeTesteOpticoFaixa),
-      nm1330: mergeById(server.cliente.nm1330, local.cliente.nm1330, mergeTesteOpticoFaixa),
+      testes: mergeById(server.cliente.testes, local.cliente.testes, mergeParCliente),
     },
     estacao: {
-      nm1550: mergeById(server.estacao.nm1550, local.estacao.nm1550, mergeTesteOpticoItem),
-      nm1330: mergeById(server.estacao.nm1330, local.estacao.nm1330, mergeTesteOpticoItem),
+      testes: mergeById(server.estacao.testes, local.estacao.testes, mergeParEstacao),
     },
   };
 }

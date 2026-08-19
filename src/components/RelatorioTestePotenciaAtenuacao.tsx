@@ -100,11 +100,17 @@ function listaOuItem(raw: unknown): unknown[] {
 }
 
 function janelaCliente(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
-  return janela === "1550" ? testeOptico.cliente?.nm1550 : testeOptico.cliente?.nm1330;
+  return (testeOptico.cliente?.testes ?? []).map((teste) => ({
+    ...(janela === "1550" ? teste.nm1550 : teste.nm1330),
+    numeroFibra: teste.numeroFibra,
+  }));
 }
 
 function janelaEstacao(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
-  return janela === "1550" ? testeOptico.estacao?.nm1550 : testeOptico.estacao?.nm1330;
+  return (testeOptico.estacao?.testes ?? []).map((teste) => ({
+    ...(janela === "1550" ? teste.nm1550 : teste.nm1330),
+    numeroFibra: teste.numeroFibra,
+  }));
 }
 
 function piTextoDoPonto(

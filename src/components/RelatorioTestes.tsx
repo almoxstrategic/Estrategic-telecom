@@ -11,12 +11,14 @@ import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
-  emptyTesteOpticoFaixa,
-  emptyTesteOpticoItem,
+  emptyTesteOpticoParCliente,
+  emptyTesteOpticoParEstacao,
   emptyTesteOtdrItem,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
   type TesteOpticoItemPayload,
+  type TesteOpticoParClientePayload,
+  type TesteOpticoParEstacaoPayload,
   type TesteOpticoPayload,
   type TesteOtdrItemPayload,
   type TestePotenciaPayload,
@@ -103,250 +105,156 @@ function FotoUnica({
   );
 }
 
-function TesteClienteColuna({
+function CardMedicaoCliente({
   titulo,
-  faixas,
+  faixa,
+  alt,
   readOnly,
-  onChange,
+  onPatch,
   onUploadPhoto,
 }: {
   titulo: string;
-  faixas: TesteOpticoFaixaPayload[];
+  faixa: TesteOpticoFaixaPayload;
+  alt: string;
   readOnly: boolean;
-  onChange: (next: TesteOpticoFaixaPayload[], opts?: ChangeOpts) => void;
+  onPatch: (next: TesteOpticoFaixaPayload, opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
 }) {
-  const patchFaixa = (id: string, patch: Partial<TesteOpticoFaixaPayload>, opts?: ChangeOpts) => {
-    onChange(
-      faixas.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)),
-      opts,
-    );
-  };
-
-  const adicionarFoto = async (id: string, file: EvidencePhotoRef) => {
+  const adicionarFoto = async (file: EvidencePhotoRef) => {
     if (!onUploadPhoto) return;
     const stored = await onUploadPhoto(file);
-    const faixa = faixas.find((item) => item.id === id);
-    if (!faixa) return;
-    patchFaixa(id, { fotos: [...faixa.fotos, stored] }, { immediate: true });
+    onPatch({ ...faixa, fotos: [...faixa.fotos, stored] }, { immediate: true });
   };
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full flex-col space-y-3 rounded-xl border border-border p-4">
       <h3 className="text-sm font-bold">{titulo}</h3>
-      {faixas.map((faixa, index) => (
-        <div
-          key={faixa.id}
-          className="relative flex h-full flex-col space-y-3 rounded-xl border border-border p-4"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold">Teste {index + 1}</p>
-            {!readOnly && index >= 1 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  faixa.fotos.forEach((foto) => {
-                    void deleteRelatorioPhoto(foto.path);
-                  });
-                  onChange(
-                    faixas.filter((row) => row.id !== faixa.id),
+      <div>
+        <label className="mb-1.5 block text-sm font-semibold">Digite o dBm</label>
+        <input
+          inputMode="decimal"
+          value={faixa.dbm}
+          onChange={(e) => onPatch({ ...faixa, dbm: e.target.value })}
+          placeholder="dBm"
+          disabled={readOnly}
+          className={inputClass()}
+        />
+      </div>
+      <div className="flex-1 space-y-2">
+        <FotoLabel>Foto</FotoLabel>
+        {faixa.fotos.length === 0 ? (
+          <FotoUnica
+            foto={null}
+            alt={alt}
+            readOnly={readOnly}
+            onPick={(file) => {
+              if (file) void adicionarFoto(file);
+            }}
+          />
+        ) : (
+          faixa.fotos.map((foto, fotoIndex) => (
+            <RelatorioFotoComControles
+              key={`${foto.path}-${fotoIndex}`}
+              src={foto.url}
+              alt={`${alt} ${fotoIndex + 1}`}
+              canEdit={!readOnly}
+              onDelete={() => {
+                void deleteRelatorioPhoto(foto.path);
+                onPatch(
+                  { ...faixa, fotos: faixa.fotos.filter((_, i) => i !== fotoIndex) },
+                  { immediate: true },
+                );
+              }}
+              onReplace={(file) => {
+                void deleteRelatorioPhoto(foto.path);
+                void (async () => {
+                  if (!onUploadPhoto) return;
+                  const stored = await onUploadPhoto(file);
+                  onPatch(
+                    {
+                      ...faixa,
+                      fotos: faixa.fotos.map((item, i) => (i === fotoIndex ? stored : item)),
+                    },
                     { immediate: true },
                   );
-                }}
-                className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-                aria-label={`Excluir teste ${index + 1}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-          <CampoNumeroFibra
-            value={faixa.numeroFibra}
-            disabled={readOnly}
-            onChange={(numeroFibra) => patchFaixa(faixa.id, { numeroFibra })}
-          />
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Digite o dBm</label>
-            <input
-              inputMode="decimal"
-              value={faixa.dbm}
-              onChange={(e) => patchFaixa(faixa.id, { dbm: e.target.value })}
-              placeholder="dBm"
-              disabled={readOnly}
-              className={inputClass()}
+                })();
+              }}
             />
-          </div>
-          <div className="flex-1 space-y-2">
-            <FotoLabel>Foto</FotoLabel>
-            {faixa.fotos.length === 0 ? (
-              <FotoUnica
-                foto={null}
-                alt={`${titulo} teste ${index + 1}`}
-                readOnly={readOnly}
-                onPick={(file) => {
-                  if (file) void adicionarFoto(faixa.id, file);
-                }}
-              />
-            ) : (
-              faixa.fotos.map((foto, fotoIndex) => (
-                <RelatorioFotoComControles
-                  key={`${foto.path}-${fotoIndex}`}
-                  src={foto.url}
-                  alt={`${titulo} ${index + 1} ${fotoIndex + 1}`}
-                  canEdit={!readOnly}
-                  onDelete={() => {
-                    void deleteRelatorioPhoto(foto.path);
-                    patchFaixa(
-                      faixa.id,
-                      { fotos: faixa.fotos.filter((_, i) => i !== fotoIndex) },
-                      { immediate: true },
-                    );
-                  }}
-                  onReplace={(file) => {
-                    void deleteRelatorioPhoto(foto.path);
-                    void (async () => {
-                      if (!onUploadPhoto) return;
-                      const stored = await onUploadPhoto(file);
-                      patchFaixa(
-                        faixa.id,
-                        {
-                          fotos: faixa.fotos.map((item, i) => (i === fotoIndex ? stored : item)),
-                        },
-                        { immediate: true },
-                      );
-                    })();
-                  }}
-                />
-              ))
-            )}
-          </div>
-          <div className="mt-auto w-full space-y-3">
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-              <textarea
-                value={faixa.obs}
-                onChange={(e) => patchFaixa(faixa.id, { obs: e.target.value })}
-                rows={3}
-                disabled={readOnly}
-                className={inputClass()}
-              />
-            </div>
-            {readOnly ? null : (
-              <AdicionarFotoExtra onPick={(file) => void adicionarFoto(faixa.id, file)} />
-            )}
-          </div>
+          ))
+        )}
+      </div>
+      <div className="mt-auto w-full space-y-3">
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+          <textarea
+            value={faixa.obs}
+            onChange={(e) => onPatch({ ...faixa, obs: e.target.value })}
+            rows={3}
+            disabled={readOnly}
+            className={inputClass()}
+          />
         </div>
-      ))}
-      {readOnly ? null : (
-        <BotaoAdicionar
-          label="Adicionar mais teste"
-          onClick={() => onChange([...faixas, emptyTesteOpticoFaixa()], { immediate: true })}
-        />
-      )}
+        {readOnly ? null : (
+          <AdicionarFotoExtra onPick={(file) => void adicionarFoto(file)} />
+        )}
+      </div>
     </div>
   );
 }
 
-function TesteEstacaoColuna({
+function CardMedicaoEstacao({
   titulo,
-  itens,
+  item,
+  alt,
   readOnly,
-  onChange,
+  onPatch,
   onUploadPhoto,
 }: {
   titulo: string;
-  itens: TesteOpticoItemPayload[];
+  item: TesteOpticoItemPayload;
+  alt: string;
   readOnly: boolean;
-  onChange: (next: TesteOpticoItemPayload[], opts?: ChangeOpts) => void;
+  onPatch: (next: TesteOpticoItemPayload, opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
 }) {
-  const patchItem = (id: string, patch: Partial<TesteOpticoItemPayload>, opts?: ChangeOpts) => {
-    onChange(
-      itens.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-      opts,
-    );
-  };
-
-  const pickFoto = async (id: string, file: EvidencePhotoRef | null) => {
+  const pickFoto = async (file: EvidencePhotoRef | null) => {
     if (!file) {
-      patchItem(id, { foto: null }, { immediate: true });
+      onPatch({ ...item, foto: null }, { immediate: true });
       return;
     }
     if (!onUploadPhoto) return;
     const stored = await onUploadPhoto(file);
-    patchItem(id, { foto: stored }, { immediate: true });
+    onPatch({ ...item, foto: stored }, { immediate: true });
   };
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full flex-col space-y-3 rounded-xl border border-border p-4">
       <h3 className="text-sm font-bold">{titulo}</h3>
-      {itens.map((item, index) => (
-        <div
-          key={item.id}
-          className="relative flex h-full flex-col space-y-3 rounded-xl border border-border p-4"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold">Teste {index + 1}</p>
-            {!readOnly && index >= 1 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  void deleteRelatorioPhoto(item.foto?.path);
-                  onChange(
-                    itens.filter((row) => row.id !== item.id),
-                    { immediate: true },
-                  );
-                }}
-                className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-                aria-label={`Excluir teste ${index + 1}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-          <CampoNumeroFibra
-            value={item.numeroFibra}
-            disabled={readOnly}
-            onChange={(numeroFibra) => patchItem(item.id, { numeroFibra })}
-          />
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Digite o dBm</label>
-            <input
-              inputMode="decimal"
-              value={item.dbm}
-              onChange={(e) => patchItem(item.id, { dbm: e.target.value })}
-              placeholder="dBm"
-              disabled={readOnly}
-              className={inputClass()}
-            />
-          </div>
-          <div className="flex-1">
-            <FotoLabel>Foto</FotoLabel>
-            <FotoUnica
-              foto={item.foto}
-              alt={`${titulo} teste ${index + 1}`}
-              readOnly={readOnly}
-              onPick={(file) => void pickFoto(item.id, file)}
-            />
-          </div>
-          <div className="mt-auto w-full">
-            <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-            <textarea
-              value={item.obs}
-              onChange={(e) => patchItem(item.id, { obs: e.target.value })}
-              rows={3}
-              disabled={readOnly}
-              className={inputClass()}
-            />
-          </div>
-        </div>
-      ))}
-      {readOnly ? null : (
-        <BotaoAdicionar
-          label="Adicionar mais teste"
-          onClick={() => onChange([...itens, emptyTesteOpticoItem()], { immediate: true })}
+      <div>
+        <label className="mb-1.5 block text-sm font-semibold">Digite o dBm</label>
+        <input
+          inputMode="decimal"
+          value={item.dbm}
+          onChange={(e) => onPatch({ ...item, dbm: e.target.value })}
+          placeholder="dBm"
+          disabled={readOnly}
+          className={inputClass()}
         />
-      )}
+      </div>
+      <div className="flex-1">
+        <FotoLabel>Foto</FotoLabel>
+        <FotoUnica foto={item.foto} alt={alt} readOnly={readOnly} onPick={(file) => void pickFoto(file)} />
+      </div>
+      <div className="mt-auto w-full">
+        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+        <textarea
+          value={item.obs}
+          onChange={(e) => onPatch({ ...item, obs: e.target.value })}
+          rows={3}
+          disabled={readOnly}
+          className={inputClass()}
+        />
+      </div>
     </div>
   );
 }
@@ -361,8 +269,8 @@ function CampoNumeroFibra({
   disabled: boolean;
 }) {
   return (
-    <div className="max-w-xs">
-      <label className="mb-1.5 block text-sm font-semibold">Nº Fibra:</label>
+    <div className="mx-auto w-full max-w-xs">
+      <label className="mb-1.5 block text-center text-sm font-semibold">Nº Fibra:</label>
       <input
         type="number"
         min={1}
@@ -387,6 +295,170 @@ function CampoNumeroFibra({
   );
 }
 
+function BlocoTesteOpticoCliente({
+  testes,
+  readOnly,
+  onChange,
+  onUploadPhoto,
+}: {
+  testes: TesteOpticoParClientePayload[];
+  readOnly: boolean;
+  onChange: (next: TesteOpticoParClientePayload[], opts?: ChangeOpts) => void;
+  onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
+}) {
+  const patchPar = (id: string, patch: Partial<TesteOpticoParClientePayload>, opts?: ChangeOpts) => {
+    onChange(
+      testes.map((teste) => (teste.id === id ? { ...teste, ...patch } : teste)),
+      opts,
+    );
+  };
+
+  return (
+    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-bold">Teste Óptico (No Cliente)</h2>
+      {testes.map((teste, index) => (
+        <div key={teste.id} className="space-y-3 rounded-xl border border-border/70 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="w-full text-center text-sm font-semibold">Teste {index + 1}</p>
+            {!readOnly && index >= 1 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  teste.nm1550.fotos.forEach((foto) => void deleteRelatorioPhoto(foto.path));
+                  teste.nm1330.fotos.forEach((foto) => void deleteRelatorioPhoto(foto.path));
+                  onChange(
+                    testes.filter((row) => row.id !== teste.id),
+                    { immediate: true },
+                  );
+                }}
+                className="shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                aria-label={`Excluir teste ${index + 1}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+          <CampoNumeroFibra
+            value={teste.numeroFibra}
+            disabled={readOnly}
+            onChange={(numeroFibra) => patchPar(teste.id, { numeroFibra })}
+          />
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="min-w-0 flex-1">
+              <CardMedicaoCliente
+                titulo="1550nm"
+                faixa={teste.nm1550}
+                alt={`Cliente 1550nm teste ${index + 1}`}
+                readOnly={readOnly}
+                onUploadPhoto={onUploadPhoto}
+                onPatch={(faixa, opts) => patchPar(teste.id, { nm1550: faixa }, opts)}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <CardMedicaoCliente
+                titulo="1330nm"
+                faixa={teste.nm1330}
+                alt={`Cliente 1330nm teste ${index + 1}`}
+                readOnly={readOnly}
+                onUploadPhoto={onUploadPhoto}
+                onPatch={(faixa, opts) => patchPar(teste.id, { nm1330: faixa }, opts)}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+      {readOnly ? null : (
+        <BotaoAdicionar
+          label="Adicionar Teste em Nova Fibra"
+          onClick={() => onChange([...testes, emptyTesteOpticoParCliente()], { immediate: true })}
+        />
+      )}
+    </div>
+  );
+}
+
+function BlocoTesteOpticoEstacao({
+  testes,
+  readOnly,
+  onChange,
+  onUploadPhoto,
+}: {
+  testes: TesteOpticoParEstacaoPayload[];
+  readOnly: boolean;
+  onChange: (next: TesteOpticoParEstacaoPayload[], opts?: ChangeOpts) => void;
+  onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
+}) {
+  const patchPar = (id: string, patch: Partial<TesteOpticoParEstacaoPayload>, opts?: ChangeOpts) => {
+    onChange(
+      testes.map((teste) => (teste.id === id ? { ...teste, ...patch } : teste)),
+      opts,
+    );
+  };
+
+  return (
+    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-bold">Teste Óptico (Na Estação)</h2>
+      {testes.map((teste, index) => (
+        <div key={teste.id} className="space-y-3 rounded-xl border border-border/70 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="w-full text-center text-sm font-semibold">Teste {index + 1}</p>
+            {!readOnly && index >= 1 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void deleteRelatorioPhoto(teste.nm1550.foto?.path);
+                  void deleteRelatorioPhoto(teste.nm1330.foto?.path);
+                  onChange(
+                    testes.filter((row) => row.id !== teste.id),
+                    { immediate: true },
+                  );
+                }}
+                className="shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                aria-label={`Excluir teste ${index + 1}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+          <CampoNumeroFibra
+            value={teste.numeroFibra}
+            disabled={readOnly}
+            onChange={(numeroFibra) => patchPar(teste.id, { numeroFibra })}
+          />
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="min-w-0 flex-1">
+              <CardMedicaoEstacao
+                titulo="1550nm"
+                item={teste.nm1550}
+                alt={`Estação 1550nm teste ${index + 1}`}
+                readOnly={readOnly}
+                onUploadPhoto={onUploadPhoto}
+                onPatch={(item, opts) => patchPar(teste.id, { nm1550: item }, opts)}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <CardMedicaoEstacao
+                titulo="1330nm"
+                item={teste.nm1330}
+                alt={`Estação 1330nm teste ${index + 1}`}
+                readOnly={readOnly}
+                onUploadPhoto={onUploadPhoto}
+                onPatch={(item, opts) => patchPar(teste.id, { nm1330: item }, opts)}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+      {readOnly ? null : (
+        <BotaoAdicionar
+          label="Adicionar Teste em Nova Fibra"
+          onClick={() => onChange([...testes, emptyTesteOpticoParEstacao()], { immediate: true })}
+        />
+      )}
+    </div>
+  );
+}
+
 export function RelatorioTesteOptico({
   value,
   onChange,
@@ -400,65 +472,18 @@ export function RelatorioTesteOptico({
 }) {
   return (
     <div className="space-y-5">
-      <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-base font-bold">Teste Óptico (No Cliente)</h2>
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-          <TesteClienteColuna
-            titulo="1550nm"
-            faixas={value.cliente.nm1550}
-            readOnly={readOnly}
-            onUploadPhoto={onUploadPhoto}
-            onChange={(faixas, opts) =>
-              onChange(
-                { ...value, cliente: { ...value.cliente, nm1550: faixas } },
-                opts,
-              )
-            }
-          />
-          <TesteClienteColuna
-            titulo="1330nm"
-            faixas={value.cliente.nm1330}
-            readOnly={readOnly}
-            onUploadPhoto={onUploadPhoto}
-            onChange={(faixas, opts) =>
-              onChange(
-                { ...value, cliente: { ...value.cliente, nm1330: faixas } },
-                opts,
-              )
-            }
-          />
-        </div>
-      </div>
-
-      <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-base font-bold">Teste Óptico (Na Estação)</h2>
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-          <TesteEstacaoColuna
-            titulo="1550nm"
-            itens={value.estacao.nm1550}
-            readOnly={readOnly}
-            onUploadPhoto={onUploadPhoto}
-            onChange={(itens, opts) =>
-              onChange(
-                { ...value, estacao: { ...value.estacao, nm1550: itens } },
-                opts,
-              )
-            }
-          />
-          <TesteEstacaoColuna
-            titulo="1330nm"
-            itens={value.estacao.nm1330}
-            readOnly={readOnly}
-            onUploadPhoto={onUploadPhoto}
-            onChange={(itens, opts) =>
-              onChange(
-                { ...value, estacao: { ...value.estacao, nm1330: itens } },
-                opts,
-              )
-            }
-          />
-        </div>
-      </div>
+      <BlocoTesteOpticoCliente
+        testes={value.cliente.testes}
+        readOnly={readOnly}
+        onUploadPhoto={onUploadPhoto}
+        onChange={(testes, opts) => onChange({ ...value, cliente: { testes } }, opts)}
+      />
+      <BlocoTesteOpticoEstacao
+        testes={value.estacao.testes}
+        readOnly={readOnly}
+        onUploadPhoto={onUploadPhoto}
+        onChange={(testes, opts) => onChange({ ...value, estacao: { testes } }, opts)}
+      />
     </div>
   );
 }
