@@ -169,7 +169,8 @@ export function formatarDb(valor: number, casas = 3): string {
 }
 
 export function formatarKm(km: number): string {
-  return `${formatarDb(km, 3)} km`;
+  const n = Number.isFinite(km) ? km : 0;
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`;
 }
 
 export function textoOuTraco(raw: string | null | undefined): string {

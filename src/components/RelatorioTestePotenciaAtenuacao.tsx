@@ -9,7 +9,6 @@ import {
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
   formatarDb,
-  formatarKm,
   parseNumeroCampo,
   textoOuTraco,
   totalConexoesCalculado,
@@ -40,7 +39,8 @@ export function RelatorioTestePotenciaAtenuacao({
   redeAcesso: QuantidadesRedePayload;
   redeCliente: QuantidadesRedePayload;
 }) {
-  const km = parseNumeroCampo(testeOtdr.comprimentoTrechoKm ?? "") ?? 0;
+  const kmRaw = String(testeOtdr.comprimentoTrechoKm || "0").replace(",", ".");
+  const km = parseFloat(kmRaw) || 0;
   const totalEmendas = totalEmendasCalculado(
     redeAcesso.qtdCaixasEmenda,
     redeCliente.qtdCaixasEmenda,
@@ -158,7 +158,13 @@ function JanelaCard({
     <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-bold">{titulo}</h2>
       <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-4">
-        <CampoImportado label="Comprimento do Trecho (km)" value={formatarKm(km)} />
+        <CampoImportado
+          label="Comprimento do Trecho (km)"
+          value={km.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }) + " km"}
+        />
         <CampoImportado label="Nº de Emendas" value={String(totalEmendas)} />
         <CampoImportado label="Nº de Conexões" value={String(totalConexoes)} />
         <CampoImportado
@@ -317,11 +323,11 @@ function LinhaRef({
 
 function LegendaCoresFibra() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+    <div className="my-6 flex w-full flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center">
       <p className="mb-2 text-xs font-semibold text-gray-700">
         Padrão de cores da fibra (Telebrás/ABNT) — repete a cada 12 fibras
       </p>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap justify-center gap-2">
         {FIBER_COLORS.map((cor, index) => (
           <span
             key={cor.sigla}
