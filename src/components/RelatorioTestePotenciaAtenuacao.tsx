@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { inputClass } from "@/components/RelatorioRedeAcesso";
+import { FIBER_COLORS, corFibraPorIndice } from "@/lib/fiber-colors";
 import {
   ATEN_EMENDA,
   ATEN_KM,
@@ -48,6 +49,7 @@ export function RelatorioTestePotenciaAtenuacao({
 
   return (
     <div className="space-y-4">
+      <LegendaCoresFibra />
       {CARDS.map((card) => (
         <JanelaCard
           key={card.titulo}
@@ -173,9 +175,10 @@ function JanelaCard({
           <span>Status</span>
         </div>
         <div className="divide-y divide-border">
-          {fibras.map((fibra) => (
+          {fibras.map((fibra, index) => (
             <LinhaFibra
               key={`${janela}-${ponto}-${fibra.numero}`}
+              index={index}
               numero={fibra.numero}
               potenciaMedida={fibra.potenciaMedida}
               pi={pi}
@@ -189,11 +192,13 @@ function JanelaCard({
 }
 
 function LinhaFibra({
+  index,
   numero,
   potenciaMedida,
   pi,
   valorMinimoAdmissivel,
 }: {
+  index: number;
   numero: string;
   potenciaMedida: string;
   pi: number | null;
@@ -207,12 +212,23 @@ function LinhaFibra({
       : po >= valorMinimoAdmissivel
         ? "aprovado"
         : "reprovado";
+  const colorCode = corFibraPorIndice(index);
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">
       <div className="min-w-0">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Fibra Nº</p>
-        <p className={`${inputClass()} cursor-default bg-muted`}>{numero}</p>
+        <div className="flex items-center gap-2">
+          <span
+            title={colorCode.label}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-[10px] font-bold ${colorCode.bg}`}
+          >
+            {colorCode.sigla}
+          </span>
+          <span className={`${inputClass()} cursor-default bg-muted font-medium text-gray-700`}>
+            {numero}
+          </span>
+        </div>
       </div>
       <div className="min-w-0">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Potência Medida - Po (dBm)</p>
@@ -287,6 +303,27 @@ function LinhaRef({
       <td className="w-24 px-3 py-2 text-center font-semibold tabular-nums">{valor}</td>
       <td className="w-20 px-3 py-2 text-gray-600">{unidade}</td>
     </tr>
+  );
+}
+
+function LegendaCoresFibra() {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+      <p className="mb-2 text-xs font-semibold text-gray-700">
+        Padrão de cores da fibra (Telebrás/ABNT) — repete a cada 12 fibras
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {FIBER_COLORS.map((cor, index) => (
+          <span
+            key={cor.sigla}
+            title={`${String(index + 1).padStart(2, "0")} · ${cor.label}`}
+            className={`inline-flex h-7 min-w-7 items-center justify-center rounded-sm px-1.5 text-[10px] font-bold ${cor.bg}`}
+          >
+            {cor.sigla}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
