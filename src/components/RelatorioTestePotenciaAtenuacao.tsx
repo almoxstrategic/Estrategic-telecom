@@ -208,6 +208,7 @@ function JanelaCard({
       </div>
       <ValoresReferencia
         janelaNm={janelaNm}
+        atenMaxima={atenMaxima}
         valorMinimoAdmissivel={
           valorMinimoAdmissivel == null ? "—" : formatarDb(valorMinimoAdmissivel, 2)
         }
@@ -313,11 +314,14 @@ function LinhaFibra({
 
 function ValoresReferencia({
   janelaNm,
+  atenMaxima,
   valorMinimoAdmissivel,
 }: {
   janelaNm: string;
+  atenMaxima: number;
   valorMinimoAdmissivel: string;
 }) {
+  const atenMaximaExibida = `-${Math.abs(atenMaxima).toFixed(2)}`;
   return (
     <table className="mb-4 w-full border-collapse text-xs text-gray-700 md:text-sm">
       <tbody>
@@ -328,6 +332,12 @@ function ValoresReferencia({
         />
         <LinhaRef rotulo="ATENUAÇÃO POR EMENDA:" valor={ATEN_EMENDA.toFixed(2)} unidade="dB" />
         <LinhaRef rotulo="PERDA POR CONEXÃO:" valor={PERDA_CONEXAO.toFixed(2)} unidade="dB" />
+        <LinhaRef
+          rotulo={`ATENUAÇÃO MÁXIMA - ${janelaNm}:`}
+          valor={atenMaximaExibida}
+          unidade="dB"
+          destaqueCinza
+        />
         <LinhaRef
           rotulo={
             <>
@@ -349,15 +359,18 @@ function LinhaRef({
   valor,
   unidade,
   destaque = false,
+  destaqueCinza = false,
 }: {
   rotulo: ReactNode;
   valor: string;
   unidade: string;
   destaque?: boolean;
+  destaqueCinza?: boolean;
 }) {
+  const fundo = destaque ? "bg-yellow-100" : destaqueCinza ? "bg-gray-100" : "bg-white";
   return (
-    <tr className={`border border-gray-300 ${destaque ? "bg-yellow-100" : "bg-white"}`}>
-      <td className="px-3 py-2">{rotulo}</td>
+    <tr className={`border border-gray-300 ${fundo}`}>
+      <td className={`px-3 py-2 ${destaqueCinza ? "font-semibold" : ""}`}>{rotulo}</td>
       <td className="w-24 px-3 py-2 text-center font-semibold tabular-nums">{valor}</td>
       <td className="w-20 px-3 py-2 text-gray-600">{unidade}</td>
     </tr>
