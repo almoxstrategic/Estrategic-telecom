@@ -100,16 +100,18 @@ function listaOuItem(raw: unknown): unknown[] {
 }
 
 function janelaCliente(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
-  return (testeOptico.cliente?.testes ?? []).map((teste) => ({
-    ...(janela === "1550" ? teste.nm1550 : teste.nm1330),
-    numeroFibra: teste.numeroFibra,
+  const lista = janela === "1550" ? testeOptico.cliente?.nm1550 : testeOptico.cliente?.nm1330;
+  return listaOuItem(lista).slice(0, 1).map((item) => ({
+    ...(typeof item === "object" && item ? item : {}),
+    numeroFibra: testeOptico.cliente?.numeroFibra,
   }));
 }
 
 function janelaEstacao(testeOptico: TesteOpticoPayload, janela: JanelaNm) {
-  return (testeOptico.estacao?.testes ?? []).map((teste) => ({
-    ...(janela === "1550" ? teste.nm1550 : teste.nm1330),
-    numeroFibra: teste.numeroFibra,
+  const lista = janela === "1550" ? testeOptico.estacao?.nm1550 : testeOptico.estacao?.nm1330;
+  return listaOuItem(lista).slice(0, 1).map((item) => ({
+    ...(typeof item === "object" && item ? item : {}),
+    numeroFibra: testeOptico.estacao?.numeroFibra,
   }));
 }
 
