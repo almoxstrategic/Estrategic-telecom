@@ -20,7 +20,7 @@ import {
   emptyQuantidadesRede,
   emptyTesteOptico,
   emptyTestePotencia,
-  emptyTestePotenciaJanela,
+  janelaPotenciaDerivada,
   labelTecnicosAtribuidos,
   removeExtraById,
   removeFotoGrupoAt,
@@ -528,6 +528,19 @@ export function RelatorioDetalhe({
     onUpdatePayload?.(next);
   };
 
+  const patchQtdCaixas = (lado: "redeAcesso" | "redeCliente", qtdCaixasEmenda: number | null) => {
+    if (!payload) return;
+    const next: RelatorioPayload = {
+      ...payload,
+      [lado]: {
+        ...(payload[lado] ?? emptyQuantidadesRede()),
+        qtdCaixasEmenda,
+      },
+    };
+    const janela = janelaPotenciaDerivada(next.redeAcesso, next.redeCliente);
+    patchPayload({ ...next, testePotencia1550: janela, testePotencia1330: janela });
+  };
+
   const adicionarOutra = (
     categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
   ) => {
@@ -548,14 +561,7 @@ export function RelatorioDetalhe({
               quantidadeLabel: "Quantidade de Caixas de Emenda",
               quantidadePlaceholder: "Ex: 4",
               onQuantidadeChange: canEditPhotos
-                ? (qtdCaixasEmenda: number | null) =>
-                    patchPayload({
-                      ...payload,
-                      redeAcesso: {
-                        ...(payload.redeAcesso ?? emptyQuantidadesRede()),
-                        qtdCaixasEmenda,
-                      },
-                    })
+                ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeAcesso", qtdCaixasEmenda)
                 : undefined,
             }
           : key === "rcCaixaEmenda"
@@ -563,16 +569,9 @@ export function RelatorioDetalhe({
                 quantidade: payload.redeCliente?.qtdCaixasEmenda ?? null,
                 quantidadeLabel: "Quantidade de Caixas de Emenda",
                 quantidadePlaceholder: "Ex: 1",
-                onQuantidadeChange: canEditPhotos
-                  ? (qtdCaixasEmenda: number | null) =>
-                      patchPayload({
-                        ...payload,
-                        redeCliente: {
-                          ...(payload.redeCliente ?? emptyQuantidadesRede()),
-                          qtdCaixasEmenda,
-                        },
-                      })
-                  : undefined,
+              onQuantidadeChange: canEditPhotos
+                ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeCliente", qtdCaixasEmenda)
+                : undefined,
               }
             : {}
         : {};
@@ -1101,19 +1100,10 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "teste-potencia" ? (
         <RelatorioTestePotenciaAtenuacao
-          readOnly={!canEditPhotos}
           testeOptico={payload?.testeOptico ?? emptyTesteOptico()}
           otdr={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
-          value1550={payload?.testePotencia1550 ?? emptyTestePotenciaJanela()}
-          value1330={payload?.testePotencia1330 ?? emptyTestePotenciaJanela()}
-          onChange1550={(next) => {
-            if (!payload) return;
-            patchPayload({ ...payload, testePotencia1550: next });
-          }}
-          onChange1330={(next) => {
-            if (!payload) return;
-            patchPayload({ ...payload, testePotencia1330: next });
-          }}
+          redeAcesso={payload?.redeAcesso ?? emptyQuantidadesRede()}
+          redeCliente={payload?.redeCliente ?? emptyQuantidadesRede()}
         />
       ) : null}
     </div>

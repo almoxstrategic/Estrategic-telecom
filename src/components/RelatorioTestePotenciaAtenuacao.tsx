@@ -7,34 +7,33 @@ import {
   formatarDb,
   parseNumeroCampo,
   textoOuTraco,
+  totalConexoesCalculado,
+  totalEmendasCalculado,
+  type QuantidadesRedePayload,
   type TesteOpticoFaixaPayload,
   type TesteOpticoPayload,
-  type TestePotenciaJanelaPayload,
   type TestePotenciaPayload,
 } from "@/lib/relatorios-transmissao";
-
-type ChangeOpts = { immediate?: boolean };
 
 export function RelatorioTestePotenciaAtenuacao({
   testeOptico,
   otdr,
-  value1550,
-  value1330,
-  onChange1550,
-  onChange1330,
-  readOnly,
+  redeAcesso,
+  redeCliente,
 }: {
   testeOptico: TesteOpticoPayload;
   otdr: TestePotenciaPayload;
-  value1550: TestePotenciaJanelaPayload;
-  value1330: TestePotenciaJanelaPayload;
-  onChange1550: (next: TestePotenciaJanelaPayload, opts?: ChangeOpts) => void;
-  onChange1330: (next: TestePotenciaJanelaPayload, opts?: ChangeOpts) => void;
-  readOnly: boolean;
+  redeAcesso: QuantidadesRedePayload;
+  redeCliente: QuantidadesRedePayload;
 }) {
   const km = otdr.otdr[0]?.distancia ?? "";
   const pi1550 = testeOptico.estacao.nm1550[0]?.dbm ?? "";
   const pi1330 = testeOptico.estacao.nm1330[0]?.dbm ?? "";
+  const totalEmendas = totalEmendasCalculado(
+    redeAcesso.qtdCaixasEmenda,
+    redeCliente.qtdCaixasEmenda,
+  );
+  const totalConexoes = totalConexoesCalculado(totalEmendas);
 
   return (
     <div className="space-y-4">
@@ -43,18 +42,16 @@ export function RelatorioTestePotenciaAtenuacao({
         km={km}
         pi={pi1550}
         faixaCliente={testeOptico.cliente.nm1550}
-        value={value1550}
-        onChange={onChange1550}
-        readOnly={readOnly}
+        totalEmendas={totalEmendas}
+        totalConexoes={totalConexoes}
       />
       <JanelaCard
         titulo="TESTE DE POTÊNCIA - 1330nm"
         km={km}
         pi={pi1330}
         faixaCliente={testeOptico.cliente.nm1330}
-        value={value1330}
-        onChange={onChange1330}
-        readOnly={readOnly}
+        totalEmendas={totalEmendas}
+        totalConexoes={totalConexoes}
       />
     </div>
   );
@@ -69,21 +66,19 @@ function JanelaCard({
   km,
   pi,
   faixaCliente,
-  value,
-  onChange,
-  readOnly,
+  totalEmendas,
+  totalConexoes,
 }: {
   titulo: string;
   km: string;
   pi: string;
   faixaCliente: TesteOpticoFaixaPayload;
-  value: TestePotenciaJanelaPayload;
-  onChange: (next: TestePotenciaJanelaPayload, opts?: ChangeOpts) => void;
-  readOnly: boolean;
+  totalEmendas: number;
+  totalConexoes: number;
 }) {
   const atenuacaoMax = useMemo(
-    () => calcularAtenuacaoMaxima(km, value.emendas, value.conexoes),
-    [km, value.emendas, value.conexoes],
+    () => calcularAtenuacaoMaxima(km, totalEmendas, totalConexoes),
+    [km, totalEmendas, totalConexoes],
   );
   const minimoAdmissivel = useMemo(
     () => calcularMinimoAdmissivel(pi, atenuacaoMax),
@@ -96,18 +91,8 @@ function JanelaCard({
       <h2 className="text-base font-bold">{titulo}</h2>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <CampoImportado label="Comprimento do Trecho (km)" value={km} />
-        <CampoNumero
-          label="Nº de Emendas"
-          value={value.emendas}
-          disabled={readOnly}
-          onChange={(emendas) => onChange({ ...value, emendas })}
-        />
-        <CampoNumero
-          label="Nº de Conexões"
-          value={value.conexoes}
-          disabled={readOnly}
-          onChange={(conexoes) => onChange({ ...value, conexoes })}
-        />
+        <CampoImportado label="Nº de Emendas" value={String(totalEmendas)} />
+        <CampoImportado label="Nº de Conexões" value={String(totalConexoes)} />
         <CampoImportado label="Referência do Instrumento (Pi) em dBm" value={pi} />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -181,31 +166,6 @@ function LinhaFibra({
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Status</p>
         <StatusBadge status={status} />
       </div>
-    </div>
-  );
-}
-
-function CampoNumero({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-sm font-semibold">{label}</label>
-      <input
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={inputClass()}
-      />
     </div>
   );
 }

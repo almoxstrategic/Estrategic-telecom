@@ -32,9 +32,9 @@ import {
   emptyRelatorioPayload,
   emptyTesteOptico,
   emptyTestePotencia,
-  emptyTestePotenciaJanela,
   fetchRelatorioTransmissaoById,
   isTecnicoAtribuido,
+  janelaPotenciaDerivada,
   patchRelatorioDraft,
   readObsAdmin,
   removeExtraById,
@@ -49,7 +49,6 @@ import {
   type RelatorioTransmissao,
   type StoredPhoto,
   type TesteOpticoPayload,
-  type TestePotenciaJanelaPayload,
   type TestePotenciaPayload,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
@@ -257,12 +256,6 @@ function RelatorioPage() {
   const [testePotenciaImplantacao, setTestePotenciaImplantacao] = useState<TestePotenciaPayload>(
     () => emptyTestePotencia(),
   );
-  const [testePotencia1550, setTestePotencia1550] = useState<TestePotenciaJanelaPayload>(
-    () => emptyTestePotenciaJanela(),
-  );
-  const [testePotencia1330, setTestePotencia1330] = useState<TestePotenciaJanelaPayload>(
-    () => emptyTestePotenciaJanela(),
-  );
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [dadosExpandidos, setDadosExpandidos] = useState(false);
@@ -389,8 +382,8 @@ function RelatorioPage() {
       testeOptico,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
-      testePotencia1550,
-      testePotencia1330,
+      testePotencia1550: janelaPotenciaDerivada(redeAcesso, redeCliente),
+      testePotencia1330: janelaPotenciaDerivada(redeAcesso, redeCliente),
     };
   }, [
     tipo,
@@ -440,8 +433,6 @@ function RelatorioPage() {
     testeOptico,
     testePotenciaEmpresarial,
     testePotenciaImplantacao,
-    testePotencia1550,
-    testePotencia1330,
   ]);
 
   const persistDraft = useCallback(
@@ -541,8 +532,6 @@ function RelatorioPage() {
       testeOptico,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
-      testePotencia1550,
-      testePotencia1330,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
@@ -632,8 +621,6 @@ function RelatorioPage() {
     setTesteOptico(p.testeOptico ?? emptyTesteOptico());
     setTestePotenciaEmpresarial(p.testePotenciaEmpresarial ?? emptyTestePotencia());
     setTestePotenciaImplantacao(p.testePotenciaImplantacao ?? emptyTestePotencia());
-    setTestePotencia1550(p.testePotencia1550 ?? emptyTestePotenciaJanela());
-    setTestePotencia1330(p.testePotencia1330 ?? emptyTestePotenciaJanela());
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
@@ -1499,23 +1486,10 @@ function RelatorioPage() {
                 />
               ) : mostrarTestePotencia ? (
                 <RelatorioTestePotenciaAtenuacao
-                  readOnly={readOnly}
                   testeOptico={testeOptico}
                   otdr={testePotenciaEmpresarial}
-                  value1550={testePotencia1550}
-                  value1330={testePotencia1330}
-                  onChange1550={(next, opts) => {
-                    setTestePotencia1550(next);
-                    if (opts?.immediate) {
-                      void persistDraft({ ...buildPayload(), testePotencia1550: next });
-                    }
-                  }}
-                  onChange1330={(next, opts) => {
-                    setTestePotencia1330(next);
-                    if (opts?.immediate) {
-                      void persistDraft({ ...buildPayload(), testePotencia1330: next });
-                    }
-                  }}
+                  redeAcesso={redeAcesso}
+                  redeCliente={redeCliente}
                 />
               ) : null}
             </>

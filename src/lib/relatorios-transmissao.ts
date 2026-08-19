@@ -137,12 +137,8 @@ function numeroOuZero(raw: string): number {
   return parseNumeroCampo(raw) ?? 0;
 }
 
-export function calcularAtenuacaoMaxima(km: string, emendas: string, conexoes: string): number {
-  return (
-    numeroOuZero(km) * ATEN_KM +
-    numeroOuZero(emendas) * ATEN_EMENDA +
-    numeroOuZero(conexoes) * PERDA_CONEXAO
-  );
+export function calcularAtenuacaoMaxima(km: string, emendas: number, conexoes: number): number {
+  return numeroOuZero(km) * ATEN_KM + emendas * ATEN_EMENDA + conexoes * PERDA_CONEXAO;
 }
 
 export function calcularMinimoAdmissivel(pi: string, atenuacaoMax: number): number | null {
@@ -342,6 +338,28 @@ function emptyFotoGrupo(): FotoGrupoPayload {
 
 export function emptyQuantidadesRede(): QuantidadesRedePayload {
   return { qtdCaixasEmenda: null };
+}
+
+export function totalEmendasCalculado(
+  qtdRe: number | null | undefined,
+  qtdRc: number | null | undefined,
+): number {
+  return (qtdRe || 0) + (qtdRc || 0);
+}
+
+export function totalConexoesCalculado(totalEmendas: number): number {
+  return totalEmendas * 2;
+}
+
+export function janelaPotenciaDerivada(
+  redeAcesso: QuantidadesRedePayload,
+  redeCliente: QuantidadesRedePayload,
+): TestePotenciaJanelaPayload {
+  const emendas = totalEmendasCalculado(redeAcesso.qtdCaixasEmenda, redeCliente.qtdCaixasEmenda);
+  return {
+    emendas: String(emendas),
+    conexoes: String(totalConexoesCalculado(emendas)),
+  };
 }
 
 export function emptyRelatorioPayload(): RelatorioPayload {
