@@ -7,6 +7,8 @@ import { waitForImageMemoryRelease } from "@/lib/compress-image";
 import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
 import type { EvidencePhotoRef } from "@/lib/types";
 
+type BusyMode = "idle" | "camera" | "gallery";
+
 export function PhotoUpload({
   label,
   suffix,
@@ -26,7 +28,8 @@ export function PhotoUpload({
 }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState<BusyMode>("idle");
+  const busy = busyMode !== "idle";
 
   useEffect(() => {
     return () => {
@@ -35,17 +38,19 @@ export function PhotoUpload({
   }, [value?.previewUrl]);
 
   const handleFile = useCallback(
-    async (file: File | undefined) => {
+    async (file: File | undefined, source: "camera" | "gallery") => {
       if (!file) return;
 
-      setBusy(true);
+      setBusyMode(source);
       try {
-        const prepared = await prepareEvidencePhotoFile(file, value?.previewUrl);
+        const prepared = await prepareEvidencePhotoFile(file, value?.previewUrl, {
+          withTimestamp: source === "camera",
+        });
         onChange(prepared);
       } catch (err) {
         toast.error(`Erro ao processar foto: ${(err as Error).message || "tente novamente"}`);
       } finally {
-        setBusy(false);
+        setBusyMode("idle");
         if (cameraRef.current) cameraRef.current.value = "";
         if (galleryRef.current) galleryRef.current.value = "";
       }
@@ -57,7 +62,7 @@ export function PhotoUpload({
     priority: suffix === "inicio" ? 0 : 1,
     isEmpty: value === null,
     isBusy: busy,
-    acceptFile: (file) => void handleFile(file),
+    acceptFile: (file) => void handleFile(file, "gallery"),
   });
 
   const openPicker = (target: "camera" | "gallery") => {
@@ -75,15 +80,20 @@ export function PhotoUpload({
     void waitForImageMemoryRelease();
   };
 
+  const busyLabel =
+    busyMode === "camera"
+      ? "Obtendo localização e processando imagem..."
+      : "Otimizando imagem...";
+
   return (
     <div>
       {hideLabel ? null : (
         <div className="mb-1 h-5 text-sm font-bold text-foreground">{label}</div>
       )}
       {busy ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-md border border-border bg-muted text-sm text-muted-foreground">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-md border border-border bg-muted px-4 text-center text-sm text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
-          Otimizando imagem...
+          {busyLabel}
         </div>
       ) : value ? (
         <div className="relative overflow-hidden rounded-md border border-border bg-muted">
@@ -142,22 +152,23 @@ export function PhotoUpload({
       <input
         ref={cameraRef}
         type="file"
-        accept="image/jpeg,image/jpg,image/png,image/heic,image/heif"
+        accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={(e) => void handleFile(e.target.files?.[0])}
+        onChange={(e) => void handleFile(e.target.files?.[0], "camera")}
       />
       <input
         ref={galleryRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png,image/heic,image/heif"
         className="hidden"
-        onChange={(e) => void handleFile(e.target.files?.[0])}
+        onChange={(e) => void handleFile(e.target.files?.[0], "gallery")}
       />
       {compact ? null : (
         <p className="mt-1 text-[11px] text-muted-foreground">
           Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
-          {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio.
+          {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio. Fotos da câmera
+          recebem data, hora e geolocalização.
         </p>
       )}
     </div>
