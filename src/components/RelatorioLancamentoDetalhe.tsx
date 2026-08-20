@@ -807,6 +807,7 @@ export function RelatorioDetalhe({
           </span>
         </p>
         <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 lg:grid-cols-5">
+          <MetaField label="Operadora" value={row.cliente_operadora || "Claro"} />
           <MetaField label="Cliente" value={displayCadastral(row.cliente)} />
           <MetaField label="Responsável" value={displayCadastral(row.responsavel)} />
           <MetaField label="Empreiteira" value={displayCadastral(row.equipe_empreiteira)} />

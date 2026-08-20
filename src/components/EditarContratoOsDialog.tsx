@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ClienteOperadoraSelect } from "@/components/ClienteOperadoraSelect";
 import { TecnicoTransmissaoMultiSelect } from "@/components/TecnicoTransmissaoMultiSelect";
 import { TipoExecucaoPicker } from "@/components/RelatorioRedeAcesso";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  DEFAULT_CLIENTE_OPERADORA,
   patchRelatorioCadastroAdmin,
+  parseClienteOperadora,
+  type ClienteOperadora,
   type RelatorioTransmissao,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
@@ -70,6 +74,9 @@ export function EditarContratoOsDialog({
   row: RelatorioTransmissao;
   onSaved: (saved: RelatorioTransmissao) => void;
 }) {
+  const [clienteOperadora, setClienteOperadora] = useState<ClienteOperadora>(
+    DEFAULT_CLIENTE_OPERADORA,
+  );
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
   const [cidade, setCidade] = useState("");
@@ -83,6 +90,7 @@ export function EditarContratoOsDialog({
 
   useEffect(() => {
     if (!open) return;
+    setClienteOperadora(parseClienteOperadora(row.cliente_operadora));
     setCliente(row.cliente ?? "");
     setEndereco(row.endereco ?? "");
     setCidade(row.cidade ?? "");
@@ -124,6 +132,7 @@ export function EditarContratoOsDialog({
     try {
       const saved = await patchRelatorioCadastroAdmin(row.id, {
         cliente,
+        clienteOperadora,
         endereco,
         cidade,
         equipeEmpreiteira: empreiteira,
@@ -162,6 +171,12 @@ export function EditarContratoOsDialog({
               className="bg-muted"
             />
           </div>
+          <ClienteOperadoraSelect
+            id="edit-os-cliente-operadora"
+            value={clienteOperadora}
+            onChange={setClienteOperadora}
+            required
+          />
           <div className="space-y-1.5">
             <Label htmlFor="edit-os-cliente">
               Cliente <OptionalHint />
@@ -170,7 +185,7 @@ export function EditarContratoOsDialog({
               id="edit-os-cliente"
               value={cliente}
               onChange={(e) => setCliente(e.target.value)}
-              placeholder="Nome do cliente"
+              placeholder="Nome do cliente / site"
             />
           </div>
           <div className="space-y-1.5">

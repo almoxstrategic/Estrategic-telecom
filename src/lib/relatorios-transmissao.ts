@@ -3,6 +3,27 @@ import { getStoragePublicUrl, getSupabaseClient } from "./supabase";
 export type RelatorioStatus = "em_aberto" | "avisado" | "fechado" | "pendente";
 export type TipoExecucao = "implantacao" | "empresarial";
 
+/** Clientes disponíveis no select do MVP (escala futura via tabela clientes_relatorio). */
+export const CLIENTES_OPERADORA_MVP = ["Claro"] as const;
+export type ClienteOperadoraMvp = (typeof CLIENTES_OPERADORA_MVP)[number];
+
+/** Valor sentinela da opção de UI "+ Adicionar Cliente" (não persiste). */
+export const ADICIONAR_CLIENTE_VALUE = "__adicionar_cliente__" as const;
+
+/** Nome/display da operadora. MVP: Claro; futuros clientes virão do catálogo. */
+export type ClienteOperadora = string;
+export const DEFAULT_CLIENTE_OPERADORA: ClienteOperadora = "Claro";
+
+/** @deprecated Use CLIENTES_OPERADORA_MVP — mantido para imports legados. */
+export const CLIENTES_OPERADORA = CLIENTES_OPERADORA_MVP;
+
+export function parseClienteOperadora(raw: unknown): ClienteOperadora {
+  if (typeof raw !== "string") return DEFAULT_CLIENTE_OPERADORA;
+  const nome = raw.trim();
+  if (!nome || nome === ADICIONAR_CLIENTE_VALUE) return DEFAULT_CLIENTE_OPERADORA;
+  return nome;
+}
+
 export type StoredPhoto = {
   url: string;
   path: string;
@@ -299,7 +320,12 @@ export type RelatorioTransmissao = {
   tecnicos_atribuidos: string[];
   tecnicos_nomes: string[];
   os_wf: string;
+  /** Nome do site / cliente final da obra (campo livre). */
   cliente: string;
+  /** Nome/display da operadora (MVP: Claro). */
+  cliente_operadora: ClienteOperadora;
+  /** FK opcional para catálogo clientes_relatorio (template PDF). */
+  cliente_relatorio_id?: string | null;
   endereco: string;
   cidade: string;
   equipe_empreiteira: string;
@@ -1064,6 +1090,8 @@ type DbRow = {
   tecnicos_nomes?: string[] | null;
   os_wf: string;
   cliente: string | null;
+  cliente_operadora?: string | null;
+  cliente_relatorio_id?: string | null;
   endereco: string | null;
   cidade: string | null;
   equipe_empreiteira: string | null;
@@ -1100,6 +1128,8 @@ function mapRow(row: DbRow): RelatorioTransmissao {
     tecnicos_nomes,
     os_wf: row.os_wf,
     cliente: row.cliente ?? "",
+    cliente_operadora: parseClienteOperadora(row.cliente_operadora),
+    cliente_relatorio_id: row.cliente_relatorio_id ?? null,
     endereco: row.endereco ?? "",
     cidade: row.cidade ?? "",
     equipe_empreiteira: row.equipe_empreiteira ?? "",
@@ -1119,16 +1149,16 @@ function mapRow(row: DbRow): RelatorioTransmissao {
 }
 
 const SELECT_COLS =
-  "id, tecnico_id, tecnicos_atribuidos, tecnicos_nomes, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
+  "id, tecnico_id, tecnicos_atribuidos, tecnicos_nomes, os_wf, cliente, cliente_operadora, cliente_relatorio_id, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
 
 const SELECT_COLS_PLAIN =
-  "id, tecnico_id, tecnicos_atribuidos, tecnicos_nomes, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
+  "id, tecnico_id, tecnicos_atribuidos, tecnicos_nomes, os_wf, cliente, cliente_operadora, cliente_relatorio_id, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
 
 const SELECT_COLS_LEGACY =
-  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
+  "id, tecnico_id, os_wf, cliente, cliente_operadora, cliente_relatorio_id, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at, profiles(nome)";
 
 const SELECT_COLS_LEGACY_PLAIN =
-  "id, tecnico_id, os_wf, cliente, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
+  "id, tecnico_id, os_wf, cliente, cliente_operadora, cliente_relatorio_id, endereco, cidade, equipe_empreiteira, responsavel, data_inicio_execucao, tipo_execucao, status, payload, motivo_pendencia, data_pendencia, avisado_at, fechado_at, created_at, updated_at";
 
 export async function uploadRelatorioPhoto(
   tecnicoId: string,
@@ -1211,9 +1241,43 @@ export async function findRelatorioFechadoPorOsWf(osWf: string): Promise<boolean
   return Boolean(data);
 }
 
+async function resolveClienteRelatorioId(
+  clienteOperadora: ClienteOperadora,
+): Promise<string | null> {
+  const nome = parseClienteOperadora(clienteOperadora);
+  const slug = nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  try {
+    const supabase = getSupabaseClient();
+    const bySlug = await supabase
+      .from("clientes_relatorio")
+      .select("id")
+      .eq("slug", slug)
+      .eq("ativo", true)
+      .maybeSingle();
+    if (!bySlug.error && bySlug.data?.id) return bySlug.data.id as string;
+
+    const byNome = await supabase
+      .from("clientes_relatorio")
+      .select("id")
+      .ilike("nome", nome)
+      .eq("ativo", true)
+      .maybeSingle();
+    if (!byNome.error && byNome.data?.id) return byNome.data.id as string;
+  } catch {
+    /* catálogo ainda indisponível — segue só com cliente_operadora */
+  }
+  return null;
+}
+
 export async function despacharRelatorioTransmissao(input: {
   osWf: string;
   cliente: string;
+  clienteOperadora?: ClienteOperadora | string;
   endereco: string;
   cidade: string;
   equipeEmpreiteira: string;
@@ -1223,6 +1287,7 @@ export async function despacharRelatorioTransmissao(input: {
 }): Promise<RelatorioTransmissao> {
   const os = input.osWf.trim();
   const cliente = input.cliente.trim();
+  const clienteOperadora = parseClienteOperadora(input.clienteOperadora);
   const endereco = input.endereco.trim();
   const cidade = input.cidade.trim();
   const equipeEmpreiteira = input.equipeEmpreiteira.trim();
@@ -1248,12 +1313,15 @@ export async function despacharRelatorioTransmissao(input: {
   }
 
   const supabase = getSupabaseClient();
+  const clienteRelatorioId = await resolveClienteRelatorioId(clienteOperadora);
   const insertRow = {
     tecnico_id: tecnicos[0].id,
     tecnicos_atribuidos: tecnicos.map((t) => t.id),
     tecnicos_nomes: tecnicos.map((t) => t.nome),
     os_wf: os,
     cliente: cliente || "",
+    cliente_operadora: clienteOperadora,
+    cliente_relatorio_id: clienteRelatorioId,
     endereco: endereco || "",
     cidade: cidade || "",
     equipe_empreiteira: equipeEmpreiteira || "",
@@ -1566,6 +1634,7 @@ export async function patchRelatorioCadastroAdmin(
   id: string,
   input: {
     cliente: string;
+    clienteOperadora?: ClienteOperadora | string;
     endereco: string;
     cidade: string;
     equipeEmpreiteira: string;
@@ -1588,6 +1657,10 @@ export async function patchRelatorioCadastroAdmin(
 
   const updateRow = {
     cliente: input.cliente.trim() || "",
+    cliente_operadora: parseClienteOperadora(input.clienteOperadora),
+    cliente_relatorio_id: await resolveClienteRelatorioId(
+      parseClienteOperadora(input.clienteOperadora),
+    ),
     endereco: input.endereco.trim() || "",
     cidade: input.cidade.trim() || "",
     equipe_empreiteira: input.equipeEmpreiteira.trim() || "",

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/lib/app-store";
+import { gerarPDFRelatorio } from "@/lib/pdf/gerar-pdf-relatorio";
 import { hasPainelFullAccess } from "@/lib/roles";
 import {
   appendStoredPhotoToPayload,
@@ -53,6 +54,7 @@ function AdminLancamentoDetalhePage() {
   const [mostrarMotivo, setMostrarMotivo] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const [uploadingCategoria, setUploadingCategoria] = useState<RelatorioFotoCategoria | null>(
     null,
   );
@@ -146,6 +148,20 @@ function AdminLancamentoDetalhePage() {
       toast.error((err as Error).message || "Não foi possível excluir o relatório.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onGerarPdf = async () => {
+    if (!row) return;
+    setGerandoPdf(true);
+    const toastId = toast.loading("Gerando PDF Claro...");
+    try {
+      await gerarPDFRelatorio(row);
+      toast.success("PDF gerado com sucesso.", { id: toastId });
+    } catch (err) {
+      toast.error((err as Error).message || "Não foi possível gerar o PDF.", { id: toastId });
+    } finally {
+      setGerandoPdf(false);
     }
   };
 
@@ -377,9 +393,13 @@ function AdminLancamentoDetalhePage() {
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
             {row.status === "fechado" ? (
               <div className="flex justify-end">
-                <Button type="button" onClick={() => toast.info("Geração de PDF em breve.")}>
+                <Button
+                  type="button"
+                  onClick={() => void onGerarPdf()}
+                  disabled={gerandoPdf}
+                >
                   <FileDown className="h-4 w-4" />
-                  Gerar PDF
+                  {gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
                 </Button>
               </div>
             ) : null}

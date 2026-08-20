@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardList, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { ClienteOperadoraSelect } from "@/components/ClienteOperadoraSelect";
 import { TecnicoTransmissaoMultiSelect } from "@/components/TecnicoTransmissaoMultiSelect";
 import { TipoExecucaoPicker } from "@/components/RelatorioRedeAcesso";
 import {
@@ -10,6 +11,7 @@ import {
   formatDateTimePendencia,
   StatusBadge,
 } from "@/components/RelatorioLancamentoDetalhe";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,10 +25,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  DEFAULT_CLIENTE_OPERADORA,
   despacharRelatorioTransmissao,
   fetchRelatoriosTransmissaoAdmin,
   labelTecnicosAtribuidos,
   subscribeRelatoriosTransmissao,
+  type ClienteOperadora,
   type RelatorioTransmissao,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
@@ -68,7 +72,12 @@ function RelatorioCard({ row }: { row: RelatorioTransmissao }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-lg font-bold">{row.os_wf}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-bold">{row.os_wf}</h3>
+            <Badge variant="secondary" className="font-semibold">
+              {row.cliente_operadora || "Claro"}
+            </Badge>
+          </div>
           <p className="text-sm text-muted-foreground">{row.cliente || "Preenchendo..."}</p>
         </div>
         <div className="flex flex-col items-end">
@@ -133,6 +142,9 @@ function NovaOsDialog({
   onCreated: (row: RelatorioTransmissao) => void;
 }) {
   const [osWf, setOsWf] = useState("");
+  const [clienteOperadora, setClienteOperadora] = useState<ClienteOperadora>(
+    DEFAULT_CLIENTE_OPERADORA,
+  );
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
   const [cidade, setCidade] = useState("");
@@ -146,6 +158,7 @@ function NovaOsDialog({
   useEffect(() => {
     if (!open) return;
     setOsWf("");
+    setClienteOperadora(DEFAULT_CLIENTE_OPERADORA);
     setCliente("");
     setEndereco("");
     setCidade("");
@@ -174,6 +187,7 @@ function NovaOsDialog({
       const row = await despacharRelatorioTransmissao({
         osWf,
         cliente,
+        clienteOperadora,
         endereco,
         cidade,
         equipeEmpreiteira: empreiteira,
@@ -221,6 +235,12 @@ function NovaOsDialog({
             />
             <FieldError message={errors.osWf} />
           </div>
+          <ClienteOperadoraSelect
+            id="os-cliente-operadora"
+            value={clienteOperadora}
+            onChange={setClienteOperadora}
+            required
+          />
           <div className="space-y-1.5">
             <Label htmlFor="os-cliente">
               Cliente <OptionalHint />
@@ -229,7 +249,7 @@ function NovaOsDialog({
               id="os-cliente"
               value={cliente}
               onChange={(e) => setCliente(e.target.value)}
-              placeholder="Nome do cliente"
+              placeholder="Nome do cliente / site"
             />
           </div>
           <div className="space-y-1.5">
@@ -366,7 +386,13 @@ function AdminTransmissaoPage() {
       const os = row.os_wf.toLowerCase();
       const tecnico = labelTecnicosAtribuidos(row).toLowerCase();
       const cliente = (row.cliente ?? "").toLowerCase();
-      return os.includes(termo) || tecnico.includes(termo) || cliente.includes(termo);
+      const operadora = (row.cliente_operadora ?? "").toLowerCase();
+      return (
+        os.includes(termo) ||
+        tecnico.includes(termo) ||
+        cliente.includes(termo) ||
+        operadora.includes(termo)
+      );
     });
   }, [contratosAbertos, busca]);
 
@@ -383,7 +409,13 @@ function AdminTransmissaoPage() {
         const os = row.os_wf.toLowerCase();
         const tecnico = labelTecnicosAtribuidos(row).toLowerCase();
         const cliente = (row.cliente ?? "").toLowerCase();
-        return os.includes(termo) || tecnico.includes(termo) || cliente.includes(termo);
+        const operadora = (row.cliente_operadora ?? "").toLowerCase();
+        return (
+          os.includes(termo) ||
+          tecnico.includes(termo) ||
+          cliente.includes(termo) ||
+          operadora.includes(termo)
+        );
       });
     }
     if (filtroStatus === "todos") return abertosAposBusca;
