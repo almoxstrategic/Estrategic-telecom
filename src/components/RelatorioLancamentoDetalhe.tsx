@@ -554,27 +554,25 @@ export function RelatorioDetalhe({
   const renderGrupo = (title: string, key: RelatorioFotoGrupoKey) => {
     const grupo = payload?.[key];
     const qtd =
-      isEmpresarial && payload
-        ? key === "caixaEmenda"
+      payload && (isEmpresarial || isImplantacao) && key === "caixaEmenda"
+        ? {
+            quantidade: payload.redeAcesso?.qtdCaixasEmenda ?? null,
+            quantidadeLabel: "Quantidade de Caixas de Emenda",
+            quantidadePlaceholder: "Ex: 4",
+            onQuantidadeChange: canEditPhotos
+              ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeAcesso", qtdCaixasEmenda)
+              : undefined,
+          }
+        : payload && isEmpresarial && key === "rcCaixaEmenda"
           ? {
-              quantidade: payload.redeAcesso?.qtdCaixasEmenda ?? null,
+              quantidade: payload.redeCliente?.qtdCaixasEmenda ?? null,
               quantidadeLabel: "Quantidade de Caixas de Emenda",
-              quantidadePlaceholder: "Ex: 4",
-              onQuantidadeChange: canEditPhotos
-                ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeAcesso", qtdCaixasEmenda)
-                : undefined,
-            }
-          : key === "rcCaixaEmenda"
-            ? {
-                quantidade: payload.redeCliente?.qtdCaixasEmenda ?? null,
-                quantidadeLabel: "Quantidade de Caixas de Emenda",
-                quantidadePlaceholder: "Ex: 1",
+              quantidadePlaceholder: "Ex: 1",
               onQuantidadeChange: canEditPhotos
                 ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeCliente", qtdCaixasEmenda)
                 : undefined,
-              }
-            : {}
-        : {};
+            }
+          : {};
     return (
       <EvidenciaBloco
         key={key}

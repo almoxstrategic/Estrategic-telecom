@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, Bell, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
@@ -873,27 +873,12 @@ function RelatorioPage() {
     eqEstacaoDgo: setEqGrupoSlots("eqEstacaoDgo"),
   };
 
-  const headerOk = useMemo(
-    () =>
-      Boolean(
-        osWf.trim() &&
-          cliente.trim() &&
-          endereco.trim() &&
-          cidade.trim() &&
-          equipe.trim() &&
-          responsavel.trim() &&
-          dataInicio &&
-          tipo,
-      ),
-    [osWf, cliente, endereco, cidade, equipe, responsavel, dataInicio, tipo],
-  );
-
   const onAvisar = async () => {
-    if (!currentReportId || (status !== "em_aberto" && status !== "pendente")) return;
-    if (!headerOk) {
-      toast.error("Preencha os dados da obra e o tipo de execução antes de avisar.");
+    if (!currentReportId?.trim()) {
+      toast.error("Relatório sem identificação válida. Recarregue a página e tente novamente.");
       return;
     }
+    if (status !== "em_aberto" && status !== "pendente") return;
     setSubmitting(true);
     try {
       await persistDraft();
@@ -1114,7 +1099,7 @@ function RelatorioPage() {
                       onObsChange: setCaixaObs,
                       obsAdmin: obsAdminGrupos.caixaEmenda ?? "",
                       onObsAdminChange: patchObsAdminGrupo("caixaEmenda"),
-                      ...(tipo === "empresarial"
+                      ...(tipo === "empresarial" || tipo === "implantacao"
                         ? {
                             quantidade: redeAcesso.qtdCaixasEmenda,
                             quantidadeLabel: "Quantidade de Caixas de Emenda",
