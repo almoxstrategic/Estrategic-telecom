@@ -23,7 +23,8 @@ const CONTENT_W = PAGE_W - MARGIN_X * 2;
 
 const PHOTO_COLS = 2;
 const PHOTO_GAP = 12;
-const PHOTO_CELL_H = 168;
+/** Altura da celula de foto (A4, 2 colunas) — aumentada para leitura tecnica. */
+const PHOTO_CELL_H = 250;
 const CAPTION_H = 16;
 const GAP = 10;
 
@@ -247,7 +248,7 @@ function fittedSize(image: PDFImage, maxW: number, maxH: number): { w: number; h
 }
 
 function drawFooter(ctx: LayoutCtx): void {
-  const { page, logoEstrategic, logoCliente, font, pageIndex } = ctx;
+  const { page, logoEstrategic, logoCliente } = ctx;
   const footerTop = FOOTER_H;
 
   page.drawLine({
@@ -279,15 +280,7 @@ function drawFooter(ctx: LayoutCtx): void {
     });
   }
 
-  const label = `${pageIndex}`;
-  const lw = font.widthOfTextAtSize(label, 8);
-  page.drawText(label, {
-    x: PAGE_W / 2 - lw / 2,
-    y: footerTop / 2 - 3,
-    size: 8,
-    font,
-    color: COR_MUTED,
-  });
+  // Numeracao fica apenas em stampTotalPages (evita sobreposicao).
 }
 
 function drawField(
@@ -543,19 +536,35 @@ async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<voi
   ctx.yFromTop += rowH;
 }
 
-async function drawPhotos(ctx: LayoutCtx, items: PdfPhotoItem[]): Promise<void> {
+async function embedPhotoItems(
+  doc: PDFDocument,
+  items: PdfPhotoItem[],
+): Promise<EmbeddedPhoto[]> {
   const embedded: EmbeddedPhoto[] = [];
   for (const item of items) {
-    const image = await embedEvidence(ctx.doc, item);
+    const image = await embedEvidence(doc, item);
     if (image) embedded.push({ ...item, image });
   }
+  return embedded;
+}
+
+async function drawPhotosFrom(
+  ctx: LayoutCtx,
+  embedded: EmbeddedPhoto[],
+  fromIndex = 0,
+): Promise<void> {
   if (!embedded.length) {
     await drawParagraph(ctx, "Fotos deste bloco indisponiveis no momento.", "Aviso");
     return;
   }
-  for (let i = 0; i < embedded.length; i += PHOTO_COLS) {
+  for (let i = fromIndex; i < embedded.length; i += PHOTO_COLS) {
     await drawPhotoRow(ctx, embedded.slice(i, i + PHOTO_COLS));
   }
+}
+
+async function drawPhotos(ctx: LayoutCtx, items: PdfPhotoItem[]): Promise<void> {
+  const embedded = await embedPhotoItems(ctx.doc, items);
+  await drawPhotosFrom(ctx, embedded, 0);
 }
 
 function measureSubheader(text: string, font: PDFFont): number {
@@ -772,7 +781,7 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
   const height = await measureGroupHeight(ctx, children);
   const pageCapacity = PAGE_H - CONTENT_BOTTOM - MARGIN_TOP - 50;
 
-  // Se o grupo cabe em uma pagina, garante espaco e trava a quebra (break-inside: avoid)
+  // Grupo cabe em uma pagina: break-inside avoid
   if (height <= pageCapacity) {
     if (remaining(ctx) < height) await newPage(ctx, false);
     ctx.lockBreak = true;
@@ -784,7 +793,41 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     return;
   }
 
-  // Grupo maior que uma pagina: mantem titulo + primeiro anexo juntos
+  // Grupo grande (ex.: "Outras fotos"): titulo + 1a linha de fotos juntos
+  const photosIdx = children.findIndex((c) => c.kind === "photos");
+  if (photosIdx >= 0) {
+    const photosBlock = children[photosIdx] as Extract<PdfAtomicBlock, { kind: "photos" }>;
+    const prefix = children.slice(0, photosIdx);
+    const suffix = children.slice(photosIdx + 1);
+    const embedded = await embedPhotoItems(ctx.doc, photosBlock.items);
+
+    const prefixH = await measureGroupHeight(ctx, prefix);
+    const firstRowCount = Math.min(PHOTO_COLS, Math.max(embedded.length, 1));
+    const firstRowH = measurePhotos(firstRowCount);
+    const keepH = prefixH + firstRowH;
+
+    if (remaining(ctx) < keepH) await newPage(ctx, false);
+
+    ctx.lockBreak = true;
+    try {
+      for (const child of prefix) await drawAtomic(ctx, child);
+      if (embedded.length) {
+        await drawPhotoRow(ctx, embedded.slice(0, PHOTO_COLS));
+      } else {
+        await drawParagraph(ctx, "Fotos deste bloco indisponiveis no momento.", "Aviso");
+      }
+    } finally {
+      ctx.lockBreak = false;
+    }
+
+    if (embedded.length > PHOTO_COLS) {
+      await drawPhotosFrom(ctx, embedded, PHOTO_COLS);
+    }
+    for (const child of suffix) await drawAtomic(ctx, child);
+    return;
+  }
+
+  // Fallback: primeiros 2 filhos juntos
   const firstKeep = children.slice(0, Math.min(2, children.length));
   const keepH = await measureGroupHeight(ctx, firstKeep);
   if (remaining(ctx) < Math.min(keepH, pageCapacity * 0.45)) await newPage(ctx, false);
@@ -808,12 +851,22 @@ function stampTotalPages(doc: PDFDocument, font: PDFFont): void {
   const pages = doc.getPages();
   const total = pages.length;
   for (let i = 0; i < total; i++) {
-    const label = `${i + 1} / ${total}`;
-    const w = font.widthOfTextAtSize(label, 8);
+    const label = sanitizePdfText(`Página ${i + 1} de ${total}`);
+    const size = 8;
+    const w = font.widthOfTextAtSize(label, size);
+    const y = FOOTER_H / 2 - 3;
+    // Limpa area central (evita residuos de numeracao antiga / sobreposicao)
+    pages[i].drawRectangle({
+      x: PAGE_W / 2 - 70,
+      y: y - 2,
+      width: 140,
+      height: 12,
+      color: rgb(1, 1, 1),
+    });
     pages[i].drawText(label, {
       x: PAGE_W / 2 - w / 2,
-      y: FOOTER_H / 2 - 3,
-      size: 8,
+      y,
+      size,
       font,
       color: COR_MUTED,
     });

@@ -19,7 +19,6 @@ import {
   type TesteOpticoFaixaPayload,
   type TesteOpticoItemPayload,
   type TesteOpticoPayload,
-  type TestePotenciaPayload,
 } from "@/lib/relatorios-transmissao";
 
 export type PdfPhotoItem = {
@@ -218,21 +217,24 @@ function collectOutras(
 ) {
   const ativos = itens.filter((i) => hasPhoto(i.foto) || i.ref.trim() || i.obs.trim());
   if (!ativos.length) return;
-  pushHeading(blocks, titulo);
+
+  // Um unico grupo: titulo amarrado a pelo menos a 1a linha de fotos no page-break.
+  const children: PdfAtomicBlock[] = [{ kind: "heading", text: titulo }];
+  const fotos: PdfPhotoItem[] = [];
   for (const item of ativos) {
     const caption = item.ref.trim() || "Outra foto";
-    const children: PdfAtomicBlock[] = [{ kind: "subheader", text: caption }];
     const andamento = andamentoTexto(item.obs, item.obsAdmin);
-    if (andamento) pushPara(children, andamento, "Andamento da Obra");
+    if (andamento) pushPara(children, andamento, caption);
     if (hasPhoto(item.foto)) {
-      pushPhotos(children, [{
+      fotos.push({
         url: resolvePhotoUrl(item.foto),
         path: item.foto?.path?.trim() || undefined,
         caption,
-      }]);
+      });
     }
-    pushGroup(blocks, children);
   }
+  pushPhotos(children, fotos);
+  pushGroup(blocks, children);
 }
 
 function collectFaixaOptica(
@@ -282,27 +284,41 @@ function collectItemOptico(
   }
 }
 
-function collectPotenciaOtdrFotos(
-  blocks: PdfContentBlock[],
-  titulo: string,
-  value: TestePotenciaPayload | null | undefined,
-) {
+function collectTesteOtdr(blocks: PdfContentBlock[], row: RelatorioTransmissao) {
+  const p = row.payload;
+  if (!p) return;
+  const isImplantacao = row.tipo_execucao === "implantacao";
+  const value = isImplantacao ? p.testePotenciaImplantacao : p.testePotenciaEmpresarial;
   if (!value) return;
-  for (const [i, item] of (value.otdr ?? []).entries()) {
-    const label = `${titulo} - OTDR ${i + 1}`;
+
+  const kmRaw = String(value.comprimentoTrechoKm ?? "").trim();
+  const otdrItens = value.otdr ?? [];
+  const ativos = otdrItens.filter((item) => hasPhoto(item.foto) || andamentoTexto(item.obs, item.obsAdmin));
+  if (!kmRaw && !ativos.length) return;
+
+  const tituloSecao = isImplantacao ? "6. Teste OTDR (Implantacao)" : "6. Teste OTDR (Empresarial)";
+  const children: PdfAtomicBlock[] = [{ kind: "heading", text: tituloSecao }];
+
+  if (kmRaw) {
+    pushPara(children, `${kmRaw} km`, "Comprimento do trecho optico testado");
+  }
+
+  const fotos: PdfPhotoItem[] = [];
+  for (const [i, item] of otdrItens.entries()) {
+    const label = `OTDR ${i + 1}`;
     const andamento = andamentoTexto(item.obs, item.obsAdmin);
     if (!hasPhoto(item.foto) && !andamento) continue;
-    const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
-    if (andamento) pushPara(children, andamento, "Andamento da Obra");
+    if (andamento) pushPara(children, andamento, `${label} - Andamento da Obra`);
     if (hasPhoto(item.foto)) {
-      pushPhotos(children, [{
+      fotos.push({
         url: resolvePhotoUrl(item.foto),
         path: item.foto?.path?.trim() || undefined,
         caption: label,
-      }]);
+      });
     }
-    pushGroup(blocks, children);
   }
+  pushPhotos(children, fotos);
+  pushGroup(blocks, children);
 }
 
 function primeiroDbm(lista: unknown): string {
@@ -382,10 +398,12 @@ function buildPotenciaCard(
 }
 
 function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTransmissao) {
+  // Implantacao nao tem Teste de Potencia — so OTDR (coletado antes).
+  if (row.tipo_execucao === "implantacao") return;
+
   const p = row.payload;
   if (!p) return;
-  const isImplantacao = row.tipo_execucao === "implantacao";
-  const otdr = isImplantacao ? p.testePotenciaImplantacao : p.testePotenciaEmpresarial;
+  const otdr = p.testePotenciaEmpresarial;
   const km = parseNumeroCampo(String(otdr?.comprimentoTrechoKm ?? "").replace(",", ".")) ?? 0;
   const totalEmendas = totalEmendasCalculado(
     p.redeAcesso?.qtdCaixasEmenda,
@@ -395,7 +413,7 @@ function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTr
   const optico = p.testeOptico;
   if (!optico) return;
 
-  pushHeading(blocks, "6. Teste de Potencia");
+  pushHeading(blocks, "7. Teste de Potencia");
 
   const cards: { titulo: string; janela: "1550" | "1330"; ponto: "cliente" | "estacao" }[] = [
     { titulo: "TESTE DE POTENCIA - 1550nm (No Cliente)", janela: "1550", ponto: "cliente" },
@@ -420,12 +438,6 @@ function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTr
     );
     pushGroup(blocks, [{ kind: "potenciaCard", card: built }]);
   }
-
-  collectPotenciaOtdrFotos(
-    blocks,
-    isImplantacao ? "OTDR (Implantacao)" : "OTDR (Empresarial)",
-    otdr,
-  );
 }
 
 export function buildCabecalhoDados(row: RelatorioTransmissao): PdfCabecalhoDados {
@@ -535,6 +547,8 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     collectItemOptico(blocks, "Estacao 1330 nm", to.estacao?.nm1330 ?? []);
   }
 
+  // OTDR antes do Teste de Potencia; potencia so em Empresarial.
+  collectTesteOtdr(blocks, row);
   collectTestePotenciaTabelas(blocks, row);
 
   return blocks;
