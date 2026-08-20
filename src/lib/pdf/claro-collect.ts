@@ -24,7 +24,10 @@ import {
 export type PdfPhotoItem = {
   url: string;
   path?: string;
+  /** Legenda abaixo da foto (obs em Outras fotos; nome/metragem em cabos). */
   caption: string;
+  /** Referencia acima da foto (Outras fotos). */
+  title?: string;
 };
 
 export type PdfPotenciaLinhaAten = {
@@ -195,14 +198,14 @@ function collectCabos(
       fotos.push({
         url: resolvePhotoUrl(cabo.fotoInicio),
         path: cabo.fotoInicio?.path?.trim() || undefined,
-        caption: `${label} - Inicio`,
+        caption: label,
       });
     }
     if (hasPhoto(cabo.fotoFim)) {
       fotos.push({
         url: resolvePhotoUrl(cabo.fotoFim),
         path: cabo.fotoFim?.path?.trim() || undefined,
-        caption: `${label} - Fim`,
+        caption: label,
       });
     }
     pushPhotos(children, fotos);
@@ -218,21 +221,19 @@ function collectOutras(
   const ativos = itens.filter((i) => hasPhoto(i.foto) || i.ref.trim() || i.obs.trim());
   if (!ativos.length) return;
 
-  // Um unico grupo: titulo amarrado a pelo menos a 1a linha de fotos no page-break.
+  // Grid 2 colunas: Ref (topo) → Foto → Legenda/obs (baixo), titulo amarrado ao bloco.
   const children: PdfAtomicBlock[] = [{ kind: "heading", text: titulo }];
   const fotos: PdfPhotoItem[] = [];
   for (const item of ativos) {
-    const caption = item.ref.trim() || "Outra foto";
-    const andamento = andamentoTexto(item.obs, item.obsAdmin);
-    if (andamento) pushPara(children, andamento, caption);
-    if (hasPhoto(item.foto)) {
-      fotos.push({
-        url: resolvePhotoUrl(item.foto),
-        path: item.foto?.path?.trim() || undefined,
-        caption,
-      });
-    }
+    if (!hasPhoto(item.foto)) continue;
+    fotos.push({
+      url: resolvePhotoUrl(item.foto),
+      path: item.foto?.path?.trim() || undefined,
+      title: item.ref.trim() || "—",
+      caption: andamentoTexto(item.obs, item.obsAdmin),
+    });
   }
+  if (!fotos.length) return;
   pushPhotos(children, fotos);
   pushGroup(blocks, children);
 }
@@ -440,6 +441,65 @@ function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTr
   }
 }
 
+/**
+ * Une titulo de secao (+ paragrafos soltos) ao proximo grupo/bloco de corpo,
+ * evitando orfaos (titulo sozinho no fim da pagina).
+ * Encadeia titulos consecutivos (ex.: "1. RE" + "Metragem...") ate o 1o grupo.
+ */
+export function coalesceSectionLeads(blocks: PdfContentBlock[]): PdfContentBlock[] {
+  const out: PdfContentBlock[] = [];
+  let pending: PdfAtomicBlock[] = [];
+  let i = 0;
+
+  const flushPendingAlone = () => {
+    if (!pending.length) return;
+    if (pending.length === 1) out.push(pending[0]);
+    else out.push({ kind: "group", children: pending });
+    pending = [];
+  };
+
+  while (i < blocks.length) {
+    const cur = blocks[i];
+    if (cur.kind === "heading") {
+      const lead: PdfAtomicBlock[] = [...pending, cur];
+      pending = [];
+      i += 1;
+      while (
+        i < blocks.length &&
+        (blocks[i].kind === "paragraph" || blocks[i].kind === "subheader")
+      ) {
+        lead.push(blocks[i] as PdfAtomicBlock);
+        i += 1;
+      }
+      const next = blocks[i];
+      if (next?.kind === "group") {
+        out.push({ kind: "group", children: [...lead, ...next.children] });
+        i += 1;
+      } else if (
+        next &&
+        (next.kind === "photos" || next.kind === "potenciaCard")
+      ) {
+        out.push({ kind: "group", children: [...lead, next] });
+        i += 1;
+      } else if (next?.kind === "heading") {
+        // Guarda para amarrar ao proximo titulo/corpo
+        pending = lead;
+      } else {
+        if (lead.length === 1) out.push(lead[0]);
+        else out.push({ kind: "group", children: lead });
+      }
+      continue;
+    }
+
+    flushPendingAlone();
+    out.push(blocks[i]);
+    i += 1;
+  }
+
+  flushPendingAlone();
+  return out;
+}
+
 export function buildCabecalhoDados(row: RelatorioTransmissao): PdfCabecalhoDados {
   return {
     osWf: row.os_wf || "-",
@@ -551,5 +611,5 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
   collectTesteOtdr(blocks, row);
   collectTestePotenciaTabelas(blocks, row);
 
-  return blocks;
+  return coalesceSectionLeads(blocks);
 }

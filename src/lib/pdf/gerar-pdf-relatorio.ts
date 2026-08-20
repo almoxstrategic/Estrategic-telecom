@@ -26,6 +26,10 @@ const PHOTO_GAP = 12;
 /** Altura da celula de foto (A4, 2 colunas) — aumentada para leitura tecnica. */
 const PHOTO_CELL_H = 250;
 const CAPTION_H = 16;
+/** Espaco extra no topo quando a foto tem Ref (Outras fotos). */
+const PHOTO_TITLE_H = 18;
+/** Legenda multi-linha (obs) abaixo da foto em Outras fotos. */
+const PHOTO_LEGEND_H = 34;
 const GAP = 10;
 
 const LOGO_ESTRATEGIC = "/assets/logos/logo-estrategic.png";
@@ -506,32 +510,70 @@ function photoCellWidth(): number {
   return (CONTENT_W - PHOTO_GAP * (PHOTO_COLS - 1)) / PHOTO_COLS;
 }
 
+function photoRowMetrics(items: { title?: string; caption?: string }[]): {
+  titleH: number;
+  captionH: number;
+  rowH: number;
+} {
+  const withTitle = items.some((i) => Boolean(i.title?.trim()));
+  const titleH = withTitle ? PHOTO_TITLE_H : 0;
+  const captionH = withTitle ? PHOTO_LEGEND_H : CAPTION_H;
+  return { titleH, captionH, rowH: titleH + PHOTO_CELL_H + captionH + GAP };
+}
+
 async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<void> {
-  const rowH = PHOTO_CELL_H + CAPTION_H + GAP;
+  const { titleH, captionH, rowH } = photoRowMetrics(items);
   if (!ctx.lockBreak && remaining(ctx) < rowH) await newPage(ctx, false);
 
   const cellW = photoCellWidth();
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const cellX = MARGIN_X + i * (cellW + PHOTO_GAP);
+    let y = ctx.yFromTop;
+
+    if (titleH > 0) {
+      const ref = truncate(item.title?.trim() || "—", ctx.fontBold, 9, cellW - 4);
+      ctx.page.drawText(ref, {
+        x: cellX + 2,
+        y: topToPdfY(y + 12),
+        size: 9,
+        font: ctx.fontBold,
+        color: COR_TEXTO,
+      });
+      y += titleH;
+    }
+
     const { w, h } = fittedSize(item.image, cellW - 4, PHOTO_CELL_H - 6);
     const x = cellX + (cellW - w) / 2;
-    const yTop = ctx.yFromTop + (PHOTO_CELL_H - h) / 2;
+    const yTop = y + (PHOTO_CELL_H - h) / 2;
     ctx.page.drawImage(item.image, {
       x,
       y: topToPdfY(yTop + h),
       width: w,
       height: h,
     });
-    const caption = truncate(item.caption, ctx.font, 7.5, cellW - 2);
-    const cw = ctx.font.widthOfTextAtSize(caption, 7.5);
-    ctx.page.drawText(caption, {
-      x: cellX + (cellW - cw) / 2,
-      y: topToPdfY(ctx.yFromTop + PHOTO_CELL_H + CAPTION_H - 4),
-      size: 7.5,
-      font: ctx.font,
-      color: COR_MUTED,
-    });
+
+    const legendTop = y + PHOTO_CELL_H;
+    const captionRaw = item.caption?.trim() ?? "";
+    if (captionRaw) {
+      const lines = wrapText(captionRaw, ctx.font, 7.5, cellW - 4).slice(
+        0,
+        titleH > 0 ? 3 : 1,
+      );
+      let ly = legendTop + 10;
+      for (const line of lines) {
+        ctx.page.drawText(line, {
+          x: cellX + 2,
+          y: topToPdfY(ly),
+          size: 7.5,
+          font: ctx.font,
+          color: COR_MUTED,
+        });
+        ly += 10;
+      }
+    } else if (titleH === 0) {
+      // Mantem espaco de legenda simples mesmo vazia (alinhamento de grade).
+    }
   }
   ctx.yFromTop += rowH;
 }
@@ -577,10 +619,14 @@ function measureParagraph(text: string, font: PDFFont, label?: string): number {
   return h;
 }
 
-function measurePhotos(count: number): number {
-  if (count <= 0) return 24;
-  const rows = Math.ceil(count / PHOTO_COLS);
-  return rows * (PHOTO_CELL_H + CAPTION_H + GAP);
+function measurePhotos(items: PdfPhotoItem[]): number {
+  if (!items.length) return 24;
+  const rows = Math.ceil(items.length / PHOTO_COLS);
+  let h = 0;
+  for (let i = 0; i < items.length; i += PHOTO_COLS) {
+    h += photoRowMetrics(items.slice(i, i + PHOTO_COLS)).rowH;
+  }
+  return h || rows * (PHOTO_CELL_H + CAPTION_H + GAP);
 }
 
 function measurePotenciaCard(card: PdfPotenciaCard): number {
@@ -599,8 +645,7 @@ async function measureGroupHeight(
     if (child.kind === "subheader") h += measureSubheader(child.text, ctx.fontBold);
     else if (child.kind === "paragraph") h += measureParagraph(child.text, ctx.font, child.label);
     else if (child.kind === "photos") {
-      // Conta fotos (embed sob demanda no draw; aqui estima pelo count)
-      h += measurePhotos(child.items.length);
+      h += measurePhotos(child.items);
     } else if (child.kind === "potenciaCard") h += measurePotenciaCard(child.card);
     else if (child.kind === "heading") h += 32;
   }
@@ -802,8 +847,10 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     const embedded = await embedPhotoItems(ctx.doc, photosBlock.items);
 
     const prefixH = await measureGroupHeight(ctx, prefix);
-    const firstRowCount = Math.min(PHOTO_COLS, Math.max(embedded.length, 1));
-    const firstRowH = measurePhotos(firstRowCount);
+    const firstRowItems = embedded.slice(0, PHOTO_COLS);
+    const firstRowH = firstRowItems.length
+      ? photoRowMetrics(firstRowItems).rowH
+      : measurePhotos(photosBlock.items.slice(0, PHOTO_COLS));
     const keepH = prefixH + firstRowH;
 
     if (remaining(ctx) < keepH) await newPage(ctx, false);
