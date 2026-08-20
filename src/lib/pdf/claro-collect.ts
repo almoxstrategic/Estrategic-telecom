@@ -416,28 +416,37 @@ function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTr
 
   pushHeading(blocks, "7. Teste de Potencia");
 
-  const cards: { titulo: string; janela: "1550" | "1330"; ponto: "cliente" | "estacao" }[] = [
-    { titulo: "TESTE DE POTENCIA - 1550nm (No Cliente)", janela: "1550", ponto: "cliente" },
-    { titulo: "TESTE DE POTENCIA - 1330nm (No Cliente)", janela: "1330", ponto: "cliente" },
-  ];
-  if (testeOpticoEstacaoAtivo(optico.estacao)) {
-    cards.push(
-      { titulo: "TESTE DE POTENCIA - 1550nm (Na Estacao)", janela: "1550", ponto: "estacao" },
-      { titulo: "TESTE DE POTENCIA - 1330nm (Na Estacao)", janela: "1330", ponto: "estacao" },
-    );
-  }
+  const buildCard = (
+    titulo: string,
+    janela: "1550" | "1330",
+    ponto: "cliente" | "estacao",
+  ): PdfPotenciaCard =>
+    buildPotenciaCard(titulo, janela, ponto, km, totalEmendas, totalConexoes, optico);
 
-  for (const card of cards) {
-    const built = buildPotenciaCard(
-      card.titulo,
-      card.janela,
-      card.ponto,
-      km,
-      totalEmendas,
-      totalConexoes,
-      optico,
-    );
-    pushGroup(blocks, [{ kind: "potenciaCard", card: built }]);
+  // Par Cliente (1550 + 1330) inquebravel na mesma pagina
+  pushGroup(blocks, [
+    {
+      kind: "potenciaCard",
+      card: buildCard("TESTE DE POTENCIA - 1550nm (No Cliente)", "1550", "cliente"),
+    },
+    {
+      kind: "potenciaCard",
+      card: buildCard("TESTE DE POTENCIA - 1330nm (No Cliente)", "1330", "cliente"),
+    },
+  ]);
+
+  // Par Estacao (1550 + 1330) inquebravel, se houver
+  if (testeOpticoEstacaoAtivo(optico.estacao)) {
+    pushGroup(blocks, [
+      {
+        kind: "potenciaCard",
+        card: buildCard("TESTE DE POTENCIA - 1550nm (Na Estacao)", "1550", "estacao"),
+      },
+      {
+        kind: "potenciaCard",
+        card: buildCard("TESTE DE POTENCIA - 1330nm (Na Estacao)", "1330", "estacao"),
+      },
+    ]);
   }
 }
 

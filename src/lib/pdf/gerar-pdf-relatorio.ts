@@ -395,7 +395,7 @@ function drawCabecalhoContinuacao(ctx: LayoutCtx): number {
     color: COR_ACCENT,
   });
   y += 8;
-  const title = sanitizePdfText(`OS/WF ${cabecalho.osWf} - continuação`);
+  const title = sanitizePdfText(`OS/WF ${cabecalho.osWf}`);
   page.drawText(title, {
     x: MARGIN_X,
     y: topToPdfY(y + 11),
@@ -562,8 +562,9 @@ async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<voi
       );
       let ly = legendTop + 10;
       for (const line of lines) {
+        const lw = ctx.font.widthOfTextAtSize(line, 7.5);
         ctx.page.drawText(line, {
-          x: cellX + 2,
+          x: cellX + (cellW - lw) / 2,
           y: topToPdfY(ly),
           size: 7.5,
           font: ctx.font,
@@ -571,8 +572,6 @@ async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<voi
         });
         ly += 10;
       }
-    } else if (titleH === 0) {
-      // Mantem espaco de legenda simples mesmo vazia (alinhamento de grade).
     }
   }
   ctx.yFromTop += rowH;
@@ -829,6 +828,19 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
   // Grupo cabe em uma pagina: break-inside avoid
   if (height <= pageCapacity) {
     if (remaining(ctx) < height) await newPage(ctx, false);
+    ctx.lockBreak = true;
+    try {
+      for (const child of children) await drawAtomic(ctx, child);
+    } finally {
+      ctx.lockBreak = false;
+    }
+    return;
+  }
+
+  // Pares de Teste de Potencia (1550+1330): nunca separar entre paginas
+  const potenciaCount = children.filter((c) => c.kind === "potenciaCard").length;
+  if (potenciaCount >= 2) {
+    if (remaining(ctx) < Math.min(height, pageCapacity)) await newPage(ctx, false);
     ctx.lockBreak = true;
     try {
       for (const child of children) await drawAtomic(ctx, child);
