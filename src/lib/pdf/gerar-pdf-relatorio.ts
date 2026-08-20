@@ -516,8 +516,9 @@ function photoRowMetrics(items: { title?: string; caption?: string }[]): {
   rowH: number;
 } {
   const withTitle = items.some((i) => Boolean(i.title?.trim()));
+  const withCaption = items.some((i) => Boolean(i.caption?.trim()));
   const titleH = withTitle ? PHOTO_TITLE_H : 0;
-  const captionH = withTitle ? PHOTO_LEGEND_H : CAPTION_H;
+  const captionH = withCaption ? (withTitle ? PHOTO_LEGEND_H : CAPTION_H) : 0;
   return { titleH, captionH, rowH: titleH + PHOTO_CELL_H + captionH + GAP };
 }
 
@@ -533,8 +534,9 @@ async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<voi
 
     if (titleH > 0) {
       const ref = truncate(item.title?.trim() || "—", ctx.fontBold, 9, cellW - 4);
+      const rw = ctx.fontBold.widthOfTextAtSize(ref, 9);
       ctx.page.drawText(ref, {
-        x: cellX + 2,
+        x: cellX + (cellW - rw) / 2,
         y: topToPdfY(y + 12),
         size: 9,
         font: ctx.fontBold,

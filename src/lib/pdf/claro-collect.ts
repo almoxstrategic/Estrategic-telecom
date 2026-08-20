@@ -143,19 +143,46 @@ function andamentoTexto(obs?: string | null, obsAdmin?: string | null): string {
   return [obs?.trim(), obsAdmin?.trim()].filter(Boolean).join("\n");
 }
 
-function toPhotoItems(fotos: StoredPhoto[], captionBase: string): PdfPhotoItem[] {
+function toPhotoItems(
+  fotos: StoredPhoto[],
+  opts: { title?: string; caption?: string },
+): PdfPhotoItem[] {
+  const caption = opts.caption?.trim() ?? "";
+  const title = opts.title?.trim();
   return fotos
     .map((f, i) => {
       const url = resolvePhotoUrl(f);
       const path = f.path?.trim() || undefined;
       if (!url && !path) return null;
+      const itemTitle =
+        title && fotos.length > 1 ? `${title} (${i + 1})` : title;
       return {
         url: url || "",
         path,
-        caption: fotos.length > 1 ? `${captionBase} (${i + 1})` : captionBase,
+        title: itemTitle,
+        caption,
       };
     })
     .filter((x): x is PdfPhotoItem => Boolean(x));
+}
+
+/** Grade 2 colunas: titulo da categoria no topo, OBS como legenda (vazio = sem texto). */
+function collectGruposEmGrade(
+  blocks: PdfContentBlock[],
+  itens: { titulo: string; grupo: FotoGrupoPayload | null | undefined }[],
+) {
+  const fotos: PdfPhotoItem[] = [];
+  for (const { titulo, grupo } of itens) {
+    if (!grupo) continue;
+    const andamento = andamentoTexto(grupo.obs, grupo.obsAdmin);
+    const stored = (grupo.fotos ?? []).filter((f) => hasPhoto(f));
+    if (!stored.length) continue;
+    for (const item of toPhotoItems(stored, { title: titulo, caption: andamento })) {
+      fotos.push(item);
+    }
+  }
+  if (!fotos.length) return;
+  pushGroup(blocks, [{ kind: "photos", items: fotos }]);
 }
 
 function collectGrupo(
@@ -163,14 +190,7 @@ function collectGrupo(
   titulo: string,
   grupo: FotoGrupoPayload | null | undefined,
 ) {
-  if (!grupo) return;
-  const items = toPhotoItems(grupo.fotos ?? [], titulo);
-  const andamento = andamentoTexto(grupo.obs, grupo.obsAdmin);
-  if (!items.length && !andamento) return;
-  const children: PdfAtomicBlock[] = [{ kind: "subheader", text: titulo }];
-  if (andamento) pushPara(children, andamento, "Andamento da Obra");
-  pushPhotos(children, items);
-  pushGroup(blocks, children);
+  collectGruposEmGrade(blocks, [{ titulo, grupo }]);
 }
 
 function collectCabos(
@@ -244,22 +264,41 @@ function collectFaixaOptica(
   faixas: TesteOpticoFaixaPayload[],
 ) {
   for (const [i, faixa] of faixas.entries()) {
-    const items = toPhotoItems(faixa.fotos ?? [], titulo);
     const andamento = andamentoTexto(faixa.obs, faixa.obsAdmin);
-    if (!items.length && !faixa.dbm.trim() && !andamento) continue;
     const label = `${titulo}${faixas.length > 1 ? ` #${i + 1}` : ""}`;
+    const items = toPhotoItems(faixa.fotos ?? [], { title: label, caption: andamento });
+    if (!items.length && !faixa.dbm.trim() && !andamento) continue;
     const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
     if (faixa.dbm.trim()) pushPara(children, `${faixa.dbm} dBm`, "Medicao");
-    if (andamento) pushPara(children, andamento, "Andamento da Obra");
-    pushPhotos(
-      children,
-      items.map((it, idx) => ({
-        ...it,
-        caption: items.length > 1 ? `${label} (${idx + 1})` : label,
-      })),
-    );
+    pushPhotos(children, items);
     pushGroup(blocks, children);
   }
+}
+
+/** Emparelha 1550nm e 1330nm na mesma linha (grid 2 colunas). */
+function collectParJanelasOpticas(
+  blocks: PdfContentBlock[],
+  pontoLabel: string,
+  faixa1550: TesteOpticoFaixaPayload | undefined,
+  faixa1330: TesteOpticoFaixaPayload | undefined,
+) {
+  const children: PdfAtomicBlock[] = [{ kind: "subheader", text: pontoLabel }];
+  const fotos: PdfPhotoItem[] = [];
+
+  const pushFaixa = (janela: string, faixa: TesteOpticoFaixaPayload | undefined) => {
+    if (!faixa) return;
+    const andamento = andamentoTexto(faixa.obs, faixa.obsAdmin);
+    const label = `${janela}`;
+    if (faixa.dbm.trim()) pushPara(children, `${faixa.dbm} dBm`, `${label} - Medicao`);
+    const items = toPhotoItems(faixa.fotos ?? [], { title: label, caption: andamento });
+    fotos.push(...items);
+  };
+
+  pushFaixa("1550 nm", faixa1550);
+  pushFaixa("1330 nm", faixa1330);
+  if (!fotos.length && children.length <= 1) return;
+  pushPhotos(children, fotos);
+  pushGroup(blocks, children);
 }
 
 function collectItemOptico(
@@ -273,16 +312,47 @@ function collectItemOptico(
     const label = `${titulo}${itens.length > 1 ? ` #${i + 1}` : ""}`;
     const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
     if (item.dbm.trim()) pushPara(children, `${item.dbm} dBm`, "Medicao");
-    if (andamento) pushPara(children, andamento, "Andamento da Obra");
     if (hasPhoto(item.foto)) {
       pushPhotos(children, [{
         url: resolvePhotoUrl(item.foto),
         path: item.foto?.path?.trim() || undefined,
-        caption: label,
+        title: label,
+        caption: andamento,
       }]);
     }
     pushGroup(blocks, children);
   }
+}
+
+function collectParItensOpticos(
+  blocks: PdfContentBlock[],
+  pontoLabel: string,
+  item1550: TesteOpticoItemPayload | undefined,
+  item1330: TesteOpticoItemPayload | undefined,
+) {
+  const children: PdfAtomicBlock[] = [{ kind: "subheader", text: pontoLabel }];
+  const fotos: PdfPhotoItem[] = [];
+
+  const pushItem = (janela: string, item: TesteOpticoItemPayload | undefined) => {
+    if (!item) return;
+    const andamento = andamentoTexto(item.obs, item.obsAdmin);
+    if (!hasPhoto(item.foto) && !item.dbm.trim() && !andamento) return;
+    if (item.dbm.trim()) pushPara(children, `${item.dbm} dBm`, `${janela} - Medicao`);
+    if (hasPhoto(item.foto)) {
+      fotos.push({
+        url: resolvePhotoUrl(item.foto),
+        path: item.foto?.path?.trim() || undefined,
+        title: janela,
+        caption: andamento,
+      });
+    }
+  };
+
+  pushItem("1550 nm", item1550);
+  pushItem("1330 nm", item1330);
+  if (!fotos.length && children.length <= 1) return;
+  pushPhotos(children, fotos);
+  pushGroup(blocks, children);
 }
 
 function collectTesteOtdr(blocks: PdfContentBlock[], row: RelatorioTransmissao) {
@@ -423,7 +493,7 @@ function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTr
   ): PdfPotenciaCard =>
     buildPotenciaCard(titulo, janela, ponto, km, totalEmendas, totalConexoes, optico);
 
-  // Par Cliente (1550 + 1330) inquebravel na mesma pagina
+  // Apenas No Cliente (1550 + 1330) — Estacao omitida na visualizacao final.
   pushGroup(blocks, [
     {
       kind: "potenciaCard",
@@ -434,20 +504,6 @@ function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTr
       card: buildCard("TESTE DE POTENCIA - 1330nm (No Cliente)", "1330", "cliente"),
     },
   ]);
-
-  // Par Estacao (1550 + 1330) inquebravel, se houver
-  if (testeOpticoEstacaoAtivo(optico.estacao)) {
-    pushGroup(blocks, [
-      {
-        kind: "potenciaCard",
-        card: buildCard("TESTE DE POTENCIA - 1550nm (Na Estacao)", "1550", "estacao"),
-      },
-      {
-        kind: "potenciaCard",
-        card: buildCard("TESTE DE POTENCIA - 1330nm (Na Estacao)", "1330", "estacao"),
-      },
-    ]);
-  }
 }
 
 /**
@@ -536,14 +592,16 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     for (const b of meta) blocks.push(b);
   }
   if (p?.lancamentoRe === true) collectCabos(blocks, "Metragem de cabos (RE)", p.metragensCabo ?? []);
-  collectGrupo(blocks, "Poste de conexao", p?.posteConexao);
-  collectGrupo(blocks, "Caixa de emenda", p?.caixaEmenda);
-  collectGrupo(blocks, "Sobra tecnica", p?.sobraTecnica);
-  collectGrupo(blocks, "Plaqueta de Identificacao", p?.plaquetaIdentificacao);
-  collectGrupo(blocks, "Novo aterramento do poste", p?.novoAterramentoPoste);
-  collectGrupo(blocks, "Aterramento - TERROMETRO", p?.aterramentoTerrometro);
-  collectGrupo(blocks, "Posicao DGO/DIO", p?.posicaoConexaoEstacao);
-  collectGrupo(blocks, "Etiqueta na estacao/PPC", p?.etiquetaIdentificacao);
+  collectGruposEmGrade(blocks, [
+    { titulo: "Poste de conexao", grupo: p?.posteConexao },
+    { titulo: "Caixa de emenda", grupo: p?.caixaEmenda },
+    { titulo: "Sobra tecnica", grupo: p?.sobraTecnica },
+    { titulo: "Plaqueta de Identificacao", grupo: p?.plaquetaIdentificacao },
+    { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
+    { titulo: "Aterramento - TERROMETRO", grupo: p?.aterramentoTerrometro },
+    { titulo: "Posicao DGO/DIO", grupo: p?.posicaoConexaoEstacao },
+    { titulo: "Etiqueta na estacao/PPC", grupo: p?.etiquetaIdentificacao },
+  ]);
   collectOutras(blocks, "Outras fotos (RE)", p?.outrasFotos ?? []);
 
   pushHeading(blocks, "2. Rede Cliente (RC)");
@@ -557,22 +615,26 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     for (const b of meta) blocks.push(b);
   }
   if (p?.lancamentoRc === true) collectCabos(blocks, "Metragem de cabos (RC)", p.metragensCaboRc ?? []);
-  collectGrupo(blocks, "Poste de conexao (RC)", p?.rcPosteConexao);
-  collectGrupo(blocks, "Caixa de emenda na acomodacao (RC)", p?.rcCaixaEmenda);
-  collectGrupo(blocks, "Terminacao do cabo no cliente", p?.rcTerminacaoCabo);
-  collectGrupo(blocks, "Plaqueta de Identificacao (RC)", p?.rcPlaquetaIdentificacao);
-  collectGrupo(blocks, "Entrada do cabo (area interna)", p?.rcEntradaInterna);
-  collectGrupo(blocks, "Entrada do cabo (area externa)", p?.rcEntradaExterna);
+  collectGruposEmGrade(blocks, [
+    { titulo: "Poste de conexao (RC)", grupo: p?.rcPosteConexao },
+    { titulo: "Caixa de emenda na acomodacao (RC)", grupo: p?.rcCaixaEmenda },
+    { titulo: "Terminacao do cabo no cliente", grupo: p?.rcTerminacaoCabo },
+    { titulo: "Plaqueta de Identificacao (RC)", grupo: p?.rcPlaquetaIdentificacao },
+    { titulo: "Entrada do cabo (area interna)", grupo: p?.rcEntradaInterna },
+    { titulo: "Entrada do cabo (area externa)", grupo: p?.rcEntradaExterna },
+  ]);
   collectOutras(blocks, "Outras fotos (RC)", p?.outrasFotosRc ?? []);
 
   pushHeading(blocks, "3. Equipamentos no Cliente");
-  collectGrupo(blocks, "Cliente - Entrada/Fachada", p?.eqClienteFachada);
-  collectGrupo(blocks, "Cliente - Ambiente", p?.eqClienteAmbiente);
-  collectGrupo(blocks, "Rack ou Local", p?.eqClienteRack);
-  collectGrupo(blocks, "DGO / DID / Roseta", p?.eqClienteDgo);
-  collectGrupo(blocks, "Equipamentos (No Cliente)", p?.eqClienteEquipamentos);
-  collectGrupo(blocks, "Etiqueta de Identificacao", p?.eqClienteEtiqueta);
-  collectGrupo(blocks, "Identificacao SGP no Cliente", p?.eqClienteSgp);
+  collectGruposEmGrade(blocks, [
+    { titulo: "Cliente - Entrada/Fachada", grupo: p?.eqClienteFachada },
+    { titulo: "Cliente - Ambiente", grupo: p?.eqClienteAmbiente },
+    { titulo: "Rack ou Local", grupo: p?.eqClienteRack },
+    { titulo: "DGO / DID / Roseta", grupo: p?.eqClienteDgo },
+    { titulo: "Equipamentos (No Cliente)", grupo: p?.eqClienteEquipamentos },
+    { titulo: "Etiqueta de Identificacao", grupo: p?.eqClienteEtiqueta },
+    { titulo: "Identificacao SGP no Cliente", grupo: p?.eqClienteSgp },
+  ]);
   collectOutras(blocks, "Outras fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
 
   if (p?.relatorioEstacao) {
@@ -585,11 +647,13 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
       }
       for (const b of meta) blocks.push(b);
     }
-    collectGrupo(blocks, "Estacao - Foto geral", p.eqEstacaoGeral);
-    collectGrupo(blocks, "Rack ou Local Instalacao", p.eqEstacaoRack);
-    collectGrupo(blocks, "Equipamento instalado", p.eqEstacaoEquipamento);
-    collectGrupo(blocks, "Etiqueta de identificacao (estacao)", p.eqEstacaoEtiqueta);
-    collectGrupo(blocks, "DGO / DID / ROUTER", p.eqEstacaoDgo);
+    collectGruposEmGrade(blocks, [
+      { titulo: "Estacao - Foto geral", grupo: p.eqEstacaoGeral },
+      { titulo: "Rack ou Local Instalacao", grupo: p.eqEstacaoRack },
+      { titulo: "Equipamento instalado", grupo: p.eqEstacaoEquipamento },
+      { titulo: "Etiqueta de identificacao (estacao)", grupo: p.eqEstacaoEtiqueta },
+      { titulo: "DGO / DID / ROUTER", grupo: p.eqEstacaoDgo },
+    ]);
     collectOutras(blocks, "Outras fotos (Estacao)", p.outrasFotosEqEstacao ?? []);
   }
 
@@ -603,17 +667,27 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
       }
       for (const b of meta) blocks.push(b);
     }
-    collectFaixaOptica(blocks, "Cliente 1550 nm", to.cliente?.nm1550 ?? []);
-    collectFaixaOptica(blocks, "Cliente 1330 nm", to.cliente?.nm1330 ?? []);
-    if (to.estacao?.numeroFibra != null) {
-      blocks.push({
-        kind: "paragraph",
-        text: String(to.estacao.numeroFibra),
-        label: "No Fibra (Estacao)",
-      });
+    collectParJanelasOpticas(
+      blocks,
+      "No Cliente",
+      to.cliente?.nm1550?.[0],
+      to.cliente?.nm1330?.[0],
+    );
+    if (testeOpticoEstacaoAtivo(to.estacao)) {
+      if (to.estacao?.numeroFibra != null) {
+        blocks.push({
+          kind: "paragraph",
+          text: String(to.estacao.numeroFibra),
+          label: "No Fibra (Estacao)",
+        });
+      }
+      collectParItensOpticos(
+        blocks,
+        "Na Estacao",
+        to.estacao?.nm1550?.[0],
+        to.estacao?.nm1330?.[0],
+      );
     }
-    collectItemOptico(blocks, "Estacao 1550 nm", to.estacao?.nm1550 ?? []);
-    collectItemOptico(blocks, "Estacao 1330 nm", to.estacao?.nm1330 ?? []);
   }
 
   // OTDR antes do Teste de Potencia; potencia so em Empresarial.

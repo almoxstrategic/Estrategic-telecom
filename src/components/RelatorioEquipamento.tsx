@@ -51,7 +51,7 @@ export function RelatorioEquipamento({
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
         <h2 className="text-base font-bold">Equipamentos no Cliente</h2>
-        <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
           {gruposCliente.map((grupo) => (
             <RelatorioFotosBloco
               key={grupo.grupoKey}
@@ -117,7 +117,7 @@ export function RelatorioEquipamento({
                 className={inputClass()}
               />
             </div>
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
             {gruposEstacao.map((grupo) => (
               <RelatorioFotosBloco
                 key={grupo.grupoKey}

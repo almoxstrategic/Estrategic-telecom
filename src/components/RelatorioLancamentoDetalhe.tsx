@@ -89,19 +89,22 @@ export function StatusBadge({ status }: { status: RelatorioStatus }) {
 function Photos({
   fotos,
   labels,
+  legenda,
   canEdit,
   onRemovePhoto,
   onReplacePhoto,
 }: {
   fotos: StoredPhoto[];
   labels?: string[];
+  /** OBS exibida sob a foto (modo leitura). Vazia = sem texto. */
+  legenda?: string;
   canEdit?: boolean;
   onRemovePhoto?: (index: number) => void;
   onReplacePhoto?: (index: number, file: EvidencePhotoRef) => void;
 }) {
   if (!fotos.length) {
     return (
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-1">
           <FotoLabel>{labels?.[0]}</FotoLabel>
           <div className={FOTO_SLOT_CLASS}>Sem foto</div>
@@ -109,12 +112,12 @@ function Photos({
       </div>
     );
   }
-  const duasColunas = Boolean(labels?.length) || fotos.length <= 2;
+  const legendaTrim = legenda?.trim() || "";
   return (
-    <div className={`grid gap-2 ${duasColunas ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {fotos.map((foto, index) => (
         <div key={`${foto.path}-${index}`} className="flex min-w-0 flex-col gap-1">
-          <FotoLabel>{labels?.[index]}</FotoLabel>
+          {labels?.[index] ? <FotoLabel>{labels[index]}</FotoLabel> : null}
           <RelatorioFotoComControles
             src={foto.url}
             alt={labels?.[index] || "Evidência"}
@@ -122,6 +125,9 @@ function Photos({
             onDelete={onRemovePhoto ? () => onRemovePhoto(index) : undefined}
             onReplace={onReplacePhoto ? (file) => onReplacePhoto(index, file) : undefined}
           />
+          {legendaTrim ? (
+            <p className="text-center text-sm text-muted-foreground">{legendaTrim}</p>
+          ) : null}
         </div>
       ))}
     </div>
@@ -131,18 +137,21 @@ function Photos({
 function CaboFotos({
   inicio,
   fim,
+  legenda,
   canEdit,
   onRemoveCampo,
   onReplaceCampo,
 }: {
   inicio: StoredPhoto | null;
   fim: StoredPhoto | null;
+  legenda?: string;
   canEdit?: boolean;
   onRemoveCampo?: (campo: "fotoInicio" | "fotoFim") => void;
   onReplaceCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
 }) {
+  const legendaTrim = legenda?.trim() || "";
   return (
-    <div className="grid w-full grid-cols-2 gap-2">
+    <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
       {(
         [
           ["Foto Inicial", inicio, "fotoInicio"],
@@ -162,6 +171,9 @@ function CaboFotos({
           ) : (
             <div className={FOTO_SLOT_CLASS}>Sem foto</div>
           )}
+          {legendaTrim ? (
+            <p className="text-center text-sm text-muted-foreground">{legendaTrim}</p>
+          ) : null}
         </div>
       ))}
     </div>
@@ -351,6 +363,7 @@ function EvidenciaBloco({
           <CaboFotos
             inicio={caboFotos.inicio}
             fim={caboFotos.fim}
+            legenda={!onObsChange ? obs ?? undefined : undefined}
             canEdit={canEdit}
             onRemoveCampo={onRemoveCaboCampo}
             onReplaceCampo={onReplaceCaboCampo}
@@ -358,28 +371,43 @@ function EvidenciaBloco({
         ) : (
           <Photos
             fotos={fotos}
+            legenda={!onObsChange ? obs ?? undefined : undefined}
             canEdit={canEdit}
             onRemovePhoto={onRemovePhoto}
             onReplacePhoto={onReplacePhoto}
           />
         )}
       </div>
-      <div className="mt-auto w-full space-y-3 pt-4">
-        <ObsEditavel value={obs ?? ""} onChange={onObsChange} />
-        {canEdit && onAdd && !(caboFotos && Boolean(caboFotos.inicio) && Boolean(caboFotos.fim)) ? (
-          <div className={uploading ? "pointer-events-none opacity-60" : undefined}>
-            <PhotoUpload
-              key={uploadKey}
-              label="Adicionar foto"
-              suffix="inicio"
-              value={null}
-              onChange={(file) => {
-                if (file) onAdd(file);
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+      {onObsChange ? (
+        <div className="mt-auto w-full space-y-3 pt-4">
+          <ObsEditavel value={obs ?? ""} onChange={onObsChange} />
+          {canEdit && onAdd && !(caboFotos && Boolean(caboFotos.inicio) && Boolean(caboFotos.fim)) ? (
+            <div className={uploading ? "pointer-events-none opacity-60" : undefined}>
+              <PhotoUpload
+                key={uploadKey}
+                label="Adicionar foto"
+                suffix="inicio"
+                value={null}
+                onChange={(file) => {
+                  if (file) onAdd(file);
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : canEdit && onAdd && !(caboFotos && Boolean(caboFotos.inicio) && Boolean(caboFotos.fim)) ? (
+        <div className={`mt-auto w-full pt-4 ${uploading ? "pointer-events-none opacity-60" : ""}`}>
+          <PhotoUpload
+            key={uploadKey}
+            label="Adicionar foto"
+            suffix="inicio"
+            value={null}
+            onChange={(file) => {
+              if (file) onAdd(file);
+            }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -884,7 +912,7 @@ export function RelatorioDetalhe({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Postes e metragem
             </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {payload?.lancamentoRe === true ? (
                 <div className="flex h-full flex-col gap-3">
                   {cabos.map((cabo, index) =>
@@ -921,7 +949,7 @@ export function RelatorioDetalhe({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Caixas de emenda
             </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {renderGrupo("Caixa de emenda", "caixaEmenda")}
               {renderGrupo("Sobra técnica", "sobraTecnica")}
             </div>
@@ -930,7 +958,7 @@ export function RelatorioDetalhe({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Demais evidências
             </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {(
                 [
                   ["Plaqueta de Identificação", "plaquetaIdentificacao"],
@@ -970,7 +998,7 @@ export function RelatorioDetalhe({
             </div>
           </div>
           <section className="space-y-3">
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {payload?.lancamentoRc === true ? (
                 <div className="flex h-full flex-col gap-3">
                   {cabosRc.map((cabo, index) =>
@@ -1022,7 +1050,7 @@ export function RelatorioDetalhe({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Equipamentos no Cliente
             </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {(
                 [
                   ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
@@ -1046,7 +1074,7 @@ export function RelatorioDetalhe({
                 Relatório fotográfico da estação: {simNao(payload?.relatorioEstacao)}
                 {payload?.estacaoEntregaAcesso ? ` · ${payload.estacaoEntregaAcesso}` : ""}
               </p>
-              <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+              <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
                 {(
                   [
                     ["Estação - (Foto geral da estação/PPC)", "eqEstacaoGeral"],

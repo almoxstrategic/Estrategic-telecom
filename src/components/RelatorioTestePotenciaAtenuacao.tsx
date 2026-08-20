@@ -13,7 +13,6 @@ import {
   formatarDb,
   parseNumeroCampo,
   textoOuTraco,
-  testeOpticoEstacaoAtivo,
   totalConexoesCalculado,
   totalEmendasCalculado,
   type QuantidadesRedePayload,
@@ -49,12 +48,11 @@ export function RelatorioTestePotenciaAtenuacao({
   const km = numeroSeguro(String(otdr.comprimentoTrechoKm ?? "0").replace(",", "."), 0);
   const totalEmendas = totalEmendasCalculado(re.qtdCaixasEmenda, rc.qtdCaixasEmenda);
   const totalConexoes = totalConexoesCalculado(totalEmendas);
-  const mostrarEstacao = testeOpticoEstacaoAtivo(optico.estacao);
 
   return (
     <div className="space-y-4">
       <LegendaCoresFibra />
-      {CARDS.filter((card) => card.ponto !== "estacao" || mostrarEstacao).map((card) => (
+      {CARDS.filter((card) => card.ponto === "cliente").map((card) => (
         <JanelaCard
           key={card.titulo}
           titulo={card.titulo}

@@ -256,8 +256,8 @@ function BlocoTesteOpticoCliente({
         disabled={readOnly}
         onChange={(numeroFibra) => onChange({ ...value, numeroFibra })}
       />
-      <div className="flex flex-col gap-4 md:flex-row">
-        <div className="min-w-0 flex-1">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="min-w-0">
           <CardMedicaoCliente
             titulo="1550nm"
             faixa={nm1550}
@@ -267,7 +267,7 @@ function BlocoTesteOpticoCliente({
             onPatch={(faixa, opts) => onChange({ ...value, nm1550: [faixa] }, opts)}
           />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <CardMedicaoCliente
             titulo="1330nm"
             faixa={nm1330}
@@ -319,8 +319,8 @@ function BlocoTesteOpticoEstacao({
         disabled={readOnly}
         onChange={(numeroFibra) => onChange({ ...value, numeroFibra })}
       />
-      <div className="flex flex-col gap-4 md:flex-row">
-        <div className="min-w-0 flex-1">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="min-w-0">
           <CardMedicaoEstacao
             titulo="1550nm"
             item={nm1550}
@@ -330,7 +330,7 @@ function BlocoTesteOpticoEstacao({
             onPatch={(item, opts) => onChange({ ...value, nm1550: [item] }, opts)}
           />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <CardMedicaoEstacao
             titulo="1330nm"
             item={nm1330}

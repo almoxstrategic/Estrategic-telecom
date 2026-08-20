@@ -339,7 +339,7 @@ export function RelatorioRedeAcesso({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         {metragemDesabilitada ? (
           <div className="pointer-events-none flex h-full flex-col rounded-2xl border border-border bg-gray-100 p-5 opacity-60 shadow-sm">
             <h2 className="text-base font-bold">Metragem de cabo</h2>
