@@ -53,6 +53,34 @@ export type CaboMetragemPayload = {
   obsAdmin: string;
 };
 
+/** SGP padrão nos itens de equipamento / DGO no cliente. */
+export const SGP_DEFAULT = "(90) 28911";
+
+export type EquipamentoClienteItemPayload = {
+  id: string;
+  tipoEquipamento: string;
+  modelo: string;
+  fabricante: string;
+  sgp: string;
+  identificacao: string;
+  foto: StoredPhoto | null;
+  etiqueta: StoredPhoto | null;
+  obs: string;
+  obsAdmin: string;
+};
+
+export type DgoClienteItemPayload = {
+  id: string;
+  tipoEquipamento: string;
+  modelo: string;
+  fabricante: string;
+  sgp: string;
+  foto: StoredPhoto | null;
+  etiqueta: StoredPhoto | null;
+  obs: string;
+  obsAdmin: string;
+};
+
 export type RelatorioFotoGrupoKeyRe =
   | "posteConexao"
   | "caixaEmenda"
@@ -75,8 +103,6 @@ export type RelatorioFotoGrupoKeyEqCliente =
   | "eqClienteFachada"
   | "eqClienteAmbiente"
   | "eqClienteRack"
-  | "eqClienteDgo"
-  | "eqClienteEquipamentos"
   | "eqClienteEtiqueta"
   | "eqClienteSgp";
 
@@ -251,8 +277,19 @@ export function emptyTestePotencia(): TestePotenciaPayload {
   };
 }
 
+export type CoordenadasPayload = {
+  latitude: string;
+  longitude: string;
+};
+
 export type QuantidadesRedePayload = {
   qtdCaixasEmenda: number | null;
+  /** Coordenadas do Cliente (aba RC). */
+  coordenadas: CoordenadasPayload;
+  /** Coordenadas da caixa de emenda na acomodação (aba RC). */
+  caixaEmendaAcomodacao: {
+    coordenadas: CoordenadasPayload;
+  };
 };
 
 export type RelatorioPayload = {
@@ -282,8 +319,8 @@ export type RelatorioPayload = {
   eqClienteFachada: FotoGrupoPayload;
   eqClienteAmbiente: FotoGrupoPayload;
   eqClienteRack: FotoGrupoPayload;
-  eqClienteDgo: FotoGrupoPayload;
-  eqClienteEquipamentos: FotoGrupoPayload;
+  eqClienteDgo: DgoClienteItemPayload[];
+  eqClienteEquipamentos: EquipamentoClienteItemPayload[];
   eqClienteEtiqueta: FotoGrupoPayload;
   eqClienteSgp: FotoGrupoPayload;
   outrasFotosEqCliente: OutraFotoPayload[];
@@ -309,6 +346,35 @@ export function emptyCaboMetragem(): CaboMetragemPayload {
     metragem: "",
     fotoInicio: null,
     fotoFim: null,
+    obs: "",
+    obsAdmin: "",
+  };
+}
+
+export function emptyEquipamentoClienteItem(): EquipamentoClienteItemPayload {
+  return {
+    id: crypto.randomUUID(),
+    tipoEquipamento: "",
+    modelo: "",
+    fabricante: "",
+    sgp: SGP_DEFAULT,
+    identificacao: "",
+    foto: null,
+    etiqueta: null,
+    obs: "",
+    obsAdmin: "",
+  };
+}
+
+export function emptyDgoClienteItem(): DgoClienteItemPayload {
+  return {
+    id: crypto.randomUUID(),
+    tipoEquipamento: "",
+    modelo: "",
+    fabricante: "",
+    sgp: SGP_DEFAULT,
+    foto: null,
+    etiqueta: null,
     obs: "",
     obsAdmin: "",
   };
@@ -396,8 +462,16 @@ function emptyFotoGrupo(): FotoGrupoPayload {
   return { fotos: [], obs: "", obsAdmin: "" };
 }
 
+export function emptyCoordenadas(): CoordenadasPayload {
+  return { latitude: "", longitude: "" };
+}
+
 export function emptyQuantidadesRede(): QuantidadesRedePayload {
-  return { qtdCaixasEmenda: null };
+  return {
+    qtdCaixasEmenda: null,
+    coordenadas: emptyCoordenadas(),
+    caixaEmendaAcomodacao: { coordenadas: emptyCoordenadas() },
+  };
 }
 
 export function totalEmendasCalculado(
@@ -450,8 +524,8 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     eqClienteFachada: emptyFotoGrupo(),
     eqClienteAmbiente: emptyFotoGrupo(),
     eqClienteRack: emptyFotoGrupo(),
-    eqClienteDgo: emptyFotoGrupo(),
-    eqClienteEquipamentos: emptyFotoGrupo(),
+    eqClienteDgo: [emptyDgoClienteItem()],
+    eqClienteEquipamentos: [emptyEquipamentoClienteItem()],
     eqClienteEtiqueta: emptyFotoGrupo(),
     eqClienteSgp: emptyFotoGrupo(),
     outrasFotosEqCliente: [],
@@ -546,10 +620,25 @@ function parseNumeroFibra(raw: unknown): number | null {
   return n;
 }
 
+function parseCoordenadas(raw: unknown): CoordenadasPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<CoordenadasPayload>;
+  return {
+    latitude: typeof src.latitude === "string" ? src.latitude : src.latitude != null ? String(src.latitude) : "",
+    longitude:
+      typeof src.longitude === "string" ? src.longitude : src.longitude != null ? String(src.longitude) : "",
+  };
+}
+
 function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
-  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload>;
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload> & {
+    caixaEmendaAcomodacao?: { coordenadas?: unknown };
+  };
   return {
     qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
+    coordenadas: parseCoordenadas(src.coordenadas),
+    caixaEmendaAcomodacao: {
+      coordenadas: parseCoordenadas(src.caixaEmendaAcomodacao?.coordenadas),
+    },
   };
 }
 
@@ -571,6 +660,80 @@ function parseStoredPhoto(raw: unknown): StoredPhoto | null {
   const foto = raw as Partial<StoredPhoto>;
   if (!foto.url && !foto.path) return null;
   return { url: foto.url ?? "", path: foto.path ?? "" };
+}
+
+function parseEquipamentoClienteItem(raw: unknown): EquipamentoClienteItemPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<EquipamentoClienteItemPayload> & {
+    id?: string;
+  };
+  return {
+    id: typeof src.id === "string" && src.id ? src.id : crypto.randomUUID(),
+    tipoEquipamento: typeof src.tipoEquipamento === "string" ? src.tipoEquipamento : "",
+    modelo: typeof src.modelo === "string" ? src.modelo : "",
+    fabricante: typeof src.fabricante === "string" ? src.fabricante : "",
+    sgp: typeof src.sgp === "string" && src.sgp.trim() ? src.sgp : SGP_DEFAULT,
+    identificacao: typeof src.identificacao === "string" ? src.identificacao : "",
+    foto: parseStoredPhoto(src.foto),
+    etiqueta: parseStoredPhoto(src.etiqueta),
+    obs: typeof src.obs === "string" ? src.obs : "",
+    obsAdmin: readObsAdmin(src),
+  };
+}
+
+function parseDgoClienteItem(raw: unknown): DgoClienteItemPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<DgoClienteItemPayload> & {
+    id?: string;
+  };
+  return {
+    id: typeof src.id === "string" && src.id ? src.id : crypto.randomUUID(),
+    tipoEquipamento: typeof src.tipoEquipamento === "string" ? src.tipoEquipamento : "",
+    modelo: typeof src.modelo === "string" ? src.modelo : "",
+    fabricante: typeof src.fabricante === "string" ? src.fabricante : "",
+    sgp: typeof src.sgp === "string" && src.sgp.trim() ? src.sgp : SGP_DEFAULT,
+    foto: parseStoredPhoto(src.foto),
+    etiqueta: parseStoredPhoto(src.etiqueta),
+    obs: typeof src.obs === "string" ? src.obs : "",
+    obsAdmin: readObsAdmin(src),
+  };
+}
+
+/** Migra legado FotoGrupoPayload → lista de itens (1 foto = 1 item). */
+function parseEquipamentoClienteLista(raw: unknown): EquipamentoClienteItemPayload[] {
+  if (Array.isArray(raw)) {
+    const items = raw.map(parseEquipamentoClienteItem);
+    return items.length ? items : [emptyEquipamentoClienteItem()];
+  }
+  if (raw && typeof raw === "object" && Array.isArray((raw as FotoGrupoPayload).fotos)) {
+    const grupo = raw as FotoGrupoPayload;
+    const fotos = grupo.fotos ?? [];
+    if (!fotos.length) return [emptyEquipamentoClienteItem()];
+    return fotos.map((foto, index) => ({
+      ...emptyEquipamentoClienteItem(),
+      foto,
+      obs: index === 0 ? (grupo.obs ?? "") : "",
+      obsAdmin: index === 0 ? readObsAdmin(grupo) : "",
+    }));
+  }
+  return [emptyEquipamentoClienteItem()];
+}
+
+function parseDgoClienteLista(raw: unknown): DgoClienteItemPayload[] {
+  if (Array.isArray(raw)) {
+    const items = raw.map(parseDgoClienteItem);
+    return items.length ? items : [emptyDgoClienteItem()];
+  }
+  if (raw && typeof raw === "object" && Array.isArray((raw as FotoGrupoPayload).fotos)) {
+    const grupo = raw as FotoGrupoPayload;
+    const fotos = grupo.fotos ?? [];
+    if (!fotos.length) return [emptyDgoClienteItem()];
+    return fotos.map((foto, index) => ({
+      ...emptyDgoClienteItem(),
+      foto,
+      obs: index === 0 ? (grupo.obs ?? "") : "",
+      obsAdmin: index === 0 ? readObsAdmin(grupo) : "",
+    }));
+  }
+  return [emptyDgoClienteItem()];
 }
 
 function parseFotosList(raw: unknown): StoredPhoto[] {
@@ -782,8 +945,8 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     eqClienteFachada: parseFotoGrupo(base.eqClienteFachada, src.eqClienteFachada),
     eqClienteAmbiente: parseFotoGrupo(base.eqClienteAmbiente, src.eqClienteAmbiente),
     eqClienteRack: parseFotoGrupo(base.eqClienteRack, src.eqClienteRack),
-    eqClienteDgo: parseFotoGrupo(base.eqClienteDgo, src.eqClienteDgo),
-    eqClienteEquipamentos: parseFotoGrupo(base.eqClienteEquipamentos, src.eqClienteEquipamentos),
+    eqClienteDgo: parseDgoClienteLista(src.eqClienteDgo),
+    eqClienteEquipamentos: parseEquipamentoClienteLista(src.eqClienteEquipamentos),
     eqClienteEtiqueta: parseFotoGrupo(base.eqClienteEtiqueta, src.eqClienteEtiqueta),
     eqClienteSgp: parseFotoGrupo(base.eqClienteSgp, src.eqClienteSgp),
     outrasFotosEqCliente: parseOutrasFotos(src.outrasFotosEqCliente),
@@ -820,8 +983,6 @@ const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
   "eqClienteFachada",
   "eqClienteAmbiente",
   "eqClienteRack",
-  "eqClienteDgo",
-  "eqClienteEquipamentos",
   "eqClienteEtiqueta",
   "eqClienteSgp",
   "eqEstacaoGeral",
@@ -880,6 +1041,41 @@ function mergeCabo(server: CaboMetragemPayload, local: CaboMetragemPayload): Cab
     metragem: local.metragem || server.metragem,
     fotoInicio: local.fotoInicio ?? server.fotoInicio,
     fotoFim: local.fotoFim ?? server.fotoFim,
+    obs: local.obs || server.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeEquipamentoClienteItem(
+  server: EquipamentoClienteItemPayload,
+  local: EquipamentoClienteItemPayload,
+): EquipamentoClienteItemPayload {
+  return {
+    ...server,
+    tipoEquipamento: local.tipoEquipamento || server.tipoEquipamento,
+    modelo: local.modelo || server.modelo,
+    fabricante: local.fabricante || server.fabricante,
+    sgp: local.sgp || server.sgp || SGP_DEFAULT,
+    identificacao: local.identificacao || server.identificacao,
+    foto: local.foto ?? server.foto,
+    etiqueta: local.etiqueta ?? server.etiqueta,
+    obs: local.obs || server.obs,
+    obsAdmin: local.obsAdmin || server.obsAdmin,
+  };
+}
+
+function mergeDgoClienteItem(
+  server: DgoClienteItemPayload,
+  local: DgoClienteItemPayload,
+): DgoClienteItemPayload {
+  return {
+    ...server,
+    tipoEquipamento: local.tipoEquipamento || server.tipoEquipamento,
+    modelo: local.modelo || server.modelo,
+    fabricante: local.fabricante || server.fabricante,
+    sgp: local.sgp || server.sgp || SGP_DEFAULT,
+    foto: local.foto ?? server.foto,
+    etiqueta: local.etiqueta ?? server.etiqueta,
     obs: local.obs || server.obs,
     obsAdmin: local.obsAdmin || server.obsAdmin,
   };
@@ -999,6 +1195,18 @@ function campoOuServidor(local: string, server: string): string {
   return local;
 }
 
+function mergeCoordenadas(
+  server: CoordenadasPayload | undefined,
+  local: CoordenadasPayload | undefined,
+): CoordenadasPayload {
+  const fromServer = server ?? emptyCoordenadas();
+  const fromLocal = local ?? emptyCoordenadas();
+  return {
+    latitude: campoOuServidor(fromLocal.latitude, fromServer.latitude),
+    longitude: campoOuServidor(fromLocal.longitude, fromServer.longitude),
+  };
+}
+
 function mergeQuantidadesRede(
   server: QuantidadesRedePayload | undefined,
   local: QuantidadesRedePayload | undefined,
@@ -1010,6 +1218,13 @@ function mergeQuantidadesRede(
       fromLocal.qtdCaixasEmenda === undefined
         ? fromServer.qtdCaixasEmenda
         : fromLocal.qtdCaixasEmenda,
+    coordenadas: mergeCoordenadas(fromServer.coordenadas, fromLocal.coordenadas),
+    caixaEmendaAcomodacao: {
+      coordenadas: mergeCoordenadas(
+        fromServer.caixaEmendaAcomodacao?.coordenadas,
+        fromLocal.caixaEmendaAcomodacao?.coordenadas,
+      ),
+    },
   };
 }
 
@@ -1048,6 +1263,12 @@ export function mergeRelatorioPayload(
     estacaoEntregaAcesso: fromLocal.estacaoEntregaAcesso || fromServer.estacaoEntregaAcesso,
     metragensCabo: mergeById(fromServer.metragensCabo, fromLocal.metragensCabo, mergeCabo),
     metragensCaboRc: mergeById(fromServer.metragensCaboRc, fromLocal.metragensCaboRc, mergeCabo),
+    eqClienteDgo: mergeById(fromServer.eqClienteDgo, fromLocal.eqClienteDgo, mergeDgoClienteItem),
+    eqClienteEquipamentos: mergeById(
+      fromServer.eqClienteEquipamentos,
+      fromLocal.eqClienteEquipamentos,
+      mergeEquipamentoClienteItem,
+    ),
     outrasFotos: mergeById(fromServer.outrasFotos, fromLocal.outrasFotos, mergeOutra),
     outrasFotosRc: mergeById(fromServer.outrasFotosRc, fromLocal.outrasFotosRc, mergeOutra),
     redeAcesso: mergeQuantidadesRede(fromServer.redeAcesso, fromLocal.redeAcesso),
@@ -1699,6 +1920,8 @@ export async function excluirRelatorioTransmissao(id: string): Promise<void> {
 
 export type RelatorioFotoCategoria =
   | RelatorioFotoGrupoKey
+  | "eqClienteDgo"
+  | "eqClienteEquipamentos"
   | "metragensCabo"
   | "outrasFotos"
   | "metragensCaboRc"
@@ -1720,6 +1943,26 @@ export function appendStoredPhotoToPayload(
     else if (!last.fotoFim) last.fotoFim = stored;
     else list.push({ ...emptyCaboMetragem(), fotoInicio: stored });
     return { ...payload, [categoria]: list };
+  }
+  if (categoria === "eqClienteEquipamentos") {
+    const list = payload.eqClienteEquipamentos.length
+      ? payload.eqClienteEquipamentos.map((item) => ({ ...item }))
+      : [emptyEquipamentoClienteItem()];
+    const last = list[list.length - 1];
+    if (!last.foto) last.foto = stored;
+    else if (!last.etiqueta) last.etiqueta = stored;
+    else list.push({ ...emptyEquipamentoClienteItem(), foto: stored });
+    return { ...payload, eqClienteEquipamentos: list };
+  }
+  if (categoria === "eqClienteDgo") {
+    const list = payload.eqClienteDgo.length
+      ? payload.eqClienteDgo.map((item) => ({ ...item }))
+      : [emptyDgoClienteItem()];
+    const last = list[list.length - 1];
+    if (!last.foto) last.foto = stored;
+    else if (!last.etiqueta) last.etiqueta = stored;
+    else list.push({ ...emptyDgoClienteItem(), foto: stored });
+    return { ...payload, eqClienteDgo: list };
   }
   if (
     categoria === "outrasFotos" ||

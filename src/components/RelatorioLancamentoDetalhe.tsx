@@ -9,7 +9,16 @@ import {
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
-import { ABAS_CAMPO, ABAS_CAMPO_IMPLANTACAO, CampoQuantidade, ChoiceButton, RefTituloInput, type AbaCampo } from "@/components/RelatorioRedeAcesso";
+import {
+  ABAS_CAMPO,
+  ABAS_CAMPO_IMPLANTACAO,
+  CampoCoordenadas,
+  CampoQuantidade,
+  ChoiceButton,
+  RefTituloInput,
+  inputClass,
+  type AbaCampo,
+} from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
@@ -17,6 +26,9 @@ import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
   emptyCaboMetragem,
+  emptyCoordenadas,
+  emptyDgoClienteItem,
+  emptyEquipamentoClienteItem,
   emptyQuantidadesRede,
   emptyTesteOptico,
   emptyTestePotencia,
@@ -25,6 +37,8 @@ import {
   removeExtraById,
   removeFotoGrupoAt,
   type CaboMetragemPayload,
+  type DgoClienteItemPayload,
+  type EquipamentoClienteItemPayload,
   type RelatorioFotoCategoria,
   type RelatorioFotoGrupoKey,
   type RelatorioPayload,
@@ -297,6 +311,9 @@ function EvidenciaBloco({
   quantidadeLabel,
   quantidadePlaceholder,
   onQuantidadeChange,
+  coordenadas,
+  coordenadasTitle,
+  onCoordenadasChange,
 }: {
   title: string;
   obs?: string | null;
@@ -317,6 +334,9 @@ function EvidenciaBloco({
   quantidadeLabel?: string;
   quantidadePlaceholder?: string;
   onQuantidadeChange?: (value: number | null) => void;
+  coordenadas?: { latitude: string; longitude: string };
+  coordenadasTitle?: string;
+  onCoordenadasChange?: (next: { latitude: string; longitude: string }) => void;
 }) {
   if (
     !fotos.length &&
@@ -326,7 +346,8 @@ function EvidenciaBloco({
     !canEdit &&
     !onObsChange &&
     !onTitleChange &&
-    quantidadeLabel == null
+    quantidadeLabel == null &&
+    !coordenadas
   ) {
     return null;
   }
@@ -357,6 +378,17 @@ function EvidenciaBloco({
           onChange={onQuantidadeChange}
           disabled={!onQuantidadeChange}
         />
+      ) : null}
+      {coordenadas ? (
+        <div className="mt-3">
+          <CampoCoordenadas
+            title={coordenadasTitle ?? "Coordenadas"}
+            value={coordenadas}
+            onChange={onCoordenadasChange}
+            disabled={!onCoordenadasChange}
+            embedded
+          />
+        </div>
       ) : null}
       <div className="mt-3 flex-1">
         {caboFotos ? (
@@ -479,6 +511,171 @@ function LancamentoCabosControle({
   );
 }
 
+function AdminListaEquipamentos({
+  titulo,
+  addLabel,
+  showIdentificacao,
+  itens,
+  canEdit,
+  onPatchList,
+  emptyItem,
+  onUploadPhoto,
+}: {
+  titulo: string;
+  addLabel: string;
+  showIdentificacao: boolean;
+  itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[];
+  canEdit: boolean;
+  onPatchList: (next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[]) => void;
+  emptyItem: () => EquipamentoClienteItemPayload | DgoClienteItemPayload;
+  onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
+}) {
+  const [fallback] = useState(() => emptyItem());
+  const list = itens.length ? itens : [fallback];
+
+  const patchItem = (
+    id: string,
+    patch: Partial<EquipamentoClienteItemPayload & DgoClienteItemPayload>,
+  ) => {
+    onPatchList(list.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  const setFoto = async (id: string, campo: "foto" | "etiqueta", file: EvidencePhotoRef | null) => {
+    if (!canEdit) return;
+    if (!file) {
+      const current = list.find((row) => row.id === id);
+      void deleteRelatorioPhoto(current?.[campo]?.path);
+      patchItem(id, { [campo]: null });
+      return;
+    }
+    if (!onUploadPhoto) return;
+    const current = list.find((row) => row.id === id);
+    const stored = await onUploadPhoto(file);
+    void deleteRelatorioPhoto(current?.[campo]?.path);
+    patchItem(id, { [campo]: stored });
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-sm font-semibold text-gray-900">{titulo}</h4>
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+        {list.map((item, index) => (
+          <div
+            key={item.id}
+            className="flex h-full flex-col gap-3 rounded-xl border border-border/80 bg-muted/20 p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h5 className="text-sm font-semibold text-gray-900">
+                {showIdentificacao ? "Equipamento" : "DGO/Roseta"} {index + 1}
+              </h5>
+              {canEdit && index >= 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void deleteRelatorioPhoto(item.foto?.path);
+                    void deleteRelatorioPhoto(item.etiqueta?.path);
+                    onPatchList(removeExtraById(list, item.id));
+                  }}
+                  className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                  aria-label="Excluir item"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {(
+                [
+                  ["Tipo equipamento", "tipoEquipamento"],
+                  ["Modelo", "modelo"],
+                  ["Fabricante", "fabricante"],
+                  ["SGP", "sgp"],
+                  ...(showIdentificacao
+                    ? ([["Identificação", "identificacao"]] as const)
+                    : []),
+                ] as const
+              ).map(([label, key]) => (
+                <div key={key}>
+                  <p className="text-xs text-gray-500">{label}</p>
+                  <input
+                    type="text"
+                    value={
+                      key === "identificacao"
+                        ? "identificacao" in item
+                          ? item.identificacao
+                          : ""
+                        : item[key]
+                    }
+                    disabled={!canEdit}
+                    onChange={(e) => patchItem(item.id, { [key]: e.target.value })}
+                    className={inputClass()}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ["Foto do equipamento", "foto"],
+                  ["Etiqueta de Identificação", "etiqueta"],
+                ] as const
+              ).map(([label, campo]) => {
+                const foto = item[campo];
+                return (
+                  <div key={campo}>
+                    <FotoLabel>{label}</FotoLabel>
+                    {foto ? (
+                      <RelatorioFotoComControles
+                        src={foto.url}
+                        alt={label}
+                        canEdit={canEdit}
+                        onDelete={canEdit ? () => void setFoto(item.id, campo, null) : undefined}
+                        onReplace={
+                          canEdit ? (file) => void setFoto(item.id, campo, file) : undefined
+                        }
+                      />
+                    ) : canEdit ? (
+                      <PhotoUpload
+                        label={label}
+                        value={null}
+                        onChange={(file) => void setFoto(item.id, campo, file)}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sem foto</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">OBS</p>
+              <textarea
+                value={item.obs}
+                disabled={!canEdit}
+                rows={2}
+                onChange={(e) => patchItem(item.id, { obs: e.target.value })}
+                className={inputClass()}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={() => onPatchList([...list, emptyItem()])}
+          className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+        >
+          <Plus className="h-4 w-4" /> {addLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function RelatorioDetalhe({
   row,
   canEditPhotos,
@@ -496,7 +693,14 @@ export function RelatorioDetalhe({
   onReplacePhoto?: (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
-    meta: { index?: number; caboId?: string; campo?: "fotoInicio" | "fotoFim"; outraId?: string },
+    meta: {
+      index?: number;
+      caboId?: string;
+      campo?: "fotoInicio" | "fotoFim";
+      outraId?: string;
+      itemId?: string;
+      campoItem?: "foto" | "etiqueta";
+    },
   ) => void;
   uploadingCategoria: RelatorioFotoCategoria | null;
   onUpdatePayload?: (payload: RelatorioPayload) => void;
@@ -543,7 +747,10 @@ export function RelatorioDetalhe({
     if (categoria === "outrasFotosRc") return payload?.outrasFotosRc.length ?? 0;
     if (categoria === "outrasFotosEqCliente") return payload?.outrasFotosEqCliente.length ?? 0;
     if (categoria === "outrasFotosEqEstacao") return payload?.outrasFotosEqEstacao.length ?? 0;
-    return payload?.[categoria].fotos.length ?? 0;
+    if (categoria === "eqClienteDgo") return payload?.eqClienteDgo.length ?? 0;
+    if (categoria === "eqClienteEquipamentos") return payload?.eqClienteEquipamentos.length ?? 0;
+    const grupo = payload?.[categoria as RelatorioFotoGrupoKey];
+    return grupo && "fotos" in grupo ? grupo.fotos.length : 0;
   };
   const blocoProps = (categoria: RelatorioFotoCategoria) => ({
     canEdit: canEditPhotos,
@@ -581,6 +788,7 @@ export function RelatorioDetalhe({
 
   const renderGrupo = (title: string, key: RelatorioFotoGrupoKey) => {
     const grupo = payload?.[key];
+    const redeCliente = payload?.redeCliente ?? emptyQuantidadesRede();
     const qtd =
       payload && (isEmpresarial || isImplantacao) && key === "caixaEmenda"
         ? {
@@ -593,11 +801,25 @@ export function RelatorioDetalhe({
           }
         : payload && isEmpresarial && key === "rcCaixaEmenda"
           ? {
-              quantidade: payload.redeCliente?.qtdCaixasEmenda ?? null,
+              quantidade: redeCliente.qtdCaixasEmenda ?? null,
               quantidadeLabel: "Quantidade de Caixas de Emenda",
               quantidadePlaceholder: "Ex: 1",
               onQuantidadeChange: canEditPhotos
                 ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeCliente", qtdCaixasEmenda)
+                : undefined,
+              coordenadas: redeCliente.caixaEmendaAcomodacao?.coordenadas ?? emptyCoordenadas(),
+              coordenadasTitle: "Coordenadas da Caixa de Emenda",
+              onCoordenadasChange: canEditPhotos
+                ? (coordenadas: { latitude: string; longitude: string }) => {
+                    if (!payload) return;
+                    patchPayload({
+                      ...payload,
+                      redeCliente: {
+                        ...redeCliente,
+                        caixaEmendaAcomodacao: { coordenadas },
+                      },
+                    });
+                  }
                 : undefined,
             }
           : {};
@@ -976,8 +1198,41 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "RC" ? (
         <div className="space-y-6">
+          <CampoCoordenadas
+            title="Coordenadas do Cliente"
+            value={payload?.redeCliente?.coordenadas ?? emptyCoordenadas()}
+            onChange={
+              canEditPhotos
+                ? (coordenadas) => {
+                    if (!payload) return;
+                    const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                    patchPayload({
+                      ...payload,
+                      redeCliente: { ...redeCliente, coordenadas },
+                    });
+                  }
+                : undefined
+            }
+            disabled={!canEditPhotos}
+          />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <MetaField label="Tecnologia de Acesso" value={payload?.tecnologiaAcesso || "—"} />
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="admin-tecnologia-acesso" className="block text-sm text-gray-500">
+                Tecnologia de Acesso
+              </label>
+              <input
+                id="admin-tecnologia-acesso"
+                type="text"
+                value={payload?.tecnologiaAcesso ?? ""}
+                placeholder="Ex: GPON, Metro Ethernet"
+                disabled={!canEditPhotos}
+                onChange={(e) => {
+                  if (!payload || !canEditPhotos) return;
+                  patchPayload({ ...payload, tecnologiaAcesso: e.target.value });
+                }}
+                className={inputClass()}
+              />
+            </div>
             <div className="sm:col-span-2 lg:col-span-2">
               <LancamentoCabosControle
                 label="Lançamento cabos (RC)"
@@ -1056,12 +1311,43 @@ export function RelatorioDetalhe({
                   ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
                   ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
                   ["(Rack ou Local)", "eqClienteRack"],
-                  ["DGO /DID; Roseta ou Pach panel", "eqClienteDgo"],
-                  ["Equipamentos (No Cliente)", "eqClienteEquipamentos"],
-                  ["Etiqueta de Identificação", "eqClienteEtiqueta"],
-                  ["Identificação SGP no Cliente", "eqClienteSgp"],
                 ] as const
               ).map(([title, key]) => renderGrupo(title, key))}
+            </div>
+
+            <AdminListaEquipamentos
+              titulo="DGO /DID; Roseta ou Pach panel"
+              addLabel="Adicionar mais DGO/Roseta/Patch Panel"
+              showIdentificacao={false}
+              itens={payload?.eqClienteDgo ?? []}
+              canEdit={canEditPhotos}
+              onUploadPhoto={onUploadPhoto}
+              onPatchList={(next) => {
+                if (!payload) return;
+                patchPayload({ ...payload, eqClienteDgo: next as DgoClienteItemPayload[] });
+              }}
+              emptyItem={emptyDgoClienteItem}
+            />
+
+            <AdminListaEquipamentos
+              titulo="Equipamentos (No Cliente)"
+              addLabel="Adicionar mais Equipamento"
+              showIdentificacao
+              itens={payload?.eqClienteEquipamentos ?? []}
+              canEdit={canEditPhotos}
+              onUploadPhoto={onUploadPhoto}
+              onPatchList={(next) => {
+                if (!payload) return;
+                patchPayload({
+                  ...payload,
+                  eqClienteEquipamentos: next as EquipamentoClienteItemPayload[],
+                });
+              }}
+              emptyItem={emptyEquipamentoClienteItem}
+            />
+
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+              {renderGrupo("Identificação SGP no Cliente", "eqClienteSgp")}
             </div>
             {renderOutrasSecao("outrasFotosEqCliente", "Outras fotos")}
           </section>

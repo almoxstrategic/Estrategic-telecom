@@ -190,7 +190,14 @@ function AdminLancamentoDetalhePage() {
   const onAdminReplacePhoto = async (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
-    meta: { index?: number; caboId?: string; campo?: "fotoInicio" | "fotoFim"; outraId?: string },
+    meta: {
+      index?: number;
+      caboId?: string;
+      campo?: "fotoInicio" | "fotoFim";
+      outraId?: string;
+      itemId?: string;
+      campoItem?: "foto" | "etiqueta";
+    },
   ) => {
     if (!row || !user?.id) return;
     setUploadingCategoria(categoria);
@@ -222,8 +229,28 @@ function AdminLancamentoDetalhePage() {
             return { ...item, foto: stored };
           }),
         };
+      } else if (categoria === "eqClienteDgo" || categoria === "eqClienteEquipamentos") {
+        nextPayload = {
+          ...row.payload,
+          [categoria]: row.payload[categoria].map((item) => {
+            if (item.id !== meta.itemId) return item;
+            if (meta.campoItem === "foto") oldPath = item.foto?.path;
+            if (meta.campoItem === "etiqueta") oldPath = item.etiqueta?.path;
+            return meta.campoItem ? { ...item, [meta.campoItem]: stored } : item;
+          }),
+        };
       } else if (typeof meta.index === "number") {
-        const grupo = row.payload[categoria];
+        const grupo = row.payload[categoria as Exclude<
+          RelatorioFotoCategoria,
+          | "metragensCabo"
+          | "metragensCaboRc"
+          | "outrasFotos"
+          | "outrasFotosRc"
+          | "outrasFotosEqCliente"
+          | "outrasFotosEqEstacao"
+          | "eqClienteDgo"
+          | "eqClienteEquipamentos"
+        >];
         oldPath = grupo.fotos[meta.index]?.path;
         nextPayload = {
           ...row.payload,

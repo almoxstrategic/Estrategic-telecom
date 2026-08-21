@@ -12,12 +12,13 @@ import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePote
 import { RelatorioSyncStatus } from "@/components/RelatorioSyncStatus";
 import {
   RelatorioAbasCampo,
+  inputClass,
   RelatorioRedeAcesso,
   TipoExecucaoPicker,
   ABAS_CAMPO,
   ABAS_CAMPO_IMPLANTACAO,
   emptyOutraFoto,
-  inputClass,
+  CampoCoordenadas,
   type AbaCampo,
   type OutraFotoState,
 } from "@/components/RelatorioRedeAcesso";
@@ -29,10 +30,14 @@ import type { EvidencePhotoRef } from "@/lib/types";
 import {
   avisarConclusaoRelatorio,
   emptyCaboMetragem,
+  emptyCoordenadas,
+  emptyDgoClienteItem,
+  emptyEquipamentoClienteItem,
   emptyQuantidadesRede,
   emptyRelatorioPayload,
   emptyTesteOptico,
   emptyTestePotencia,
+  deleteRelatorioPhoto,
   fetchRelatorioTransmissaoById,
   isTecnicoAtribuido,
   janelaPotenciaDerivada,
@@ -43,6 +48,8 @@ import {
   subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   type CaboMetragemPayload,
+  type DgoClienteItemPayload,
+  type EquipamentoClienteItemPayload,
   type RelatorioFotoGrupoKey,
   type RelatorioFotoGrupoKeyEq,
   type RelatorioPayload,
@@ -144,8 +151,6 @@ const EQ_GRUPO_KEYS: RelatorioFotoGrupoKeyEq[] = [
   "eqClienteFachada",
   "eqClienteAmbiente",
   "eqClienteRack",
-  "eqClienteDgo",
-  "eqClienteEquipamentos",
   "eqClienteEtiqueta",
   "eqClienteSgp",
   "eqEstacaoGeral",
@@ -160,8 +165,6 @@ function emptyEqGrupos(): Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi> {
     eqClienteFachada: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqClienteAmbiente: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqClienteRack: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
-    eqClienteDgo: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
-    eqClienteEquipamentos: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqClienteEtiqueta: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqClienteSgp: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqEstacaoGeral: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
@@ -247,6 +250,12 @@ function RelatorioPage() {
   const [rcEntradaExternaObs, setRcEntradaExternaObs] = useState("");
   const [outrasRc, setOutrasRc] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [eqGrupos, setEqGrupos] = useState<Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi>>(emptyEqGrupos);
+  const [eqClienteDgoItens, setEqClienteDgoItens] = useState<DgoClienteItemPayload[]>(() => [
+    emptyDgoClienteItem(),
+  ]);
+  const [eqClienteEquipamentosItens, setEqClienteEquipamentosItens] = useState<
+    EquipamentoClienteItemPayload[]
+  >(() => [emptyEquipamentoClienteItem()]);
   const [outrasEqCliente, setOutrasEqCliente] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [relatorioEstacao, setRelatorioEstacao] = useState<"sim" | "nao">("nao");
   const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
@@ -332,16 +341,8 @@ function RelatorioPage() {
         eqGrupos.eqClienteRack.obs,
         eqGrupos.eqClienteRack.obsAdmin,
       ),
-      eqClienteDgo: grupoPayload(
-        eqGrupos.eqClienteDgo.slots,
-        eqGrupos.eqClienteDgo.obs,
-        eqGrupos.eqClienteDgo.obsAdmin,
-      ),
-      eqClienteEquipamentos: grupoPayload(
-        eqGrupos.eqClienteEquipamentos.slots,
-        eqGrupos.eqClienteEquipamentos.obs,
-        eqGrupos.eqClienteEquipamentos.obsAdmin,
-      ),
+      eqClienteDgo: eqClienteDgoItens,
+      eqClienteEquipamentos: eqClienteEquipamentosItens,
       eqClienteEtiqueta: grupoPayload(
         eqGrupos.eqClienteEtiqueta.slots,
         eqGrupos.eqClienteEtiqueta.obs,
@@ -428,6 +429,8 @@ function RelatorioPage() {
     outrasRc,
     redeCliente,
     eqGrupos,
+    eqClienteDgoItens,
+    eqClienteEquipamentosItens,
     outrasEqCliente,
     relatorioEstacao,
     estacaoEntregaAcesso,
@@ -533,6 +536,8 @@ function RelatorioPage() {
       outrasRc,
       redeCliente,
       eqGrupos,
+      eqClienteDgoItens,
+      eqClienteEquipamentosItens,
       outrasEqCliente,
       relatorioEstacao,
       estacaoEntregaAcesso,
@@ -620,8 +625,23 @@ function RelatorioPage() {
     setRcEntradaExterna(slotsFromStored(p.rcEntradaExterna?.fotos ?? [], 1));
     setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
     setOutrasRc(outrasFromPayload(p.outrasFotosRc));
-    setRedeCliente(p.redeCliente ?? emptyQuantidadesRede());
+    setRedeCliente({
+      ...emptyQuantidadesRede(),
+      ...(p.redeCliente ?? {}),
+      coordenadas: p.redeCliente?.coordenadas ?? emptyCoordenadas(),
+      caixaEmendaAcomodacao: {
+        coordenadas: p.redeCliente?.caixaEmendaAcomodacao?.coordenadas ?? emptyCoordenadas(),
+      },
+    });
     setEqGrupos(eqGruposFromPayload(p));
+    setEqClienteDgoItens(
+      p.eqClienteDgo?.length ? p.eqClienteDgo : [emptyDgoClienteItem()],
+    );
+    setEqClienteEquipamentosItens(
+      p.eqClienteEquipamentos?.length
+        ? p.eqClienteEquipamentos
+        : [emptyEquipamentoClienteItem()],
+    );
     setOutrasEqCliente(outrasFromPayload(p.outrasFotosEqCliente));
     setRelatorioEstacao(p.relatorioEstacao === true ? "sim" : "nao");
     setEstacaoEntregaAcesso(p.estacaoEntregaAcesso ?? "");
@@ -807,6 +827,39 @@ function RelatorioPage() {
     });
   };
 
+  const handleEqItemPhoto = (
+    setter: React.Dispatch<
+      React.SetStateAction<EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]>
+    >,
+    payloadKey: "eqClienteEquipamentos" | "eqClienteDgo",
+    itemId: string,
+    campo: "foto" | "etiqueta",
+    file: EvidencePhotoRef | null,
+  ) => {
+    if (!file) {
+      let next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[] = [];
+      setter((prev) => {
+        next = prev.map((item) => {
+          if (item.id !== itemId) return item;
+          const old = item[campo];
+          void deleteRelatorioPhoto(old?.path);
+          return { ...item, [campo]: null };
+        });
+        return next as typeof prev;
+      });
+      void persistDraft({ ...buildPayload(), [payloadKey]: next });
+      return;
+    }
+    void uploadFotoImediato(file, `${payloadKey}-${campo}-${itemId.slice(0, 8)}`, (stored) => {
+      let next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[] = [];
+      setter((prev) => {
+        next = prev.map((item) => (item.id === itemId ? { ...item, [campo]: stored } : item));
+        return next as typeof prev;
+      });
+      return { ...buildPayload(), [payloadKey]: next };
+    });
+  };
+
   const patchCabo = (
     setter: React.Dispatch<React.SetStateAction<CaboMetragemPayload[]>>,
     caboId: string,
@@ -862,8 +915,6 @@ function RelatorioPage() {
     eqClienteFachada: setEqGrupoSlots("eqClienteFachada"),
     eqClienteAmbiente: setEqGrupoSlots("eqClienteAmbiente"),
     eqClienteRack: setEqGrupoSlots("eqClienteRack"),
-    eqClienteDgo: setEqGrupoSlots("eqClienteDgo"),
-    eqClienteEquipamentos: setEqGrupoSlots("eqClienteEquipamentos"),
     eqClienteEtiqueta: setEqGrupoSlots("eqClienteEtiqueta"),
     eqClienteSgp: setEqGrupoSlots("eqClienteSgp"),
     eqEstacaoGeral: setEqGrupoSlots("eqEstacaoGeral"),
@@ -1185,22 +1236,32 @@ function RelatorioPage() {
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
                   header={
-                    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-                      <label
-                        htmlFor="tecnologia-acesso"
-                        className="mb-1.5 block text-sm font-semibold"
-                      >
-                        Tecnologia de Acesso
-                      </label>
-                      <input
-                        id="tecnologia-acesso"
-                        type="text"
-                        value={tecnologiaAcesso}
-                        onChange={(e) => setTecnologiaAcesso(e.target.value)}
-                        placeholder="Ex: GPON, Metro Ethernet"
+                    <div className="space-y-3">
+                      <CampoCoordenadas
+                        title="Coordenadas do Cliente"
+                        value={redeCliente.coordenadas}
+                        onChange={(coordenadas) =>
+                          setRedeCliente((prev) => ({ ...prev, coordenadas }))
+                        }
                         disabled={readOnly}
-                        className={inputClass()}
                       />
+                      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <label
+                          htmlFor="tecnologia-acesso"
+                          className="mb-1.5 block text-sm font-semibold"
+                        >
+                          Tecnologia de Acesso
+                        </label>
+                        <input
+                          id="tecnologia-acesso"
+                          type="text"
+                          value={tecnologiaAcesso}
+                          onChange={(e) => setTecnologiaAcesso(e.target.value)}
+                          placeholder="Ex: GPON, Metro Ethernet"
+                          disabled={readOnly}
+                          className={inputClass()}
+                        />
+                      </div>
                     </div>
                   }
                   lancamentoTitle="Lançamento cabos (RC)?"
@@ -1244,6 +1305,13 @@ function RelatorioPage() {
                       quantidadePlaceholder: "Ex: 1",
                       onQuantidadeChange: (qtdCaixasEmenda) =>
                         setRedeCliente((prev) => ({ ...prev, qtdCaixasEmenda })),
+                      coordenadas: redeCliente.caixaEmendaAcomodacao.coordenadas,
+                      coordenadasTitle: "Coordenadas da Caixa de Emenda",
+                      onCoordenadasChange: (coordenadas) =>
+                        setRedeCliente((prev) => ({
+                          ...prev,
+                          caixaEmendaAcomodacao: { coordenadas },
+                        })),
                     },
                     {
                       grupoKey: "rcTerminacaoCabo",
@@ -1331,36 +1399,6 @@ function RelatorioPage() {
                       onObsAdminChange: setEqGrupoObsAdmin("eqClienteRack"),
                     },
                     {
-                      grupoKey: "eqClienteDgo",
-                      title: "DGO /DID; Roseta ou Pach panel",
-                      slots: eqGrupos.eqClienteDgo.slots,
-                      onChange: setEqGrupoSlots("eqClienteDgo"),
-                      obs: eqGrupos.eqClienteDgo.obs,
-                      onObsChange: setEqGrupoObs("eqClienteDgo"),
-                      obsAdmin: eqGrupos.eqClienteDgo.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteDgo"),
-                    },
-                    {
-                      grupoKey: "eqClienteEquipamentos",
-                      title: "Equipamentos (No Cliente)",
-                      slots: eqGrupos.eqClienteEquipamentos.slots,
-                      onChange: setEqGrupoSlots("eqClienteEquipamentos"),
-                      obs: eqGrupos.eqClienteEquipamentos.obs,
-                      onObsChange: setEqGrupoObs("eqClienteEquipamentos"),
-                      obsAdmin: eqGrupos.eqClienteEquipamentos.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteEquipamentos"),
-                    },
-                    {
-                      grupoKey: "eqClienteEtiqueta",
-                      title: "Etiqueta de Identificação",
-                      slots: eqGrupos.eqClienteEtiqueta.slots,
-                      onChange: setEqGrupoSlots("eqClienteEtiqueta"),
-                      obs: eqGrupos.eqClienteEtiqueta.obs,
-                      onObsChange: setEqGrupoObs("eqClienteEtiqueta"),
-                      obsAdmin: eqGrupos.eqClienteEtiqueta.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteEtiqueta"),
-                    },
-                    {
                       grupoKey: "eqClienteSgp",
                       title: "Identificação SGP no Cliente",
                       slots: eqGrupos.eqClienteSgp.slots,
@@ -1371,6 +1409,36 @@ function RelatorioPage() {
                       onObsAdminChange: setEqGrupoObsAdmin("eqClienteSgp"),
                     },
                   ]}
+                  dgosCliente={eqClienteDgoItens}
+                  onDgosClienteChange={setEqClienteDgoItens}
+                  onDgoClientePhoto={(itemId, campo, file) =>
+                    handleEqItemPhoto(
+                      setEqClienteDgoItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqClienteDgo",
+                      itemId,
+                      campo,
+                      file,
+                    )
+                  }
+                  equipamentosCliente={eqClienteEquipamentosItens}
+                  onEquipamentosClienteChange={setEqClienteEquipamentosItens}
+                  onEquipamentoClientePhoto={(itemId, campo, file) =>
+                    handleEqItemPhoto(
+                      setEqClienteEquipamentosItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqClienteEquipamentos",
+                      itemId,
+                      campo,
+                      file,
+                    )
+                  }
                   outrasCliente={outrasEqCliente}
                   onOutrasClienteChange={setOutrasEqCliente}
                   onOutraClientePhoto={(itemId, file) =>

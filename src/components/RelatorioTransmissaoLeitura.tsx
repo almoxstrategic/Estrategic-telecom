@@ -202,21 +202,37 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.eqClienteRack.obs}
         fotos={payload?.eqClienteRack.fotos ?? []}
       />
-      <Secao
-        titulo="DGO /DID; Roseta ou Pach panel"
-        obs={payload?.eqClienteDgo.obs}
-        fotos={payload?.eqClienteDgo.fotos ?? []}
-      />
-      <Secao
-        titulo="Equipamentos (No Cliente)"
-        obs={payload?.eqClienteEquipamentos.obs}
-        fotos={payload?.eqClienteEquipamentos.fotos ?? []}
-      />
-      <Secao
-        titulo="Etiqueta de Identificação"
-        obs={payload?.eqClienteEtiqueta.obs}
-        fotos={payload?.eqClienteEtiqueta.fotos ?? []}
-      />
+      {(payload?.eqClienteDgo ?? []).map((item, index) => (
+        <Secao
+          key={item.id}
+          titulo={`DGO/Roseta ${index + 1}${item.tipoEquipamento ? ` — ${item.tipoEquipamento}` : ""}`}
+          obs={[
+            item.modelo && `Modelo: ${item.modelo}`,
+            item.fabricante && `Fabricante: ${item.fabricante}`,
+            item.sgp && `SGP: ${item.sgp}`,
+            item.obs,
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          fotos={[item.foto, item.etiqueta].filter((f): f is NonNullable<typeof f> => Boolean(f))}
+        />
+      ))}
+      {(payload?.eqClienteEquipamentos ?? []).map((item, index) => (
+        <Secao
+          key={item.id}
+          titulo={`Equipamento ${index + 1}${item.tipoEquipamento ? ` — ${item.tipoEquipamento}` : ""}`}
+          obs={[
+            item.modelo && `Modelo: ${item.modelo}`,
+            item.fabricante && `Fabricante: ${item.fabricante}`,
+            item.sgp && `SGP: ${item.sgp}`,
+            item.identificacao && `Identificação: ${item.identificacao}`,
+            item.obs,
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          fotos={[item.foto, item.etiqueta].filter((f): f is NonNullable<typeof f> => Boolean(f))}
+        />
+      ))}
       <Secao
         titulo="Identificação SGP no Cliente"
         obs={payload?.eqClienteSgp.obs}

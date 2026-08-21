@@ -208,6 +208,65 @@ export function RelatorioAbaFixa({ label }: { label: string }) {
   );
 }
 
+export function CampoCoordenadas({
+  title = "Coordenadas",
+  value,
+  onChange,
+  disabled = false,
+  embedded = false,
+}: {
+  title?: string;
+  value: { latitude: string; longitude: string };
+  onChange?: (next: { latitude: string; longitude: string }) => void;
+  disabled?: boolean;
+  /** Sem card externo (quando já está dentro de outro bloco). */
+  embedded?: boolean;
+}) {
+  const idLat = useId();
+  const idLng = useId();
+  const body = (
+    <>
+      <h3 className="text-sm font-bold">{title}</h3>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor={idLat} className="mb-1.5 block text-sm font-semibold">
+            Latitude (Y)
+          </label>
+          <input
+            id={idLat}
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex: -23.550520"
+            value={value.latitude}
+            disabled={disabled || !onChange}
+            onChange={(e) => onChange?.({ ...value, latitude: e.target.value })}
+            className={inputClass()}
+          />
+        </div>
+        <div>
+          <label htmlFor={idLng} className="mb-1.5 block text-sm font-semibold">
+            Longitude (X)
+          </label>
+          <input
+            id={idLng}
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex: -46.633308"
+            value={value.longitude}
+            disabled={disabled || !onChange}
+            onChange={(e) => onChange?.({ ...value, longitude: e.target.value })}
+            className={inputClass()}
+          />
+        </div>
+      </div>
+    </>
+  );
+  if (embedded) return <div className="space-y-3">{body}</div>;
+  return (
+    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">{body}</div>
+  );
+}
+
 export type GrupoFotoCampo = {
   title: string;
   hint?: string;
@@ -223,6 +282,9 @@ export type GrupoFotoCampo = {
   quantidadeLabel?: string;
   quantidadePlaceholder?: string;
   onQuantidadeChange?: (value: number | null) => void;
+  coordenadas?: { latitude: string; longitude: string };
+  coordenadasTitle?: string;
+  onCoordenadasChange?: (next: { latitude: string; longitude: string }) => void;
 };
 
 export function CampoQuantidade({
@@ -482,14 +544,27 @@ export function RelatorioRedeAcesso({
             title={grupo.title}
             hint={grupo.hint}
             headerExtra={
-              grupo.quantidadeLabel ? (
-                <CampoQuantidade
-                  label={grupo.quantidadeLabel}
-                  placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
-                  value={grupo.quantidade ?? null}
-                  onChange={grupo.onQuantidadeChange}
-                  disabled={readOnly}
-                />
+              grupo.quantidadeLabel || grupo.coordenadas ? (
+                <div className="space-y-3">
+                  {grupo.quantidadeLabel ? (
+                    <CampoQuantidade
+                      label={grupo.quantidadeLabel}
+                      placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
+                      value={grupo.quantidade ?? null}
+                      onChange={grupo.onQuantidadeChange}
+                      disabled={readOnly}
+                    />
+                  ) : null}
+                  {grupo.coordenadas ? (
+                    <CampoCoordenadas
+                      title={grupo.coordenadasTitle ?? "Coordenadas"}
+                      value={grupo.coordenadas}
+                      onChange={grupo.onCoordenadasChange}
+                      disabled={readOnly}
+                      embedded
+                    />
+                  ) : null}
+                </div>
               ) : null
             }
             slots={grupo.slots}

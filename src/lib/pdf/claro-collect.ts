@@ -10,6 +10,8 @@ import {
   totalConexoesCalculado,
   totalEmendasCalculado,
   type CaboMetragemPayload,
+  type DgoClienteItemPayload,
+  type EquipamentoClienteItemPayload,
   type FotoGrupoPayload,
   type OutraFotoPayload,
   type RelatorioPayload,
@@ -195,6 +197,63 @@ function collectGrupo(
   grupo: FotoGrupoPayload | null | undefined,
 ) {
   collectGruposEmGrade(blocks, [{ titulo, grupo }]);
+}
+
+function collectEquipamentoItensLista(
+  blocks: PdfContentBlock[],
+  tituloSecao: string,
+  itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[],
+  opts: { comIdentificacao: boolean },
+) {
+  const ativos = itens.filter(
+    (item) =>
+      hasPhoto(item.foto) ||
+      hasPhoto(item.etiqueta) ||
+      item.tipoEquipamento.trim() ||
+      item.modelo.trim() ||
+      item.fabricante.trim() ||
+      item.sgp.trim() ||
+      ("identificacao" in item && item.identificacao.trim()) ||
+      item.obs.trim(),
+  );
+  if (!ativos.length) return;
+  pushHeading(blocks, tituloSecao);
+  for (const [index, item] of ativos.entries()) {
+    const children: PdfAtomicBlock[] = [
+      {
+        kind: "subheader",
+        text: `${opts.comIdentificacao ? "Equipamento" : "DGO/Roseta"} ${index + 1}`,
+      },
+    ];
+    pushPara(children, item.tipoEquipamento, "Tipo equipamento");
+    pushPara(children, item.modelo, "Modelo");
+    pushPara(children, item.fabricante, "Fabricante");
+    pushPara(children, item.sgp, "SGP");
+    if (opts.comIdentificacao && "identificacao" in item) {
+      pushPara(children, item.identificacao, "Identificacao");
+    }
+    const andamento = andamentoTexto(item.obs, item.obsAdmin);
+    if (andamento) pushPara(children, andamento, "Andamento da Obra");
+    const fotos: PdfPhotoItem[] = [];
+    if (hasPhoto(item.foto)) {
+      fotos.push({
+        url: resolvePhotoUrl(item.foto),
+        path: item.foto?.path?.trim() || undefined,
+        title: "Foto do equipamento",
+        caption: "",
+      });
+    }
+    if (hasPhoto(item.etiqueta)) {
+      fotos.push({
+        url: resolvePhotoUrl(item.etiqueta),
+        path: item.etiqueta?.path?.trim() || undefined,
+        title: "Etiqueta de Identificacao",
+        caption: "",
+      });
+    }
+    if (fotos.length) children.push({ kind: "photos", items: fotos });
+    pushGroup(blocks, children);
+  }
 }
 
 function collectCabos(
@@ -564,9 +623,17 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     { titulo: "Cliente - Entrada/Fachada", grupo: p?.eqClienteFachada },
     { titulo: "Cliente - Ambiente", grupo: p?.eqClienteAmbiente },
     { titulo: "Rack ou Local", grupo: p?.eqClienteRack },
-    { titulo: "DGO / DID / Roseta", grupo: p?.eqClienteDgo },
-    { titulo: "Equipamentos (No Cliente)", grupo: p?.eqClienteEquipamentos },
-    { titulo: "Etiqueta de Identificacao", grupo: p?.eqClienteEtiqueta },
+  ]);
+  collectEquipamentoItensLista(blocks, "DGO / DID / Roseta", p?.eqClienteDgo ?? [], {
+    comIdentificacao: false,
+  });
+  collectEquipamentoItensLista(
+    blocks,
+    "Equipamentos (No Cliente)",
+    p?.eqClienteEquipamentos ?? [],
+    { comIdentificacao: true },
+  );
+  collectGruposEmGrade(blocks, [
     { titulo: "Identificacao SGP no Cliente", grupo: p?.eqClienteSgp },
   ]);
   collectOutras(blocks, "Outras fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
