@@ -27,7 +27,27 @@ export type AbaCampo =
   | "medicoes"
   | "contatos";
 
-export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
+/** Abas filhas (tier 2) — sem Medições/Contatos (viram abas pai). */
+export type AbaFilha =
+  | "RE"
+  | "RC"
+  | "equipamento"
+  | "teste-optico"
+  | "teste-otdr"
+  | "teste-potencia"
+  | "configuracao"
+  | "infraestrutura";
+
+export type AbaPai = "Aereo" | "Subterraneo" | "Medicoes" | "Contatos";
+
+export const ABAS_PAI: { id: AbaPai; label: string }[] = [
+  { id: "Aereo", label: "Aéreo" },
+  { id: "Subterraneo", label: "Subterrâneo" },
+  { id: "Medicoes", label: "Medições" },
+  { id: "Contatos", label: "Contatos" },
+];
+
+export const ABAS_FILHAS: { id: AbaFilha; label: string }[] = [
   { id: "RE", label: "Rede Acesso (RE)" },
   { id: "RC", label: "Rede Cliente (RC)" },
   { id: "equipamento", label: "Equipamento" },
@@ -36,6 +56,11 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "teste-potencia", label: "Teste de Potência" },
   { id: "configuracao", label: "Configuração / Conexões" },
   { id: "infraestrutura", label: "Infraestrutura" },
+];
+
+/** @deprecated Prefer ABAS_FILHAS + ABAS_PAI (Empresarial two-tier). */
+export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
+  ...ABAS_FILHAS,
   { id: "medicoes", label: "Medições" },
   { id: "contatos", label: "Contatos" },
 ];
@@ -44,6 +69,12 @@ export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
   { id: "RE", label: "Rede Acesso (RE)" },
   { id: "teste-otdr", label: "Teste OTDR" },
 ];
+
+export function abaPaiToEscopo(abaPai: AbaPai): "aereo" | "subterraneo" | null {
+  if (abaPai === "Aereo") return "aereo";
+  if (abaPai === "Subterraneo") return "subterraneo";
+  return null;
+}
 
 export type OutraFotoState = {
   id: string;
@@ -208,6 +239,71 @@ export function RelatorioAbasCampo({
   );
 }
 
+export function RelatorioAbasPai({
+  abaAtiva,
+  onChange,
+}: {
+  abaAtiva: AbaPai;
+  onChange: (aba: AbaPai) => void;
+}) {
+  return (
+    <nav className="flex flex-wrap justify-center gap-2" aria-label="Escopo do relatório">
+      {ABAS_PAI.map((aba) => {
+        const ativa = abaAtiva === aba.id;
+        return (
+          <button
+            key={aba.id}
+            type="button"
+            onClick={() => onChange(aba.id)}
+            className={`min-w-[7.5rem] rounded-xl border px-4 py-2.5 text-center text-sm font-bold transition ${
+              ativa
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-foreground hover:bg-muted"
+            }`}
+          >
+            {aba.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function RelatorioAbasFilha({
+  abaAtiva,
+  onChange,
+  abas = ABAS_FILHAS,
+}: {
+  abaAtiva: AbaFilha;
+  onChange: (aba: AbaFilha) => void;
+  abas?: { id: AbaFilha; label: string }[];
+}) {
+  return (
+    <nav
+      className="flex flex-wrap justify-center gap-2"
+      aria-label="Seções do escopo"
+    >
+      {abas.map((aba) => {
+        const ativa = abaAtiva === aba.id;
+        return (
+          <button
+            key={aba.id}
+            type="button"
+            onClick={() => onChange(aba.id)}
+            className={`w-auto rounded-full border px-3 py-1.5 text-center text-xs font-semibold md:text-sm transition ${
+              ativa
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {aba.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function RelatorioAbaFixa({ label }: { label: string }) {
   return (
     <div className="-mx-1 px-1 pb-1" aria-label={label}>
@@ -341,12 +437,64 @@ export function CampoQuantidade({
   );
 }
 
+export function CordoalhaSimNaoCard({
+  title,
+  quantidadeLabel,
+  quantidadePlaceholder,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  title: string;
+  quantidadeLabel: string;
+  quantidadePlaceholder: string;
+  value: { isSim: boolean | null; quantidade: number | null };
+  onChange?: (next: { isSim: boolean | null; quantidade: number | null }) => void;
+  disabled?: boolean;
+}) {
+  const sim = value.isSim === true;
+  return (
+    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-bold">{title}</h2>
+      <div className="flex gap-2">
+        <ChoiceButton
+          active={value.isSim === true}
+          onClick={() => onChange?.({ ...value, isSim: true })}
+          disabled={disabled || !onChange}
+        >
+          SIM
+        </ChoiceButton>
+        <ChoiceButton
+          active={value.isSim === false}
+          onClick={() => onChange?.({ isSim: false, quantidade: null })}
+          disabled={disabled || !onChange}
+        >
+          NÃO
+        </ChoiceButton>
+      </div>
+      {sim ? (
+        <CampoQuantidade
+          label={quantidadeLabel}
+          placeholder={quantidadePlaceholder}
+          value={value.quantidade}
+          onChange={(quantidade) => onChange?.({ ...value, isSim: true, quantidade })}
+          disabled={disabled || !onChange}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function RelatorioRedeAcesso({
   readOnly,
   header,
   lancamentoTitle = "Lançamento cabos (RE)?",
   lancamentoRe,
   onLancamentoRe,
+  cordoalhaLancada,
+  onCordoalhaLancadaChange,
+  cordoalhaExistente,
+  onCordoalhaExistenteChange,
   cabos,
   onPatchCabo,
   onAddCabo,
@@ -364,6 +512,16 @@ export function RelatorioRedeAcesso({
   lancamentoTitle?: string;
   lancamentoRe: "sim" | "nao" | "";
   onLancamentoRe: (value: "sim" | "nao") => void;
+  cordoalhaLancada?: { isSim: boolean | null; quantidade: number | null };
+  onCordoalhaLancadaChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
+  cordoalhaExistente?: { isSim: boolean | null; quantidade: number | null };
+  onCordoalhaExistenteChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
   cabos: CaboMetragemPayload[];
   onPatchCabo: (id: string, patch: Partial<CaboMetragemPayload>) => void;
   onAddCabo: () => void;
@@ -386,6 +544,7 @@ export function RelatorioRedeAcesso({
 }) {
   const mostrarMetragem = lancamentoRe === "sim";
   const metragemDesabilitada = lancamentoRe === "nao";
+  const mostrarCordoalha = Boolean(cordoalhaLancada && cordoalhaExistente);
 
   return (
     <EvidencePhotoPasteProvider>
@@ -410,6 +569,27 @@ export function RelatorioRedeAcesso({
             </ChoiceButton>
           </div>
         </div>
+
+        {mostrarCordoalha ? (
+          <div className="space-y-4">
+            <CordoalhaSimNaoCard
+              title="Lançado cordoalha?"
+              quantidadeLabel="Quantidade de cordoalha lançada:"
+              quantidadePlaceholder="Ex: 50"
+              value={cordoalhaLancada!}
+              onChange={onCordoalhaLancadaChange}
+              disabled={readOnly}
+            />
+            <CordoalhaSimNaoCard
+              title="Cordoalha existente?"
+              quantidadeLabel="Quantidade de cordoalha existente:"
+              quantidadePlaceholder="Ex: 120"
+              value={cordoalhaExistente!}
+              onChange={onCordoalhaExistenteChange}
+              disabled={readOnly}
+            />
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         {metragemDesabilitada ? (

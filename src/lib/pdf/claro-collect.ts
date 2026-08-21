@@ -2,6 +2,8 @@ import { getStoragePublicUrl } from "@/lib/supabase";
 import {
   ATEN_EMENDA,
   ATEN_KM,
+  ESCOPO_RELATORIO_KEYS,
+  ESCOPO_RELATORIO_LABELS,
   PERDA_CONEXAO,
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
@@ -12,9 +14,9 @@ import {
   type CaboMetragemPayload,
   type DgoClienteItemPayload,
   type EquipamentoClienteItemPayload,
+  type EscopoPayload,
   type FotoGrupoPayload,
   type OutraFotoPayload,
-  type RelatorioPayload,
   type RelatorioTransmissao,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
@@ -352,10 +354,12 @@ function appendParJanelasOpticas(
   target.push(...children);
 }
 
-function buildTesteOtdrAtoms(row: RelatorioTransmissao): PdfAtomicBlock[] {
-  const p = row.payload;
+function buildTesteOtdrAtoms(
+  p: EscopoPayload | undefined,
+  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+): PdfAtomicBlock[] {
   if (!p) return [];
-  const isImplantacao = row.tipo_execucao === "implantacao";
+  const isImplantacao = tipoExecucao === "implantacao";
   const value = isImplantacao ? p.testePotenciaImplantacao : p.testePotenciaEmpresarial;
   if (!value) return [];
 
@@ -466,11 +470,14 @@ function buildPotenciaCard(
   };
 }
 
-function collectTestePotenciaTabelas(blocks: PdfContentBlock[], row: RelatorioTransmissao) {
+function collectTestePotenciaTabelas(
+  blocks: PdfContentBlock[],
+  p: EscopoPayload | undefined,
+  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+) {
   // Implantacao nao tem Teste de Potencia — so OTDR (coletado antes).
-  if (row.tipo_execucao === "implantacao") return;
+  if (tipoExecucao === "implantacao") return;
 
-  const p = row.payload;
   if (!p) return;
   const otdr = p.testePotenciaEmpresarial;
   const km = parseNumeroCampo(String(otdr?.comprimentoTrechoKm ?? "").replace(",", ".")) ?? 0;
@@ -576,14 +583,33 @@ export function buildCabecalhoDados(row: RelatorioTransmissao): PdfCabecalhoDado
   };
 }
 
-export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
-  const blocks: PdfContentBlock[] = [];
-  const p: RelatorioPayload | undefined = row.payload;
+export function collectPdfBlocksEscopo(
+  blocks: PdfContentBlock[],
+  p: EscopoPayload | undefined,
+  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+  prefix?: string,
+): PdfContentBlock[] {
+  const sec = (titulo: string) => (prefix ? `${prefix} · ${titulo}` : titulo);
 
-  pushHeading(blocks, "1. Rede Externa (RE)");
+  pushHeading(blocks, sec("1. Rede Externa (RE)"));
   {
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, simNao(p?.lancamentoRe), "Lancamento de cabos (RE)");
+    pushPara(meta, simNao(p?.redeAcesso?.cordoalhaLancada?.isSim), "Lancado cordoalha (RE)");
+    if (p?.redeAcesso?.cordoalhaLancada?.isSim && p.redeAcesso.cordoalhaLancada.quantidade != null) {
+      pushPara(meta, String(p.redeAcesso.cordoalhaLancada.quantidade), "Qtd. cordoalha lancada (RE)");
+    }
+    pushPara(meta, simNao(p?.redeAcesso?.cordoalhaExistente?.isSim), "Cordoalha existente (RE)");
+    if (
+      p?.redeAcesso?.cordoalhaExistente?.isSim &&
+      p.redeAcesso.cordoalhaExistente.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeAcesso.cordoalhaExistente.quantidade),
+        "Qtd. cordoalha existente (RE)",
+      );
+    }
     if (p?.redeAcesso?.qtdCaixasEmenda != null) {
       pushPara(meta, String(p.redeAcesso.qtdCaixasEmenda), "Qtd. caixas de emenda");
     }
@@ -602,11 +628,33 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
   ]);
   collectOutras(blocks, "Outras fotos (RE)", p?.outrasFotos ?? []);
 
-  pushHeading(blocks, "2. Rede Cliente (RC)");
+  pushHeading(blocks, sec("2. Rede Cliente (RC)"));
   {
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, p?.tecnologiaAcesso?.trim() || "-", "Tecnologia de Acesso");
     pushPara(meta, simNao(p?.lancamentoRc), "Lancamento de cabos (RC)");
+    pushPara(meta, simNao(p?.redeCliente?.cordoalhaLancada?.isSim), "Lancado cordoalha (RC)");
+    if (
+      p?.redeCliente?.cordoalhaLancada?.isSim &&
+      p.redeCliente.cordoalhaLancada.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeCliente.cordoalhaLancada.quantidade),
+        "Qtd. cordoalha lancada (RC)",
+      );
+    }
+    pushPara(meta, simNao(p?.redeCliente?.cordoalhaExistente?.isSim), "Cordoalha existente (RC)");
+    if (
+      p?.redeCliente?.cordoalhaExistente?.isSim &&
+      p.redeCliente.cordoalhaExistente.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeCliente.cordoalhaExistente.quantidade),
+        "Qtd. cordoalha existente (RC)",
+      );
+    }
     if (p?.redeCliente?.qtdCaixasEmenda != null) {
       pushPara(meta, String(p.redeCliente.qtdCaixasEmenda), "Qtd. caixas de emenda (RC)");
     }
@@ -624,7 +672,7 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
   ]);
   collectOutras(blocks, "Outras fotos (RC)", p?.outrasFotosRc ?? []);
 
-  pushHeading(blocks, "3. Equipamentos no Cliente");
+  pushHeading(blocks, sec("3. Equipamentos no Cliente"));
   collectGruposEmGrade(blocks, [
     { titulo: "Cliente - Entrada/Fachada", grupo: p?.eqClienteFachada },
     { titulo: "Cliente - Ambiente", grupo: p?.eqClienteAmbiente },
@@ -645,7 +693,7 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
   collectOutras(blocks, "Outras fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
 
   if (p?.relatorioEstacao) {
-    pushHeading(blocks, "4. Equipamentos na Estacao/PPC");
+    pushHeading(blocks, sec("4. Equipamentos na Estacao/PPC"));
     {
       const meta: PdfAtomicBlock[] = [];
       pushPara(meta, simNao(p.relatorioEstacao), "Relatorio fotografico da estacao");
@@ -675,7 +723,7 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     const combined: PdfAtomicBlock[] = [];
     const to = p?.testeOptico;
     if (to) {
-      combined.push({ kind: "heading", text: "5. Teste Optico" });
+      combined.push({ kind: "heading", text: sec("5. Teste Optico") });
       if (to.cliente?.numeroFibra != null) {
         pushPara(combined, String(to.cliente.numeroFibra), "No Fibra (Cliente)");
       }
@@ -686,12 +734,70 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
         to.cliente?.nm1330?.[0],
       );
     }
-    combined.push(...buildTesteOtdrAtoms(row));
+    combined.push(...buildTesteOtdrAtoms(p, tipoExecucao));
     if (combined.length) pushGroup(blocks, combined);
   }
 
   // Potencia so em Empresarial (apenas No Cliente).
-  collectTestePotenciaTabelas(blocks, row);
+  collectTestePotenciaTabelas(blocks, p, tipoExecucao);
+
+  return blocks;
+}
+
+/** Um escopo entra no PDF apenas se o técnico preencheu algo nele. */
+function escopoTemConteudo(p: EscopoPayload | undefined): boolean {
+  if (!p) return false;
+  if (p.lancamentoRe != null || p.lancamentoRc != null || p.relatorioEstacao) return true;
+  if (p.tecnologiaAcesso?.trim() || p.estacaoEntregaAcesso?.trim()) return true;
+  const listas = [
+    p.metragensCabo,
+    p.metragensCaboRc,
+    p.outrasFotos,
+    p.outrasFotosRc,
+    p.outrasFotosEqCliente,
+    p.outrasFotosEqEstacao,
+  ];
+  if (listas.some((lista) => (lista ?? []).length > 0)) return true;
+  const grupos: (FotoGrupoPayload | undefined)[] = [
+    p.posteConexao,
+    p.caixaEmenda,
+    p.plaquetaIdentificacao,
+    p.novoAterramentoPoste,
+    p.aterramentoTerrometro,
+    p.posicaoConexaoEstacao,
+    p.etiquetaIdentificacao,
+    p.sobraTecnica,
+    p.rcPosteConexao,
+    p.rcCaixaEmenda,
+    p.rcTerminacaoCabo,
+    p.rcPlaquetaIdentificacao,
+    p.rcEntradaInterna,
+    p.rcEntradaExterna,
+    p.rcSobraTecnica,
+    p.eqClienteFachada,
+    p.eqClienteAmbiente,
+    p.eqClienteRack,
+    p.eqClienteEtiqueta,
+    p.eqClienteSgp,
+    p.eqEstacaoGeral,
+    p.eqEstacaoRack,
+    p.eqEstacaoEtiqueta,
+  ];
+  return grupos.some((grupo) => (grupo?.fotos ?? []).length > 0);
+}
+
+export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
+  const blocks: PdfContentBlock[] = [];
+  const payload = row.payload;
+
+  const preenchidos = ESCOPO_RELATORIO_KEYS.filter((key) => escopoTemConteudo(payload?.[key]));
+  const escopos = preenchidos.length ? preenchidos : (["aereo"] as const);
+  const rotular = escopos.length > 1;
+
+  for (const key of escopos) {
+    if (rotular) pushHeading(blocks, ESCOPO_RELATORIO_LABELS[key]);
+    collectPdfBlocksEscopo(blocks, payload?.[key], row.tipo_execucao);
+  }
 
   return coalesceSectionLeads(blocks);
 }

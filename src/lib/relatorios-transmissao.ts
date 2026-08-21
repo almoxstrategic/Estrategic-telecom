@@ -308,10 +308,17 @@ export type CoordenadasPayload = {
   longitude: string;
 };
 
+export type CordoalhaBlocoPayload = {
+  isSim: boolean | null;
+  quantidade: number | null;
+};
+
 export type QuantidadesRedePayload = {
   qtdCaixasEmenda: number | null;
   /** Quantidade de Fiberloop instalado (Sobra técnica). */
   qtdFiberloopInstalado: number | null;
+  cordoalhaLancada: CordoalhaBlocoPayload;
+  cordoalhaExistente: CordoalhaBlocoPayload;
   /** Coordenadas do Cliente (aba RC). */
   coordenadas: CoordenadasPayload;
   /** Coordenadas da caixa de emenda na acomodação (aba RC). */
@@ -320,7 +327,22 @@ export type QuantidadesRedePayload = {
   };
 };
 
-export type RelatorioPayload = {
+/** Escopos independentes de execução de um mesmo relatório. */
+export type EscopoRelatorioKey = "aereo" | "subterraneo";
+
+export const ESCOPO_RELATORIO_KEYS: EscopoRelatorioKey[] = ["aereo", "subterraneo"];
+
+export const ESCOPO_RELATORIO_LABELS: Record<EscopoRelatorioKey, string> = {
+  aereo: "Aéreo",
+  subterraneo: "Subterrâneo",
+};
+
+export function isEscopoRelatorioKey(value: unknown): value is EscopoRelatorioKey {
+  return value === "aereo" || value === "subterraneo";
+}
+
+/** Conteúdo de um escopo (RE, RC, equipamentos, testes, configuração, infraestrutura). */
+export type EscopoPayload = {
   lancamentoRe: boolean | null;
   metragensCabo: CaboMetragemPayload[];
   posteConexao: FotoGrupoPayload;
@@ -366,12 +388,110 @@ export type RelatorioPayload = {
   testePotenciaImplantacao: TestePotenciaPayload;
   testePotencia1550: TestePotenciaJanelaPayload;
   testePotencia1330: TestePotenciaJanelaPayload;
-  /** Abas futuras (estrutura reservada no JSON). */
-  configuracao: Record<string, never>;
-  infraestrutura: Record<string, never>;
-  medicoes: Record<string, never>;
-  contatos: Record<string, never>;
+  configuracao: ConfiguracaoPayload;
+  infraestrutura: InfraestruturaPayload;
 };
+
+export type RelatorioPayload = {
+  aereo: EscopoPayload;
+  subterraneo: EscopoPayload;
+  medicoes: MedicoesPayload;
+  contatos: ContatosPayload;
+};
+
+export function getEscopo(payload: RelatorioPayload, key: EscopoRelatorioKey): EscopoPayload {
+  return payload[key] ?? emptyEscopoPayload();
+}
+
+export type EquipamentoRedeIpsPayload = {
+  hostName: string;
+  ipEth: string;
+  ipGw: string;
+  ipDmlan: string;
+};
+
+export type ConfiguracaoPayload = {
+  equipamentosCliente: EquipamentoRedeIpsPayload;
+  equipamentosEstacao: EquipamentoRedeIpsPayload;
+};
+
+export type MedicaoTomadaPayload = {
+  id: string;
+  faseNeutro: string;
+  terraFase: string;
+  terraNeutro: string;
+};
+
+export type InfraestruturaPayload = {
+  possuiEspacoRack: boolean | null;
+  tomadasNovoPadrao: boolean | null;
+  pinagemPadraoCorreto: boolean | null;
+  possuiNobreak: boolean | null;
+  localClimatizado: boolean | null;
+  tomadas: MedicaoTomadaPayload[];
+};
+
+/** Aba reservada — sem formulários ativos. */
+export type MedicoesPayload = Record<string, never>;
+
+export type ContatosPayload = {
+  cliente: {
+    local: { nome: string; telefone: string };
+    remoto: { email: string; telefone: string };
+  };
+  empresaParceira: {
+    supervisor: { nome: string; telefone: string };
+    tecnico: { telefone: string; email: string };
+  };
+};
+
+export function emptyEquipamentoRedeIps(): EquipamentoRedeIpsPayload {
+  return { hostName: "", ipEth: "", ipGw: "", ipDmlan: "" };
+}
+
+export function emptyConfiguracao(): ConfiguracaoPayload {
+  return {
+    equipamentosCliente: emptyEquipamentoRedeIps(),
+    equipamentosEstacao: emptyEquipamentoRedeIps(),
+  };
+}
+
+export function emptyMedicaoTomada(): MedicaoTomadaPayload {
+  return {
+    id: crypto.randomUUID(),
+    faseNeutro: "",
+    terraFase: "",
+    terraNeutro: "",
+  };
+}
+
+export function emptyInfraestrutura(): InfraestruturaPayload {
+  return {
+    possuiEspacoRack: null,
+    tomadasNovoPadrao: null,
+    pinagemPadraoCorreto: null,
+    possuiNobreak: null,
+    localClimatizado: null,
+    tomadas: [emptyMedicaoTomada()],
+  };
+}
+
+export function emptyMedicoes(): MedicoesPayload {
+  return {};
+}
+
+export function emptyContatos(): ContatosPayload {
+  return {
+    cliente: {
+      local: { nome: "", telefone: "" },
+      remoto: { email: "", telefone: "" },
+    },
+    empresaParceira: {
+      supervisor: { nome: "", telefone: "" },
+      tecnico: { telefone: "", email: "" },
+    },
+  };
+}
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
   return {
@@ -385,10 +505,6 @@ export function emptyCaboMetragem(): CaboMetragemPayload {
     obs: "",
     obsAdmin: "",
   };
-}
-
-export function emptySecaoPlaceholder(): Record<string, never> {
-  return {};
 }
 
 export function emptyEquipamentoClienteItem(): EquipamentoClienteItemPayload {
@@ -506,10 +622,16 @@ export function emptyCoordenadas(): CoordenadasPayload {
   return { latitude: "", longitude: "" };
 }
 
+export function emptyCordoalhaBloco(): CordoalhaBlocoPayload {
+  return { isSim: null, quantidade: null };
+}
+
 export function emptyQuantidadesRede(): QuantidadesRedePayload {
   return {
     qtdCaixasEmenda: null,
     qtdFiberloopInstalado: null,
+    cordoalhaLancada: emptyCordoalhaBloco(),
+    cordoalhaExistente: emptyCordoalhaBloco(),
     coordenadas: emptyCoordenadas(),
     caixaEmendaAcomodacao: { coordenadas: emptyCoordenadas() },
   };
@@ -537,7 +659,7 @@ export function janelaPotenciaDerivada(
   };
 }
 
-export function emptyRelatorioPayload(): RelatorioPayload {
+export function emptyEscopoPayload(): EscopoPayload {
   return {
     lancamentoRe: null,
     metragensCabo: [],
@@ -584,10 +706,17 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     testePotenciaImplantacao: emptyTestePotencia(),
     testePotencia1550: emptyTestePotenciaJanela(),
     testePotencia1330: emptyTestePotenciaJanela(),
-    configuracao: emptySecaoPlaceholder(),
-    infraestrutura: emptySecaoPlaceholder(),
-    medicoes: emptySecaoPlaceholder(),
-    contatos: emptySecaoPlaceholder(),
+    configuracao: emptyConfiguracao(),
+    infraestrutura: emptyInfraestrutura(),
+  };
+}
+
+export function emptyRelatorioPayload(): RelatorioPayload {
+  return {
+    aereo: emptyEscopoPayload(),
+    subterraneo: emptyEscopoPayload(),
+    medicoes: emptyMedicoes(),
+    contatos: emptyContatos(),
   };
 }
 
@@ -631,7 +760,7 @@ function parseCabosList(raw: unknown): CaboMetragemPayload[] {
 
 function parseCabos(raw: unknown): CaboMetragemPayload[] {
   if (!raw || typeof raw !== "object") return [];
-  const src = raw as Partial<RelatorioPayload> & { metragemRe?: LegacyMetragemRe };
+  const src = raw as Partial<EscopoPayload> & { metragemRe?: LegacyMetragemRe };
   const fromArray = parseCabosList(src.metragensCabo);
   if (fromArray.length > 0) return fromArray;
   const old = src.metragemRe;
@@ -692,6 +821,16 @@ function parseCoordenadas(raw: unknown): CoordenadasPayload {
   };
 }
 
+function parseCordoalhaBloco(raw: unknown): CordoalhaBlocoPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<CordoalhaBlocoPayload>;
+  const isSim =
+    src.isSim === true ? true : src.isSim === false ? false : null;
+  return {
+    isSim,
+    quantidade: parseQtdInteiro(src.quantidade),
+  };
+}
+
 function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload> & {
     caixaEmendaAcomodacao?: { coordenadas?: unknown };
@@ -699,9 +838,109 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   return {
     qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
     qtdFiberloopInstalado: parseQtdInteiro(src.qtdFiberloopInstalado),
+    cordoalhaLancada: parseCordoalhaBloco(src.cordoalhaLancada),
+    cordoalhaExistente: parseCordoalhaBloco(src.cordoalhaExistente),
     coordenadas: parseCoordenadas(src.coordenadas),
     caixaEmendaAcomodacao: {
       coordenadas: parseCoordenadas(src.caixaEmendaAcomodacao?.coordenadas),
+    },
+  };
+}
+
+function parseBoolNull(raw: unknown): boolean | null {
+  if (raw === true) return true;
+  if (raw === false) return false;
+  return null;
+}
+
+function parseStr(raw: unknown): string {
+  return typeof raw === "string" ? raw : raw != null ? String(raw) : "";
+}
+
+function parseEquipamentoRedeIps(raw: unknown): EquipamentoRedeIpsPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<EquipamentoRedeIpsPayload>;
+  return {
+    hostName: parseStr(src.hostName),
+    ipEth: parseStr(src.ipEth),
+    ipGw: parseStr(src.ipGw),
+    ipDmlan: parseStr(src.ipDmlan),
+  };
+}
+
+function parseConfiguracao(raw: unknown): ConfiguracaoPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<ConfiguracaoPayload>;
+  return {
+    equipamentosCliente: parseEquipamentoRedeIps(src.equipamentosCliente),
+    equipamentosEstacao: parseEquipamentoRedeIps(src.equipamentosEstacao),
+  };
+}
+
+function parseMedicaoTomada(raw: unknown): MedicaoTomadaPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<MedicaoTomadaPayload>;
+  return {
+    id: typeof src.id === "string" && src.id ? src.id : crypto.randomUUID(),
+    faseNeutro: parseStr(src.faseNeutro),
+    terraFase: parseStr(src.terraFase),
+    terraNeutro: parseStr(src.terraNeutro),
+  };
+}
+
+function parseTomadasLista(raw: unknown): MedicaoTomadaPayload[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(parseMedicaoTomada);
+}
+
+function parseInfraestrutura(
+  raw: unknown,
+  legacyTomadasFromMedicoes?: unknown,
+): InfraestruturaPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<InfraestruturaPayload>;
+  let tomadas = parseTomadasLista(src.tomadas);
+  if (!tomadas.length) {
+    tomadas = parseTomadasLista(legacyTomadasFromMedicoes);
+  }
+  return {
+    possuiEspacoRack: parseBoolNull(src.possuiEspacoRack),
+    tomadasNovoPadrao: parseBoolNull(src.tomadasNovoPadrao),
+    pinagemPadraoCorreto: parseBoolNull(src.pinagemPadraoCorreto),
+    possuiNobreak: parseBoolNull(src.possuiNobreak),
+    localClimatizado: parseBoolNull(src.localClimatizado),
+    tomadas: tomadas.length ? tomadas : [emptyMedicaoTomada()],
+  };
+}
+
+function parseMedicoes(_raw: unknown): MedicoesPayload {
+  return emptyMedicoes();
+}
+
+function parseContatos(raw: unknown): ContatosPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<ContatosPayload> & {
+    cliente?: { local?: Record<string, unknown>; remoto?: Record<string, unknown> };
+    empresaParceira?: {
+      supervisor?: Record<string, unknown>;
+      tecnico?: Record<string, unknown>;
+    };
+  };
+  return {
+    cliente: {
+      local: {
+        nome: parseStr(src.cliente?.local?.nome),
+        telefone: parseStr(src.cliente?.local?.telefone),
+      },
+      remoto: {
+        email: parseStr(src.cliente?.remoto?.email),
+        telefone: parseStr(src.cliente?.remoto?.telefone),
+      },
+    },
+    empresaParceira: {
+      supervisor: {
+        nome: parseStr(src.empresaParceira?.supervisor?.nome),
+        telefone: parseStr(src.empresaParceira?.supervisor?.telefone),
+      },
+      tecnico: {
+        telefone: parseStr(src.empresaParceira?.tecnico?.telefone),
+        email: parseStr(src.empresaParceira?.tecnico?.email),
+      },
     },
   };
 }
@@ -949,12 +1188,12 @@ function parseTestePotenciaJanela(raw: unknown): TestePotenciaJanelaPayload {
 }
 
 function parseTestesPotenciaSeparados(
-  src: Partial<RelatorioPayload> & {
+  src: Partial<EscopoPayload> & {
     testePotencia?: unknown;
     testeOptico?: { comprimentoTrechoKm?: unknown };
   },
   tipoExecucao?: TipoExecucao | null,
-): Pick<RelatorioPayload, "testePotenciaEmpresarial" | "testePotenciaImplantacao"> {
+): Pick<EscopoPayload, "testePotenciaEmpresarial" | "testePotenciaImplantacao"> {
   const kmLegado = parseComprimentoTrechoKm(src.testeOptico?.comprimentoTrechoKm);
   const temEmpresarial = src.testePotenciaEmpresarial != null;
   const temImplantacao = src.testePotenciaImplantacao != null;
@@ -977,10 +1216,17 @@ function parseTestesPotenciaSeparados(
   };
 }
 
-function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): RelatorioPayload {
-  const base = emptyRelatorioPayload();
+export function parseEscopoPayload(
+  raw: unknown,
+  tipoExecucao?: TipoExecucao | null,
+  legacyTomadasFromMedicoes?: unknown,
+): EscopoPayload {
+  const base = emptyEscopoPayload();
   if (!raw || typeof raw !== "object") return base;
-  const src = raw as Partial<RelatorioPayload> & { testePotencia?: unknown };
+  const src = raw as Partial<EscopoPayload> & {
+    testePotencia?: unknown;
+    medicoes?: unknown;
+  };
   return {
     ...base,
     lancamentoRe: src.lancamentoRe ?? null,
@@ -1027,10 +1273,61 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     ...parseTestesPotenciaSeparados(src, tipoExecucao),
     testePotencia1550: parseTestePotenciaJanela(src.testePotencia1550),
     testePotencia1330: parseTestePotenciaJanela(src.testePotencia1330),
-    configuracao: emptySecaoPlaceholder(),
-    infraestrutura: emptySecaoPlaceholder(),
-    medicoes: emptySecaoPlaceholder(),
-    contatos: emptySecaoPlaceholder(),
+    configuracao: parseConfiguracao(src.configuracao),
+    infraestrutura: parseInfraestrutura(
+      src.infraestrutura,
+      legacyTomadasFromMedicoes ?? (src.medicoes as { tomadas?: unknown } | undefined)?.tomadas,
+    ),
+  };
+}
+
+/** Chaves que só existem no formato plano (pré-escopos) — sinalizam payload legado. */
+const LEGACY_FLAT_KEYS = [
+  "redeAcesso",
+  "lancamentoRe",
+  "posteConexao",
+  "redeCliente",
+  "lancamentoRc",
+  "metragensCabo",
+  "testeOptico",
+  "configuracao",
+  "infraestrutura",
+] as const;
+
+function isLegacyFlatPayload(src: Record<string, unknown>): boolean {
+  return LEGACY_FLAT_KEYS.some((key) => src[key] !== undefined);
+}
+
+function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): RelatorioPayload {
+  if (!raw || typeof raw !== "object") return emptyRelatorioPayload();
+  const src = raw as Record<string, unknown>;
+
+  const temAereo = Boolean(src.aereo && typeof src.aereo === "object");
+  const temSubterraneo = Boolean(src.subterraneo && typeof src.subterraneo === "object");
+
+  if (temAereo || temSubterraneo) {
+    return {
+      aereo: parseEscopoPayload(src.aereo, tipoExecucao),
+      subterraneo: parseEscopoPayload(src.subterraneo, tipoExecucao),
+      medicoes: parseMedicoes(src.medicoes),
+      contatos: parseContatos(src.contatos),
+    };
+  }
+
+  if (isLegacyFlatPayload(src)) {
+    return {
+      aereo: parseEscopoPayload(src, tipoExecucao, (src.medicoes as { tomadas?: unknown } | undefined)?.tomadas),
+      subterraneo: emptyEscopoPayload(),
+      medicoes: parseMedicoes(src.medicoes),
+      contatos: parseContatos(src.contatos),
+    };
+  }
+
+  return {
+    aereo: emptyEscopoPayload(),
+    subterraneo: emptyEscopoPayload(),
+    medicoes: parseMedicoes(src.medicoes),
+    contatos: parseContatos(src.contatos),
   };
 }
 
@@ -1280,6 +1577,19 @@ function mergeCoordenadas(
   };
 }
 
+function mergeCordoalhaBloco(
+  server: CordoalhaBlocoPayload | undefined,
+  local: CordoalhaBlocoPayload | undefined,
+): CordoalhaBlocoPayload {
+  const fromServer = server ?? emptyCordoalhaBloco();
+  const fromLocal = local ?? emptyCordoalhaBloco();
+  return {
+    isSim: fromLocal.isSim === undefined ? fromServer.isSim : fromLocal.isSim,
+    quantidade:
+      fromLocal.quantidade === undefined ? fromServer.quantidade : fromLocal.quantidade,
+  };
+}
+
 function mergeQuantidadesRede(
   server: QuantidadesRedePayload | undefined,
   local: QuantidadesRedePayload | undefined,
@@ -1295,6 +1605,14 @@ function mergeQuantidadesRede(
       fromLocal.qtdFiberloopInstalado === undefined
         ? fromServer.qtdFiberloopInstalado
         : fromLocal.qtdFiberloopInstalado,
+    cordoalhaLancada: mergeCordoalhaBloco(
+      fromServer.cordoalhaLancada,
+      fromLocal.cordoalhaLancada,
+    ),
+    cordoalhaExistente: mergeCordoalhaBloco(
+      fromServer.cordoalhaExistente,
+      fromLocal.cordoalhaExistente,
+    ),
     coordenadas: mergeCoordenadas(fromServer.coordenadas, fromLocal.coordenadas),
     caixaEmendaAcomodacao: {
       coordenadas: mergeCoordenadas(
@@ -1315,20 +1633,129 @@ function mergeTestePotenciaJanela(
   };
 }
 
+function mergeEquipamentoRedeIps(
+  server: EquipamentoRedeIpsPayload,
+  local: EquipamentoRedeIpsPayload,
+): EquipamentoRedeIpsPayload {
+  return {
+    hostName: campoOuServidor(local.hostName, server.hostName),
+    ipEth: campoOuServidor(local.ipEth, server.ipEth),
+    ipGw: campoOuServidor(local.ipGw, server.ipGw),
+    ipDmlan: campoOuServidor(local.ipDmlan, server.ipDmlan),
+  };
+}
+
+function mergeConfiguracao(
+  server: ConfiguracaoPayload,
+  local: ConfiguracaoPayload,
+): ConfiguracaoPayload {
+  return {
+    equipamentosCliente: mergeEquipamentoRedeIps(
+      server.equipamentosCliente,
+      local.equipamentosCliente,
+    ),
+    equipamentosEstacao: mergeEquipamentoRedeIps(
+      server.equipamentosEstacao,
+      local.equipamentosEstacao,
+    ),
+  };
+}
+
+function mergeBoolNull(local: boolean | null, server: boolean | null): boolean | null {
+  return local !== null ? local : server;
+}
+
+function mergeMedicaoTomada(
+  server: MedicaoTomadaPayload,
+  local: MedicaoTomadaPayload,
+): MedicaoTomadaPayload {
+  return {
+    id: local.id || server.id,
+    faseNeutro: campoOuServidor(local.faseNeutro, server.faseNeutro),
+    terraFase: campoOuServidor(local.terraFase, server.terraFase),
+    terraNeutro: campoOuServidor(local.terraNeutro, server.terraNeutro),
+  };
+}
+
+function mergeInfraestrutura(
+  server: InfraestruturaPayload,
+  local: InfraestruturaPayload,
+): InfraestruturaPayload {
+  const mergedTomadas = mergeById(server.tomadas, local.tomadas, mergeMedicaoTomada);
+  return {
+    possuiEspacoRack: mergeBoolNull(local.possuiEspacoRack, server.possuiEspacoRack),
+    tomadasNovoPadrao: mergeBoolNull(local.tomadasNovoPadrao, server.tomadasNovoPadrao),
+    pinagemPadraoCorreto: mergeBoolNull(
+      local.pinagemPadraoCorreto,
+      server.pinagemPadraoCorreto,
+    ),
+    possuiNobreak: mergeBoolNull(local.possuiNobreak, server.possuiNobreak),
+    localClimatizado: mergeBoolNull(local.localClimatizado, server.localClimatizado),
+    tomadas: mergedTomadas.length ? mergedTomadas : [emptyMedicaoTomada()],
+  };
+}
+
+function mergeMedicoes(_server: MedicoesPayload, _local: MedicoesPayload): MedicoesPayload {
+  return emptyMedicoes();
+}
+
+function mergeContatos(server: ContatosPayload, local: ContatosPayload): ContatosPayload {
+  return {
+    cliente: {
+      local: {
+        nome: campoOuServidor(local.cliente.local.nome, server.cliente.local.nome),
+        telefone: campoOuServidor(
+          local.cliente.local.telefone,
+          server.cliente.local.telefone,
+        ),
+      },
+      remoto: {
+        email: campoOuServidor(local.cliente.remoto.email, server.cliente.remoto.email),
+        telefone: campoOuServidor(
+          local.cliente.remoto.telefone,
+          server.cliente.remoto.telefone,
+        ),
+      },
+    },
+    empresaParceira: {
+      supervisor: {
+        nome: campoOuServidor(
+          local.empresaParceira.supervisor.nome,
+          server.empresaParceira.supervisor.nome,
+        ),
+        telefone: campoOuServidor(
+          local.empresaParceira.supervisor.telefone,
+          server.empresaParceira.supervisor.telefone,
+        ),
+      },
+      tecnico: {
+        telefone: campoOuServidor(
+          local.empresaParceira.tecnico.telefone,
+          server.empresaParceira.tecnico.telefone,
+        ),
+        email: campoOuServidor(
+          local.empresaParceira.tecnico.email,
+          server.empresaParceira.tecnico.email,
+        ),
+      },
+    },
+  };
+}
+
 /**
  * Merge colaborativo de JSONB: arrays de caixinhas/fotos são unidos por id/path
  * (append). Itens remotos não presentes no rascunho local não são apagados,
  * para o auto-save de um técnico não sobrescrever o de outro.
  */
-export function mergeRelatorioPayload(
-  server: RelatorioPayload,
-  local: RelatorioPayload,
-): RelatorioPayload {
-  const fromServer = parsePayload(server);
-  const fromLocal = parsePayload(local);
+export function mergeEscopoPayload(
+  serverRaw: EscopoPayload,
+  localRaw: EscopoPayload,
+): EscopoPayload {
+  const fromServer = parseEscopoPayload(serverRaw);
+  const fromLocal = parseEscopoPayload(localRaw);
   const grupos = Object.fromEntries(
     FOTO_GRUPO_KEYS.map((key) => [key, mergeFotoGrupo(fromServer[key], fromLocal[key])]),
-  ) as Pick<RelatorioPayload, RelatorioFotoGrupoKey>;
+  ) as Pick<EscopoPayload, RelatorioFotoGrupoKey>;
 
   return {
     ...fromServer,
@@ -1377,7 +1804,26 @@ export function mergeRelatorioPayload(
       fromServer.testePotencia1330,
       fromLocal.testePotencia1330,
     ),
+    configuracao: mergeConfiguracao(fromServer.configuracao, fromLocal.configuracao),
+    infraestrutura: mergeInfraestrutura(
+      fromServer.infraestrutura,
+      fromLocal.infraestrutura,
+    ),
     ...grupos,
+  };
+}
+
+export function mergeRelatorioPayload(
+  server: RelatorioPayload,
+  local: RelatorioPayload,
+): RelatorioPayload {
+  const fromServer = parsePayload(server);
+  const fromLocal = parsePayload(local);
+  return {
+    aereo: mergeEscopoPayload(fromServer.aereo, fromLocal.aereo),
+    subterraneo: mergeEscopoPayload(fromServer.subterraneo, fromLocal.subterraneo),
+    medicoes: mergeMedicoes(fromServer.medicoes, fromLocal.medicoes),
+    contatos: mergeContatos(fromServer.contatos, fromLocal.contatos),
   };
 }
 
@@ -2014,11 +2460,11 @@ export type RelatorioFotoCategoria =
   | "outrasFotosEqCliente"
   | "outrasFotosEqEstacao";
 
-export function appendStoredPhotoToPayload(
-  payload: RelatorioPayload,
+export function appendStoredPhotoToEscopo(
+  payload: EscopoPayload,
   categoria: RelatorioFotoCategoria,
   stored: StoredPhoto,
-): RelatorioPayload {
+): EscopoPayload {
   if (categoria === "metragensCabo" || categoria === "metragensCaboRc") {
     const list = (payload[categoria].length
       ? payload[categoria].map((item) => ({ ...item }))
@@ -2067,6 +2513,18 @@ export function appendStoredPhotoToPayload(
   return {
     ...payload,
     [categoria]: { ...grupo, fotos: [...grupo.fotos, stored] },
+  };
+}
+
+export function appendStoredPhotoToPayload(
+  payload: RelatorioPayload,
+  categoria: RelatorioFotoCategoria,
+  stored: StoredPhoto,
+  escopo: EscopoRelatorioKey = "aereo",
+): RelatorioPayload {
+  return {
+    ...payload,
+    [escopo]: appendStoredPhotoToEscopo(getEscopo(payload, escopo), categoria, stored),
   };
 }
 

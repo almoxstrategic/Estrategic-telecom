@@ -16,14 +16,19 @@ import {
   AbaMedicoes,
 } from "@/components/RelatorioAbasPlaceholder";
 import {
-  ABAS_CAMPO,
   ABAS_CAMPO_IMPLANTACAO,
   CampoCoordenadas,
   CampoQuantidade,
   ChoiceButton,
+  CordoalhaSimNaoCard,
   RefTituloInput,
+  RelatorioAbasFilha,
+  RelatorioAbasPai,
+  abaPaiToEscopo,
   inputClass,
   type AbaCampo,
+  type AbaFilha,
+  type AbaPai,
 } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,13 +38,18 @@ import {
   deleteRelatorioPhoto,
   emptyCaboMetragem,
   emptyCoordenadas,
+  emptyCordoalhaBloco,
   emptyDgoClienteItem,
   emptyEquipamentoClienteItem,
+  emptyConfiguracao,
+  emptyContatos,
+  emptyInfraestrutura,
   emptyQuantidadesRede,
   emptyTesteOptico,
   emptyTestePotencia,
   apenasDigitos,
   calcularMetragemCaboTotal,
+  getEscopo,
   janelaPotenciaDerivada,
   labelTecnicosAtribuidos,
   removeExtraById,
@@ -49,6 +59,8 @@ import {
   type EquipamentoClienteItemPayload,
   type RelatorioFotoCategoria,
   type RelatorioFotoGrupoKey,
+  type EscopoPayload,
+  type EscopoRelatorioKey,
   type RelatorioPayload,
   type RelatorioStatus,
   type RelatorioTransmissao,
@@ -464,7 +476,7 @@ function BotaoAdicionar({ label, onClick }: { label: string; onClick: () => void
   );
 }
 
-function emptyOutraFoto(): RelatorioPayload["outrasFotos"][number] {
+function emptyOutraFoto(): EscopoPayload["outrasFotos"][number] {
   return { id: crypto.randomUUID(), ref: "", foto: null, obs: "", obsAdmin: "" };
 }
 
@@ -700,7 +712,11 @@ export function RelatorioDetalhe({
 }: {
   row: RelatorioTransmissao;
   canEditPhotos: boolean;
-  onAddPhoto: (categoria: RelatorioFotoCategoria, file: EvidencePhotoRef) => void;
+  onAddPhoto: (
+    categoria: RelatorioFotoCategoria,
+    file: EvidencePhotoRef,
+    escopo?: EscopoRelatorioKey,
+  ) => void;
   onReplacePhoto?: (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
@@ -711,6 +727,7 @@ export function RelatorioDetalhe({
       outraId?: string;
       itemId?: string;
       campoItem?: "foto" | "etiqueta";
+      escopo?: EscopoRelatorioKey;
     },
   ) => void;
   uploadingCategoria: RelatorioFotoCategoria | null;
@@ -719,28 +736,41 @@ export function RelatorioDetalhe({
   onCadastroSaved?: (saved: RelatorioTransmissao) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
 }) {
-  const [abaAtiva, setAbaAtiva] = useState<AbaCampo>("RE");
+  const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
+  const [abaPai, setAbaPai] = useState<AbaPai>("Aereo");
+  const [abaFilha, setAbaFilha] = useState<AbaFilha>("RE");
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const isEmpresarial = row.tipo_execucao === "empresarial";
   const isImplantacao = row.tipo_execucao === "implantacao";
-  const abasVisiveis = isEmpresarial
-    ? ABAS_CAMPO
-    : isImplantacao
-      ? ABAS_CAMPO_IMPLANTACAO
-      : ABAS_CAMPO.filter((aba) => aba.id === "RE");
+  const abasVisiveis = isImplantacao
+    ? ABAS_CAMPO_IMPLANTACAO
+    : ABAS_CAMPO_IMPLANTACAO.filter((aba) => aba.id === "RE");
+  /** Empresarial: escopo escolhido no tier 1. Implantação escreve sempre no aéreo. */
+  const escopoKey: EscopoRelatorioKey = isEmpresarial
+    ? abaPaiToEscopo(abaPai) ?? "aereo"
+    : "aereo";
+  const emEscopo = isEmpresarial ? abaPai === "Aereo" || abaPai === "Subterraneo" : true;
+  const abaAtiva: AbaCampo | AbaFilha | null = isEmpresarial
+    ? emEscopo
+      ? abaFilha
+      : null
+    : abaCampo;
 
   useEffect(() => {
-    setAbaAtiva("RE");
+    setAbaCampo("RE");
+    setAbaPai("Aereo");
+    setAbaFilha("RE");
   }, [row.id]);
 
   useEffect(() => {
     if (isEmpresarial) return;
-    setAbaAtiva((atual) =>
+    setAbaCampo((atual) =>
       atual === "RE" || (isImplantacao && atual === "teste-otdr") ? atual : "RE",
     );
   }, [isEmpresarial, isImplantacao]);
 
-  const payload = row.payload;
+  const payloadRaiz = row.payload;
+  const payload = payloadRaiz ? getEscopo(payloadRaiz, escopoKey) : undefined;
   const cabos = payload?.metragensCabo ?? [];
   const cabosRc = payload?.metragensCaboRc ?? [];
   const fotosCabosCount = cabos.reduce(
@@ -767,18 +797,27 @@ export function RelatorioDetalhe({
   };
   const blocoProps = (categoria: RelatorioFotoCategoria) => ({
     canEdit: canEditPhotos,
-    onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file),
-    uploadKey: `${row.id}-${categoria}-${blocoCount(categoria)}`,
+    onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file, escopoKey),
+    uploadKey: `${row.id}-${escopoKey}-${categoria}-${blocoCount(categoria)}`,
     uploading: uploadingCategoria === categoria,
   });
 
-  const patchPayload = (next: RelatorioPayload) => {
+  const patchPayload = (next: EscopoPayload) => {
+    if (!payloadRaiz) return;
+    onUpdatePayload?.(
+      escopoKey === "aereo"
+        ? { ...payloadRaiz, aereo: next }
+        : { ...payloadRaiz, subterraneo: next },
+    );
+  };
+
+  const patchRaiz = (next: RelatorioPayload) => {
     onUpdatePayload?.(next);
   };
 
   const patchQtdCaixas = (lado: "redeAcesso" | "redeCliente", qtdCaixasEmenda: number | null) => {
     if (!payload) return;
-    const next: RelatorioPayload = {
+    const next: EscopoPayload = {
       ...payload,
       [lado]: {
         ...(payload[lado] ?? emptyQuantidadesRede()),
@@ -898,7 +937,7 @@ export function RelatorioDetalhe({
         }
         onReplacePhoto={
           canEditPhotos && onReplacePhoto
-            ? (index, file) => onReplacePhoto(key, file, { index })
+            ? (index, file) => onReplacePhoto(key, file, { index, escopo: escopoKey })
             : undefined
         }
         {...blocoProps(key)}
@@ -1032,7 +1071,12 @@ export function RelatorioDetalhe({
           }
           onReplaceCaboCampo={
             canEditPhotos && onReplacePhoto
-              ? (campo, file) => onReplacePhoto(categoria, file, { caboId: cabo.id, campo })
+              ? (campo, file) =>
+                  onReplacePhoto(categoria, file, {
+                    caboId: cabo.id,
+                    campo,
+                    escopo: escopoKey,
+                  })
               : undefined
           }
           {...blocoProps(categoria)}
@@ -1040,7 +1084,11 @@ export function RelatorioDetalhe({
             canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
               ? (file) => {
                   const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
-                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo });
+                  onReplacePhoto(categoria, file, {
+                    caboId: cabo.id,
+                    campo,
+                    escopo: escopoKey,
+                  });
                 }
               : undefined
           }
@@ -1050,7 +1098,7 @@ export function RelatorioDetalhe({
   };
 
   const renderOutra = (
-    item: RelatorioPayload["outrasFotos"][number],
+    item: EscopoPayload["outrasFotos"][number],
     categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
   ) => (
     <EvidenciaBloco
@@ -1112,16 +1160,17 @@ export function RelatorioDetalhe({
       }
       onReplacePhoto={
         canEditPhotos && onReplacePhoto
-          ? (_index, file) => onReplacePhoto(categoria, file, { outraId: item.id })
+          ? (_index, file) =>
+              onReplacePhoto(categoria, file, { outraId: item.id, escopo: escopoKey })
           : undefined
       }
       canEdit={canEditPhotos}
       onAdd={
         canEditPhotos && onReplacePhoto && !item.foto
-          ? (file) => onReplacePhoto(categoria, file, { outraId: item.id })
+          ? (file) => onReplacePhoto(categoria, file, { outraId: item.id, escopo: escopoKey })
           : undefined
       }
-      uploadKey={`${row.id}-${categoria}-${item.id}`}
+      uploadKey={`${row.id}-${escopoKey}-${categoria}-${item.id}`}
       uploading={uploadingCategoria === categoria}
     />
   );
@@ -1218,25 +1267,32 @@ export function RelatorioDetalhe({
         </div>
       ) : null}
 
-      <nav className="flex w-full border-b border-border" aria-label="Seções do relatório">
-        {abasVisiveis.map((aba) => {
-          const ativa = abaAtiva === aba.id;
-          return (
-            <button
-              key={aba.id}
-              type="button"
-              onClick={() => setAbaAtiva(aba.id)}
-              className={`${abasVisiveis.length > 1 ? "min-w-0 flex-1" : ""} px-2 py-3 text-center text-xs sm:px-3 sm:text-sm transition ${
-                ativa
-                  ? "border-b-2 border-green-600 font-bold text-green-700"
-                  : "border-b-2 border-transparent font-medium text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {aba.label}
-            </button>
-          );
-        })}
-      </nav>
+      {isEmpresarial ? (
+        <div className="space-y-3">
+          <RelatorioAbasPai abaAtiva={abaPai} onChange={setAbaPai} />
+          {emEscopo ? <RelatorioAbasFilha abaAtiva={abaFilha} onChange={setAbaFilha} /> : null}
+        </div>
+      ) : (
+        <nav className="flex w-full border-b border-border" aria-label="Seções do relatório">
+          {abasVisiveis.map((aba) => {
+            const ativa = abaCampo === aba.id;
+            return (
+              <button
+                key={aba.id}
+                type="button"
+                onClick={() => setAbaCampo(aba.id)}
+                className={`${abasVisiveis.length > 1 ? "min-w-0 flex-1" : ""} px-2 py-3 text-center text-xs sm:px-3 sm:text-sm transition ${
+                  ativa
+                    ? "border-b-2 border-green-600 font-bold text-green-700"
+                    : "border-b-2 border-transparent font-medium text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {aba.label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {abaAtiva === "RE" ? (
         <div className="space-y-6">
@@ -1256,6 +1312,46 @@ export function RelatorioDetalhe({
               });
             }}
           />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <CordoalhaSimNaoCard
+              title="Lançado cordoalha?"
+              quantidadeLabel="Quantidade de cordoalha lançada:"
+              quantidadePlaceholder="Ex: 50"
+              value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (cordoalhaLancada) => {
+                      if (!payload) return;
+                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeAcesso: { ...redeAcesso, cordoalhaLancada },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            <CordoalhaSimNaoCard
+              title="Cordoalha existente?"
+              quantidadeLabel="Quantidade de cordoalha existente:"
+              quantidadePlaceholder="Ex: 120"
+              value={payload?.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (cordoalhaExistente) => {
+                      if (!payload) return;
+                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeAcesso: { ...redeAcesso, cordoalhaExistente },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+          </div>
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Postes e metragem
@@ -1377,6 +1473,46 @@ export function RelatorioDetalhe({
                 }}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <CordoalhaSimNaoCard
+              title="Lançado cordoalha?"
+              quantidadeLabel="Quantidade de cordoalha lançada:"
+              quantidadePlaceholder="Ex: 50"
+              value={payload?.redeCliente?.cordoalhaLancada ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (cordoalhaLancada) => {
+                      if (!payload) return;
+                      const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeCliente: { ...redeCliente, cordoalhaLancada },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            <CordoalhaSimNaoCard
+              title="Cordoalha existente?"
+              quantidadeLabel="Quantidade de cordoalha existente:"
+              quantidadePlaceholder="Ex: 120"
+              value={payload?.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (cordoalhaExistente) => {
+                      if (!payload) return;
+                      const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeCliente: { ...redeCliente, cordoalhaExistente },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
           </div>
           <section className="space-y-3">
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
@@ -1599,10 +1735,40 @@ export function RelatorioDetalhe({
         />
       ) : null}
 
-      {abaAtiva === "configuracao" ? <AbaConfiguracao /> : null}
-      {abaAtiva === "infraestrutura" ? <AbaInfraestrutura /> : null}
-      {abaAtiva === "medicoes" ? <AbaMedicoes /> : null}
-      {abaAtiva === "contatos" ? <AbaContatos /> : null}
+      {abaAtiva === "configuracao" ? (
+        <AbaConfiguracao
+          value={payload?.configuracao ?? emptyConfiguracao()}
+          onChange={
+            canEditPhotos && payload
+              ? (configuracao) => patchPayload({ ...payload, configuracao })
+              : undefined
+          }
+          readOnly={!canEditPhotos}
+        />
+      ) : null}
+      {abaAtiva === "infraestrutura" ? (
+        <AbaInfraestrutura
+          value={payload?.infraestrutura ?? emptyInfraestrutura()}
+          onChange={
+            canEditPhotos && payload
+              ? (infraestrutura) => patchPayload({ ...payload, infraestrutura })
+              : undefined
+          }
+          readOnly={!canEditPhotos}
+        />
+      ) : null}
+      {isEmpresarial && abaPai === "Medicoes" ? <AbaMedicoes /> : null}
+      {isEmpresarial && abaPai === "Contatos" ? (
+        <AbaContatos
+          value={payloadRaiz?.contatos ?? emptyContatos()}
+          onChange={
+            canEditPhotos && payloadRaiz
+              ? (contatos) => patchRaiz({ ...payloadRaiz, contatos })
+              : undefined
+          }
+          readOnly={!canEditPhotos}
+        />
+      ) : null}
     </div>
   );
 }
