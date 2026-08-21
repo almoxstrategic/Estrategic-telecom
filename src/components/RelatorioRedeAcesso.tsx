@@ -495,6 +495,10 @@ export function RelatorioRedeAcesso({
   onCordoalhaLancadaChange,
   cordoalhaExistente,
   onCordoalhaExistenteChange,
+  postesNovaCordoalha,
+  onPostesNovaCordoalhaChange,
+  postesCordoalhaExistente,
+  onPostesCordoalhaExistenteChange,
   cabos,
   onPatchCabo,
   onAddCabo,
@@ -522,6 +526,16 @@ export function RelatorioRedeAcesso({
     isSim: boolean | null;
     quantidade: number | null;
   }) => void;
+  postesNovaCordoalha?: { isSim: boolean | null; quantidade: number | null };
+  onPostesNovaCordoalhaChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
+  postesCordoalhaExistente?: { isSim: boolean | null; quantidade: number | null };
+  onPostesCordoalhaExistenteChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
   cabos: CaboMetragemPayload[];
   onPatchCabo: (id: string, patch: Partial<CaboMetragemPayload>) => void;
   onAddCabo: () => void;
@@ -543,8 +557,8 @@ export function RelatorioRedeAcesso({
   showObsAdmin?: boolean;
 }) {
   const mostrarMetragem = lancamentoRe === "sim";
-  const metragemDesabilitada = lancamentoRe === "nao";
   const mostrarCordoalha = Boolean(cordoalhaLancada && cordoalhaExistente);
+  const mostrarPostes = Boolean(postesNovaCordoalha && postesCordoalhaExistente);
 
   return (
     <EvidencePhotoPasteProvider>
@@ -568,6 +582,190 @@ export function RelatorioRedeAcesso({
               NÃO
             </ChoiceButton>
           </div>
+
+          {mostrarMetragem ? (
+            <div className="space-y-4 border-t border-border pt-4">
+              <h2 className="text-base font-bold">Metragem de cabo</h2>
+              {cabos.map((cabo, index) => (
+                <div
+                  key={cabo.id}
+                  className="relative flex flex-col space-y-3 rounded-xl border border-border p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold">Cabo {index + 1}</p>
+                    {!readOnly && index >= 1 && onRemoveCabo ? (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveCabo(cabo.id)}
+                        className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                        aria-label={`Excluir cabo ${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={cabo.tipoCabo}
+                      onChange={(e) =>
+                        onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value) })
+                      }
+                      placeholder="Ex: 12"
+                      disabled={readOnly}
+                      className={inputClass()}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold">
+                        Marcação Inicial (m)
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        value={cabo.marcacaoInicial}
+                        onChange={(e) => {
+                          const marcacaoInicial = e.target.value;
+                          onPatchCabo(cabo.id, {
+                            marcacaoInicial,
+                            metragem: calcularMetragemCaboTotal(
+                              marcacaoInicial,
+                              cabo.marcacaoFinal,
+                            ),
+                          });
+                        }}
+                        disabled={readOnly}
+                        className={inputClass()}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold">
+                        Marcação Final (m)
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        value={cabo.marcacaoFinal}
+                        onChange={(e) => {
+                          const marcacaoFinal = e.target.value;
+                          onPatchCabo(cabo.id, {
+                            marcacaoFinal,
+                            metragem: calcularMetragemCaboTotal(
+                              cabo.marcacaoInicial,
+                              marcacaoFinal,
+                            ),
+                          });
+                        }}
+                        disabled={readOnly}
+                        className={inputClass()}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold">Metragem Total (m)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={
+                        cabo.metragem ||
+                        calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
+                      }
+                      className={`${inputClass()} cursor-default bg-gray-100`}
+                      tabIndex={-1}
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <FotoLabel>Foto Inicial</FotoLabel>
+                      {cabo.fotoInicio ? (
+                        <RelatorioFotoComControles
+                          src={cabo.fotoInicio.url}
+                          alt="Foto Inicial"
+                          canEdit={!readOnly}
+                          onDelete={() => {
+                            void deleteRelatorioPhoto(cabo.fotoInicio?.path);
+                            onCaboPhoto(cabo.id, "fotoInicio", null);
+                          }}
+                          onReplace={(file) => {
+                            void deleteRelatorioPhoto(cabo.fotoInicio?.path);
+                            onCaboPhoto(cabo.id, "fotoInicio", file);
+                          }}
+                        />
+                      ) : readOnly ? (
+                        <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
+                      ) : (
+                        <PhotoUpload
+                          label="Foto Inicial"
+                          suffix="inicio"
+                          hideLabel
+                          compact
+                          value={null}
+                          onChange={(file) => {
+                            if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <FotoLabel>Foto Final</FotoLabel>
+                      {cabo.fotoFim ? (
+                        <RelatorioFotoComControles
+                          src={cabo.fotoFim.url}
+                          alt="Foto Final"
+                          canEdit={!readOnly}
+                          onDelete={() => {
+                            void deleteRelatorioPhoto(cabo.fotoFim?.path);
+                            onCaboPhoto(cabo.id, "fotoFim", null);
+                          }}
+                          onReplace={(file) => {
+                            void deleteRelatorioPhoto(cabo.fotoFim?.path);
+                            onCaboPhoto(cabo.id, "fotoFim", file);
+                          }}
+                        />
+                      ) : readOnly ? (
+                        <p className="text-sm text-muted-foreground">Sem foto final.</p>
+                      ) : (
+                        <PhotoUpload
+                          label="Foto Final"
+                          suffix="fim"
+                          hideLabel
+                          compact
+                          value={null}
+                          onChange={(file) => {
+                            if (file) onCaboPhoto(cabo.id, "fotoFim", file);
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-auto w-full">
+                    <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+                    <textarea
+                      value={cabo.obs}
+                      onChange={(e) => onPatchCabo(cabo.id, { obs: e.target.value })}
+                      rows={3}
+                      disabled={readOnly}
+                      className={inputClass()}
+                    />
+                  </div>
+                </div>
+              ))}
+              {readOnly ? null : (
+                <button
+                  type="button"
+                  onClick={onAddCabo}
+                  className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar mais cabo
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {mostrarCordoalha ? (
@@ -592,224 +790,66 @@ export function RelatorioRedeAcesso({
         ) : null}
 
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-        {metragemDesabilitada ? (
-          <div className="pointer-events-none flex h-full flex-col rounded-2xl border border-border bg-gray-100 p-5 opacity-60 shadow-sm">
-            <h2 className="text-base font-bold">Metragem de cabo</h2>
-            <div className="flex min-h-[120px] flex-1 items-center justify-center">
-              <span className="rounded-full bg-white px-3 py-1.5 text-center text-sm font-semibold text-gray-700">
-                Sem lançamento de cabos nesta OS
-              </span>
+          {grupos.map((grupo) => (
+            <div key={grupo.grupoKey} className="contents">
+              <RelatorioFotosBloco
+                title={grupo.title}
+                hint={grupo.hint}
+                headerExtra={
+                  grupo.quantidadeLabel || grupo.coordenadas ? (
+                    <div className="space-y-3">
+                      {grupo.quantidadeLabel ? (
+                        <CampoQuantidade
+                          label={grupo.quantidadeLabel}
+                          placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
+                          value={grupo.quantidade ?? null}
+                          onChange={grupo.onQuantidadeChange}
+                          disabled={readOnly}
+                        />
+                      ) : null}
+                      {grupo.coordenadas ? (
+                        <CampoCoordenadas
+                          title={grupo.coordenadasTitle ?? "Coordenadas"}
+                          value={grupo.coordenadas}
+                          onChange={grupo.onCoordenadasChange}
+                          disabled={readOnly}
+                          embedded
+                        />
+                      ) : null}
+                    </div>
+                  ) : null
+                }
+                slots={grupo.slots}
+                onChange={grupo.onChange}
+                obs={grupo.obs}
+                onObsChange={grupo.onObsChange}
+                minSlots={grupo.minSlots}
+                readOnly={readOnly}
+                onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+              />
+              {mostrarPostes &&
+              (grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao") ? (
+                <>
+                  <CordoalhaSimNaoCard
+                    title="Postes novo com nova cordoalha?"
+                    quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+                    quantidadePlaceholder="Ex: 10"
+                    value={postesNovaCordoalha!}
+                    onChange={onPostesNovaCordoalhaChange}
+                    disabled={readOnly}
+                  />
+                  <CordoalhaSimNaoCard
+                    title="Postes com cordoalha Existente?"
+                    quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
+                    quantidadePlaceholder="Ex: 10"
+                    value={postesCordoalhaExistente!}
+                    onChange={onPostesCordoalhaExistenteChange}
+                    disabled={readOnly}
+                  />
+                </>
+              ) : null}
             </div>
-          </div>
-        ) : mostrarMetragem ? (
-          <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-base font-bold">Metragem de cabo</h2>
-            {cabos.map((cabo, index) => (
-              <div key={cabo.id} className="relative flex flex-col space-y-3 rounded-xl border border-border p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold">Cabo {index + 1}</p>
-                  {!readOnly && index >= 1 && onRemoveCabo ? (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveCabo(cabo.id)}
-                      className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-                      aria-label={`Excluir cabo ${index + 1}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={cabo.tipoCabo}
-                    onChange={(e) =>
-                      onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value) })
-                    }
-                    placeholder="Ex: 12"
-                    disabled={readOnly}
-                    className={inputClass()}
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold">Marcação Inicial (m)</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      value={cabo.marcacaoInicial}
-                      onChange={(e) => {
-                        const marcacaoInicial = e.target.value;
-                        onPatchCabo(cabo.id, {
-                          marcacaoInicial,
-                          metragem: calcularMetragemCaboTotal(marcacaoInicial, cabo.marcacaoFinal),
-                        });
-                      }}
-                      disabled={readOnly}
-                      className={inputClass()}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold">Marcação Final (m)</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      value={cabo.marcacaoFinal}
-                      onChange={(e) => {
-                        const marcacaoFinal = e.target.value;
-                        onPatchCabo(cabo.id, {
-                          marcacaoFinal,
-                          metragem: calcularMetragemCaboTotal(cabo.marcacaoInicial, marcacaoFinal),
-                        });
-                      }}
-                      disabled={readOnly}
-                      className={inputClass()}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Metragem Total (m)</label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={
-                      cabo.metragem ||
-                      calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
-                    }
-                    className={`${inputClass()} cursor-default bg-gray-100`}
-                    tabIndex={-1}
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <FotoLabel>Foto Inicial</FotoLabel>
-                    {cabo.fotoInicio ? (
-                      <RelatorioFotoComControles
-                        src={cabo.fotoInicio.url}
-                        alt="Foto Inicial"
-                        canEdit={!readOnly}
-                        onDelete={() => {
-                          void deleteRelatorioPhoto(cabo.fotoInicio?.path);
-                          onCaboPhoto(cabo.id, "fotoInicio", null);
-                        }}
-                        onReplace={(file) => {
-                          void deleteRelatorioPhoto(cabo.fotoInicio?.path);
-                          onCaboPhoto(cabo.id, "fotoInicio", file);
-                        }}
-                      />
-                    ) : readOnly ? (
-                      <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
-                    ) : (
-                      <PhotoUpload
-                        label="Foto Inicial"
-                        suffix="inicio"
-                        hideLabel
-                        compact
-                        value={null}
-                        onChange={(file) => {
-                          if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <FotoLabel>Foto Final</FotoLabel>
-                    {cabo.fotoFim ? (
-                      <RelatorioFotoComControles
-                        src={cabo.fotoFim.url}
-                        alt="Foto Final"
-                        canEdit={!readOnly}
-                        onDelete={() => {
-                          void deleteRelatorioPhoto(cabo.fotoFim?.path);
-                          onCaboPhoto(cabo.id, "fotoFim", null);
-                        }}
-                        onReplace={(file) => {
-                          void deleteRelatorioPhoto(cabo.fotoFim?.path);
-                          onCaboPhoto(cabo.id, "fotoFim", file);
-                        }}
-                      />
-                    ) : readOnly ? (
-                      <p className="text-sm text-muted-foreground">Sem foto final.</p>
-                    ) : (
-                      <PhotoUpload
-                        label="Foto Final"
-                        suffix="fim"
-                        hideLabel
-                        compact
-                        value={null}
-                        onChange={(file) => {
-                          if (file) onCaboPhoto(cabo.id, "fotoFim", file);
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="mt-auto w-full">
-                  <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-                  <textarea
-                    value={cabo.obs}
-                    onChange={(e) => onPatchCabo(cabo.id, { obs: e.target.value })}
-                    rows={3}
-                    disabled={readOnly}
-                    className={inputClass()}
-                  />
-                </div>
-              </div>
-            ))}
-            {readOnly ? null : (
-              <button
-                type="button"
-                onClick={onAddCabo}
-                className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
-              >
-                <Plus className="h-4 w-4" /> Adicionar mais cabo
-              </button>
-            )}
-          </div>
-        ) : null}
-
-        {grupos.map((grupo) => (
-          <RelatorioFotosBloco
-            key={grupo.grupoKey}
-            title={grupo.title}
-            hint={grupo.hint}
-            headerExtra={
-              grupo.quantidadeLabel || grupo.coordenadas ? (
-                <div className="space-y-3">
-                  {grupo.quantidadeLabel ? (
-                    <CampoQuantidade
-                      label={grupo.quantidadeLabel}
-                      placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
-                      value={grupo.quantidade ?? null}
-                      onChange={grupo.onQuantidadeChange}
-                      disabled={readOnly}
-                    />
-                  ) : null}
-                  {grupo.coordenadas ? (
-                    <CampoCoordenadas
-                      title={grupo.coordenadasTitle ?? "Coordenadas"}
-                      value={grupo.coordenadas}
-                      onChange={grupo.onCoordenadasChange}
-                      disabled={readOnly}
-                      embedded
-                    />
-                  ) : null}
-                </div>
-              ) : null
-            }
-            slots={grupo.slots}
-            onChange={grupo.onChange}
-            obs={grupo.obs}
-            onObsChange={grupo.onObsChange}
-            minSlots={grupo.minSlots}
-            readOnly={readOnly}
-            onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
-          />
-        ))}
+          ))}
         </div>
 
         <RelatorioOutrasFotos

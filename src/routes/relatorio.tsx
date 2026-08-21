@@ -247,6 +247,8 @@ function RelatorioPage() {
   const [posteObs, setPosteObs] = useState("");
   const [caixa, setCaixa] = useState<FotoSlot[]>([newFotoSlot()]);
   const [caixaObs, setCaixaObs] = useState("");
+  const [duto, setDuto] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [dutoObs, setDutoObs] = useState("");
   const [plaqueta, setPlaqueta] = useState<FotoSlot[]>([newFotoSlot()]);
   const [plaquetaObs, setPlaquetaObs] = useState("");
   const [sobra, setSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
@@ -333,6 +335,7 @@ function RelatorioPage() {
       metragensCabo: cabos,
       posteConexao: grupoPayload(poste, posteObs, obsAdminGrupos.posteConexao),
       caixaEmenda: grupoPayload(caixa, caixaObs, obsAdminGrupos.caixaEmenda),
+      dutoSubterraneo: grupoPayload(duto, dutoObs, obsAdminGrupos.dutoSubterraneo),
       plaquetaIdentificacao: grupoPayload(plaqueta, plaquetaObs, obsAdminGrupos.plaquetaIdentificacao),
       novoAterramentoPoste: grupoPayload(
         novoAterramento,
@@ -437,6 +440,8 @@ function RelatorioPage() {
     posteObs,
     caixa,
     caixaObs,
+    duto,
+    dutoObs,
     plaqueta,
     plaquetaObs,
     novoAterramento,
@@ -574,6 +579,7 @@ function RelatorioPage() {
       cabos,
       posteObs,
       caixaObs,
+      dutoObs,
       plaquetaObs,
       sobraObs,
       terrometroObs,
@@ -582,6 +588,7 @@ function RelatorioPage() {
       etiquetaObs,
       poste,
       caixa,
+      duto,
       plaqueta,
       sobra,
       terrometro,
@@ -639,6 +646,8 @@ function RelatorioPage() {
     setPosteObs(p.posteConexao?.obs ?? "");
     setCaixa(slotsFromStored(p.caixaEmenda?.fotos ?? [], 1));
     setCaixaObs(p.caixaEmenda?.obs ?? "");
+    setDuto(slotsFromStored(p.dutoSubterraneo?.fotos ?? [], 1));
+    setDutoObs(p.dutoSubterraneo?.obs ?? "");
     setPlaqueta(slotsFromStored(p.plaquetaIdentificacao?.fotos ?? [], 1));
     setPlaquetaObs(p.plaquetaIdentificacao?.obs ?? "");
     setSobra(slotsFromStored(p.sobraTecnica?.fotos ?? [], 1));
@@ -657,10 +666,14 @@ function RelatorioPage() {
       ...(p.redeAcesso ?? {}),
       cordoalhaLancada: p.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco(),
       cordoalhaExistente: p.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco(),
+      postesNovaCordoalha: p.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
+      postesCordoalhaExistente: p.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
+      aterramento: p.redeAcesso?.aterramento ?? { totalHastes: null },
     });
     setObsAdminGrupos({
       posteConexao: readObsAdmin(p.posteConexao),
       caixaEmenda: readObsAdmin(p.caixaEmenda),
+      dutoSubterraneo: readObsAdmin(p.dutoSubterraneo),
       plaquetaIdentificacao: readObsAdmin(p.plaquetaIdentificacao),
       novoAterramentoPoste: readObsAdmin(p.novoAterramentoPoste),
       aterramentoTerrometro: readObsAdmin(p.aterramentoTerrometro),
@@ -698,6 +711,9 @@ function RelatorioPage() {
       ...(p.redeCliente ?? {}),
       cordoalhaLancada: p.redeCliente?.cordoalhaLancada ?? emptyCordoalhaBloco(),
       cordoalhaExistente: p.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco(),
+      postesNovaCordoalha: p.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
+      postesCordoalhaExistente: p.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
+      aterramento: p.redeCliente?.aterramento ?? { totalHastes: null },
       coordenadas: p.redeCliente?.coordenadas ?? emptyCoordenadas(),
       caixaEmendaAcomodacao: {
         coordenadas: p.redeCliente?.caixaEmendaAcomodacao?.coordenadas ?? emptyCoordenadas(),
@@ -1050,6 +1066,7 @@ function RelatorioPage() {
   > = {
     posteConexao: setPoste,
     caixaEmenda: setCaixa,
+    dutoSubterraneo: setDuto,
     plaquetaIdentificacao: setPlaqueta,
     sobraTecnica: setSobra,
     novoAterramentoPoste: setNovoAterramento,
@@ -1297,6 +1314,14 @@ function RelatorioPage() {
                   onCordoalhaExistenteChange={(cordoalhaExistente) =>
                     setRedeAcesso((prev) => ({ ...prev, cordoalhaExistente }))
                   }
+                  postesNovaCordoalha={redeAcesso.postesNovaCordoalha}
+                  onPostesNovaCordoalhaChange={(postesNovaCordoalha) =>
+                    setRedeAcesso((prev) => ({ ...prev, postesNovaCordoalha }))
+                  }
+                  postesCordoalhaExistente={redeAcesso.postesCordoalhaExistente}
+                  onPostesCordoalhaExistenteChange={(postesCordoalhaExistente) =>
+                    setRedeAcesso((prev) => ({ ...prev, postesCordoalhaExistente }))
+                  }
                   cabos={cabos}
                   onPatchCabo={(id, patch) => patchCabo(setCabos, id, patch)}
                   onAddCabo={() => setCabos((prev) => [...prev, emptyCaboMetragem()])}
@@ -1334,6 +1359,16 @@ function RelatorioPage() {
                               setRedeAcesso((prev) => ({ ...prev, qtdCaixasEmenda })),
                           }
                         : {}),
+                    },
+                    {
+                      grupoKey: "dutoSubterraneo",
+                      title: "Const. de duto subterraneio (MD ou MND)",
+                      slots: duto,
+                      onChange: setDuto,
+                      obs: dutoObs,
+                      onObsChange: setDutoObs,
+                      obsAdmin: obsAdminGrupos.dutoSubterraneo ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("dutoSubterraneo"),
                     },
                     {
                       grupoKey: "plaquetaIdentificacao",
@@ -1380,6 +1415,14 @@ function RelatorioPage() {
                       onObsChange: setTerrometroObs,
                       obsAdmin: obsAdminGrupos.aterramentoTerrometro ?? "",
                       onObsAdminChange: patchObsAdminGrupo("aterramentoTerrometro"),
+                      quantidade: redeAcesso.aterramento?.totalHastes ?? null,
+                      quantidadeLabel: "Total de Hastes (5/8):",
+                      quantidadePlaceholder: "Ex: 4",
+                      onQuantidadeChange: (totalHastes) =>
+                        setRedeAcesso((prev) => ({
+                          ...prev,
+                          aterramento: { ...prev.aterramento, totalHastes },
+                        })),
                     },
                     {
                       grupoKey: "posicaoConexaoEstacao",
@@ -1458,6 +1501,14 @@ function RelatorioPage() {
                   cordoalhaExistente={redeCliente.cordoalhaExistente}
                   onCordoalhaExistenteChange={(cordoalhaExistente) =>
                     setRedeCliente((prev) => ({ ...prev, cordoalhaExistente }))
+                  }
+                  postesNovaCordoalha={redeCliente.postesNovaCordoalha}
+                  onPostesNovaCordoalhaChange={(postesNovaCordoalha) =>
+                    setRedeCliente((prev) => ({ ...prev, postesNovaCordoalha }))
+                  }
+                  postesCordoalhaExistente={redeCliente.postesCordoalhaExistente}
+                  onPostesCordoalhaExistenteChange={(postesCordoalhaExistente) =>
+                    setRedeCliente((prev) => ({ ...prev, postesCordoalhaExistente }))
                   }
                   cabos={cabosRc}
                   onPatchCabo={(id, patch) => patchCabo(setCabosRc, id, patch)}

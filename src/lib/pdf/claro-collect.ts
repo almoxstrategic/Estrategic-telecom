@@ -610,8 +610,37 @@ export function collectPdfBlocksEscopo(
         "Qtd. cordoalha existente (RE)",
       );
     }
+    pushPara(meta, simNao(p?.redeAcesso?.postesNovaCordoalha?.isSim), "Postes novo com nova cordoalha (RE)");
+    if (
+      p?.redeAcesso?.postesNovaCordoalha?.isSim &&
+      p.redeAcesso.postesNovaCordoalha.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeAcesso.postesNovaCordoalha.quantidade),
+        "Qtd. postes com nova cordoalha (RE)",
+      );
+    }
+    pushPara(
+      meta,
+      simNao(p?.redeAcesso?.postesCordoalhaExistente?.isSim),
+      "Postes com cordoalha existente (RE)",
+    );
+    if (
+      p?.redeAcesso?.postesCordoalhaExistente?.isSim &&
+      p.redeAcesso.postesCordoalhaExistente.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeAcesso.postesCordoalhaExistente.quantidade),
+        "Qtd. postes com cordoalha existente (RE)",
+      );
+    }
     if (p?.redeAcesso?.qtdCaixasEmenda != null) {
       pushPara(meta, String(p.redeAcesso.qtdCaixasEmenda), "Qtd. caixas de emenda");
+    }
+    if (p?.redeAcesso?.aterramento?.totalHastes != null) {
+      pushPara(meta, String(p.redeAcesso.aterramento.totalHastes), "Total de hastes (5/8)");
     }
     for (const b of meta) blocks.push(b);
   }
@@ -619,6 +648,7 @@ export function collectPdfBlocksEscopo(
   collectGruposEmGrade(blocks, [
     { titulo: "Poste de conexao", grupo: p?.posteConexao },
     { titulo: "Caixa de emenda", grupo: p?.caixaEmenda },
+    { titulo: "Const. de duto subterraneio (MD ou MND)", grupo: p?.dutoSubterraneo },
     { titulo: "Sobra tecnica / Fiberloop", grupo: p?.sobraTecnica },
     { titulo: "Plaqueta de Identificacao", grupo: p?.plaquetaIdentificacao },
     { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
@@ -653,6 +683,32 @@ export function collectPdfBlocksEscopo(
         meta,
         String(p.redeCliente.cordoalhaExistente.quantidade),
         "Qtd. cordoalha existente (RC)",
+      );
+    }
+    pushPara(meta, simNao(p?.redeCliente?.postesNovaCordoalha?.isSim), "Postes novo com nova cordoalha (RC)");
+    if (
+      p?.redeCliente?.postesNovaCordoalha?.isSim &&
+      p.redeCliente.postesNovaCordoalha.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeCliente.postesNovaCordoalha.quantidade),
+        "Qtd. postes com nova cordoalha (RC)",
+      );
+    }
+    pushPara(
+      meta,
+      simNao(p?.redeCliente?.postesCordoalhaExistente?.isSim),
+      "Postes com cordoalha existente (RC)",
+    );
+    if (
+      p?.redeCliente?.postesCordoalhaExistente?.isSim &&
+      p.redeCliente.postesCordoalhaExistente.quantidade != null
+    ) {
+      pushPara(
+        meta,
+        String(p.redeCliente.postesCordoalhaExistente.quantidade),
+        "Qtd. postes com cordoalha existente (RC)",
       );
     }
     if (p?.redeCliente?.qtdCaixasEmenda != null) {
@@ -761,6 +817,7 @@ function escopoTemConteudo(p: EscopoPayload | undefined): boolean {
   const grupos: (FotoGrupoPayload | undefined)[] = [
     p.posteConexao,
     p.caixaEmenda,
+    p.dutoSubterraneo,
     p.plaquetaIdentificacao,
     p.novoAterramentoPoste,
     p.aterramentoTerrometro,

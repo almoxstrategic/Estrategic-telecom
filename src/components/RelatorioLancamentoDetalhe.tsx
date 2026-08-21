@@ -480,25 +480,6 @@ function emptyOutraFoto(): EscopoPayload["outrasFotos"][number] {
   return { id: crypto.randomUUID(), ref: "", foto: null, obs: "", obsAdmin: "" };
 }
 
-function mensagemMetragemDesabilitada(lancamento: boolean | null | undefined) {
-  return lancamento === false
-    ? "Sem lançamento de cabos nesta OS"
-    : "Existência de cabo ainda não informada pelo técnico";
-}
-
-function MetragemDesabilitada({ title, mensagem }: { title: string; mensagem: string }) {
-  return (
-    <div className="pointer-events-none flex h-full flex-col items-center justify-center rounded-xl border border-border bg-gray-100 p-6 opacity-60">
-      <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
-      <div className="flex min-h-[100px] items-center justify-center">
-        <span className="rounded-full bg-white px-3 py-1.5 text-center text-sm font-semibold text-gray-700">
-          {mensagem}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function simNao(value: boolean | null | undefined) {
   if (value === true) return "SIM";
   if (value === false) return "NÃO";
@@ -909,7 +890,25 @@ export function RelatorioDetalhe({
                         patchQtdFiberloop("redeCliente", qtdFiberloopInstalado)
                     : undefined,
                 }
-              : {};
+              : payload && key === "aterramentoTerrometro"
+                ? {
+                    quantidade: redeAcesso.aterramento?.totalHastes ?? null,
+                    quantidadeLabel: "Total de Hastes (5/8):",
+                    quantidadePlaceholder: "Ex: 4",
+                    onQuantidadeChange: canEditPhotos
+                      ? (totalHastes: number | null) => {
+                          if (!payload) return;
+                          patchPayload({
+                            ...payload,
+                            redeAcesso: {
+                              ...redeAcesso,
+                              aterramento: { ...redeAcesso.aterramento, totalHastes },
+                            },
+                          });
+                        }
+                      : undefined,
+                  }
+                : {};
     return (
       <EvidenciaBloco
         key={key}
@@ -1380,13 +1379,46 @@ export function RelatorioDetalhe({
                     />
                   ) : null}
                 </div>
-              ) : (
-                <MetragemDesabilitada
-                  title="Metragem de cabo (RE)"
-                  mensagem={mensagemMetragemDesabilitada(payload?.lancamentoRe)}
-                />
-              )}
+              ) : null}
               {renderGrupo("Poste de conexão", "posteConexao")}
+              <CordoalhaSimNaoCard
+                title="Postes novo com nova cordoalha?"
+                quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+                quantidadePlaceholder="Ex: 10"
+                value={payload?.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (postesNovaCordoalha) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: { ...redeAcesso, postesNovaCordoalha },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+              <CordoalhaSimNaoCard
+                title="Postes com cordoalha Existente?"
+                quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
+                quantidadePlaceholder="Ex: 10"
+                value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (postesCordoalhaExistente) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: { ...redeAcesso, postesCordoalhaExistente },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
             </div>
           </section>
           <section className="space-y-3">
@@ -1395,6 +1427,7 @@ export function RelatorioDetalhe({
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {renderGrupo("Caixa de emenda", "caixaEmenda")}
+              {renderGrupo("Const. de duto subterraneio (MD ou MND)", "dutoSubterraneo")}
               {renderGrupo("Sobra técnica / Fiberloop instalado", "sobraTecnica")}
             </div>
           </section>
@@ -1539,15 +1572,48 @@ export function RelatorioDetalhe({
                     />
                   ) : null}
                 </div>
-              ) : (
-                <MetragemDesabilitada
-                  title="Metragem de cabo (RC)"
-                  mensagem={mensagemMetragemDesabilitada(payload?.lancamentoRc)}
-                />
-              )}
+              ) : null}
+              {renderGrupo("Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao")}
+              <CordoalhaSimNaoCard
+                title="Postes novo com nova cordoalha?"
+                quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+                quantidadePlaceholder="Ex: 10"
+                value={payload?.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (postesNovaCordoalha) => {
+                        if (!payload) return;
+                        const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeCliente: { ...redeCliente, postesNovaCordoalha },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+              <CordoalhaSimNaoCard
+                title="Postes com cordoalha Existente?"
+                quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
+                quantidadePlaceholder="Ex: 10"
+                value={payload?.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (postesCordoalhaExistente) => {
+                        if (!payload) return;
+                        const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeCliente: { ...redeCliente, postesCordoalhaExistente },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
               {(
                 [
-                  ["Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao"],
                   ["Caixa de emenda na acomodação (Rede cliente com Rede Externa)", "rcCaixaEmenda"],
                   ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
                   ["Plaqueta de Identificação - Terminação do cabo no cliente", "rcPlaquetaIdentificacao"],

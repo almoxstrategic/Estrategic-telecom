@@ -100,6 +100,11 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         fotos={payload?.caixaEmenda.fotos ?? []}
       />
       <Secao
+        titulo="Const. de duto subterraneio (MD ou MND)"
+        obs={payload?.dutoSubterraneo.obs}
+        fotos={payload?.dutoSubterraneo.fotos ?? []}
+      />
+      <Secao
         titulo="Plaqueta de Identificação"
         obs={payload?.plaquetaIdentificacao.obs}
         fotos={payload?.plaquetaIdentificacao.fotos ?? []}
@@ -114,6 +119,12 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.aterramentoTerrometro.obs}
         fotos={payload?.aterramentoTerrometro.fotos ?? []}
       />
+      {payload?.redeAcesso?.aterramento?.totalHastes != null ? (
+        <Campo
+          label="Total de Hastes (5/8)"
+          value={String(payload.redeAcesso.aterramento.totalHastes)}
+        />
+      ) : null}
       <Secao
         titulo="Posição DGO/DIO"
         obs={payload?.posicaoConexaoEstacao.obs}

@@ -165,6 +165,7 @@ export const CLARO_TEMPLATE_SCHEMA: ClienteRelatorioTemplateSchema = {
       gruposFoto: [
         "posteConexao",
         "caixaEmenda",
+        "dutoSubterraneo",
         "plaquetaIdentificacao",
         "novoAterramentoPoste",
         "aterramentoTerrometro",

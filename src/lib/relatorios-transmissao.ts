@@ -111,6 +111,7 @@ export type DgoClienteItemPayload = {
 export type RelatorioFotoGrupoKeyRe =
   | "posteConexao"
   | "caixaEmenda"
+  | "dutoSubterraneo"
   | "plaquetaIdentificacao"
   | "novoAterramentoPoste"
   | "aterramentoTerrometro"
@@ -319,6 +320,14 @@ export type QuantidadesRedePayload = {
   qtdFiberloopInstalado: number | null;
   cordoalhaLancada: CordoalhaBlocoPayload;
   cordoalhaExistente: CordoalhaBlocoPayload;
+  /** Postes novos com nova cordoalha (após Poste de conexão). */
+  postesNovaCordoalha: CordoalhaBlocoPayload;
+  /** Postes com cordoalha existente (após Poste de conexão). */
+  postesCordoalhaExistente: CordoalhaBlocoPayload;
+  /** Aterramento / terrometro. */
+  aterramento: {
+    totalHastes: number | null;
+  };
   /** Coordenadas do Cliente (aba RC). */
   coordenadas: CoordenadasPayload;
   /** Coordenadas da caixa de emenda na acomodação (aba RC). */
@@ -347,6 +356,7 @@ export type EscopoPayload = {
   metragensCabo: CaboMetragemPayload[];
   posteConexao: FotoGrupoPayload;
   caixaEmenda: FotoGrupoPayload;
+  dutoSubterraneo: FotoGrupoPayload;
   plaquetaIdentificacao: FotoGrupoPayload;
   novoAterramentoPoste: FotoGrupoPayload;
   aterramentoTerrometro: FotoGrupoPayload;
@@ -632,6 +642,9 @@ export function emptyQuantidadesRede(): QuantidadesRedePayload {
     qtdFiberloopInstalado: null,
     cordoalhaLancada: emptyCordoalhaBloco(),
     cordoalhaExistente: emptyCordoalhaBloco(),
+    postesNovaCordoalha: emptyCordoalhaBloco(),
+    postesCordoalhaExistente: emptyCordoalhaBloco(),
+    aterramento: { totalHastes: null },
     coordenadas: emptyCoordenadas(),
     caixaEmendaAcomodacao: { coordenadas: emptyCoordenadas() },
   };
@@ -665,6 +678,7 @@ export function emptyEscopoPayload(): EscopoPayload {
     metragensCabo: [],
     posteConexao: emptyFotoGrupo(),
     caixaEmenda: emptyFotoGrupo(),
+    dutoSubterraneo: emptyFotoGrupo(),
     plaquetaIdentificacao: emptyFotoGrupo(),
     novoAterramentoPoste: emptyFotoGrupo(),
     aterramentoTerrometro: emptyFotoGrupo(),
@@ -834,12 +848,18 @@ function parseCordoalhaBloco(raw: unknown): CordoalhaBlocoPayload {
 function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload> & {
     caixaEmendaAcomodacao?: { coordenadas?: unknown };
+    aterramento?: { totalHastes?: unknown };
   };
   return {
     qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
     qtdFiberloopInstalado: parseQtdInteiro(src.qtdFiberloopInstalado),
     cordoalhaLancada: parseCordoalhaBloco(src.cordoalhaLancada),
     cordoalhaExistente: parseCordoalhaBloco(src.cordoalhaExistente),
+    postesNovaCordoalha: parseCordoalhaBloco(src.postesNovaCordoalha),
+    postesCordoalhaExistente: parseCordoalhaBloco(src.postesCordoalhaExistente),
+    aterramento: {
+      totalHastes: parseQtdInteiro(src.aterramento?.totalHastes),
+    },
     coordenadas: parseCoordenadas(src.coordenadas),
     caixaEmendaAcomodacao: {
       coordenadas: parseCoordenadas(src.caixaEmendaAcomodacao?.coordenadas),
@@ -1233,6 +1253,7 @@ export function parseEscopoPayload(
     metragensCabo: parseCabos(raw),
     posteConexao: parseFotoGrupo(base.posteConexao, src.posteConexao),
     caixaEmenda: parseFotoGrupo(base.caixaEmenda, src.caixaEmenda),
+    dutoSubterraneo: parseFotoGrupo(base.dutoSubterraneo, src.dutoSubterraneo),
     plaquetaIdentificacao: parseFotoGrupo(base.plaquetaIdentificacao, src.plaquetaIdentificacao),
     novoAterramentoPoste: parseFotoGrupo(base.novoAterramentoPoste, src.novoAterramentoPoste),
     aterramentoTerrometro: parseFotoGrupo(base.aterramentoTerrometro, src.aterramentoTerrometro),
@@ -1334,6 +1355,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
 const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
   "posteConexao",
   "caixaEmenda",
+  "dutoSubterraneo",
   "plaquetaIdentificacao",
   "novoAterramentoPoste",
   "aterramentoTerrometro",
@@ -1613,6 +1635,20 @@ function mergeQuantidadesRede(
       fromServer.cordoalhaExistente,
       fromLocal.cordoalhaExistente,
     ),
+    postesNovaCordoalha: mergeCordoalhaBloco(
+      fromServer.postesNovaCordoalha,
+      fromLocal.postesNovaCordoalha,
+    ),
+    postesCordoalhaExistente: mergeCordoalhaBloco(
+      fromServer.postesCordoalhaExistente,
+      fromLocal.postesCordoalhaExistente,
+    ),
+    aterramento: {
+      totalHastes:
+        fromLocal.aterramento?.totalHastes === undefined
+          ? fromServer.aterramento?.totalHastes ?? null
+          : fromLocal.aterramento.totalHastes,
+    },
     coordenadas: mergeCoordenadas(fromServer.coordenadas, fromLocal.coordenadas),
     caixaEmendaAcomodacao: {
       coordenadas: mergeCoordenadas(
