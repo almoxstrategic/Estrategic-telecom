@@ -48,7 +48,7 @@ export const ABAS_PAI: { id: AbaPai; label: string }[] = [
 ];
 
 export const ABAS_FILHAS: { id: AbaFilha; label: string }[] = [
-  { id: "RE", label: "Rede Acesso (RE)" },
+  { id: "RE", label: "Rede Externa (RE)" },
   { id: "RC", label: "Rede Cliente (RC)" },
   { id: "equipamento", label: "Equipamento" },
   { id: "teste-optico", label: "Teste Óptico" },
@@ -66,7 +66,7 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
 ];
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
-  { id: "RE", label: "Rede Acesso (RE)" },
+  { id: "RE", label: "Rede Externa (RE)" },
   { id: "teste-otdr", label: "Teste OTDR" },
 ];
 
