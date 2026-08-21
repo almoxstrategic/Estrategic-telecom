@@ -266,16 +266,21 @@ function collectCabos(
       hasPhoto(c.fotoInicio) ||
       hasPhoto(c.fotoFim) ||
       c.tipoCabo.trim() ||
+      c.marcacaoInicial.trim() ||
+      c.marcacaoFinal.trim() ||
       c.metragem.trim() ||
       c.obs.trim(),
   );
   if (!ativos.length) return;
   pushHeading(blocks, tituloSecao);
   for (const [index, cabo] of ativos.entries()) {
-    const label = `Cabo ${index + 1} - ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "-"} m`;
+    const label = `Cabo ${index + 1} - tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "-"} m`;
     const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
     const andamento = andamentoTexto(cabo.obs, cabo.obsAdmin);
     if (andamento) pushPara(children, andamento, "Andamento da Obra");
+    pushPara(children, cabo.marcacaoInicial, "Marcacao Inicial (m)");
+    pushPara(children, cabo.marcacaoFinal, "Marcacao Final (m)");
+    pushPara(children, cabo.metragem, "Metragem Total (m)");
     const fotos: PdfPhotoItem[] = [];
     if (hasPhoto(cabo.fotoInicio)) {
       fotos.push({
@@ -588,7 +593,7 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
   collectGruposEmGrade(blocks, [
     { titulo: "Poste de conexao", grupo: p?.posteConexao },
     { titulo: "Caixa de emenda", grupo: p?.caixaEmenda },
-    { titulo: "Sobra tecnica", grupo: p?.sobraTecnica },
+    { titulo: "Sobra tecnica / Fiberloop", grupo: p?.sobraTecnica },
     { titulo: "Plaqueta de Identificacao", grupo: p?.plaquetaIdentificacao },
     { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
     { titulo: "Aterramento - TERROMETRO", grupo: p?.aterramentoTerrometro },
@@ -615,6 +620,7 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     { titulo: "Plaqueta de Identificacao (RC)", grupo: p?.rcPlaquetaIdentificacao },
     { titulo: "Entrada do cabo (area interna)", grupo: p?.rcEntradaInterna },
     { titulo: "Entrada do cabo (area externa)", grupo: p?.rcEntradaExterna },
+    { titulo: "Sobra tecnica / Fiberloop (RC)", grupo: p?.rcSobraTecnica },
   ]);
   collectOutras(blocks, "Outras fotos (RC)", p?.outrasFotosRc ?? []);
 
@@ -651,10 +657,16 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     collectGruposEmGrade(blocks, [
       { titulo: "Estacao - Foto geral", grupo: p.eqEstacaoGeral },
       { titulo: "Rack ou Local Instalacao", grupo: p.eqEstacaoRack },
-      { titulo: "Equipamento instalado", grupo: p.eqEstacaoEquipamento },
-      { titulo: "Etiqueta de identificacao (estacao)", grupo: p.eqEstacaoEtiqueta },
-      { titulo: "DGO / DID / ROUTER", grupo: p.eqEstacaoDgo },
     ]);
+    collectEquipamentoItensLista(
+      blocks,
+      "Equipamento instalado (Na estacao/PPC)",
+      p.eqEstacaoEquipamento ?? [],
+      { comIdentificacao: true },
+    );
+    collectEquipamentoItensLista(blocks, "DGO / DID / ROUTER", p.eqEstacaoDgo ?? [], {
+      comIdentificacao: false,
+    });
     collectOutras(blocks, "Outras fotos (Estacao)", p.outrasFotosEqEstacao ?? []);
   }
 

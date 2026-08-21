@@ -7,6 +7,12 @@ import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissa
 import { Badge } from "@/components/ui/badge";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
+import {
+  AbaConfiguracao,
+  AbaContatos,
+  AbaInfraestrutura,
+  AbaMedicoes,
+} from "@/components/RelatorioAbasPlaceholder";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
 import { RelatorioSyncStatus } from "@/components/RelatorioSyncStatus";
@@ -35,9 +41,12 @@ import {
   emptyEquipamentoClienteItem,
   emptyQuantidadesRede,
   emptyRelatorioPayload,
+  emptySecaoPlaceholder,
   emptyTesteOptico,
   emptyTestePotencia,
   deleteRelatorioPhoto,
+  apenasDigitos,
+  calcularMetragemCaboTotal,
   fetchRelatorioTransmissaoById,
   isTecnicoAtribuido,
   janelaPotenciaDerivada,
@@ -155,9 +164,7 @@ const EQ_GRUPO_KEYS: RelatorioFotoGrupoKeyEq[] = [
   "eqClienteSgp",
   "eqEstacaoGeral",
   "eqEstacaoRack",
-  "eqEstacaoEquipamento",
   "eqEstacaoEtiqueta",
-  "eqEstacaoDgo",
 ];
 
 function emptyEqGrupos(): Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi> {
@@ -169,9 +176,7 @@ function emptyEqGrupos(): Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi> {
     eqClienteSgp: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqEstacaoGeral: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqEstacaoRack: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
-    eqEstacaoEquipamento: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
     eqEstacaoEtiqueta: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
-    eqEstacaoDgo: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
   };
 }
 
@@ -217,7 +222,7 @@ function RelatorioPage() {
   const [caixaObs, setCaixaObs] = useState("");
   const [plaqueta, setPlaqueta] = useState<FotoSlot[]>([newFotoSlot()]);
   const [plaquetaObs, setPlaquetaObs] = useState("");
-  const [sobra, setSobra] = useState<FotoSlot[]>(() => [newFotoSlot(), newFotoSlot()]);
+  const [sobra, setSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
   const [sobraObs, setSobraObs] = useState("");
   const [terrometro, setTerrometro] = useState<FotoSlot[]>([newFotoSlot()]);
   const [terrometroObs, setTerrometroObs] = useState("");
@@ -248,6 +253,8 @@ function RelatorioPage() {
   const [rcEntradaInternaObs, setRcEntradaInternaObs] = useState("");
   const [rcEntradaExterna, setRcEntradaExterna] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcEntradaExternaObs, setRcEntradaExternaObs] = useState("");
+  const [rcSobra, setRcSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
+  const [rcSobraObs, setRcSobraObs] = useState("");
   const [outrasRc, setOutrasRc] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [eqGrupos, setEqGrupos] = useState<Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi>>(emptyEqGrupos);
   const [eqClienteDgoItens, setEqClienteDgoItens] = useState<DgoClienteItemPayload[]>(() => [
@@ -256,6 +263,12 @@ function RelatorioPage() {
   const [eqClienteEquipamentosItens, setEqClienteEquipamentosItens] = useState<
     EquipamentoClienteItemPayload[]
   >(() => [emptyEquipamentoClienteItem()]);
+  const [eqEstacaoEquipamentoItens, setEqEstacaoEquipamentoItens] = useState<
+    EquipamentoClienteItemPayload[]
+  >(() => [emptyEquipamentoClienteItem()]);
+  const [eqEstacaoDgoItens, setEqEstacaoDgoItens] = useState<DgoClienteItemPayload[]>(() => [
+    emptyDgoClienteItem(),
+  ]);
   const [outrasEqCliente, setOutrasEqCliente] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [relatorioEstacao, setRelatorioEstacao] = useState<"sim" | "nao">("nao");
   const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
@@ -324,6 +337,7 @@ function RelatorioPage() {
         rcEntradaExternaObs,
         obsAdminGrupos.rcEntradaExterna,
       ),
+      rcSobraTecnica: grupoPayload(rcSobra, rcSobraObs, obsAdminGrupos.rcSobraTecnica),
       outrasFotosRc: outrasParaPayload(outrasRc),
       redeCliente,
       eqClienteFachada: grupoPayload(
@@ -366,27 +380,23 @@ function RelatorioPage() {
         eqGrupos.eqEstacaoRack.obs,
         eqGrupos.eqEstacaoRack.obsAdmin,
       ),
-      eqEstacaoEquipamento: grupoPayload(
-        eqGrupos.eqEstacaoEquipamento.slots,
-        eqGrupos.eqEstacaoEquipamento.obs,
-        eqGrupos.eqEstacaoEquipamento.obsAdmin,
-      ),
+      eqEstacaoEquipamento: eqEstacaoEquipamentoItens,
       eqEstacaoEtiqueta: grupoPayload(
         eqGrupos.eqEstacaoEtiqueta.slots,
         eqGrupos.eqEstacaoEtiqueta.obs,
         eqGrupos.eqEstacaoEtiqueta.obsAdmin,
       ),
-      eqEstacaoDgo: grupoPayload(
-        eqGrupos.eqEstacaoDgo.slots,
-        eqGrupos.eqEstacaoDgo.obs,
-        eqGrupos.eqEstacaoDgo.obsAdmin,
-      ),
+      eqEstacaoDgo: eqEstacaoDgoItens,
       outrasFotosEqEstacao: outrasParaPayload(outrasEqEstacao),
       testeOptico,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
       testePotencia1550: janelaPotenciaDerivada(redeAcesso, redeCliente),
       testePotencia1330: janelaPotenciaDerivada(redeAcesso, redeCliente),
+      configuracao: emptySecaoPlaceholder(),
+      infraestrutura: emptySecaoPlaceholder(),
+      medicoes: emptySecaoPlaceholder(),
+      contatos: emptySecaoPlaceholder(),
     };
   }, [
     tipo,
@@ -426,11 +436,15 @@ function RelatorioPage() {
     rcEntradaInternaObs,
     rcEntradaExterna,
     rcEntradaExternaObs,
+    rcSobra,
+    rcSobraObs,
     outrasRc,
     redeCliente,
     eqGrupos,
     eqClienteDgoItens,
     eqClienteEquipamentosItens,
+    eqEstacaoEquipamentoItens,
+    eqEstacaoDgoItens,
     outrasEqCliente,
     relatorioEstacao,
     estacaoEntregaAcesso,
@@ -527,17 +541,21 @@ function RelatorioPage() {
       rcPlaquetaObs,
       rcEntradaInternaObs,
       rcEntradaExternaObs,
+      rcSobraObs,
       rcPoste,
       rcCaixa,
       rcTerminacao,
       rcPlaqueta,
       rcEntradaInterna,
       rcEntradaExterna,
+      rcSobra,
       outrasRc,
       redeCliente,
       eqGrupos,
       eqClienteDgoItens,
       eqClienteEquipamentosItens,
+      eqEstacaoEquipamentoItens,
+      eqEstacaoDgoItens,
       outrasEqCliente,
       relatorioEstacao,
       estacaoEntregaAcesso,
@@ -581,7 +599,7 @@ function RelatorioPage() {
     setCaixaObs(p.caixaEmenda?.obs ?? "");
     setPlaqueta(slotsFromStored(p.plaquetaIdentificacao?.fotos ?? [], 1));
     setPlaquetaObs(p.plaquetaIdentificacao?.obs ?? "");
-    setSobra(slotsFromStored(p.sobraTecnica?.fotos ?? [], 2));
+    setSobra(slotsFromStored(p.sobraTecnica?.fotos ?? [], 1));
     setSobraObs(p.sobraTecnica?.obs ?? "");
     setTerrometro(slotsFromStored(p.aterramentoTerrometro?.fotos ?? [], 1));
     setTerrometroObs(p.aterramentoTerrometro?.obs ?? "");
@@ -608,6 +626,7 @@ function RelatorioPage() {
       rcPlaquetaIdentificacao: readObsAdmin(p.rcPlaquetaIdentificacao),
       rcEntradaInterna: readObsAdmin(p.rcEntradaInterna),
       rcEntradaExterna: readObsAdmin(p.rcEntradaExterna),
+      rcSobraTecnica: readObsAdmin(p.rcSobraTecnica),
     });
     setTecnologiaAcesso(p.tecnologiaAcesso ?? "");
     setLancamentoCabosRC(p.lancamentoRc === true ? "sim" : p.lancamentoRc === false ? "nao" : "");
@@ -624,6 +643,8 @@ function RelatorioPage() {
     setRcEntradaInternaObs(p.rcEntradaInterna?.obs ?? "");
     setRcEntradaExterna(slotsFromStored(p.rcEntradaExterna?.fotos ?? [], 1));
     setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
+    setRcSobra(slotsFromStored(p.rcSobraTecnica?.fotos ?? [], 1));
+    setRcSobraObs(p.rcSobraTecnica?.obs ?? "");
     setOutrasRc(outrasFromPayload(p.outrasFotosRc));
     setRedeCliente({
       ...emptyQuantidadesRede(),
@@ -642,6 +663,12 @@ function RelatorioPage() {
         ? p.eqClienteEquipamentos
         : [emptyEquipamentoClienteItem()],
     );
+    setEqEstacaoEquipamentoItens(
+      p.eqEstacaoEquipamento?.length
+        ? p.eqEstacaoEquipamento
+        : [emptyEquipamentoClienteItem()],
+    );
+    setEqEstacaoDgoItens(p.eqEstacaoDgo?.length ? p.eqEstacaoDgo : [emptyDgoClienteItem()]);
     setOutrasEqCliente(outrasFromPayload(p.outrasFotosEqCliente));
     setRelatorioEstacao(p.relatorioEstacao === true ? "sim" : "nao");
     setEstacaoEntregaAcesso(p.estacaoEntregaAcesso ?? "");
@@ -831,7 +858,7 @@ function RelatorioPage() {
     setter: React.Dispatch<
       React.SetStateAction<EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]>
     >,
-    payloadKey: "eqClienteEquipamentos" | "eqClienteDgo",
+    payloadKey: "eqClienteEquipamentos" | "eqClienteDgo" | "eqEstacaoEquipamento" | "eqEstacaoDgo",
     itemId: string,
     campo: "foto" | "etiqueta",
     file: EvidencePhotoRef | null,
@@ -865,7 +892,19 @@ function RelatorioPage() {
     caboId: string,
     patch: Partial<CaboMetragemPayload>,
   ) => {
-    setter((prev) => prev.map((item) => (item.id === caboId ? { ...item, ...patch } : item)));
+    setter((prev) =>
+      prev.map((item) => {
+        if (item.id !== caboId) return item;
+        const next = { ...item, ...patch };
+        if ("marcacaoInicial" in patch || "marcacaoFinal" in patch) {
+          next.metragem = calcularMetragemCaboTotal(next.marcacaoInicial, next.marcacaoFinal);
+        }
+        if ("tipoCabo" in patch && patch.tipoCabo != null) {
+          next.tipoCabo = apenasDigitos(patch.tipoCabo);
+        }
+        return next;
+      }),
+    );
   };
 
   const setEqGrupoSlots = (
@@ -912,6 +951,7 @@ function RelatorioPage() {
     rcPlaquetaIdentificacao: setRcPlaqueta,
     rcEntradaInterna: setRcEntradaInterna,
     rcEntradaExterna: setRcEntradaExterna,
+    rcSobraTecnica: setRcSobra,
     eqClienteFachada: setEqGrupoSlots("eqClienteFachada"),
     eqClienteAmbiente: setEqGrupoSlots("eqClienteAmbiente"),
     eqClienteRack: setEqGrupoSlots("eqClienteRack"),
@@ -919,9 +959,7 @@ function RelatorioPage() {
     eqClienteSgp: setEqGrupoSlots("eqClienteSgp"),
     eqEstacaoGeral: setEqGrupoSlots("eqEstacaoGeral"),
     eqEstacaoRack: setEqGrupoSlots("eqEstacaoRack"),
-    eqEstacaoEquipamento: setEqGrupoSlots("eqEstacaoEquipamento"),
     eqEstacaoEtiqueta: setEqGrupoSlots("eqEstacaoEtiqueta"),
-    eqEstacaoDgo: setEqGrupoSlots("eqEstacaoDgo"),
   };
 
   const onAvisar = async () => {
@@ -959,6 +997,12 @@ function RelatorioPage() {
   const mostrarTesteOtdr =
     (tipo === "empresarial" || tipo === "implantacao") && abaCampo === "teste-otdr";
   const mostrarTestePotencia = tipo === "empresarial" && abaCampo === "teste-potencia";
+  const mostrarAbaPlaceholder =
+    tipo === "empresarial" &&
+    (abaCampo === "configuracao" ||
+      abaCampo === "infraestrutura" ||
+      abaCampo === "medicoes" ||
+      abaCampo === "contatos");
   const nomesOutros = tecnicosAtribuidos
     .map((id, index) => (id === user?.id ? "" : tecnicosNomes[index] ?? ""))
     .map((nome) => nome.trim())
@@ -1173,14 +1217,18 @@ function RelatorioPage() {
                     {
                       grupoKey: "sobraTecnica",
                       title: "Sobra técnica / Fiberloop instalado",
-                      hint: "Duas fotos iniciais",
-                      minSlots: 2,
+                      minSlots: 1,
                       slots: sobra,
                       onChange: setSobra,
                       obs: sobraObs,
                       onObsChange: setSobraObs,
                       obsAdmin: obsAdminGrupos.sobraTecnica ?? "",
                       onObsAdminChange: patchObsAdminGrupo("sobraTecnica"),
+                      quantidade: redeAcesso.qtdFiberloopInstalado,
+                      quantidadeLabel: "Quantidade de Fiberloop instalado",
+                      quantidadePlaceholder: "Ex: 2",
+                      onQuantidadeChange: (qtdFiberloopInstalado) =>
+                        setRedeAcesso((prev) => ({ ...prev, qtdFiberloopInstalado })),
                     },
                     {
                       grupoKey: "novoAterramentoPoste",
@@ -1257,7 +1305,7 @@ function RelatorioPage() {
                           type="text"
                           value={tecnologiaAcesso}
                           onChange={(e) => setTecnologiaAcesso(e.target.value)}
-                          placeholder="Ex: GPON, Metro Ethernet"
+                          placeholder="EX: FO ABC"
                           disabled={readOnly}
                           className={inputClass()}
                         />
@@ -1352,6 +1400,22 @@ function RelatorioPage() {
                       onObsChange: setRcEntradaExternaObs,
                       obsAdmin: obsAdminGrupos.rcEntradaExterna ?? "",
                       onObsAdminChange: patchObsAdminGrupo("rcEntradaExterna"),
+                    },
+                    {
+                      grupoKey: "rcSobraTecnica",
+                      title: "Sobra técnica / Fiberloop instalado",
+                      minSlots: 1,
+                      slots: rcSobra,
+                      onChange: setRcSobra,
+                      obs: rcSobraObs,
+                      onObsChange: setRcSobraObs,
+                      obsAdmin: obsAdminGrupos.rcSobraTecnica ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcSobraTecnica"),
+                      quantidade: redeCliente.qtdFiberloopInstalado,
+                      quantidadeLabel: "Quantidade de Fiberloop instalado",
+                      quantidadePlaceholder: "Ex: 2",
+                      onQuantidadeChange: (qtdFiberloopInstalado) =>
+                        setRedeCliente((prev) => ({ ...prev, qtdFiberloopInstalado })),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file) => {
@@ -1469,37 +1533,37 @@ function RelatorioPage() {
                       obsAdmin: eqGrupos.eqEstacaoRack.obsAdmin,
                       onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoRack"),
                     },
-                    {
-                      grupoKey: "eqEstacaoEquipamento",
-                      title: "Equipamento instalado (Na estação/PPC)",
-                      slots: eqGrupos.eqEstacaoEquipamento.slots,
-                      onChange: setEqGrupoSlots("eqEstacaoEquipamento"),
-                      obs: eqGrupos.eqEstacaoEquipamento.obs,
-                      onObsChange: setEqGrupoObs("eqEstacaoEquipamento"),
-                      obsAdmin: eqGrupos.eqEstacaoEquipamento.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoEquipamento"),
-                    },
-                    {
-                      grupoKey: "eqEstacaoEtiqueta",
-                      title: "Etiqueta de identificação",
-                      slots: eqGrupos.eqEstacaoEtiqueta.slots,
-                      onChange: setEqGrupoSlots("eqEstacaoEtiqueta"),
-                      obs: eqGrupos.eqEstacaoEtiqueta.obs,
-                      onObsChange: setEqGrupoObs("eqEstacaoEtiqueta"),
-                      obsAdmin: eqGrupos.eqEstacaoEtiqueta.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoEtiqueta"),
-                    },
-                    {
-                      grupoKey: "eqEstacaoDgo",
-                      title: "DGO / DID / ROUTER (Conexão)",
-                      slots: eqGrupos.eqEstacaoDgo.slots,
-                      onChange: setEqGrupoSlots("eqEstacaoDgo"),
-                      obs: eqGrupos.eqEstacaoDgo.obs,
-                      onObsChange: setEqGrupoObs("eqEstacaoDgo"),
-                      obsAdmin: eqGrupos.eqEstacaoDgo.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoDgo"),
-                    },
                   ]}
+                  equipamentosEstacao={eqEstacaoEquipamentoItens}
+                  onEquipamentosEstacaoChange={setEqEstacaoEquipamentoItens}
+                  onEquipamentoEstacaoPhoto={(itemId, campo, file) =>
+                    handleEqItemPhoto(
+                      setEqEstacaoEquipamentoItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqEstacaoEquipamento",
+                      itemId,
+                      campo,
+                      file,
+                    )
+                  }
+                  dgosEstacao={eqEstacaoDgoItens}
+                  onDgosEstacaoChange={setEqEstacaoDgoItens}
+                  onDgoEstacaoPhoto={(itemId, campo, file) =>
+                    handleEqItemPhoto(
+                      setEqEstacaoDgoItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqEstacaoDgo",
+                      itemId,
+                      campo,
+                      file,
+                    )
+                  }
                   outrasEstacao={outrasEqEstacao}
                   onOutrasEstacaoChange={setOutrasEqEstacao}
                   onOutraEstacaoPhoto={(itemId, file) =>
@@ -1558,6 +1622,16 @@ function RelatorioPage() {
                   redeAcesso={redeAcesso ?? emptyQuantidadesRede()}
                   redeCliente={redeCliente ?? emptyQuantidadesRede()}
                 />
+              ) : mostrarAbaPlaceholder ? (
+                abaCampo === "configuracao" ? (
+                  <AbaConfiguracao />
+                ) : abaCampo === "infraestrutura" ? (
+                  <AbaInfraestrutura />
+                ) : abaCampo === "medicoes" ? (
+                  <AbaMedicoes />
+                ) : (
+                  <AbaContatos />
+                )
               ) : null}
             </>
           ) : null}

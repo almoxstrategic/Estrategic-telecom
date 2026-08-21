@@ -6,6 +6,8 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioFotosBloco, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
+  apenasDigitos,
+  calcularMetragemCaboTotal,
   deleteRelatorioPhoto,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
@@ -19,7 +21,11 @@ export type AbaCampo =
   | "equipamento"
   | "teste-optico"
   | "teste-otdr"
-  | "teste-potencia";
+  | "teste-potencia"
+  | "configuracao"
+  | "infraestrutura"
+  | "medicoes"
+  | "contatos";
 
 export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "RE", label: "Rede Acesso (RE)" },
@@ -28,6 +34,10 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "teste-optico", label: "Teste Óptico" },
   { id: "teste-otdr", label: "Teste OTDR" },
   { id: "teste-potencia", label: "Teste de Potência" },
+  { id: "configuracao", label: "Configuração / Conexões" },
+  { id: "infraestrutura", label: "Infraestrutura" },
+  { id: "medicoes", label: "Medições" },
+  { id: "contatos", label: "Contatos" },
 ];
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
@@ -432,22 +442,66 @@ export function RelatorioRedeAcesso({
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
                   <input
-                    type="text"
+                    type="number"
+                    inputMode="numeric"
                     value={cabo.tipoCabo}
-                    onChange={(e) => onPatchCabo(cabo.id, { tipoCabo: e.target.value })}
-                    placeholder="Ex: 12FO"
+                    onChange={(e) =>
+                      onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value) })
+                    }
+                    placeholder="Ex: 12"
                     disabled={readOnly}
                     className={inputClass()}
                   />
                 </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold">Marcação Inicial (m)</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      value={cabo.marcacaoInicial}
+                      onChange={(e) => {
+                        const marcacaoInicial = e.target.value;
+                        onPatchCabo(cabo.id, {
+                          marcacaoInicial,
+                          metragem: calcularMetragemCaboTotal(marcacaoInicial, cabo.marcacaoFinal),
+                        });
+                      }}
+                      disabled={readOnly}
+                      className={inputClass()}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold">Marcação Final (m)</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      value={cabo.marcacaoFinal}
+                      onChange={(e) => {
+                        const marcacaoFinal = e.target.value;
+                        onPatchCabo(cabo.id, {
+                          marcacaoFinal,
+                          metragem: calcularMetragemCaboTotal(cabo.marcacaoInicial, marcacaoFinal),
+                        });
+                      }}
+                      disabled={readOnly}
+                      className={inputClass()}
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Metragem</label>
+                  <label className="mb-1.5 block text-sm font-semibold">Metragem Total (m)</label>
                   <input
-                    inputMode="decimal"
-                    value={cabo.metragem}
-                    onChange={(e) => onPatchCabo(cabo.id, { metragem: e.target.value })}
-                    disabled={readOnly}
-                    className={inputClass()}
+                    type="text"
+                    readOnly
+                    value={
+                      cabo.metragem ||
+                      calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
+                    }
+                    className={`${inputClass()} cursor-default bg-gray-100`}
+                    tabIndex={-1}
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">

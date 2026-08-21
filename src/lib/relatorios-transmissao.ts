@@ -45,13 +45,40 @@ export type OutraFotoPayload = {
 
 export type CaboMetragemPayload = {
   id: string;
+  /** Código numérico do tipo de cabo (apenas dígitos). */
   tipoCabo: string;
+  marcacaoInicial: string;
+  marcacaoFinal: string;
+  /** Total calculado: |marcacaoFinal - marcacaoInicial|. Persistido no payload. */
   metragem: string;
   fotoInicio: StoredPhoto | null;
   fotoFim: StoredPhoto | null;
   obs: string;
   obsAdmin: string;
 };
+
+/** Remove caracteres não numéricos (Tipo do cabo). */
+export function apenasDigitos(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/** Normaliza número decimal (aceita vírgula) para cálculo. */
+export function parseMarcacaoNumero(value: string): number | null {
+  const raw = value.trim().replace(",", ".");
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function calcularMetragemCaboTotal(
+  marcacaoInicial: string,
+  marcacaoFinal: string,
+): string {
+  const ini = parseMarcacaoNumero(marcacaoInicial);
+  const fim = parseMarcacaoNumero(marcacaoFinal);
+  if (ini == null || fim == null) return "";
+  return String(Math.abs(fim - ini));
+}
 
 /** SGP padrão nos itens de equipamento / DGO no cliente. */
 export const SGP_DEFAULT = "(90) 28911";
@@ -97,7 +124,8 @@ export type RelatorioFotoGrupoKeyRc =
   | "rcTerminacaoCabo"
   | "rcPlaquetaIdentificacao"
   | "rcEntradaInterna"
-  | "rcEntradaExterna";
+  | "rcEntradaExterna"
+  | "rcSobraTecnica";
 
 export type RelatorioFotoGrupoKeyEqCliente =
   | "eqClienteFachada"
@@ -109,9 +137,7 @@ export type RelatorioFotoGrupoKeyEqCliente =
 export type RelatorioFotoGrupoKeyEqEstacao =
   | "eqEstacaoGeral"
   | "eqEstacaoRack"
-  | "eqEstacaoEquipamento"
-  | "eqEstacaoEtiqueta"
-  | "eqEstacaoDgo";
+  | "eqEstacaoEtiqueta";
 
 export type RelatorioFotoGrupoKeyEq =
   | RelatorioFotoGrupoKeyEqCliente
@@ -284,6 +310,8 @@ export type CoordenadasPayload = {
 
 export type QuantidadesRedePayload = {
   qtdCaixasEmenda: number | null;
+  /** Quantidade de Fiberloop instalado (Sobra técnica). */
+  qtdFiberloopInstalado: number | null;
   /** Coordenadas do Cliente (aba RC). */
   coordenadas: CoordenadasPayload;
   /** Coordenadas da caixa de emenda na acomodação (aba RC). */
@@ -314,6 +342,7 @@ export type RelatorioPayload = {
   rcPlaquetaIdentificacao: FotoGrupoPayload;
   rcEntradaInterna: FotoGrupoPayload;
   rcEntradaExterna: FotoGrupoPayload;
+  rcSobraTecnica: FotoGrupoPayload;
   outrasFotosRc: OutraFotoPayload[];
   redeCliente: QuantidadesRedePayload;
   eqClienteFachada: FotoGrupoPayload;
@@ -328,27 +357,38 @@ export type RelatorioPayload = {
   estacaoEntregaAcesso: string;
   eqEstacaoGeral: FotoGrupoPayload;
   eqEstacaoRack: FotoGrupoPayload;
-  eqEstacaoEquipamento: FotoGrupoPayload;
+  eqEstacaoEquipamento: EquipamentoClienteItemPayload[];
   eqEstacaoEtiqueta: FotoGrupoPayload;
-  eqEstacaoDgo: FotoGrupoPayload;
+  eqEstacaoDgo: DgoClienteItemPayload[];
   outrasFotosEqEstacao: OutraFotoPayload[];
   testeOptico: TesteOpticoPayload;
   testePotenciaEmpresarial: TestePotenciaPayload;
   testePotenciaImplantacao: TestePotenciaPayload;
   testePotencia1550: TestePotenciaJanelaPayload;
   testePotencia1330: TestePotenciaJanelaPayload;
+  /** Abas futuras (estrutura reservada no JSON). */
+  configuracao: Record<string, never>;
+  infraestrutura: Record<string, never>;
+  medicoes: Record<string, never>;
+  contatos: Record<string, never>;
 };
 
 export function emptyCaboMetragem(): CaboMetragemPayload {
   return {
     id: crypto.randomUUID(),
     tipoCabo: "",
+    marcacaoInicial: "",
+    marcacaoFinal: "",
     metragem: "",
     fotoInicio: null,
     fotoFim: null,
     obs: "",
     obsAdmin: "",
   };
+}
+
+export function emptySecaoPlaceholder(): Record<string, never> {
+  return {};
 }
 
 export function emptyEquipamentoClienteItem(): EquipamentoClienteItemPayload {
@@ -469,6 +509,7 @@ export function emptyCoordenadas(): CoordenadasPayload {
 export function emptyQuantidadesRede(): QuantidadesRedePayload {
   return {
     qtdCaixasEmenda: null,
+    qtdFiberloopInstalado: null,
     coordenadas: emptyCoordenadas(),
     caixaEmendaAcomodacao: { coordenadas: emptyCoordenadas() },
   };
@@ -519,6 +560,7 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     rcPlaquetaIdentificacao: emptyFotoGrupo(),
     rcEntradaInterna: emptyFotoGrupo(),
     rcEntradaExterna: emptyFotoGrupo(),
+    rcSobraTecnica: emptyFotoGrupo(),
     outrasFotosRc: [],
     redeCliente: emptyQuantidadesRede(),
     eqClienteFachada: emptyFotoGrupo(),
@@ -533,15 +575,19 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     estacaoEntregaAcesso: "",
     eqEstacaoGeral: emptyFotoGrupo(),
     eqEstacaoRack: emptyFotoGrupo(),
-    eqEstacaoEquipamento: emptyFotoGrupo(),
+    eqEstacaoEquipamento: [emptyEquipamentoClienteItem()],
     eqEstacaoEtiqueta: emptyFotoGrupo(),
-    eqEstacaoDgo: emptyFotoGrupo(),
+    eqEstacaoDgo: [emptyDgoClienteItem()],
     outrasFotosEqEstacao: [],
     testeOptico: emptyTesteOptico(),
     testePotenciaEmpresarial: emptyTestePotencia(),
     testePotenciaImplantacao: emptyTestePotencia(),
     testePotencia1550: emptyTestePotenciaJanela(),
     testePotencia1330: emptyTestePotenciaJanela(),
+    configuracao: emptySecaoPlaceholder(),
+    infraestrutura: emptySecaoPlaceholder(),
+    medicoes: emptySecaoPlaceholder(),
+    contatos: emptySecaoPlaceholder(),
   };
 }
 
@@ -556,10 +602,25 @@ function parseCabosList(raw: unknown): CaboMetragemPayload[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   return raw.map((item) => {
     const cabo = (item ?? {}) as Partial<CaboMetragemPayload>;
+    const marcacaoInicial =
+      typeof cabo.marcacaoInicial === "string"
+        ? cabo.marcacaoInicial
+        : cabo.marcacaoInicial != null
+          ? String(cabo.marcacaoInicial)
+          : "";
+    const marcacaoFinal =
+      typeof cabo.marcacaoFinal === "string"
+        ? cabo.marcacaoFinal
+        : cabo.marcacaoFinal != null
+          ? String(cabo.marcacaoFinal)
+          : "";
+    const metragemCalculada = calcularMetragemCaboTotal(marcacaoInicial, marcacaoFinal);
     return {
       id: cabo.id || crypto.randomUUID(),
-      tipoCabo: cabo.tipoCabo ?? "",
-      metragem: cabo.metragem ?? "",
+      tipoCabo: apenasDigitos(cabo.tipoCabo ?? ""),
+      marcacaoInicial,
+      marcacaoFinal,
+      metragem: metragemCalculada || (cabo.metragem ?? ""),
       fotoInicio: cabo.fotoInicio ?? null,
       fotoFim: cabo.fotoFim ?? null,
       obs: cabo.obs ?? "",
@@ -579,6 +640,8 @@ function parseCabos(raw: unknown): CaboMetragemPayload[] {
       {
         id: crypto.randomUUID(),
         tipoCabo: "",
+        marcacaoInicial: "",
+        marcacaoFinal: "",
         metragem: old.metragem ?? "",
         fotoInicio: old.fotoInicio ?? null,
         fotoFim: old.fotoFim ?? null,
@@ -635,6 +698,7 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   };
   return {
     qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
+    qtdFiberloopInstalado: parseQtdInteiro(src.qtdFiberloopInstalado),
     coordenadas: parseCoordenadas(src.coordenadas),
     caixaEmendaAcomodacao: {
       coordenadas: parseCoordenadas(src.caixaEmendaAcomodacao?.coordenadas),
@@ -940,6 +1004,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     rcPlaquetaIdentificacao: parseFotoGrupo(base.rcPlaquetaIdentificacao, src.rcPlaquetaIdentificacao),
     rcEntradaInterna: parseFotoGrupo(base.rcEntradaInterna, src.rcEntradaInterna),
     rcEntradaExterna: parseFotoGrupo(base.rcEntradaExterna, src.rcEntradaExterna),
+    rcSobraTecnica: parseFotoGrupo(base.rcSobraTecnica, src.rcSobraTecnica),
     outrasFotosRc: parseOutrasFotos(src.outrasFotosRc),
     redeCliente: parseQuantidadesRede(src.redeCliente),
     eqClienteFachada: parseFotoGrupo(base.eqClienteFachada, src.eqClienteFachada),
@@ -954,14 +1019,18 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     estacaoEntregaAcesso: src.estacaoEntregaAcesso ?? "",
     eqEstacaoGeral: parseFotoGrupo(base.eqEstacaoGeral, src.eqEstacaoGeral),
     eqEstacaoRack: parseFotoGrupo(base.eqEstacaoRack, src.eqEstacaoRack),
-    eqEstacaoEquipamento: parseFotoGrupo(base.eqEstacaoEquipamento, src.eqEstacaoEquipamento),
+    eqEstacaoEquipamento: parseEquipamentoClienteLista(src.eqEstacaoEquipamento),
     eqEstacaoEtiqueta: parseFotoGrupo(base.eqEstacaoEtiqueta, src.eqEstacaoEtiqueta),
-    eqEstacaoDgo: parseFotoGrupo(base.eqEstacaoDgo, src.eqEstacaoDgo),
+    eqEstacaoDgo: parseDgoClienteLista(src.eqEstacaoDgo),
     outrasFotosEqEstacao: parseOutrasFotos(src.outrasFotosEqEstacao),
     testeOptico: parseTesteOptico(src.testeOptico),
     ...parseTestesPotenciaSeparados(src, tipoExecucao),
     testePotencia1550: parseTestePotenciaJanela(src.testePotencia1550),
     testePotencia1330: parseTestePotenciaJanela(src.testePotencia1330),
+    configuracao: emptySecaoPlaceholder(),
+    infraestrutura: emptySecaoPlaceholder(),
+    medicoes: emptySecaoPlaceholder(),
+    contatos: emptySecaoPlaceholder(),
   };
 }
 
@@ -980,6 +1049,7 @@ const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
   "rcPlaquetaIdentificacao",
   "rcEntradaInterna",
   "rcEntradaExterna",
+  "rcSobraTecnica",
   "eqClienteFachada",
   "eqClienteAmbiente",
   "eqClienteRack",
@@ -987,9 +1057,7 @@ const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
   "eqClienteSgp",
   "eqEstacaoGeral",
   "eqEstacaoRack",
-  "eqEstacaoEquipamento",
   "eqEstacaoEtiqueta",
-  "eqEstacaoDgo",
 ];
 
 function mergeById<T extends { id: string }>(
@@ -1035,10 +1103,15 @@ function mergeFotoGrupo(server: FotoGrupoPayload, local: FotoGrupoPayload): Foto
 }
 
 function mergeCabo(server: CaboMetragemPayload, local: CaboMetragemPayload): CaboMetragemPayload {
+  const marcacaoInicial = local.marcacaoInicial || server.marcacaoInicial;
+  const marcacaoFinal = local.marcacaoFinal || server.marcacaoFinal;
+  const metragemCalculada = calcularMetragemCaboTotal(marcacaoInicial, marcacaoFinal);
   return {
     ...server,
     tipoCabo: local.tipoCabo || server.tipoCabo,
-    metragem: local.metragem || server.metragem,
+    marcacaoInicial,
+    marcacaoFinal,
+    metragem: metragemCalculada || local.metragem || server.metragem,
     fotoInicio: local.fotoInicio ?? server.fotoInicio,
     fotoFim: local.fotoFim ?? server.fotoFim,
     obs: local.obs || server.obs,
@@ -1218,6 +1291,10 @@ function mergeQuantidadesRede(
       fromLocal.qtdCaixasEmenda === undefined
         ? fromServer.qtdCaixasEmenda
         : fromLocal.qtdCaixasEmenda,
+    qtdFiberloopInstalado:
+      fromLocal.qtdFiberloopInstalado === undefined
+        ? fromServer.qtdFiberloopInstalado
+        : fromLocal.qtdFiberloopInstalado,
     coordenadas: mergeCoordenadas(fromServer.coordenadas, fromLocal.coordenadas),
     caixaEmendaAcomodacao: {
       coordenadas: mergeCoordenadas(
@@ -1269,6 +1346,12 @@ export function mergeRelatorioPayload(
       fromLocal.eqClienteEquipamentos,
       mergeEquipamentoClienteItem,
     ),
+    eqEstacaoEquipamento: mergeById(
+      fromServer.eqEstacaoEquipamento,
+      fromLocal.eqEstacaoEquipamento,
+      mergeEquipamentoClienteItem,
+    ),
+    eqEstacaoDgo: mergeById(fromServer.eqEstacaoDgo, fromLocal.eqEstacaoDgo, mergeDgoClienteItem),
     outrasFotos: mergeById(fromServer.outrasFotos, fromLocal.outrasFotos, mergeOutra),
     outrasFotosRc: mergeById(fromServer.outrasFotosRc, fromLocal.outrasFotosRc, mergeOutra),
     redeAcesso: mergeQuantidadesRede(fromServer.redeAcesso, fromLocal.redeAcesso),
@@ -1922,6 +2005,8 @@ export type RelatorioFotoCategoria =
   | RelatorioFotoGrupoKey
   | "eqClienteDgo"
   | "eqClienteEquipamentos"
+  | "eqEstacaoEquipamento"
+  | "eqEstacaoDgo"
   | "metragensCabo"
   | "outrasFotos"
   | "metragensCaboRc"
@@ -1944,25 +2029,25 @@ export function appendStoredPhotoToPayload(
     else list.push({ ...emptyCaboMetragem(), fotoInicio: stored });
     return { ...payload, [categoria]: list };
   }
-  if (categoria === "eqClienteEquipamentos") {
-    const list = payload.eqClienteEquipamentos.length
-      ? payload.eqClienteEquipamentos.map((item) => ({ ...item }))
+  if (categoria === "eqClienteEquipamentos" || categoria === "eqEstacaoEquipamento") {
+    const list = payload[categoria].length
+      ? payload[categoria].map((item) => ({ ...item }))
       : [emptyEquipamentoClienteItem()];
     const last = list[list.length - 1];
     if (!last.foto) last.foto = stored;
     else if (!last.etiqueta) last.etiqueta = stored;
     else list.push({ ...emptyEquipamentoClienteItem(), foto: stored });
-    return { ...payload, eqClienteEquipamentos: list };
+    return { ...payload, [categoria]: list };
   }
-  if (categoria === "eqClienteDgo") {
-    const list = payload.eqClienteDgo.length
-      ? payload.eqClienteDgo.map((item) => ({ ...item }))
+  if (categoria === "eqClienteDgo" || categoria === "eqEstacaoDgo") {
+    const list = payload[categoria].length
+      ? payload[categoria].map((item) => ({ ...item }))
       : [emptyDgoClienteItem()];
     const last = list[list.length - 1];
     if (!last.foto) last.foto = stored;
     else if (!last.etiqueta) last.etiqueta = stored;
     else list.push({ ...emptyDgoClienteItem(), foto: stored });
-    return { ...payload, eqClienteDgo: list };
+    return { ...payload, [categoria]: list };
   }
   if (
     categoria === "outrasFotos" ||

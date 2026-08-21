@@ -462,7 +462,7 @@ export function RelatorioTestePotencia({
           min={0}
           step={0.001}
           inputMode="decimal"
-          placeholder="Ex: 1.932"
+          placeholder="EX, 2,9"
           value={value.comprimentoTrechoKm ?? ""}
           disabled={readOnly}
           onChange={(e) => onChange({ ...value, comprimentoTrechoKm: e.target.value })}

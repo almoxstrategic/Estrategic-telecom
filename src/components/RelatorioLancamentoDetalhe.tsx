@@ -10,6 +10,12 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
 import {
+  AbaConfiguracao,
+  AbaContatos,
+  AbaInfraestrutura,
+  AbaMedicoes,
+} from "@/components/RelatorioAbasPlaceholder";
+import {
   ABAS_CAMPO,
   ABAS_CAMPO_IMPLANTACAO,
   CampoCoordenadas,
@@ -32,6 +38,8 @@ import {
   emptyQuantidadesRede,
   emptyTesteOptico,
   emptyTestePotencia,
+  apenasDigitos,
+  calcularMetragemCaboTotal,
   janelaPotenciaDerivada,
   labelTecnicosAtribuidos,
   removeExtraById,
@@ -515,6 +523,7 @@ function AdminListaEquipamentos({
   titulo,
   addLabel,
   showIdentificacao,
+  itemLabel,
   itens,
   canEdit,
   onPatchList,
@@ -524,6 +533,7 @@ function AdminListaEquipamentos({
   titulo: string;
   addLabel: string;
   showIdentificacao: boolean;
+  itemLabel?: string;
   itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[];
   canEdit: boolean;
   onPatchList: (next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[]) => void;
@@ -532,6 +542,7 @@ function AdminListaEquipamentos({
 }) {
   const [fallback] = useState(() => emptyItem());
   const list = itens.length ? itens : [fallback];
+  const label = itemLabel ?? (showIdentificacao ? "Equipamento" : "DGO/Roseta");
 
   const patchItem = (
     id: string,
@@ -566,7 +577,7 @@ function AdminListaEquipamentos({
           >
             <div className="flex items-start justify-between gap-2">
               <h5 className="text-sm font-semibold text-gray-900">
-                {showIdentificacao ? "Equipamento" : "DGO/Roseta"} {index + 1}
+                {label} {index + 1}
               </h5>
               {canEdit && index >= 1 ? (
                 <button
@@ -749,6 +760,8 @@ export function RelatorioDetalhe({
     if (categoria === "outrasFotosEqEstacao") return payload?.outrasFotosEqEstacao.length ?? 0;
     if (categoria === "eqClienteDgo") return payload?.eqClienteDgo.length ?? 0;
     if (categoria === "eqClienteEquipamentos") return payload?.eqClienteEquipamentos.length ?? 0;
+    if (categoria === "eqEstacaoDgo") return payload?.eqEstacaoDgo.length ?? 0;
+    if (categoria === "eqEstacaoEquipamento") return payload?.eqEstacaoEquipamento.length ?? 0;
     const grupo = payload?.[categoria as RelatorioFotoGrupoKey];
     return grupo && "fotos" in grupo ? grupo.fotos.length : 0;
   };
@@ -776,6 +789,20 @@ export function RelatorioDetalhe({
     patchPayload({ ...next, testePotencia1550: janela, testePotencia1330: janela });
   };
 
+  const patchQtdFiberloop = (
+    lado: "redeAcesso" | "redeCliente",
+    qtdFiberloopInstalado: number | null,
+  ) => {
+    if (!payload) return;
+    patchPayload({
+      ...payload,
+      [lado]: {
+        ...(payload[lado] ?? emptyQuantidadesRede()),
+        qtdFiberloopInstalado,
+      },
+    });
+  };
+
   const adicionarOutra = (
     categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
   ) => {
@@ -789,10 +816,11 @@ export function RelatorioDetalhe({
   const renderGrupo = (title: string, key: RelatorioFotoGrupoKey) => {
     const grupo = payload?.[key];
     const redeCliente = payload?.redeCliente ?? emptyQuantidadesRede();
+    const redeAcesso = payload?.redeAcesso ?? emptyQuantidadesRede();
     const qtd =
       payload && (isEmpresarial || isImplantacao) && key === "caixaEmenda"
         ? {
-            quantidade: payload.redeAcesso?.qtdCaixasEmenda ?? null,
+            quantidade: redeAcesso.qtdCaixasEmenda ?? null,
             quantidadeLabel: "Quantidade de Caixas de Emenda",
             quantidadePlaceholder: "Ex: 4",
             onQuantidadeChange: canEditPhotos
@@ -822,7 +850,27 @@ export function RelatorioDetalhe({
                   }
                 : undefined,
             }
-          : {};
+          : payload && key === "sobraTecnica"
+            ? {
+                quantidade: redeAcesso.qtdFiberloopInstalado ?? null,
+                quantidadeLabel: "Quantidade de Fiberloop instalado",
+                quantidadePlaceholder: "Ex: 2",
+                onQuantidadeChange: canEditPhotos
+                  ? (qtdFiberloopInstalado: number | null) =>
+                      patchQtdFiberloop("redeAcesso", qtdFiberloopInstalado)
+                  : undefined,
+              }
+            : payload && isEmpresarial && key === "rcSobraTecnica"
+              ? {
+                  quantidade: redeCliente.qtdFiberloopInstalado ?? null,
+                  quantidadeLabel: "Quantidade de Fiberloop instalado",
+                  quantidadePlaceholder: "Ex: 2",
+                  onQuantidadeChange: canEditPhotos
+                    ? (qtdFiberloopInstalado: number | null) =>
+                        patchQtdFiberloop("redeCliente", qtdFiberloopInstalado)
+                    : undefined,
+                }
+              : {};
     return (
       <EvidenciaBloco
         key={key}
@@ -863,65 +911,143 @@ export function RelatorioDetalhe({
     index: number,
     categoria: "metragensCabo" | "metragensCaboRc",
     titulo: string,
-  ) => (
-    <EvidenciaBloco
-      key={cabo.id}
-      title={titulo}
-      obs={cabo.obs}
-      fotos={[]}
-      caboFotos={{ inicio: cabo.fotoInicio, fim: cabo.fotoFim }}
-      onObsChange={
-        canEditPhotos
-          ? (obs) => {
-              if (!payload) return;
-              patchPayload({
-                ...payload,
-                [categoria]: payload[categoria].map((item) =>
-                  item.id === cabo.id ? { ...item, obs } : item,
-                ),
-              });
-            }
-          : undefined
-      }
-      onRemove={
-        canEditPhotos && index >= 1
-          ? () => {
-              if (!payload) return;
-              patchPayload({ ...payload, [categoria]: removeExtraById(payload[categoria], cabo.id) });
-            }
-          : undefined
-      }
-      onRemoveCaboCampo={
-        canEditPhotos
-          ? (campo) => {
-              if (!payload) return;
-              const old = cabo[campo];
-              patchPayload({
-                ...payload,
-                [categoria]: payload[categoria].map((item) =>
-                  item.id === cabo.id ? { ...item, [campo]: null } : item,
-                ),
-              });
-              void deleteRelatorioPhoto(old?.path);
-            }
-          : undefined
-      }
-      onReplaceCaboCampo={
-        canEditPhotos && onReplacePhoto
-          ? (campo, file) => onReplacePhoto(categoria, file, { caboId: cabo.id, campo })
-          : undefined
-      }
-      {...blocoProps(categoria)}
-      onAdd={
-        canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
-          ? (file) => {
-              const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
-              onReplacePhoto(categoria, file, { caboId: cabo.id, campo });
-            }
-          : undefined
-      }
-    />
-  );
+  ) => {
+    const patchCaboCampos = (patch: Partial<CaboMetragemPayload>) => {
+      if (!payload || !canEditPhotos) return;
+      patchPayload({
+        ...payload,
+        [categoria]: payload[categoria].map((item) => {
+          if (item.id !== cabo.id) return item;
+          const next = { ...item, ...patch };
+          if ("marcacaoInicial" in patch || "marcacaoFinal" in patch) {
+            next.metragem = calcularMetragemCaboTotal(next.marcacaoInicial, next.marcacaoFinal);
+          }
+          if ("tipoCabo" in patch && patch.tipoCabo != null) {
+            next.tipoCabo = apenasDigitos(patch.tipoCabo);
+          }
+          return next;
+        }),
+      });
+    };
+
+    return (
+      <div key={cabo.id} className="flex h-full flex-col gap-3">
+        <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+          <p className="text-sm font-semibold text-gray-900">{titulo}</p>
+          <div>
+            <p className="text-xs text-gray-500">Tipo do cabo</p>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={cabo.tipoCabo}
+              disabled={!canEditPhotos}
+              onChange={(e) => patchCaboCampos({ tipoCabo: e.target.value })}
+              placeholder="Ex: 12"
+              className={inputClass()}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-gray-500">Marcação Inicial (m)</p>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={cabo.marcacaoInicial}
+                disabled={!canEditPhotos}
+                onChange={(e) => patchCaboCampos({ marcacaoInicial: e.target.value })}
+                className={inputClass()}
+              />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Marcação Final (m)</p>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={cabo.marcacaoFinal}
+                disabled={!canEditPhotos}
+                onChange={(e) => patchCaboCampos({ marcacaoFinal: e.target.value })}
+                className={inputClass()}
+              />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Metragem Total (m)</p>
+            <input
+              type="text"
+              readOnly
+              value={
+                cabo.metragem ||
+                calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
+              }
+              className={`${inputClass()} cursor-default bg-gray-100`}
+              tabIndex={-1}
+            />
+          </div>
+        </div>
+        <EvidenciaBloco
+          title="Fotos do cabo"
+          obs={cabo.obs}
+          fotos={[]}
+          caboFotos={{ inicio: cabo.fotoInicio, fim: cabo.fotoFim }}
+          onObsChange={
+            canEditPhotos
+              ? (obs) => {
+                  if (!payload) return;
+                  patchPayload({
+                    ...payload,
+                    [categoria]: payload[categoria].map((item) =>
+                      item.id === cabo.id ? { ...item, obs } : item,
+                    ),
+                  });
+                }
+              : undefined
+          }
+          onRemove={
+            canEditPhotos && index >= 1
+              ? () => {
+                  if (!payload) return;
+                  patchPayload({
+                    ...payload,
+                    [categoria]: removeExtraById(payload[categoria], cabo.id),
+                  });
+                }
+              : undefined
+          }
+          onRemoveCaboCampo={
+            canEditPhotos
+              ? (campo) => {
+                  if (!payload) return;
+                  const old = cabo[campo];
+                  patchPayload({
+                    ...payload,
+                    [categoria]: payload[categoria].map((item) =>
+                      item.id === cabo.id ? { ...item, [campo]: null } : item,
+                    ),
+                  });
+                  void deleteRelatorioPhoto(old?.path);
+                }
+              : undefined
+          }
+          onReplaceCaboCampo={
+            canEditPhotos && onReplacePhoto
+              ? (campo, file) => onReplacePhoto(categoria, file, { caboId: cabo.id, campo })
+              : undefined
+          }
+          {...blocoProps(categoria)}
+          onAdd={
+            canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
+              ? (file) => {
+                  const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
+                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo });
+                }
+              : undefined
+          }
+        />
+      </div>
+    );
+  };
 
   const renderOutra = (
     item: RelatorioPayload["outrasFotos"][number],
@@ -1142,7 +1268,7 @@ export function RelatorioDetalhe({
                       cabo,
                       index,
                       "metragensCabo",
-                      `Cabo ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`,
+                      `Cabo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal) || "—"} m`,
                     ),
                   )}
                   {canEditPhotos ? (
@@ -1173,7 +1299,7 @@ export function RelatorioDetalhe({
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {renderGrupo("Caixa de emenda", "caixaEmenda")}
-              {renderGrupo("Sobra técnica", "sobraTecnica")}
+              {renderGrupo("Sobra técnica / Fiberloop instalado", "sobraTecnica")}
             </div>
           </section>
           <section className="space-y-3">
@@ -1224,7 +1350,7 @@ export function RelatorioDetalhe({
                 id="admin-tecnologia-acesso"
                 type="text"
                 value={payload?.tecnologiaAcesso ?? ""}
-                placeholder="Ex: GPON, Metro Ethernet"
+                placeholder="EX: FO ABC"
                 disabled={!canEditPhotos}
                 onChange={(e) => {
                   if (!payload || !canEditPhotos) return;
@@ -1261,7 +1387,7 @@ export function RelatorioDetalhe({
                       cabo,
                       index,
                       "metragensCaboRc",
-                      `Cabo RC ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`,
+                      `Cabo RC ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal) || "—"} m`,
                     ),
                   )}
                   {canEditPhotos ? (
@@ -1291,6 +1417,7 @@ export function RelatorioDetalhe({
                   ["Plaqueta de Identificação - Terminação do cabo no cliente", "rcPlaquetaIdentificacao"],
                   ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
                   ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
+                  ["Sobra técnica / Fiberloop instalado", "rcSobraTecnica"],
                 ] as const
               ).map(([title, key]) => renderGrupo(title, key))}
             </div>
@@ -1365,12 +1492,43 @@ export function RelatorioDetalhe({
                   [
                     ["Estação - (Foto geral da estação/PPC)", "eqEstacaoGeral"],
                     ["(Rack ou Local Instalação)", "eqEstacaoRack"],
-                    ["Equipamento instalado (Na estação/PPC)", "eqEstacaoEquipamento"],
-                    ["Etiqueta de identificação", "eqEstacaoEtiqueta"],
-                    ["DGO / DID / ROUTER (Conexão)", "eqEstacaoDgo"],
                   ] as const
                 ).map(([title, key]) => renderGrupo(title, key))}
               </div>
+
+              <AdminListaEquipamentos
+                titulo="Equipamento instalado (Na estação/PPC)"
+                addLabel="Adicionar mais Equipamento"
+                showIdentificacao
+                itemLabel="Equipamento"
+                itens={payload?.eqEstacaoEquipamento ?? []}
+                canEdit={canEditPhotos}
+                onUploadPhoto={onUploadPhoto}
+                onPatchList={(next) => {
+                  if (!payload) return;
+                  patchPayload({
+                    ...payload,
+                    eqEstacaoEquipamento: next as EquipamentoClienteItemPayload[],
+                  });
+                }}
+                emptyItem={emptyEquipamentoClienteItem}
+              />
+
+              <AdminListaEquipamentos
+                titulo="DGO / DID / ROUTER (Conexão)"
+                addLabel="Adicionar DGO / DID / ROUTER"
+                showIdentificacao={false}
+                itemLabel="DGO / DID / ROUTER"
+                itens={payload?.eqEstacaoDgo ?? []}
+                canEdit={canEditPhotos}
+                onUploadPhoto={onUploadPhoto}
+                onPatchList={(next) => {
+                  if (!payload) return;
+                  patchPayload({ ...payload, eqEstacaoDgo: next as DgoClienteItemPayload[] });
+                }}
+                emptyItem={emptyDgoClienteItem}
+              />
+
               {renderOutrasSecao("outrasFotosEqEstacao", "Outras fotos")}
             </section>
           ) : (
@@ -1440,6 +1598,11 @@ export function RelatorioDetalhe({
           redeCliente={payload?.redeCliente ?? emptyQuantidadesRede()}
         />
       ) : null}
+
+      {abaAtiva === "configuracao" ? <AbaConfiguracao /> : null}
+      {abaAtiva === "infraestrutura" ? <AbaInfraestrutura /> : null}
+      {abaAtiva === "medicoes" ? <AbaMedicoes /> : null}
+      {abaAtiva === "contatos" ? <AbaContatos /> : null}
     </div>
   );
 }

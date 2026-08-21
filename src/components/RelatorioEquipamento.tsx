@@ -217,6 +217,7 @@ function EquipamentoItemCard({
 
 function ListaItensEquipamento({
   tituloSecao,
+  itemLabel,
   itens,
   showIdentificacao,
   addLabel,
@@ -226,6 +227,7 @@ function ListaItensEquipamento({
   emptyItem,
 }: {
   tituloSecao: string;
+  itemLabel: string;
   itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[];
   showIdentificacao: boolean;
   addLabel: string;
@@ -243,7 +245,7 @@ function ListaItensEquipamento({
         {list.map((item, index) => (
           <EquipamentoItemCard
             key={item.id}
-            title={showIdentificacao ? "Equipamento" : "DGO/Roseta"}
+            title={itemLabel}
             index={index}
             item={item}
             showIdentificacao={showIdentificacao}
@@ -288,6 +290,12 @@ export function RelatorioEquipamento({
   estacaoEntregaAcesso,
   onEstacaoEntregaAcesso,
   gruposEstacao,
+  equipamentosEstacao,
+  onEquipamentosEstacaoChange,
+  onEquipamentoEstacaoPhoto,
+  dgosEstacao,
+  onDgosEstacaoChange,
+  onDgoEstacaoPhoto,
   outrasEstacao,
   onOutrasEstacaoChange,
   onOutraEstacaoPhoto,
@@ -314,6 +322,16 @@ export function RelatorioEquipamento({
   estacaoEntregaAcesso: string;
   onEstacaoEntregaAcesso: (value: string) => void;
   gruposEstacao: GrupoFotoCampo[];
+  equipamentosEstacao: EquipamentoClienteItemPayload[];
+  onEquipamentosEstacaoChange: (next: EquipamentoClienteItemPayload[]) => void;
+  onEquipamentoEstacaoPhoto: (
+    itemId: string,
+    campo: CampoFotoEq,
+    file: EvidencePhotoRef | null,
+  ) => void;
+  dgosEstacao: DgoClienteItemPayload[];
+  onDgosEstacaoChange: (next: DgoClienteItemPayload[]) => void;
+  onDgoEstacaoPhoto: (itemId: string, campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
   outrasEstacao: OutraFotoState[];
   onOutrasEstacaoChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraEstacaoPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
@@ -349,6 +367,7 @@ export function RelatorioEquipamento({
 
           <ListaItensEquipamento
             tituloSecao="DGO /DID; Roseta ou Pach panel"
+            itemLabel="DGO/Roseta"
             itens={dgosCliente}
             showIdentificacao={false}
             addLabel="Adicionar mais DGO/Roseta/Patch Panel"
@@ -360,6 +379,7 @@ export function RelatorioEquipamento({
 
           <ListaItensEquipamento
             tituloSecao="Equipamentos (No Cliente)"
+            itemLabel="Equipamento"
             itens={equipamentosCliente}
             showIdentificacao
             addLabel="Adicionar mais Equipamento"
@@ -453,6 +473,32 @@ export function RelatorioEquipamento({
                   onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
                 />
               ))}
+
+              <ListaItensEquipamento
+                tituloSecao="Equipamento instalado (Na estação/PPC)"
+                itemLabel="Equipamento"
+                itens={equipamentosEstacao}
+                showIdentificacao
+                addLabel="Adicionar mais Equipamento"
+                readOnly={readOnly}
+                onChange={(next) =>
+                  onEquipamentosEstacaoChange(next as EquipamentoClienteItemPayload[])
+                }
+                onPhoto={onEquipamentoEstacaoPhoto}
+                emptyItem={emptyEquipamentoClienteItem}
+              />
+
+              <ListaItensEquipamento
+                tituloSecao="DGO / DID / ROUTER (Conexão)"
+                itemLabel="DGO / DID / ROUTER"
+                itens={dgosEstacao}
+                showIdentificacao={false}
+                addLabel="Adicionar DGO / DID / ROUTER"
+                readOnly={readOnly}
+                onChange={(next) => onDgosEstacaoChange(next as DgoClienteItemPayload[])}
+                onPhoto={onDgoEstacaoPhoto}
+                emptyItem={emptyDgoClienteItem}
+              />
             </div>
             <RelatorioOutrasFotos
               title="Outras fotos"

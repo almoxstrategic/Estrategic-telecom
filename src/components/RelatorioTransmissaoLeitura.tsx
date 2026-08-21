@@ -73,8 +73,14 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
       {(payload?.metragensCabo ?? []).map((cabo, index) => (
         <Secao
           key={cabo.id}
-          titulo={`Cabo RE ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
-          obs={cabo.obs}
+          titulo={`Cabo RE ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          obs={[
+            cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
+            cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
+            cabo.obs,
+          ]
+            .filter(Boolean)
+            .join("\n")}
           fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
         />
       ))}
@@ -118,6 +124,12 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.sobraTecnica.obs}
         fotos={payload?.sobraTecnica.fotos ?? []}
       />
+      {payload?.redeAcesso?.qtdFiberloopInstalado != null ? (
+        <Campo
+          label="Qtd. Fiberloop (RE)"
+          value={String(payload.redeAcesso.qtdFiberloopInstalado)}
+        />
+      ) : null}
       {(payload?.outrasFotos ?? [])
         .filter((item) => item.foto || item.ref || item.obs)
         .map((item) => (
@@ -141,8 +153,14 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
       {(payload?.metragensCaboRc ?? []).map((cabo, index) => (
         <Secao
           key={cabo.id}
-          titulo={`Cabo RC ${index + 1} — ${cabo.tipoCabo || "tipo n/d"} · ${cabo.metragem || "—"}`}
-          obs={cabo.obs}
+          titulo={`Cabo RC ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          obs={[
+            cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
+            cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
+            cabo.obs,
+          ]
+            .filter(Boolean)
+            .join("\n")}
           fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
         />
       ))}
@@ -176,6 +194,17 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.rcEntradaExterna.obs}
         fotos={payload?.rcEntradaExterna.fotos ?? []}
       />
+      <Secao
+        titulo="Sobra técnica / Fiberloop (RC)"
+        obs={payload?.rcSobraTecnica.obs}
+        fotos={payload?.rcSobraTecnica.fotos ?? []}
+      />
+      {payload?.redeCliente?.qtdFiberloopInstalado != null ? (
+        <Campo
+          label="Qtd. Fiberloop (RC)"
+          value={String(payload.redeCliente.qtdFiberloopInstalado)}
+        />
+      ) : null}
       {(payload?.outrasFotosRc ?? [])
         .filter((item) => item.foto || item.ref || item.obs)
         .map((item) => (
@@ -263,21 +292,37 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
             obs={payload.eqEstacaoRack.obs}
             fotos={payload.eqEstacaoRack.fotos ?? []}
           />
-          <Secao
-            titulo="Equipamento instalado (Na estação/PPC)"
-            obs={payload.eqEstacaoEquipamento.obs}
-            fotos={payload.eqEstacaoEquipamento.fotos ?? []}
-          />
-          <Secao
-            titulo="Etiqueta de identificação"
-            obs={payload.eqEstacaoEtiqueta.obs}
-            fotos={payload.eqEstacaoEtiqueta.fotos ?? []}
-          />
-          <Secao
-            titulo="DGO / DID / ROUTER (Conexão)"
-            obs={payload.eqEstacaoDgo.obs}
-            fotos={payload.eqEstacaoDgo.fotos ?? []}
-          />
+          {(payload.eqEstacaoEquipamento ?? []).map((item, index) => (
+            <Secao
+              key={item.id}
+              titulo={`Equipamento (Estação) ${index + 1}${item.tipoEquipamento ? ` — ${item.tipoEquipamento}` : ""}`}
+              obs={[
+                item.modelo && `Modelo: ${item.modelo}`,
+                item.fabricante && `Fabricante: ${item.fabricante}`,
+                item.sgp && `SGP: ${item.sgp}`,
+                item.identificacao && `Identificação: ${item.identificacao}`,
+                item.obs,
+              ]
+                .filter(Boolean)
+                .join("\n")}
+              fotos={[item.foto, item.etiqueta].filter((f): f is NonNullable<typeof f> => Boolean(f))}
+            />
+          ))}
+          {(payload.eqEstacaoDgo ?? []).map((item, index) => (
+            <Secao
+              key={item.id}
+              titulo={`DGO / DID / ROUTER ${index + 1}${item.tipoEquipamento ? ` — ${item.tipoEquipamento}` : ""}`}
+              obs={[
+                item.modelo && `Modelo: ${item.modelo}`,
+                item.fabricante && `Fabricante: ${item.fabricante}`,
+                item.sgp && `SGP: ${item.sgp}`,
+                item.obs,
+              ]
+                .filter(Boolean)
+                .join("\n")}
+              fotos={[item.foto, item.etiqueta].filter((f): f is NonNullable<typeof f> => Boolean(f))}
+            />
+          ))}
           {(payload.outrasFotosEqEstacao ?? [])
             .filter((item) => item.foto || item.ref || item.obs)
             .map((item) => (

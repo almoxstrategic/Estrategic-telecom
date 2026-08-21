@@ -189,6 +189,7 @@ export const CLARO_TEMPLATE_SCHEMA: ClienteRelatorioTemplateSchema = {
         "rcPlaquetaIdentificacao",
         "rcEntradaInterna",
         "rcEntradaExterna",
+        "rcSobraTecnica",
       ],
       outrasFotos: "outrasFotosRc",
     },
@@ -213,9 +214,6 @@ export const CLARO_TEMPLATE_SCHEMA: ClienteRelatorioTemplateSchema = {
       gruposFoto: [
         "eqEstacaoGeral",
         "eqEstacaoRack",
-        "eqEstacaoEquipamento",
-        "eqEstacaoEtiqueta",
-        "eqEstacaoDgo",
       ],
       outrasFotos: "outrasFotosEqEstacao",
     },

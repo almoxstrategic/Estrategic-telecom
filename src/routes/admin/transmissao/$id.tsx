@@ -229,7 +229,12 @@ function AdminLancamentoDetalhePage() {
             return { ...item, foto: stored };
           }),
         };
-      } else if (categoria === "eqClienteDgo" || categoria === "eqClienteEquipamentos") {
+      } else if (
+        categoria === "eqClienteDgo" ||
+        categoria === "eqClienteEquipamentos" ||
+        categoria === "eqEstacaoDgo" ||
+        categoria === "eqEstacaoEquipamento"
+      ) {
         nextPayload = {
           ...row.payload,
           [categoria]: row.payload[categoria].map((item) => {
@@ -250,6 +255,8 @@ function AdminLancamentoDetalhePage() {
           | "outrasFotosEqEstacao"
           | "eqClienteDgo"
           | "eqClienteEquipamentos"
+          | "eqEstacaoDgo"
+          | "eqEstacaoEquipamento"
         >];
         oldPath = grupo.fotos[meta.index]?.path;
         nextPayload = {
