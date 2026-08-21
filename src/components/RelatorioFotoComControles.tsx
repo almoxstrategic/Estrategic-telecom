@@ -6,6 +6,8 @@ import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
 import type { EvidencePhotoRef } from "@/lib/types";
 
 const IMAGE_CLASS = "h-48 w-full rounded-md object-cover";
+const IMAGE_CLASS_COMPACT =
+  "h-48 max-h-[280px] w-full rounded-md object-contain print:h-64 print:max-h-[300px]";
 
 export function RelatorioFotoComControles({
   src,
@@ -13,12 +15,15 @@ export function RelatorioFotoComControles({
   canEdit = false,
   onDelete,
   onReplace,
+  compact = false,
 }: {
   src: string;
   alt: string;
   canEdit?: boolean;
   onDelete?: () => void;
   onReplace?: (file: EvidencePhotoRef) => void;
+  /** Imagens menores (Teste Optico / OTDR) — object-contain para preservar watermark. */
+  compact?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -35,8 +40,12 @@ export function RelatorioFotoComControles({
   };
 
   return (
-    <div className="group relative">
-      <ExpandableImage src={src} alt={alt} className={IMAGE_CLASS} />
+    <div className="group relative break-inside-avoid print:break-inside-avoid">
+      <ExpandableImage
+        src={src}
+        alt={alt}
+        className={compact ? IMAGE_CLASS_COMPACT : IMAGE_CLASS}
+      />
       {canEdit && (onDelete || onReplace) ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-4 rounded-md bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
           {onReplace ? (

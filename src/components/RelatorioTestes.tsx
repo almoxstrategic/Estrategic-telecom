@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
-  FOTO_SLOT_CLASS,
   FotoLabel,
   RelatorioFotoComControles,
 } from "@/components/RelatorioFotoComControles";
@@ -52,6 +51,7 @@ function FotoUnica({
       <RelatorioFotoComControles
         src={foto.url}
         alt={alt}
+        compact
         canEdit={!readOnly}
         onDelete={() => {
           void deleteRelatorioPhoto(foto.path);
@@ -65,7 +65,11 @@ function FotoUnica({
     );
   }
   if (readOnly) {
-    return <div className={FOTO_SLOT_CLASS}>Sem foto</div>;
+    return (
+      <div className="flex h-48 max-h-[280px] w-full items-center justify-center rounded-md border border-dashed border-border bg-muted/40 text-xs text-muted-foreground print:h-64 print:max-h-[300px]">
+        Sem foto
+      </div>
+    );
   }
   return (
     <PhotoUpload
@@ -109,10 +113,10 @@ function CardMedicaoCliente({
   };
 
   return (
-    <div className="flex h-full flex-col space-y-3 rounded-xl border border-border p-4">
-      <h3 className="text-sm font-bold">{titulo}</h3>
+    <div className="flex h-full break-inside-avoid flex-col space-y-3 rounded-xl border border-border p-4 print:break-inside-avoid print:space-y-1 print:p-2">
+      <h3 className="text-sm font-bold print:mb-0 print:text-xs">{titulo}</h3>
       <div>
-        <label className="mb-1.5 block text-sm font-semibold">Digite o dBm</label>
+        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs">Digite o dBm</label>
         <input
           inputMode="decimal"
           value={faixa.dbm}
@@ -126,8 +130,8 @@ function CardMedicaoCliente({
         <FotoLabel>Foto</FotoLabel>
         <FotoUnica foto={foto} alt={alt} readOnly={readOnly} onPick={(file) => void pickFoto(file)} />
       </div>
-      <div className="mt-auto w-full">
-        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+      <div className="mt-auto w-full print:mt-1">
+        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs">OBS</label>
         <textarea
           value={faixa.obs}
           onChange={(e) => onPatch({ ...faixa, obs: e.target.value })}
@@ -166,10 +170,10 @@ function CardMedicaoEstacao({
   };
 
   return (
-    <div className="flex h-full flex-col space-y-3 rounded-xl border border-border p-4">
-      <h3 className="text-sm font-bold">{titulo}</h3>
+    <div className="flex h-full break-inside-avoid flex-col space-y-3 rounded-xl border border-border p-4 print:break-inside-avoid print:space-y-1 print:p-2">
+      <h3 className="text-sm font-bold print:mb-0 print:text-xs">{titulo}</h3>
       <div>
-        <label className="mb-1.5 block text-sm font-semibold">Digite o dBm</label>
+        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs">Digite o dBm</label>
         <input
           inputMode="decimal"
           value={item.dbm}
@@ -183,8 +187,8 @@ function CardMedicaoEstacao({
         <FotoLabel>Foto</FotoLabel>
         <FotoUnica foto={item.foto} alt={alt} readOnly={readOnly} onPick={(file) => void pickFoto(file)} />
       </div>
-      <div className="mt-auto w-full">
-        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+      <div className="mt-auto w-full print:mt-1">
+        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs">OBS</label>
         <textarea
           value={item.obs}
           onChange={(e) => onPatch({ ...item, obs: e.target.value })}
@@ -249,15 +253,15 @@ function BlocoTesteOpticoCliente({
   if (!nm1550 || !nm1330) return null;
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold">Teste Óptico (No Cliente)</h2>
+    <div className="space-y-4 break-inside-avoid rounded-2xl border border-border bg-card p-5 shadow-sm print:break-inside-avoid print:space-y-1 print:border-0 print:p-2 print:shadow-none">
+      <h2 className="text-base font-bold print:mb-1 print:text-sm">Teste Óptico (No Cliente)</h2>
       <CampoNumeroFibra
         value={value.numeroFibra}
         disabled={readOnly}
         onChange={(numeroFibra) => onChange({ ...value, numeroFibra })}
       />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="min-w-0">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 print:gap-2">
+        <div className="min-w-0 w-full break-inside-avoid">
           <CardMedicaoCliente
             titulo="1550nm"
             faixa={nm1550}
@@ -267,7 +271,7 @@ function BlocoTesteOpticoCliente({
             onPatch={(faixa, opts) => onChange({ ...value, nm1550: [faixa] }, opts)}
           />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 w-full break-inside-avoid">
           <CardMedicaoCliente
             titulo="1330nm"
             faixa={nm1330}
@@ -380,7 +384,7 @@ export function RelatorioTesteOptico({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 break-inside-avoid print:break-inside-avoid print:space-y-2">
       <BlocoTesteOpticoCliente
         value={value.cliente}
         readOnly={readOnly}
@@ -388,13 +392,15 @@ export function RelatorioTesteOptico({
         onChange={(cliente, opts) => onChange({ ...value, cliente }, opts)}
       />
       {mostrarEstacao ? (
-        <BlocoTesteOpticoEstacao
-          value={value.estacao}
-          readOnly={readOnly}
-          onUploadPhoto={onUploadPhoto}
-          onChange={(estacao, opts) => onChange({ ...value, estacao }, opts)}
-          onRemover={readOnly ? undefined : removerEstacao}
-        />
+        <div className="print:hidden">
+          <BlocoTesteOpticoEstacao
+            value={value.estacao}
+            readOnly={readOnly}
+            onUploadPhoto={onUploadPhoto}
+            onChange={(estacao, opts) => onChange({ ...value, estacao }, opts)}
+            onRemover={readOnly ? undefined : removerEstacao}
+          />
+        </div>
       ) : readOnly ? null : (
         <BotaoAdicionar
           label="Adicionar Teste Óptico (Na Estação)"
@@ -444,10 +450,10 @@ export function RelatorioTestePotencia({
   };
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold">Teste OTDR</h2>
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold" htmlFor="comprimento-trecho-otdr">
+    <div className="space-y-4 break-inside-avoid rounded-2xl border border-border bg-card p-5 shadow-sm print:break-before-avoid print:break-inside-avoid print:space-y-1 print:border-0 print:p-2 print:shadow-none">
+      <h2 className="text-base font-bold print:mb-1 print:text-sm">Teste OTDR</h2>
+      <div className="print:mb-1">
+        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs" htmlFor="comprimento-trecho-otdr">
           Comprimento do trecho óptico testado (km):
         </label>
         <input
@@ -463,11 +469,11 @@ export function RelatorioTestePotencia({
           className={inputClass()}
         />
       </div>
-      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 print:gap-2">
         {value.otdr.map((item, index) => (
           <div
             key={item.id}
-            className="relative flex h-full flex-col space-y-3 rounded-xl border border-border p-4"
+            className="relative flex h-full min-w-0 w-full break-inside-avoid flex-col space-y-3 rounded-xl border border-border p-4 print:space-y-1 print:p-2"
           >
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold">Teste {index + 1}</p>

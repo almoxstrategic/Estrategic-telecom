@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { getSupabaseClient } from "@/lib/supabase";
+import { corFibraPorNumero } from "@/lib/fiber-colors";
 import type { RelatorioTransmissao } from "@/lib/relatorios-transmissao";
 import {
   buildCabecalhoDados,
@@ -23,8 +24,10 @@ const CONTENT_W = PAGE_W - MARGIN_X * 2;
 
 const PHOTO_COLS = 2;
 const PHOTO_GAP = 12;
-/** Altura da celula de foto (A4, 2 colunas) — aumentada para leitura tecnica. */
+/** Altura da celula de foto (A4, 2 colunas) — padrao do relatorio. */
 const PHOTO_CELL_H = 250;
+/** Altura Optico/OTDR — ocupa melhor a pagina sem forcar quebra do bloco. */
+const PHOTO_CELL_H_COMPACT = 185;
 const CAPTION_H = 16;
 /** Espaco extra no topo quando a foto tem Ref (Outras fotos). */
 const PHOTO_TITLE_H = 18;
@@ -506,24 +509,44 @@ async function drawParagraph(ctx: LayoutCtx, text: string, label?: string): Prom
   ctx.yFromTop += 4;
 }
 
+function photoCellHeight(compact?: boolean): number {
+  return compact ? PHOTO_CELL_H_COMPACT : PHOTO_CELL_H;
+}
+
 function photoCellWidth(): number {
   return (CONTENT_W - PHOTO_GAP * (PHOTO_COLS - 1)) / PHOTO_COLS;
 }
 
-function photoRowMetrics(items: { title?: string; caption?: string }[]): {
+function photoRowMetrics(
+  items: { title?: string; caption?: string }[],
+  compact?: boolean,
+): {
   titleH: number;
   captionH: number;
+  cellH: number;
   rowH: number;
 } {
   const withTitle = items.some((i) => Boolean(i.title?.trim()));
   const withCaption = items.some((i) => Boolean(i.caption?.trim()));
-  const titleH = withTitle ? PHOTO_TITLE_H : 0;
-  const captionH = withCaption ? (withTitle ? PHOTO_LEGEND_H : CAPTION_H) : 0;
-  return { titleH, captionH, rowH: titleH + PHOTO_CELL_H + captionH + GAP };
+  const titleH = withTitle ? (compact ? 14 : PHOTO_TITLE_H) : 0;
+  const captionH = withCaption
+    ? compact
+      ? 12
+      : withTitle
+        ? PHOTO_LEGEND_H
+        : CAPTION_H
+    : 0;
+  const cellH = photoCellHeight(compact);
+  const gap = compact ? 6 : GAP;
+  return { titleH, captionH, cellH, rowH: titleH + cellH + captionH + gap };
 }
 
-async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<void> {
-  const { titleH, captionH, rowH } = photoRowMetrics(items);
+async function drawPhotoRow(
+  ctx: LayoutCtx,
+  items: EmbeddedPhoto[],
+  compact?: boolean,
+): Promise<void> {
+  const { titleH, cellH, rowH } = photoRowMetrics(items, compact);
   if (!ctx.lockBreak && remaining(ctx) < rowH) await newPage(ctx, false);
 
   const cellW = photoCellWidth();
@@ -545,9 +568,9 @@ async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<voi
       y += titleH;
     }
 
-    const { w, h } = fittedSize(item.image, cellW - 4, PHOTO_CELL_H - 6);
+    const { w, h } = fittedSize(item.image, cellW - 4, cellH - 6);
     const x = cellX + (cellW - w) / 2;
-    const yTop = y + (PHOTO_CELL_H - h) / 2;
+    const yTop = y + (cellH - h) / 2;
     ctx.page.drawImage(item.image, {
       x,
       y: topToPdfY(yTop + h),
@@ -555,7 +578,7 @@ async function drawPhotoRow(ctx: LayoutCtx, items: EmbeddedPhoto[]): Promise<voi
       height: h,
     });
 
-    const legendTop = y + PHOTO_CELL_H;
+    const legendTop = y + cellH;
     const captionRaw = item.caption?.trim() ?? "";
     if (captionRaw) {
       const lines = wrapText(captionRaw, ctx.font, 7.5, cellW - 4).slice(
@@ -595,19 +618,24 @@ async function drawPhotosFrom(
   ctx: LayoutCtx,
   embedded: EmbeddedPhoto[],
   fromIndex = 0,
+  compact?: boolean,
 ): Promise<void> {
   if (!embedded.length) {
     await drawParagraph(ctx, "Fotos deste bloco indisponiveis no momento.", "Aviso");
     return;
   }
   for (let i = fromIndex; i < embedded.length; i += PHOTO_COLS) {
-    await drawPhotoRow(ctx, embedded.slice(i, i + PHOTO_COLS));
+    await drawPhotoRow(ctx, embedded.slice(i, i + PHOTO_COLS), compact);
   }
 }
 
-async function drawPhotos(ctx: LayoutCtx, items: PdfPhotoItem[]): Promise<void> {
+async function drawPhotos(
+  ctx: LayoutCtx,
+  items: PdfPhotoItem[],
+  compact?: boolean,
+): Promise<void> {
   const embedded = await embedPhotoItems(ctx.doc, items);
-  await drawPhotosFrom(ctx, embedded, 0);
+  await drawPhotosFrom(ctx, embedded, 0, compact);
 }
 
 function measureSubheader(text: string, font: PDFFont): number {
@@ -620,14 +648,14 @@ function measureParagraph(text: string, font: PDFFont, label?: string): number {
   return h;
 }
 
-function measurePhotos(items: PdfPhotoItem[]): number {
+function measurePhotos(items: PdfPhotoItem[], compact?: boolean): number {
   if (!items.length) return 24;
   const rows = Math.ceil(items.length / PHOTO_COLS);
   let h = 0;
   for (let i = 0; i < items.length; i += PHOTO_COLS) {
-    h += photoRowMetrics(items.slice(i, i + PHOTO_COLS)).rowH;
+    h += photoRowMetrics(items.slice(i, i + PHOTO_COLS), compact).rowH;
   }
-  return h || rows * (PHOTO_CELL_H + CAPTION_H + GAP);
+  return h || rows * (photoCellHeight(compact) + CAPTION_H + GAP);
 }
 
 function measurePotenciaCard(card: PdfPotenciaCard): number {
@@ -646,7 +674,7 @@ async function measureGroupHeight(
     if (child.kind === "subheader") h += measureSubheader(child.text, ctx.fontBold);
     else if (child.kind === "paragraph") h += measureParagraph(child.text, ctx.font, child.label);
     else if (child.kind === "photos") {
-      h += measurePhotos(child.items);
+      h += measurePhotos(child.items, child.compact);
     } else if (child.kind === "potenciaCard") h += measurePotenciaCard(child.card);
     else if (child.kind === "heading") h += 32;
   }
@@ -782,7 +810,7 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
     ctx.yFromTop += 18;
   } else {
     for (const fibra of card.fibras) {
-      const rowH = 16;
+      const rowH = 18;
       if (!ctx.lockBreak && remaining(ctx) < rowH + 4) await newPage(ctx, false);
       ctx.page.drawRectangle({
         x: MARGIN_X,
@@ -792,9 +820,42 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
         borderColor: COR_LINE,
         borderWidth: 0.4,
       });
-      const vals = [fibra.numero, fibra.po, fibra.poPi, fibra.status];
+
+      // Coluna Fibra No: badge Telebras + numero
+      const telebras = corFibraPorNumero(fibra.numeroFibra);
+      const badgeW = 18;
+      const badgeH = 11;
+      const badgeX = MARGIN_X + 4;
+      const badgeYPdf = topToPdfY(ctx.yFromTop + (rowH + badgeH) / 2);
+      ctx.page.drawRectangle({
+        x: badgeX,
+        y: badgeYPdf,
+        width: badgeW,
+        height: badgeH,
+        color: rgb(telebras.fill[0] / 255, telebras.fill[1] / 255, telebras.fill[2] / 255),
+        borderColor: telebras.sigla === "BR" ? COR_LINE : undefined,
+        borderWidth: telebras.sigla === "BR" ? 0.5 : undefined,
+      });
+      const siglaW = ctx.fontBold.widthOfTextAtSize(telebras.sigla, 6.5);
+      ctx.page.drawText(telebras.sigla, {
+        x: badgeX + (badgeW - siglaW) / 2,
+        y: badgeYPdf + 2.5,
+        size: 6.5,
+        font: ctx.fontBold,
+        color: rgb(telebras.text[0] / 255, telebras.text[1] / 255, telebras.text[2] / 255),
+      });
+      ctx.page.drawText(sanitizePdfText(fibra.numero), {
+        x: badgeX + badgeW + 5,
+        y: topToPdfY(ctx.yFromTop + 12),
+        size: 8,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+
+      const vals = [fibra.po, fibra.poPi, fibra.status];
       for (let i = 0; i < vals.length; i++) {
-        const isStatus = i === 3;
+        const col = i + 1;
+        const isStatus = i === 2;
         const color =
           isStatus && fibra.status === "OK"
             ? COR_OK
@@ -802,8 +863,8 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
               ? COR_NOK
               : COR_TEXTO;
         ctx.page.drawText(sanitizePdfText(vals[i]), {
-          x: MARGIN_X + i * cw + 4,
-          y: topToPdfY(ctx.yFromTop + 11),
+          x: MARGIN_X + col * cw + 4,
+          y: topToPdfY(ctx.yFromTop + 12),
           size: 8,
           font: isStatus ? ctx.fontBold : ctx.font,
           color,
@@ -819,13 +880,32 @@ async function drawAtomic(ctx: LayoutCtx, block: PdfAtomicBlock): Promise<void> 
   if (block.kind === "heading") await drawHeading(ctx, block.text);
   else if (block.kind === "subheader") await drawSubheader(ctx, block.text);
   else if (block.kind === "paragraph") await drawParagraph(ctx, block.text, block.label);
-  else if (block.kind === "photos") await drawPhotos(ctx, block.items);
+  else if (block.kind === "photos") await drawPhotos(ctx, block.items, block.compact);
   else if (block.kind === "potenciaCard") await drawPotenciaCard(ctx, block.card);
 }
 
 async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<void> {
   const height = await measureGroupHeight(ctx, children);
   const pageCapacity = PAGE_H - CONTENT_BOTTOM - MARGIN_TOP - 50;
+
+  const headings = children
+    .filter((c): c is Extract<PdfAtomicBlock, { kind: "heading" }> => c.kind === "heading")
+    .map((c) => c.text);
+  const isOpticoOtdrBundle =
+    headings.some((t) => /teste\s*optico/i.test(t)) &&
+    headings.some((t) => /teste\s*otdr/i.test(t));
+
+  // Optico + OTDR: bloco unico inquebravel (nova pagina se nao couber no restante)
+  if (isOpticoOtdrBundle) {
+    if (remaining(ctx) < Math.min(height, pageCapacity)) await newPage(ctx, false);
+    ctx.lockBreak = true;
+    try {
+      for (const child of children) await drawAtomic(ctx, child);
+    } finally {
+      ctx.lockBreak = false;
+    }
+    return;
+  }
 
   // Grupo cabe em uma pagina: break-inside avoid
   if (height <= pageCapacity) {
@@ -856,6 +936,7 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
   const photosIdx = children.findIndex((c) => c.kind === "photos");
   if (photosIdx >= 0) {
     const photosBlock = children[photosIdx] as Extract<PdfAtomicBlock, { kind: "photos" }>;
+    const compact = photosBlock.compact;
     const prefix = children.slice(0, photosIdx);
     const suffix = children.slice(photosIdx + 1);
     const embedded = await embedPhotoItems(ctx.doc, photosBlock.items);
@@ -863,8 +944,8 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     const prefixH = await measureGroupHeight(ctx, prefix);
     const firstRowItems = embedded.slice(0, PHOTO_COLS);
     const firstRowH = firstRowItems.length
-      ? photoRowMetrics(firstRowItems).rowH
-      : measurePhotos(photosBlock.items.slice(0, PHOTO_COLS));
+      ? photoRowMetrics(firstRowItems, compact).rowH
+      : measurePhotos(photosBlock.items.slice(0, PHOTO_COLS), compact);
     const keepH = prefixH + firstRowH;
 
     if (remaining(ctx) < keepH) await newPage(ctx, false);
@@ -873,7 +954,7 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     try {
       for (const child of prefix) await drawAtomic(ctx, child);
       if (embedded.length) {
-        await drawPhotoRow(ctx, embedded.slice(0, PHOTO_COLS));
+        await drawPhotoRow(ctx, embedded.slice(0, PHOTO_COLS), compact);
       } else {
         await drawParagraph(ctx, "Fotos deste bloco indisponiveis no momento.", "Aviso");
       }
@@ -882,7 +963,7 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     }
 
     if (embedded.length > PHOTO_COLS) {
-      await drawPhotosFrom(ctx, embedded, PHOTO_COLS);
+      await drawPhotosFrom(ctx, embedded, PHOTO_COLS, compact);
     }
     for (const child of suffix) await drawAtomic(ctx, child);
     return;

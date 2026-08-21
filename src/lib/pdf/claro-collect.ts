@@ -7,7 +7,6 @@ import {
   calcularMinimoAdmissivel,
   formatarDb,
   parseNumeroCampo,
-  testeOpticoEstacaoAtivo,
   totalConexoesCalculado,
   totalEmendasCalculado,
   type CaboMetragemPayload,
@@ -17,7 +16,6 @@ import {
   type RelatorioTransmissao,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
-  type TesteOpticoItemPayload,
   type TesteOpticoPayload,
 } from "@/lib/relatorios-transmissao";
 
@@ -39,6 +37,8 @@ export type PdfPotenciaLinhaAten = {
 
 export type PdfPotenciaFibra = {
   numero: string;
+  /** Numero inteiro da fibra (1-based) para cor Telebras. */
+  numeroFibra: number;
   po: string;
   poPi: string;
   status: "OK" | "NAO OK" | "-";
@@ -58,7 +58,7 @@ export type PdfAtomicBlock =
   | { kind: "heading"; text: string }
   | { kind: "subheader"; text: string }
   | { kind: "paragraph"; text: string; label?: string }
-  | { kind: "photos"; items: PdfPhotoItem[] }
+  | { kind: "photos"; items: PdfPhotoItem[]; compact?: boolean }
   | { kind: "potenciaCard"; card: PdfPotenciaCard };
 
 /** group = titulo + anexos (page-break-inside: avoid). */
@@ -133,10 +133,14 @@ function pushPara(target: PdfAtomicBlock[], text: string, label?: string) {
   target.push({ kind: "paragraph", text: t, label });
 }
 
-function pushPhotos(target: PdfAtomicBlock[], items: PdfPhotoItem[]) {
+function pushPhotos(
+  target: PdfAtomicBlock[],
+  items: PdfPhotoItem[],
+  opts?: { compact?: boolean },
+) {
   const valid = items.filter((i) => i.url.trim() || i.path?.trim());
   if (!valid.length) return;
-  target.push({ kind: "photos", items: valid });
+  target.push({ kind: "photos", items: valid, compact: opts?.compact });
 }
 
 function andamentoTexto(obs?: string | null, obsAdmin?: string | null): string {
@@ -258,26 +262,9 @@ function collectOutras(
   pushGroup(blocks, children);
 }
 
-function collectFaixaOptica(
-  blocks: PdfContentBlock[],
-  titulo: string,
-  faixas: TesteOpticoFaixaPayload[],
-) {
-  for (const [i, faixa] of faixas.entries()) {
-    const andamento = andamentoTexto(faixa.obs, faixa.obsAdmin);
-    const label = `${titulo}${faixas.length > 1 ? ` #${i + 1}` : ""}`;
-    const items = toPhotoItems(faixa.fotos ?? [], { title: label, caption: andamento });
-    if (!items.length && !faixa.dbm.trim() && !andamento) continue;
-    const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
-    if (faixa.dbm.trim()) pushPara(children, `${faixa.dbm} dBm`, "Medicao");
-    pushPhotos(children, items);
-    pushGroup(blocks, children);
-  }
-}
-
 /** Emparelha 1550nm e 1330nm na mesma linha (grid 2 colunas). */
-function collectParJanelasOpticas(
-  blocks: PdfContentBlock[],
+function appendParJanelasOpticas(
+  target: PdfAtomicBlock[],
   pontoLabel: string,
   faixa1550: TesteOpticoFaixaPayload | undefined,
   faixa1330: TesteOpticoFaixaPayload | undefined,
@@ -297,75 +284,21 @@ function collectParJanelasOpticas(
   pushFaixa("1550 nm", faixa1550);
   pushFaixa("1330 nm", faixa1330);
   if (!fotos.length && children.length <= 1) return;
-  pushPhotos(children, fotos);
-  pushGroup(blocks, children);
+  pushPhotos(children, fotos, { compact: true });
+  target.push(...children);
 }
 
-function collectItemOptico(
-  blocks: PdfContentBlock[],
-  titulo: string,
-  itens: TesteOpticoItemPayload[],
-) {
-  for (const [i, item] of itens.entries()) {
-    const andamento = andamentoTexto(item.obs, item.obsAdmin);
-    if (!hasPhoto(item.foto) && !item.dbm.trim() && !andamento) continue;
-    const label = `${titulo}${itens.length > 1 ? ` #${i + 1}` : ""}`;
-    const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
-    if (item.dbm.trim()) pushPara(children, `${item.dbm} dBm`, "Medicao");
-    if (hasPhoto(item.foto)) {
-      pushPhotos(children, [{
-        url: resolvePhotoUrl(item.foto),
-        path: item.foto?.path?.trim() || undefined,
-        title: label,
-        caption: andamento,
-      }]);
-    }
-    pushGroup(blocks, children);
-  }
-}
-
-function collectParItensOpticos(
-  blocks: PdfContentBlock[],
-  pontoLabel: string,
-  item1550: TesteOpticoItemPayload | undefined,
-  item1330: TesteOpticoItemPayload | undefined,
-) {
-  const children: PdfAtomicBlock[] = [{ kind: "subheader", text: pontoLabel }];
-  const fotos: PdfPhotoItem[] = [];
-
-  const pushItem = (janela: string, item: TesteOpticoItemPayload | undefined) => {
-    if (!item) return;
-    const andamento = andamentoTexto(item.obs, item.obsAdmin);
-    if (!hasPhoto(item.foto) && !item.dbm.trim() && !andamento) return;
-    if (item.dbm.trim()) pushPara(children, `${item.dbm} dBm`, `${janela} - Medicao`);
-    if (hasPhoto(item.foto)) {
-      fotos.push({
-        url: resolvePhotoUrl(item.foto),
-        path: item.foto?.path?.trim() || undefined,
-        title: janela,
-        caption: andamento,
-      });
-    }
-  };
-
-  pushItem("1550 nm", item1550);
-  pushItem("1330 nm", item1330);
-  if (!fotos.length && children.length <= 1) return;
-  pushPhotos(children, fotos);
-  pushGroup(blocks, children);
-}
-
-function collectTesteOtdr(blocks: PdfContentBlock[], row: RelatorioTransmissao) {
+function buildTesteOtdrAtoms(row: RelatorioTransmissao): PdfAtomicBlock[] {
   const p = row.payload;
-  if (!p) return;
+  if (!p) return [];
   const isImplantacao = row.tipo_execucao === "implantacao";
   const value = isImplantacao ? p.testePotenciaImplantacao : p.testePotenciaEmpresarial;
-  if (!value) return;
+  if (!value) return [];
 
   const kmRaw = String(value.comprimentoTrechoKm ?? "").trim();
   const otdrItens = value.otdr ?? [];
   const ativos = otdrItens.filter((item) => hasPhoto(item.foto) || andamentoTexto(item.obs, item.obsAdmin));
-  if (!kmRaw && !ativos.length) return;
+  if (!kmRaw && !ativos.length) return [];
 
   const tituloSecao = isImplantacao ? "6. Teste OTDR (Implantacao)" : "6. Teste OTDR (Empresarial)";
   const children: PdfAtomicBlock[] = [{ kind: "heading", text: tituloSecao }];
@@ -388,8 +321,8 @@ function collectTesteOtdr(blocks: PdfContentBlock[], row: RelatorioTransmissao) 
       });
     }
   }
-  pushPhotos(children, fotos);
-  pushGroup(blocks, children);
+  pushPhotos(children, fotos, { compact: true });
+  return children;
 }
 
 function primeiroDbm(lista: unknown): string {
@@ -431,6 +364,7 @@ function buildPotenciaCard(
       : [
           {
             numero: String(numeroFibra).padStart(2, "0"),
+            numeroFibra,
             po: formatarPtBr(valPo),
             poPi: piEmBranco ? "-" : `${formatarPtBr(atenuacao)} dB`,
             status,
@@ -657,41 +591,27 @@ export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
     collectOutras(blocks, "Outras fotos (Estacao)", p.outrasFotosEqEstacao ?? []);
   }
 
-  const to = p?.testeOptico;
-  if (to) {
-    pushHeading(blocks, "5. Teste Optico");
-    {
-      const meta: PdfAtomicBlock[] = [];
+  // Secoes 5 (Optico — so Cliente) e 6 (OTDR) no mesmo grupo: fluem na mesma pagina.
+  {
+    const combined: PdfAtomicBlock[] = [];
+    const to = p?.testeOptico;
+    if (to) {
+      combined.push({ kind: "heading", text: "5. Teste Optico" });
       if (to.cliente?.numeroFibra != null) {
-        pushPara(meta, String(to.cliente.numeroFibra), "No Fibra (Cliente)");
+        pushPara(combined, String(to.cliente.numeroFibra), "No Fibra (Cliente)");
       }
-      for (const b of meta) blocks.push(b);
-    }
-    collectParJanelasOpticas(
-      blocks,
-      "No Cliente",
-      to.cliente?.nm1550?.[0],
-      to.cliente?.nm1330?.[0],
-    );
-    if (testeOpticoEstacaoAtivo(to.estacao)) {
-      if (to.estacao?.numeroFibra != null) {
-        blocks.push({
-          kind: "paragraph",
-          text: String(to.estacao.numeroFibra),
-          label: "No Fibra (Estacao)",
-        });
-      }
-      collectParItensOpticos(
-        blocks,
-        "Na Estacao",
-        to.estacao?.nm1550?.[0],
-        to.estacao?.nm1330?.[0],
+      appendParJanelasOpticas(
+        combined,
+        "No Cliente",
+        to.cliente?.nm1550?.[0],
+        to.cliente?.nm1330?.[0],
       );
     }
+    combined.push(...buildTesteOtdrAtoms(row));
+    if (combined.length) pushGroup(blocks, combined);
   }
 
-  // OTDR antes do Teste de Potencia; potencia so em Empresarial.
-  collectTesteOtdr(blocks, row);
+  // Potencia so em Empresarial (apenas No Cliente).
   collectTestePotenciaTabelas(blocks, row);
 
   return coalesceSectionLeads(blocks);

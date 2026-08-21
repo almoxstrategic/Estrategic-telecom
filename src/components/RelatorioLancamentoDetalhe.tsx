@@ -1095,34 +1095,55 @@ export function RelatorioDetalhe({
         </div>
       ) : null}
 
-      {abaAtiva === "teste-optico" ? (
-        <RelatorioTesteOptico
-          readOnly={!canEditPhotos}
-          value={payload?.testeOptico ?? emptyTesteOptico()}
-          onChange={(next) => {
-            if (!payload) return;
-            patchPayload({ ...payload, testeOptico: next });
-          }}
-          onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
-        />
-      ) : null}
-
-      {abaAtiva === "teste-otdr" ? (
-        <RelatorioTestePotencia
-          tipoExecucao={isImplantacao ? "implantacao" : "empresarial"}
-          readOnly={!canEditPhotos}
-          valueEmpresarial={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
-          valueImplantacao={payload?.testePotenciaImplantacao ?? emptyTestePotencia()}
-          onChangeEmpresarial={(next) => {
-            if (!payload) return;
-            patchPayload({ ...payload, testePotenciaEmpresarial: next });
-          }}
-          onChangeImplantacao={(next) => {
-            if (!payload) return;
-            patchPayload({ ...payload, testePotenciaImplantacao: next });
-          }}
-          onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
-        />
+      {abaAtiva === "teste-optico" || abaAtiva === "teste-otdr" ? (
+        <>
+          <div className="print:hidden">
+            {abaAtiva === "teste-optico" ? (
+              <RelatorioTesteOptico
+                readOnly={!canEditPhotos}
+                value={payload?.testeOptico ?? emptyTesteOptico()}
+                onChange={(next) => {
+                  if (!payload) return;
+                  patchPayload({ ...payload, testeOptico: next });
+                }}
+                onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
+              />
+            ) : null}
+            {abaAtiva === "teste-otdr" ? (
+              <RelatorioTestePotencia
+                tipoExecucao={isImplantacao ? "implantacao" : "empresarial"}
+                readOnly={!canEditPhotos}
+                valueEmpresarial={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
+                valueImplantacao={payload?.testePotenciaImplantacao ?? emptyTestePotencia()}
+                onChangeEmpresarial={(next) => {
+                  if (!payload) return;
+                  patchPayload({ ...payload, testePotenciaEmpresarial: next });
+                }}
+                onChangeImplantacao={(next) => {
+                  if (!payload) return;
+                  patchPayload({ ...payload, testePotenciaImplantacao: next });
+                }}
+                onUploadPhoto={canEditPhotos ? onUploadPhoto : undefined}
+              />
+            ) : null}
+          </div>
+          {/* Bloco unico inquebravel so na impressao (Optico + OTDR juntos) */}
+          <div className="hidden break-inside-avoid print:block print:space-y-2">
+            <RelatorioTesteOptico
+              readOnly
+              value={payload?.testeOptico ?? emptyTesteOptico()}
+              onChange={() => undefined}
+            />
+            <RelatorioTestePotencia
+              tipoExecucao={isImplantacao ? "implantacao" : "empresarial"}
+              readOnly
+              valueEmpresarial={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
+              valueImplantacao={payload?.testePotenciaImplantacao ?? emptyTestePotencia()}
+              onChangeEmpresarial={() => undefined}
+              onChangeImplantacao={() => undefined}
+            />
+          </div>
+        </>
       ) : null}
 
       {abaAtiva === "teste-potencia" ? (
