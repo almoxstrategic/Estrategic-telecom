@@ -146,7 +146,7 @@ function JanelaCard({
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-bold">{titulo}</h2>
-      <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-4">
+      <div className="mb-4 grid w-full grid-cols-2 gap-4 text-left md:grid-cols-4 print:grid-cols-4">
         <CampoImportado
           label="Comprimento do Trecho (km)"
           value={`${formatarPtBr(kmSeguro)} km`}
@@ -171,10 +171,10 @@ function JanelaCard({
           Potência medida (Po) gerada automaticamente pela Atenuação Máxima.
         </p>
         <div className="hidden gap-4 px-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-4">
-          <span>Fibra Nº</span>
-          <span>Po (dBm)</span>
-          <span>Po - Pi (dB)</span>
-          <span>Status</span>
+          <span className="text-left">Fibra Nº</span>
+          <span className="text-center">Po (dBm)</span>
+          <span className="text-center">Po - Pi (dB)</span>
+          <span className="text-center">Status</span>
         </div>
         <div className="divide-y divide-border">
           {numeroFibra == null ? (
@@ -223,7 +223,7 @@ function LinhaFibra({
 
   return (
     <div className="grid grid-cols-2 items-center gap-4 py-2 md:grid-cols-4">
-      <div className="min-w-0">
+      <div className="min-w-0 text-left">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Fibra Nº</p>
         <div className="flex items-center gap-2">
           <span
@@ -237,22 +237,22 @@ function LinhaFibra({
           </span>
         </div>
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 text-center">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Po (dBm)</p>
         <input
           value={poFormatado}
           readOnly
           tabIndex={-1}
-          className={`${inputClass()} cursor-default bg-muted`}
+          className={`${inputClass()} cursor-default bg-muted text-center`}
         />
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 text-center">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Po - Pi (dB)</p>
-        <p className={`${inputClass()} cursor-default bg-muted tabular-nums`}>
+        <p className={`${inputClass()} cursor-default bg-muted text-center tabular-nums`}>
           {piEmBranco ? "—" : atenuacaoFormatada}
         </p>
       </div>
-      <div className="flex min-h-[48px] items-center md:min-h-0">
+      <div className="flex min-h-[48px] items-center justify-center md:min-h-0">
         <p className="mb-1 text-xs font-medium text-gray-700 md:sr-only">Status</p>
         <StatusBadge status={status} />
       </div>
@@ -319,9 +319,13 @@ function LinhaRef({
   const fundo = destaque ? "bg-yellow-100" : destaqueCinza ? "bg-gray-100" : "bg-white";
   return (
     <tr className={`border border-gray-300 ${fundo}`}>
-      <td className={`px-3 py-2 ${destaqueCinza ? "font-semibold" : ""}`}>{rotulo}</td>
-      <td className="w-24 px-3 py-2 text-center font-semibold tabular-nums">{valor}</td>
-      <td className="w-20 px-3 py-2 text-gray-600">{unidade}</td>
+      <td
+        className={`w-2/3 px-3 py-2 text-left ${destaqueCinza ? "font-semibold" : ""}`}
+      >
+        {rotulo}
+      </td>
+      <td className="w-1/6 px-3 py-2 text-right font-bold tabular-nums">{valor}</td>
+      <td className="w-1/6 px-3 py-2 pl-2 text-left text-gray-600">{unidade}</td>
     </tr>
   );
 }
@@ -349,15 +353,15 @@ function LegendaCoresFibra() {
 
 function CampoImportado({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex h-full flex-col justify-end">
-      <label className="mb-1.5 block text-sm font-semibold leading-snug">{label}</label>
+    <div className="flex h-full w-full flex-col justify-end text-left">
+      <label className="mb-1.5 block text-left text-sm font-semibold leading-snug">{label}</label>
       <input
         value={textoOuTraco(value)}
         readOnly
         tabIndex={-1}
-        className={`${inputClass()} cursor-default bg-muted`}
+        className={`${inputClass()} cursor-default bg-muted text-left`}
       />
-      <p className="mt-1 text-[10px] leading-tight text-gray-400 md:text-xs">
+      <p className="mt-1 text-left text-[10px] leading-tight text-gray-400 md:text-xs">
         Importado automaticamente
       </p>
     </div>

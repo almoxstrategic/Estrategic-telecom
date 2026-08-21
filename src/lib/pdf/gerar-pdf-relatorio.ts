@@ -695,8 +695,9 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
   });
   ctx.yFromTop += 18;
 
-  // Bloco 1 — meta 4 colunas
-  const colW = CONTENT_W / 4;
+  // Bloco 1 — meta 4 colunas estritas, text-left
+  const metaGap = 8;
+  const colW = (CONTENT_W - metaGap * 3) / 4;
   const metas: [string, string][] = [
     ["Comprimento do Trecho", card.km],
     ["No de Emendas", card.emendas],
@@ -705,7 +706,7 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
   ];
   for (let i = 0; i < metas.length; i++) {
     const [lab, val] = metas[i];
-    const x = MARGIN_X + i * colW;
+    const x = MARGIN_X + i * (colW + metaGap);
     ctx.page.drawText(sanitizePdfText(lab), {
       x,
       y: topToPdfY(ctx.yFromTop + 8),
@@ -713,7 +714,7 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
       font: ctx.fontBold,
       color: COR_MUTED,
     });
-    ctx.page.drawText(truncate(val, ctx.font, 9, colW - 6), {
+    ctx.page.drawText(truncate(val, ctx.font, 9, colW - 2), {
       x,
       y: topToPdfY(ctx.yFromTop + 20),
       size: 9,
@@ -721,11 +722,11 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
       color: COR_TEXTO,
     });
   }
-  ctx.yFromTop += 28;
+  ctx.yFromTop += 30;
 
-  // Bloco 2 — linhas de atenuacao
-  const colRotulo = CONTENT_W * 0.62;
-  const colValor = CONTENT_W * 0.2;
+  // Bloco 2 — grid 12 colunas: rotulo 8 | valor 2 (direita) | unidade 2
+  const span8 = (CONTENT_W * 8) / 12;
+  const span2 = CONTENT_W / 6;
   for (const linha of card.linhasAten) {
     const rowH = 16;
     if (!ctx.lockBreak && remaining(ctx) < rowH + 4) await newPage(ctx, false);
@@ -744,22 +745,28 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
       borderColor: COR_LINE,
       borderWidth: 0.5,
     });
-    ctx.page.drawText(truncate(linha.rotulo, ctx.font, 7, colRotulo - 8), {
+    // Col 1 — rotulo (text-left)
+    ctx.page.drawText(truncate(linha.rotulo, ctx.font, 7, span8 - 10), {
       x: MARGIN_X + 4,
       y: topToPdfY(ctx.yFromTop + 11),
       size: 7,
       font: linha.destaque ? ctx.fontBold : ctx.font,
       color: COR_TEXTO,
     });
-    ctx.page.drawText(sanitizePdfText(linha.valor), {
-      x: MARGIN_X + colRotulo,
+    // Col 2 — valor (text-right)
+    const valorTxt = sanitizePdfText(linha.valor);
+    const valorW = ctx.fontBold.widthOfTextAtSize(valorTxt, 8);
+    const valorColX = MARGIN_X + span8;
+    ctx.page.drawText(valorTxt, {
+      x: valorColX + span2 - 4 - valorW,
       y: topToPdfY(ctx.yFromTop + 11),
       size: 8,
       font: ctx.fontBold,
       color: COR_TEXTO,
     });
+    // Col 3 — unidade (text-left)
     ctx.page.drawText(sanitizePdfText(linha.unidade), {
-      x: MARGIN_X + colRotulo + colValor,
+      x: MARGIN_X + span8 + span2 + 4,
       y: topToPdfY(ctx.yFromTop + 11),
       size: 7,
       font: ctx.font,
@@ -789,10 +796,18 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
     color: COR_BAND,
   });
   for (let i = 0; i < cols.length; i++) {
-    ctx.page.drawText(sanitizePdfText(cols[i]), {
-      x: MARGIN_X + i * cw + 4,
+    const label = sanitizePdfText(cols[i]);
+    const size = 7.5;
+    const tw = ctx.fontBold.widthOfTextAtSize(label, size);
+    // Fibra No: text-left; demais: text-center
+    const x =
+      i === 0
+        ? MARGIN_X + 4
+        : MARGIN_X + i * cw + (cw - tw) / 2;
+    ctx.page.drawText(label, {
+      x,
       y: topToPdfY(ctx.yFromTop + 10),
-      size: 7.5,
+      size,
       font: ctx.fontBold,
       color: COR_MUTED,
     });
@@ -821,7 +836,7 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
         borderWidth: 0.4,
       });
 
-      // Coluna Fibra No: badge Telebras + numero
+      // Coluna Fibra No: badge + numero (flex-like, text-left)
       const telebras = corFibraPorNumero(fibra.numeroFibra);
       const badgeW = 18;
       const badgeH = 11;
@@ -852,6 +867,7 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
         color: COR_TEXTO,
       });
 
+      // Po, Po-Pi, Status — text-center alinhado aos cabecalhos
       const vals = [fibra.po, fibra.poPi, fibra.status];
       for (let i = 0; i < vals.length; i++) {
         const col = i + 1;
@@ -862,11 +878,15 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
             : isStatus && fibra.status === "NAO OK"
               ? COR_NOK
               : COR_TEXTO;
-        ctx.page.drawText(sanitizePdfText(vals[i]), {
-          x: MARGIN_X + col * cw + 4,
+        const txt = sanitizePdfText(vals[i]);
+        const size = 8;
+        const font = isStatus ? ctx.fontBold : ctx.font;
+        const tw = font.widthOfTextAtSize(txt, size);
+        ctx.page.drawText(txt, {
+          x: MARGIN_X + col * cw + (cw - tw) / 2,
           y: topToPdfY(ctx.yFromTop + 12),
-          size: 8,
-          font: isStatus ? ctx.fontBold : ctx.font,
+          size,
+          font,
           color,
         });
       }
