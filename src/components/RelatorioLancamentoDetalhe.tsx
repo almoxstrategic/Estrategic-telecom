@@ -1429,6 +1429,7 @@ export function RelatorioDetalhe({
                   ) : null}
                 </div>
               ) : null}
+              {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
               {renderGrupo("Poste de conexão", "posteConexao")}
               <CordoalhaSimNaoCard
                 title="Postes novo com nova cordoalha?"
@@ -1451,8 +1452,7 @@ export function RelatorioDetalhe({
               />
               <CordoalhaSimNaoCard
                 title="Postes com cordoalha Existente?"
-                quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
-                quantidadePlaceholder="Ex: 10"
+                hideQuantidade
                 value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos
@@ -1461,7 +1461,13 @@ export function RelatorioDetalhe({
                         const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
                         patchPayload({
                           ...payload,
-                          redeAcesso: { ...redeAcesso, postesCordoalhaExistente },
+                          redeAcesso: {
+                            ...redeAcesso,
+                            postesCordoalhaExistente: {
+                              isSim: postesCordoalhaExistente.isSim,
+                              quantidade: null,
+                            },
+                          },
                         });
                       }
                     : undefined
@@ -1476,7 +1482,6 @@ export function RelatorioDetalhe({
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
-              {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
               {renderGrupo("Sobra técnica / Fiberloop", "sobraTecnica", true)}
             </div>
           </section>
@@ -1648,8 +1653,7 @@ export function RelatorioDetalhe({
               />
               <CordoalhaSimNaoCard
                 title="Postes com cordoalha Existente?"
-                quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
-                quantidadePlaceholder="Ex: 10"
+                hideQuantidade
                 value={payload?.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos
@@ -1658,7 +1662,13 @@ export function RelatorioDetalhe({
                         const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
                         patchPayload({
                           ...payload,
-                          redeCliente: { ...redeCliente, postesCordoalhaExistente },
+                          redeCliente: {
+                            ...redeCliente,
+                            postesCordoalhaExistente: {
+                              isSim: postesCordoalhaExistente.isSim,
+                              quantidade: null,
+                            },
+                          },
                         });
                       }
                     : undefined
@@ -1667,9 +1677,9 @@ export function RelatorioDetalhe({
               />
               {(
                 [
+                  ["Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo"],
                   ["Caixa de emenda na acomodação (Rede cliente com Rede Externa)", "rcCaixaEmenda"],
                   ["Plaqueta de Identificação - Caixa de emenda", "rcPlaquetaIdentificacao"],
-                  ["Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo"],
                   ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
                   ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
                   ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],

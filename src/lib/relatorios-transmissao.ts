@@ -988,7 +988,10 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
       quantidade: null,
     },
     postesNovaCordoalha: parseCordoalhaBloco(src.postesNovaCordoalha),
-    postesCordoalhaExistente: parseCordoalhaBloco(src.postesCordoalhaExistente),
+    postesCordoalhaExistente: {
+      isSim: parseCordoalhaBloco(src.postesCordoalhaExistente).isSim,
+      quantidade: null,
+    },
     aterramento: {
       totalHastes: parseQtdInteiro(src.aterramento?.totalHastes),
     },
@@ -1907,10 +1910,13 @@ function mergeQuantidadesRede(
       fromServer.postesNovaCordoalha,
       fromLocal.postesNovaCordoalha,
     ),
-    postesCordoalhaExistente: mergeCordoalhaBloco(
-      fromServer.postesCordoalhaExistente,
-      fromLocal.postesCordoalhaExistente,
-    ),
+    postesCordoalhaExistente: {
+      isSim: mergeCordoalhaBloco(
+        fromServer.postesCordoalhaExistente,
+        fromLocal.postesCordoalhaExistente,
+      ).isSim,
+      quantidade: null,
+    },
     aterramento: {
       totalHastes:
         fromLocal.aterramento?.totalHastes === undefined

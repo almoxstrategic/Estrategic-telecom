@@ -188,6 +188,8 @@ export type SecaoPesquisavel = {
 /** Índice de navegação rápida por aba (âncoras no próprio formulário). */
 export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisavel[]>> = {
   RE: [
+    { titulo: "LANÇAMENTO", id: "secao-cabos" },
+    { titulo: "Cabo e Lançamento", id: "secao-cabos" },
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
     { titulo: "Sobra técnica / Fiberloop", id: "secao-sobraTecnica" },
@@ -201,6 +203,8 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Outras fotos", id: "secao-outras-fotos" },
   ],
   RC: [
+    { titulo: "LANÇAMENTO", id: "secao-cabos" },
+    { titulo: "Cabo e Lançamento", id: "secao-cabos" },
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
     { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
@@ -257,6 +261,7 @@ export function RelatorioAbasCampo({
   abas = ABAS_CAMPO,
   topBlockRef,
   secoesPesquisaveis,
+  stickToViewportTop = false,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
@@ -265,6 +270,8 @@ export function RelatorioAbasCampo({
   topBlockRef?: RefObject<HTMLElement | null>;
   /** Sobrescreve o índice padrão de seções da aba ativa. */
   secoesPesquisaveis?: SecaoPesquisavel[];
+  /** Técnico no relatório: gruda no topo da tela (header da app não é sticky). */
+  stickToViewportTop?: boolean;
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -299,11 +306,12 @@ export function RelatorioAbasCampo({
   }, [abaAtiva]);
 
   useEffect(() => {
+    const thresholdPx = stickToViewportTop ? 72 : ABAS_COMPACT_THRESHOLD_PX;
     const onScroll = () => {
       const trigger = topBlockRef?.current;
       if (trigger) {
         const topBlockBottom = trigger.getBoundingClientRect().bottom;
-        setIsScrolled(topBlockBottom <= ABAS_COMPACT_THRESHOLD_PX);
+        setIsScrolled(topBlockBottom <= thresholdPx);
         return;
       }
       setIsScrolled(window.scrollY > 50);
@@ -315,7 +323,7 @@ export function RelatorioAbasCampo({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [topBlockRef, abaAtiva]);
+  }, [topBlockRef, abaAtiva, stickToViewportTop]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
@@ -339,7 +347,13 @@ export function RelatorioAbasCampo({
 
   return (
     <>
-      <div className="sticky top-16 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300">
+      <div
+        className={
+          stickToViewportTop
+            ? "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300"
+            : "sticky top-16 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300"
+        }
+      >
         <nav
           className={
             isScrolled
@@ -858,6 +872,12 @@ export function RelatorioRedeAcesso({
   const mostrarCordoalha = Boolean(cordoalhaLancada && cordoalhaExistente);
   const mostrarPostes = Boolean(postesNovaCordoalha && postesCordoalhaExistente);
   const gruposCabos = grupos.filter((g) => g.section === "cabos");
+  const gruposCabosPrincipais = gruposCabos.filter(
+    (g) => g.grupoKey !== "dutoSubterraneo" && g.grupoKey !== "rcDutoSubterraneo",
+  );
+  const gruposDuto = gruposCabos.filter(
+    (g) => g.grupoKey === "dutoSubterraneo" || g.grupoKey === "rcDutoSubterraneo",
+  );
   const gruposPoste = grupos.filter((g) => g.section === "poste");
   const gruposCaixa = grupos.filter((g) => g.section === "caixa");
   const fotoCtx = { readOnly, onGrupoPhoto };
@@ -867,7 +887,7 @@ export function RelatorioRedeAcesso({
       <div className="space-y-5">
         {header}
 
-        <AccordionBloco title="CABOS" id="secao-cabos">
+        <AccordionBloco title="LANÇAMENTO" id="secao-cabos">
           <div className={flatSectionClass}>
             <h2 className="mb-3 font-semibold text-gray-800">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">
@@ -1085,7 +1105,7 @@ export function RelatorioRedeAcesso({
             </div>
           ) : null}
 
-          {gruposCabos.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          {gruposCabosPrincipais.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
 
           {fiberloopInstalado &&
           onFiberloopInstaladoChange &&
@@ -1100,6 +1120,8 @@ export function RelatorioRedeAcesso({
               variant="flat"
             />
           ) : null}
+
+          {gruposDuto.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
         </AccordionBloco>
 
         <AccordionBloco title="POSTE" id="secao-poste">
@@ -1143,8 +1165,7 @@ export function RelatorioRedeAcesso({
                     />
                     <CordoalhaSimNaoCard
                       title="Postes com cordoalha Existente?"
-                      quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
-                      quantidadePlaceholder="Ex: 10"
+                      hideQuantidade
                       value={postesCordoalhaExistente!}
                       onChange={onPostesCordoalhaExistenteChange}
                       disabled={readOnly}

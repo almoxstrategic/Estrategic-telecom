@@ -688,7 +688,10 @@ function RelatorioPage() {
         quantidade: null,
       },
       postesNovaCordoalha: p.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
-      postesCordoalhaExistente: p.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
+      postesCordoalhaExistente: {
+        isSim: (p.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()).isSim,
+        quantidade: null,
+      },
       aterramento: { totalHastes: null },
     });
     setObsAdminGrupos({
@@ -745,7 +748,10 @@ function RelatorioPage() {
         quantidade: null,
       },
       postesNovaCordoalha: p.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
-      postesCordoalhaExistente: p.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
+      postesCordoalhaExistente: {
+        isSim: (p.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco()).isSim,
+        quantidade: null,
+      },
       aterramento: { totalHastes: null },
       coordenadas: p.redeCliente?.coordenadas ?? emptyCoordenadas(),
       caixaEmendaAcomodacao: {
@@ -1196,6 +1202,8 @@ function RelatorioPage() {
   };
 
   const showObsAdmin = hasPainelFullAccess(user?.role);
+  /** Técnico no relatório: header rola; abas grudem no topo da viewport. */
+  const headerRolaComPagina = !showObsAdmin;
 
   const grupoSetters: Record<
     RelatorioFotoGrupoKey,
@@ -1272,7 +1280,7 @@ function RelatorioPage() {
   if (loadingById) {
     return (
       <div className="min-h-screen bg-surface">
-        <AppHeader />
+        <AppHeader sticky={!headerRolaComPagina} />
         <main className="mx-auto max-w-2xl px-5 pb-16 pt-10">
           <p className="text-sm text-muted-foreground">Carregando relatório...</p>
         </main>
@@ -1283,7 +1291,7 @@ function RelatorioPage() {
   if (step === 1) {
     return (
       <div className="min-h-screen bg-surface">
-        <AppHeader />
+        <AppHeader sticky={!headerRolaComPagina} />
         <main className="mx-auto max-w-2xl px-5 pb-16 pt-4">
           <Link
             to="/"
@@ -1306,7 +1314,7 @@ function RelatorioPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <AppHeader />
+      <AppHeader sticky={!headerRolaComPagina} />
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">
         <Link
           to="/relatorio"
@@ -1416,6 +1424,7 @@ function RelatorioPage() {
                 onChange={setAbaCampo}
                 abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
                 topBlockRef={topBlockRef}
+                stickToViewportTop={headerRolaComPagina}
               />
 
               {mostrarRedeAcesso ? (
@@ -1449,7 +1458,13 @@ function RelatorioPage() {
                   }
                   postesCordoalhaExistente={redeAcesso.postesCordoalhaExistente}
                   onPostesCordoalhaExistenteChange={(postesCordoalhaExistente) =>
-                    setRedeAcesso((prev) => ({ ...prev, postesCordoalhaExistente }))
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      postesCordoalhaExistente: {
+                        isSim: postesCordoalhaExistente.isSim,
+                        quantidade: null,
+                      },
+                    }))
                   }
                   cabos={lancamentoCabosRe[lancamentoReAmbiente].metragens}
                   onPatchCabo={(id, patch) =>
@@ -1518,6 +1533,17 @@ function RelatorioPage() {
                       onObsAdminChange: patchObsAdminGrupo("novoAterramentoPoste"),
                     },
                     {
+                      grupoKey: "dutoSubterraneo",
+                      section: "cabos",
+                      title: "Const. de duto subterrâneo (MD ou MND)",
+                      slots: duto,
+                      onChange: setDuto,
+                      obs: dutoObs,
+                      onObsChange: setDutoObs,
+                      obsAdmin: obsAdminGrupos.dutoSubterraneo ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("dutoSubterraneo"),
+                    },
+                    {
                       grupoKey: "caixaEmenda",
                       section: "caixa",
                       title: "Caixa de emenda",
@@ -1541,17 +1567,6 @@ function RelatorioPage() {
                             },
                           }
                         : {}),
-                    },
-                    {
-                      grupoKey: "dutoSubterraneo",
-                      section: "caixa",
-                      title: "Const. de duto subterrâneo (MD ou MND)",
-                      slots: duto,
-                      onChange: setDuto,
-                      obs: dutoObs,
-                      onObsChange: setDutoObs,
-                      obsAdmin: obsAdminGrupos.dutoSubterraneo ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("dutoSubterraneo"),
                     },
                     {
                       grupoKey: "plaquetaIdentificacao",
@@ -1634,7 +1649,13 @@ function RelatorioPage() {
                   }
                   postesCordoalhaExistente={redeCliente.postesCordoalhaExistente}
                   onPostesCordoalhaExistenteChange={(postesCordoalhaExistente) =>
-                    setRedeCliente((prev) => ({ ...prev, postesCordoalhaExistente }))
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      postesCordoalhaExistente: {
+                        isSim: postesCordoalhaExistente.isSim,
+                        quantidade: null,
+                      },
+                    }))
                   }
                   cabos={lancamentoCabosRc[lancamentoRcAmbiente].metragens}
                   onPatchCabo={(id, patch) =>
@@ -1679,6 +1700,17 @@ function RelatorioPage() {
                       title: "Sobra técnica / Fiberloop",
                       minSlots: 1,
                       ...bindDualGrupo("rcSobraTecnica", rcSobraDual, setRcSobraDual),
+                    },
+                    {
+                      grupoKey: "rcDutoSubterraneo",
+                      section: "cabos",
+                      title: "Const. de duto subterrâneo (MD ou MND)",
+                      slots: rcDuto,
+                      onChange: setRcDuto,
+                      obs: rcDutoObs,
+                      onObsChange: setRcDutoObs,
+                      obsAdmin: obsAdminGrupos.rcDutoSubterraneo ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcDutoSubterraneo"),
                     },
                     {
                       grupoKey: "rcPosteConexao",
@@ -1746,17 +1778,6 @@ function RelatorioPage() {
                       section: "caixa",
                       title: "Plaqueta de Identificação - Caixa de emenda",
                       ...bindDualGrupo("rcPlaquetaIdentificacao", rcPlaquetaDual, setRcPlaquetaDual),
-                    },
-                    {
-                      grupoKey: "rcDutoSubterraneo",
-                      section: "caixa",
-                      title: "Const. de duto subterrâneo (MD ou MND)",
-                      slots: rcDuto,
-                      onChange: setRcDuto,
-                      obs: rcDutoObs,
-                      onObsChange: setRcDutoObs,
-                      obsAdmin: obsAdminGrupos.rcDutoSubterraneo ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcDutoSubterraneo"),
                     },
                     {
                       grupoKey: "rcTerminacaoCabo",

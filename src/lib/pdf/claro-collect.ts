@@ -648,16 +648,6 @@ export function collectPdfBlocksEscopo(
       simNao(p?.redeAcesso?.postesCordoalhaExistente?.isSim),
       "Postes com cordoalha existente (RE)",
     );
-    if (
-      p?.redeAcesso?.postesCordoalhaExistente?.isSim &&
-      p.redeAcesso.postesCordoalhaExistente.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeAcesso.postesCordoalhaExistente.quantidade),
-        "Qtd. postes com cordoalha existente (RE)",
-      );
-    }
     if (p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.aereo != null) {
       pushPara(meta, String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.aereo), "Qtd. caixas aereo (RE)");
     }
@@ -742,16 +732,6 @@ export function collectPdfBlocksEscopo(
       simNao(p?.redeCliente?.postesCordoalhaExistente?.isSim),
       "Postes com cordoalha existente (RC)",
     );
-    if (
-      p?.redeCliente?.postesCordoalhaExistente?.isSim &&
-      p.redeCliente.postesCordoalhaExistente.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeCliente.postesCordoalhaExistente.quantidade),
-        "Qtd. postes com cordoalha existente (RC)",
-      );
-    }
     if (p?.redeCliente?.qtdCaixasEmenda != null) {
       pushPara(meta, String(p.redeCliente.qtdCaixasEmenda), "Qtd. caixas de emenda (RC)");
     }

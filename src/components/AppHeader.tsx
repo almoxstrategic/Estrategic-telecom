@@ -5,11 +5,22 @@ import { Logo } from "./Logo";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppSidebar } from "./AppSidebar";
 import { resetAdminTabToInicio } from "@/lib/admin-tab";
+import { cn } from "@/lib/utils";
 
-export function AppHeader() {
+export function AppHeader({
+  /** Quando false, o header rola com a página (ex.: técnico no formulário de relatório). */
+  sticky = true,
+}: {
+  sticky?: boolean;
+} = {}) {
   const [open, setOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-30 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
+    <header
+      className={cn(
+        "z-30 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur",
+        sticky ? "sticky top-0" : "relative",
+      )}
+    >
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           aria-label="Abrir menu"
