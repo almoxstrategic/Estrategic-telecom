@@ -1,10 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell, ChevronDown } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissao";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import {
@@ -272,6 +282,7 @@ function RelatorioPage() {
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
   const topBlockRef = useRef<HTMLDivElement | null>(null);
+  const [isDadosObraOpen, setIsDadosObraOpen] = useState(false);
   const [lancamentoCabosRe, setLancamentoCabosRe] = useState<LancamentoPorAmbientePayload>(() =>
     emptyLancamentoPorAmbiente(),
   );
@@ -353,7 +364,6 @@ function RelatorioPage() {
   const [contatos, setContatos] = useState<ContatosPayload>(() => emptyContatos());
   const [submitting, setSubmitting] = useState(false);
   const [saveHint, setSaveHint] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [dadosExpandidos, setDadosExpandidos] = useState(false);
   const canAutosaveRef = useRef(false);
   const lastAppliedUpdatedAtRef = useRef<string | null>(null);
   const lastSavedUpdatedAtRef = useRef<string | null>(null);
@@ -1323,36 +1333,42 @@ function RelatorioPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar às OS
         </Link>
 
-        <header className="mb-6 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">Relatórios</h1>
-            {tecnicosAtribuidos.length > 1 ? (
-              <Badge className="mt-2 bg-sky-600 text-white hover:bg-sky-600">
-                OS Colaborativa — {nomesOutros.length ? nomesOutros.join(", ") : "equipe"}
-              </Badge>
-            ) : null}
+        <header ref={topBlockRef} className="mb-6">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-black tracking-tight text-gray-900">Relatórios</h1>
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDadosObraOpen(true)}
+                className="flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 transition-colors hover:bg-green-100"
+              >
+                <Info className="h-4 w-4" aria-hidden />
+                <span className="hidden sm:inline">Dados da obra</span>
+              </button>
+              {readOnly ? (
+                <span className="text-xs font-medium text-muted-foreground">
+                  {status === "fechado" ? "Fechado" : "Avisado"}
+                </span>
+              ) : (
+                <RelatorioSyncStatus
+                  status={
+                    saveHint === "saving"
+                      ? "saving"
+                      : saveHint === "error"
+                        ? "error"
+                        : saveHint === "saved"
+                          ? "saved"
+                          : "idle"
+                  }
+                />
+              )}
+            </div>
           </div>
-          <span className="shrink-0">
-            {readOnly
-              ? (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {status === "fechado" ? "Fechado" : "Avisado"}
-                  </span>
-                )
-              : (
-                  <RelatorioSyncStatus
-                    status={
-                      saveHint === "saving"
-                        ? "saving"
-                        : saveHint === "error"
-                          ? "error"
-                          : saveHint === "saved"
-                            ? "saved"
-                            : "idle"
-                    }
-                  />
-                )}
-          </span>
+          {tecnicosAtribuidos.length > 1 ? (
+            <Badge className="mt-2 bg-sky-600 text-white hover:bg-sky-600">
+              OS Colaborativa — {nomesOutros.length ? nomesOutros.join(", ") : "equipe"}
+            </Badge>
+          ) : null}
         </header>
 
         {status === "pendente" ? (
@@ -1376,47 +1392,6 @@ function RelatorioPage() {
           }}
           className="space-y-5"
         >
-          <div
-            ref={topBlockRef}
-            className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4 shadow-sm"
-          >
-            <h2 className="text-base font-bold">Dados da obra</h2>
-            <div className="space-y-2">
-              <DadoObraCampo label="OS/WF" value={osWf} />
-              <DadoObraCampo label="Cliente" value={cliente} />
-            </div>
-            <button
-              type="button"
-              onClick={() => setDadosExpandidos((aberto) => !aberto)}
-              className="inline-flex items-center gap-1 text-xs font-medium text-primary"
-              aria-expanded={dadosExpandidos}
-            >
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${dadosExpandidos ? "rotate-180" : ""}`}
-              />
-              {dadosExpandidos ? "Ver menos detalhes" : "Ver todos os detalhes da obra"}
-            </button>
-            {dadosExpandidos ? (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-muted/50 p-3">
-                <DadoObraCampo label="Endereço" value={endereco} />
-                <DadoObraCampo
-                  label="Tipo de Execução"
-                  value={
-                    tipo === "empresarial"
-                      ? "Empresarial"
-                      : tipo === "implantacao"
-                        ? "Implantação"
-                        : ""
-                  }
-                />
-                <DadoObraCampo label="Cidade" value={cidade} />
-                <DadoObraCampo label="Equipe/Empreiteira" value={equipe} />
-                <DadoObraCampo label="Responsável" value={responsavel} />
-                <DadoObraCampo label="Data de início" value={formatDataObra(dataInicio)} />
-              </div>
-            ) : null}
-          </div>
-
           {mostrarFormularioCampo ? (
             <>
               <RelatorioAbasCampo
@@ -2062,6 +2037,60 @@ function RelatorioPage() {
           ) : null}
         </form>
       </main>
+
+      <Drawer open={isDadosObraOpen} onOpenChange={setIsDadosObraOpen}>
+        <DrawerContent className="max-h-[92vh]">
+          <DrawerHeader className="text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DrawerTitle>Dados da obra</DrawerTitle>
+                <DrawerDescription>Informações cadastrais desta OS</DrawerDescription>
+              </div>
+              <DrawerClose asChild>
+                <button
+                  type="button"
+                  className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  aria-label="Fechar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-2">
+            <div className="space-y-4 rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="space-y-3">
+                <DadoObraCampo label="OS/WF" value={osWf} />
+                <DadoObraCampo label="Cliente" value={cliente} />
+              </div>
+              <div className="grid grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2">
+                <DadoObraCampo label="Endereço" value={endereco} />
+                <DadoObraCampo
+                  label="Tipo de Execução"
+                  value={
+                    tipo === "empresarial"
+                      ? "Empresarial"
+                      : tipo === "implantacao"
+                        ? "Implantação"
+                        : ""
+                  }
+                />
+                <DadoObraCampo label="Cidade" value={cidade} />
+                <DadoObraCampo label="Equipe/Empreiteira" value={equipe} />
+                <DadoObraCampo label="Responsável" value={responsavel} />
+                <DadoObraCampo label="Data de início" value={formatDataObra(dataInicio)} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button type="button" variant="outline" className="w-full">
+                Fechar
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       {readOnly ? null : (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 pt-1.5 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
