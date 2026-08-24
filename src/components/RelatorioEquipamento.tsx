@@ -8,6 +8,7 @@ import {
   ChoiceButton,
   RelatorioOutrasFotos,
   inputClass,
+  textareaObsClass,
   type GrupoFotoCampo,
   type OutraFotoState,
 } from "@/components/RelatorioRedeAcesso";
@@ -209,7 +210,7 @@ function EquipamentoItemCard({
           onChange={(e) => onPatch({ obs: e.target.value })}
           disabled={readOnly}
           rows={2}
-          className={inputClass()}
+          className={textareaObsClass()}
           placeholder="Observações"
         />
       </div>

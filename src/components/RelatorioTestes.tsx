@@ -5,7 +5,7 @@ import {
   RelatorioFotoComControles,
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { inputClass } from "@/components/RelatorioRedeAcesso";
+import { inputClass, textareaObsClass } from "@/components/RelatorioRedeAcesso";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
@@ -135,9 +135,9 @@ function CardMedicaoCliente({
         <textarea
           value={faixa.obs}
           onChange={(e) => onPatch({ ...faixa, obs: e.target.value })}
-          rows={3}
+          rows={2}
           disabled={readOnly}
-          className={inputClass()}
+          className={textareaObsClass()}
         />
       </div>
     </div>
@@ -192,9 +192,9 @@ function CardMedicaoEstacao({
         <textarea
           value={item.obs}
           onChange={(e) => onPatch({ ...item, obs: e.target.value })}
-          rows={3}
+          rows={2}
           disabled={readOnly}
-          className={inputClass()}
+          className={textareaObsClass()}
         />
       </div>
     </div>
@@ -508,9 +508,9 @@ export function RelatorioTestePotencia({
               <textarea
                 value={item.obs}
                 onChange={(e) => patchItem(item.id, { obs: e.target.value })}
-                rows={3}
+                rows={2}
                 disabled={readOnly}
-                className={inputClass()}
+                className={textareaObsClass()}
               />
             </div>
           </div>

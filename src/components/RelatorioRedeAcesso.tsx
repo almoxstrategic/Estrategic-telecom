@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ChevronDown, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -64,6 +64,11 @@ export function emptyOutraFoto(): OutraFotoState {
 
 export function inputClass() {
   return "w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted";
+}
+
+/** Textarea de OBS compacta (2 linhas) com resize vertical manual. */
+export function textareaObsClass() {
+  return `${inputClass()} min-h-[64px] resize-y`;
 }
 
 export const REF_TITULO_PLACEHOLDER = "Ex: Foto do quadro de energia";
@@ -177,12 +182,10 @@ export function TipoExecucaoPicker({
   );
 }
 
-/** Header sticky (~64px) — colapsa quando o fim de "Dados da obra" passa por aqui. */
-const ABAS_COMPACT_THRESHOLD_PX = 100;
-
 /** Âncora DOM da barra sticky (abas + busca) — usada para medir o offset do accordion. */
 export const RELATORIO_ABAS_STICKY_ID = "relatorio-abas-sticky";
 
+/** Header sticky (~64px) — usado só como fallback de offset dos accordions. */
 const APP_HEADER_STICKY_PX = 64;
 /** Fallback se a barra ainda não estiver no DOM. */
 const ABAS_BAR_FALLBACK_PX = 104;
@@ -205,7 +208,7 @@ function useAbasStickyOffsetPx(stickTabsAtViewportTop: boolean): number {
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     if (bar && ro) ro.observe(bar);
     window.addEventListener("resize", measure);
-    // Altura muda quando as abas colapsam (wrap → scroll); observa o subtree.
+    // Altura da barra muda com conteúdo (ex.: busca); observa o subtree.
     const mo =
       typeof MutationObserver !== "undefined" && bar
         ? new MutationObserver(measure)
@@ -330,25 +333,23 @@ export function RelatorioAbasCampo({
   abaAtiva,
   onChange,
   abas = ABAS_CAMPO,
-  topBlockRef,
   secoesPesquisaveis,
   stickToViewportTop = false,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
   abas?: { id: AbaCampo; label: string }[];
-  /** Bloco superior (ex.: Dados da obra) — colapsa as abas quando o bottom dele passa do header. */
-  topBlockRef?: RefObject<HTMLElement | null>;
   /** Sobrescreve o índice padrão de seções da aba ativa. */
   secoesPesquisaveis?: SecaoPesquisavel[];
-  /** Técnico no relatório: gruda no topo da tela (header da app não é sticky). */
+  /** Técnico no relatório: gruda no topo da viewport (header da app não é sticky). */
   stickToViewportTop?: boolean;
 }) {
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const abaInicialRef = useRef(true);
   const buscaWrapRef = useRef<HTMLDivElement | null>(null);
+  const abasScrollRef = useRef<HTMLNavElement | null>(null);
 
   const secoes = secoesPesquisaveis ?? SECOES_PESQUISAVEIS_POR_ABA[abaAtiva] ?? [];
   const resultados = useMemo(() => {
@@ -377,24 +378,11 @@ export function RelatorioAbasCampo({
   }, [abaAtiva]);
 
   useEffect(() => {
-    const thresholdPx = stickToViewportTop ? 72 : ABAS_COMPACT_THRESHOLD_PX;
-    const onScroll = () => {
-      const trigger = topBlockRef?.current;
-      if (trigger) {
-        const topBlockBottom = trigger.getBoundingClientRect().bottom;
-        setIsScrolled(topBlockBottom <= thresholdPx);
-        return;
-      }
-      setIsScrolled(window.scrollY > 50);
-    };
+    const onScroll = () => setShowBackToTop(window.scrollY > 120);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [topBlockRef, abaAtiva, stickToViewportTop]);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
@@ -416,42 +404,63 @@ export function RelatorioAbasCampo({
     setIsDropdownOpen(false);
   };
 
+  const scrollAbas = (direction: "left" | "right") => {
+    const el = abasScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction === "left" ? -160 : 160, behavior: "smooth" });
+  };
+
   return (
     <>
       <div
         id={RELATORIO_ABAS_STICKY_ID}
         className={
           stickToViewportTop
-            ? "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300"
-            : "sticky top-16 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300"
+            ? "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm"
+            : "sticky top-16 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm"
         }
       >
-        <nav
-          className={
-            isScrolled
-              ? "flex w-full flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-              : "flex w-full flex-wrap justify-center gap-2"
-          }
-          aria-label="Seções do relatório"
-        >
-          {abas.map((aba) => {
-            const ativa = abaAtiva === aba.id;
-            return (
-              <button
-                key={aba.id}
-                type="button"
-                onClick={() => onChange(aba.id)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:text-sm ${
-                  ativa
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {aba.label}
-              </button>
-            );
-          })}
-        </nav>
+        <div className="-mx-5 flex w-[calc(100%+2.5rem)] items-center justify-between">
+          <button
+            type="button"
+            onClick={() => scrollAbas("left")}
+            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600"
+            aria-label="Rolar abas para a esquerda"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <nav
+            ref={abasScrollRef}
+            className="flex w-full min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="Seções do relatório"
+          >
+            {abas.map((aba) => {
+              const ativa = abaAtiva === aba.id;
+              return (
+                <button
+                  key={aba.id}
+                  type="button"
+                  onClick={() => onChange(aba.id)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:text-sm ${
+                    ativa
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {aba.label}
+                </button>
+              );
+            })}
+          </nav>
+          <button
+            type="button"
+            onClick={() => scrollAbas("right")}
+            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600"
+            aria-label="Rolar abas para a direita"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
 
         {secoes.length > 0 ? (
           <div ref={buscaWrapRef} className="relative mt-2 block w-full">
@@ -494,7 +503,7 @@ export function RelatorioAbasCampo({
         ) : null}
       </div>
 
-      {isScrolled ? (
+      {showBackToTop ? (
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
@@ -1185,9 +1194,9 @@ export function RelatorioRedeAcesso({
                       <textarea
                         value={cabo.obs}
                         onChange={(e) => onPatchCabo(cabo.id, { obs: e.target.value })}
-                        rows={3}
+                        rows={2}
                         disabled={readOnly}
-                        className={inputClass()}
+                        className={textareaObsClass()}
                       />
                     </div>
                   </div>
@@ -1424,7 +1433,7 @@ export function RelatorioOutrasFotos({
                   }
                   rows={2}
                   disabled={readOnly}
-                  className={inputClass()}
+                  className={textareaObsClass()}
                 />
               </div>
             </div>

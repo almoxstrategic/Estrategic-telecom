@@ -281,7 +281,6 @@ function RelatorioPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
-  const topBlockRef = useRef<HTMLDivElement | null>(null);
   const [isDadosObraOpen, setIsDadosObraOpen] = useState(false);
   const [lancamentoCabosRe, setLancamentoCabosRe] = useState<LancamentoPorAmbientePayload>(() =>
     emptyLancamentoPorAmbiente(),
@@ -1333,17 +1332,20 @@ function RelatorioPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar às OS
         </Link>
 
-        <header ref={topBlockRef} className="mb-6">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-black tracking-tight text-gray-900">Relatórios</h1>
+        <header className="mb-6">
+          <h1 className="text-2xl font-black tracking-tight text-gray-900">Relatório</h1>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-lg font-semibold text-gray-700">
+              OS - {osWf.trim() || "—"}
+            </p>
             <div className="flex shrink-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsDadosObraOpen(true)}
-                className="flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 transition-colors hover:bg-green-100"
+                className="flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
               >
-                <Info className="h-4 w-4" aria-hidden />
-                <span className="hidden sm:inline">Dados da obra</span>
+                <Info className="h-4 w-4 shrink-0" aria-hidden />
+                <span>Dados do contrato</span>
               </button>
               {readOnly ? (
                 <span className="text-xs font-medium text-muted-foreground">
@@ -1398,7 +1400,6 @@ function RelatorioPage() {
                 abaAtiva={abaCampo}
                 onChange={setAbaCampo}
                 abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
-                topBlockRef={topBlockRef}
                 stickToViewportTop={headerRolaComPagina}
               />
 

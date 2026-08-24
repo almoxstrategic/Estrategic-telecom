@@ -157,9 +157,9 @@ export function RelatorioFotosBloco({
           <textarea
             value={obs}
             onChange={(e) => onObsChange(e.target.value)}
-            rows={3}
+            rows={2}
             disabled={readOnly}
-            className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+            className="w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
           />
         </div>
 
