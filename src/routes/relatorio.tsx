@@ -77,7 +77,10 @@ import {
   type TesteOpticoPayload,
   type TestePotenciaPayload,
   type TipoExecucao,
+  emptyLancamentoPorAmbiente,
+  isFotoGrupoPorAmbienteKey,
   type AmbienteRede,
+  type LancamentoPorAmbientePayload,
 } from "@/lib/relatorios-transmissao";
 
 type RelatorioSearch = {
@@ -106,9 +109,54 @@ function grupoPayload(
   slots: FotoSlot[],
   obs: string,
   obsAdmin = "",
-  ambiente: AmbienteRede | null = null,
 ): EscopoPayload["posteConexao"] {
-  return { fotos: fotosDosSlots(slots), obs, obsAdmin, ambiente };
+  return { fotos: fotosDosSlots(slots), obs, obsAdmin };
+}
+
+type DualFotoUi = Record<AmbienteRede, { slots: FotoSlot[]; obs: string; obsAdmin: string }>;
+
+function emptyDualFotoUi(): DualFotoUi {
+  return {
+    aereo: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+    subterraneo: { slots: [newFotoSlot()], obs: "", obsAdmin: "" },
+  };
+}
+
+function dualFromGrupo(grupo: EscopoPayload["caixaEmenda"] | undefined): DualFotoUi {
+  const empty = emptyDualFotoUi();
+  if (!grupo) return empty;
+  return {
+    aereo: {
+      slots: slotsFromStored(grupo.aereo?.fotos ?? [], 1),
+      obs: grupo.aereo?.obs ?? "",
+      obsAdmin: grupo.aereo?.obsAdmin ?? "",
+    },
+    subterraneo: {
+      slots: slotsFromStored(grupo.subterraneo?.fotos ?? [], 1),
+      obs: grupo.subterraneo?.obs ?? "",
+      obsAdmin: grupo.subterraneo?.obsAdmin ?? "",
+    },
+  };
+}
+
+function dualToGrupo(dual: DualFotoUi): EscopoPayload["caixaEmenda"] {
+  return {
+    aereo: grupoPayload(dual.aereo.slots, dual.aereo.obs, dual.aereo.obsAdmin),
+    subterraneo: grupoPayload(
+      dual.subterraneo.slots,
+      dual.subterraneo.obs,
+      dual.subterraneo.obsAdmin,
+    ),
+  };
+}
+
+function simDerivadoLancamento(l: {
+  aereo: { isSim: boolean | null };
+  subterraneo: { isSim: boolean | null };
+}): boolean | null {
+  if (l.aereo.isSim === true || l.subterraneo.isSim === true) return true;
+  if (l.aereo.isSim === false || l.subterraneo.isSim === false) return false;
+  return null;
 }
 
 function outrasParaPayload(items: OutraFotoState[]): EscopoPayload["outrasFotos"] {
@@ -224,19 +272,17 @@ function RelatorioPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
-  const [lancamentoRe, setLancamentoRe] = useState<"sim" | "nao" | "">("");
-  const [lancamentoReAmbiente, setLancamentoReAmbiente] = useState<AmbienteRede | null>(null);
-  const [cabos, setCabos] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
+  const [lancamentoCabosRe, setLancamentoCabosRe] = useState<LancamentoPorAmbientePayload>(() =>
+    emptyLancamentoPorAmbiente(),
+  );
+  const [lancamentoReAmbiente, setLancamentoReAmbiente] = useState<AmbienteRede>("aereo");
   const [poste, setPoste] = useState<FotoSlot[]>([newFotoSlot()]);
   const [posteObs, setPosteObs] = useState("");
-  const [caixa, setCaixa] = useState<FotoSlot[]>([newFotoSlot()]);
-  const [caixaObs, setCaixaObs] = useState("");
+  const [caixaDual, setCaixaDual] = useState<DualFotoUi>(emptyDualFotoUi);
   const [duto, setDuto] = useState<FotoSlot[]>([newFotoSlot()]);
   const [dutoObs, setDutoObs] = useState("");
-  const [plaqueta, setPlaqueta] = useState<FotoSlot[]>([newFotoSlot()]);
-  const [plaquetaObs, setPlaquetaObs] = useState("");
-  const [sobra, setSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
-  const [sobraObs, setSobraObs] = useState("");
+  const [plaquetaDual, setPlaquetaDual] = useState<DualFotoUi>(emptyDualFotoUi);
+  const [sobraDual, setSobraDual] = useState<DualFotoUi>(emptyDualFotoUi);
   const [novoAterramento, setNovoAterramento] = useState<FotoSlot[]>([newFotoSlot()]);
   const [novoAterramentoObs, setNovoAterramentoObs] = useState("");
   const [posicao, setPosicao] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -253,23 +299,21 @@ function RelatorioPage() {
     Partial<Record<RelatorioFotoGrupoKey, AmbienteRede | null>>
   >({});
   const [tecnologiaAcesso, setTecnologiaAcesso] = useState("");
-  const [lancamentoCabosRC, setLancamentoCabosRC] = useState<"sim" | "nao" | "">("");
-  const [lancamentoRcAmbiente, setLancamentoRcAmbiente] = useState<AmbienteRede | null>(null);
-  const [cabosRc, setCabosRc] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
+  const [lancamentoCabosRc, setLancamentoCabosRc] = useState<LancamentoPorAmbientePayload>(() =>
+    emptyLancamentoPorAmbiente(),
+  );
+  const [lancamentoRcAmbiente, setLancamentoRcAmbiente] = useState<AmbienteRede>("aereo");
   const [rcPoste, setRcPoste] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcPosteObs, setRcPosteObs] = useState("");
-  const [rcCaixa, setRcCaixa] = useState<FotoSlot[]>([newFotoSlot()]);
-  const [rcCaixaObs, setRcCaixaObs] = useState("");
+  const [rcCaixaDual, setRcCaixaDual] = useState<DualFotoUi>(emptyDualFotoUi);
   const [rcTerminacao, setRcTerminacao] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcTerminacaoObs, setRcTerminacaoObs] = useState("");
-  const [rcPlaqueta, setRcPlaqueta] = useState<FotoSlot[]>([newFotoSlot()]);
-  const [rcPlaquetaObs, setRcPlaquetaObs] = useState("");
+  const [rcPlaquetaDual, setRcPlaquetaDual] = useState<DualFotoUi>(emptyDualFotoUi);
   const [rcEntradaInterna, setRcEntradaInterna] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcEntradaInternaObs, setRcEntradaInternaObs] = useState("");
   const [rcEntradaExterna, setRcEntradaExterna] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcEntradaExternaObs, setRcEntradaExternaObs] = useState("");
-  const [rcSobra, setRcSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
-  const [rcSobraObs, setRcSobraObs] = useState("");
+  const [rcSobraDual, setRcSobraDual] = useState<DualFotoUi>(emptyDualFotoUi);
   const [rcNovoAterramento, setRcNovoAterramento] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcNovoAterramentoObs, setRcNovoAterramentoObs] = useState("");
   const [rcDuto, setRcDuto] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -317,60 +361,35 @@ function RelatorioPage() {
   const enableAutosaveTimerRef = useRef<number | null>(null);
 
   const buildEscopoFromUi = useCallback((): EscopoPayload => {
-    const ambienteDe = (key: RelatorioFotoGrupoKey) => ambientesGrupos[key] ?? null;
     return {
-      lancamentoRe: lancamentoRe === "sim" ? true : lancamentoRe === "nao" ? false : null,
+      lancamentoCabosRe,
+      lancamentoRe: simDerivadoLancamento(lancamentoCabosRe),
       lancamentoReAmbiente,
-      metragensCabo: cabos,
+      metragensCabo: lancamentoCabosRe.aereo.metragens,
       posteConexao: grupoPayload(poste, posteObs, obsAdminGrupos.posteConexao),
-      caixaEmenda: grupoPayload(
-        caixa,
-        caixaObs,
-        obsAdminGrupos.caixaEmenda,
-        ambienteDe("caixaEmenda"),
-      ),
+      caixaEmenda: dualToGrupo(caixaDual),
       dutoSubterraneo: grupoPayload(duto, dutoObs, obsAdminGrupos.dutoSubterraneo),
-      plaquetaIdentificacao: grupoPayload(
-        plaqueta,
-        plaquetaObs,
-        obsAdminGrupos.plaquetaIdentificacao,
-        ambienteDe("plaquetaIdentificacao"),
-      ),
+      plaquetaIdentificacao: dualToGrupo(plaquetaDual),
       novoAterramentoPoste: grupoPayload(
         novoAterramento,
         novoAterramentoObs,
         obsAdminGrupos.novoAterramentoPoste,
       ),
-      aterramentoTerrometro: { fotos: [], obs: "", obsAdmin: "", ambiente: null },
+      aterramentoTerrometro: { fotos: [], obs: "", obsAdmin: "" },
       posicaoConexaoEstacao: grupoPayload(posicao, posicaoObs, obsAdminGrupos.posicaoConexaoEstacao),
       etiquetaIdentificacao: grupoPayload(etiqueta, etiquetaObs, obsAdminGrupos.etiquetaIdentificacao),
-      sobraTecnica: grupoPayload(
-        sobra,
-        sobraObs,
-        obsAdminGrupos.sobraTecnica,
-        ambienteDe("sobraTecnica"),
-      ),
+      sobraTecnica: dualToGrupo(sobraDual),
       outrasFotos: outrasParaPayload(outras),
       redeAcesso,
       tecnologiaAcesso,
-      lancamentoRc:
-        lancamentoCabosRC === "sim" ? true : lancamentoCabosRC === "nao" ? false : null,
+      lancamentoCabosRc,
+      lancamentoRc: simDerivadoLancamento(lancamentoCabosRc),
       lancamentoRcAmbiente,
-      metragensCaboRc: cabosRc,
+      metragensCaboRc: lancamentoCabosRc.aereo.metragens,
       rcPosteConexao: grupoPayload(rcPoste, rcPosteObs, obsAdminGrupos.rcPosteConexao),
-      rcCaixaEmenda: grupoPayload(
-        rcCaixa,
-        rcCaixaObs,
-        obsAdminGrupos.rcCaixaEmenda,
-        ambienteDe("rcCaixaEmenda"),
-      ),
+      rcCaixaEmenda: dualToGrupo(rcCaixaDual),
       rcTerminacaoCabo: grupoPayload(rcTerminacao, rcTerminacaoObs, obsAdminGrupos.rcTerminacaoCabo),
-      rcPlaquetaIdentificacao: grupoPayload(
-        rcPlaqueta,
-        rcPlaquetaObs,
-        obsAdminGrupos.rcPlaquetaIdentificacao,
-        ambienteDe("rcPlaquetaIdentificacao"),
-      ),
+      rcPlaquetaIdentificacao: dualToGrupo(rcPlaquetaDual),
       rcEntradaInterna: grupoPayload(
         rcEntradaInterna,
         rcEntradaInternaObs,
@@ -381,12 +400,7 @@ function RelatorioPage() {
         rcEntradaExternaObs,
         obsAdminGrupos.rcEntradaExterna,
       ),
-      rcSobraTecnica: grupoPayload(
-        rcSobra,
-        rcSobraObs,
-        obsAdminGrupos.rcSobraTecnica,
-        ambienteDe("rcSobraTecnica"),
-      ),
+      rcSobraTecnica: dualToGrupo(rcSobraDual),
       rcNovoAterramentoPoste: grupoPayload(
         rcNovoAterramento,
         rcNovoAterramentoObs,
@@ -452,47 +466,38 @@ function RelatorioPage() {
       infraestrutura,
     };
   }, [
-    lancamentoRe,
+    lancamentoCabosRe,
     lancamentoReAmbiente,
-    cabos,
     poste,
     posteObs,
-    caixa,
-    caixaObs,
+    caixaDual,
     duto,
     dutoObs,
-    plaqueta,
-    plaquetaObs,
+    plaquetaDual,
     novoAterramento,
     novoAterramentoObs,
     posicao,
     posicaoObs,
     etiqueta,
     etiquetaObs,
-    sobra,
-    sobraObs,
+    sobraDual,
     outras,
     redeAcesso,
     obsAdminGrupos,
-    ambientesGrupos,
     tecnologiaAcesso,
-    lancamentoCabosRC,
+    lancamentoCabosRc,
     lancamentoRcAmbiente,
-    cabosRc,
     rcPoste,
     rcPosteObs,
-    rcCaixa,
-    rcCaixaObs,
+    rcCaixaDual,
     rcTerminacao,
     rcTerminacaoObs,
-    rcPlaqueta,
-    rcPlaquetaObs,
+    rcPlaquetaDual,
     rcEntradaInterna,
     rcEntradaInternaObs,
     rcEntradaExterna,
     rcEntradaExternaObs,
-    rcSobra,
-    rcSobraObs,
+    rcSobraDual,
     rcNovoAterramento,
     rcNovoAterramentoObs,
     rcDuto,
@@ -584,22 +589,18 @@ function RelatorioPage() {
       equipe,
       responsavel,
       dataInicio,
-      lancamentoRe,
+      lancamentoCabosRe,
       lancamentoReAmbiente,
-      cabos,
       posteObs,
-      caixaObs,
+      caixaDual,
       dutoObs,
-      plaquetaObs,
-      sobraObs,
+      plaquetaDual,
+      sobraDual,
       novoAterramentoObs,
       posicaoObs,
       etiquetaObs,
       poste,
-      caixa,
       duto,
-      plaqueta,
-      sobra,
       novoAterramento,
       posicao,
       etiqueta,
@@ -607,25 +608,21 @@ function RelatorioPage() {
       redeAcesso,
       ambientesGrupos,
       tecnologiaAcesso,
-      lancamentoCabosRC,
+      lancamentoCabosRc,
       lancamentoRcAmbiente,
-      cabosRc,
       rcPosteObs,
-      rcCaixaObs,
+      rcCaixaDual,
       rcTerminacaoObs,
-      rcPlaquetaObs,
+      rcPlaquetaDual,
       rcEntradaInternaObs,
       rcEntradaExternaObs,
-      rcSobraObs,
+      rcSobraDual,
       rcNovoAterramentoObs,
       rcDutoObs,
       rcPoste,
-      rcCaixa,
       rcTerminacao,
-      rcPlaqueta,
       rcEntradaInterna,
       rcEntradaExterna,
-      rcSobra,
       rcNovoAterramento,
       rcDuto,
       outrasRc,
@@ -653,19 +650,23 @@ function RelatorioPage() {
 
   /** Carrega os campos de campo do payload no formulário. */
   const applyEscopoToUi = (p: EscopoPayload) => {
-    setLancamentoRe(p.lancamentoRe === true ? "sim" : p.lancamentoRe === false ? "nao" : "");
-    setLancamentoReAmbiente(p.lancamentoReAmbiente ?? null);
-    setCabos(p.metragensCabo.length > 0 ? p.metragensCabo : [emptyCaboMetragem()]);
+    const hydrateLanc = (l: LancamentoPorAmbientePayload | undefined) => {
+      const src = l ?? emptyLancamentoPorAmbiente();
+      const lado = (b: LancamentoPorAmbientePayload["aereo"]) => ({
+        ...b,
+        metragens: b.metragens.length ? b.metragens : [emptyCaboMetragem()],
+      });
+      return { aereo: lado(src.aereo), subterraneo: lado(src.subterraneo) };
+    };
+    setLancamentoCabosRe(hydrateLanc(p.lancamentoCabosRe));
+    setLancamentoReAmbiente(p.lancamentoReAmbiente ?? "aereo");
     setPoste(slotsFromStored(p.posteConexao?.fotos ?? [], 1));
     setPosteObs(p.posteConexao?.obs ?? "");
-    setCaixa(slotsFromStored(p.caixaEmenda?.fotos ?? [], 1));
-    setCaixaObs(p.caixaEmenda?.obs ?? "");
+    setCaixaDual(dualFromGrupo(p.caixaEmenda));
     setDuto(slotsFromStored(p.dutoSubterraneo?.fotos ?? [], 1));
     setDutoObs(p.dutoSubterraneo?.obs ?? "");
-    setPlaqueta(slotsFromStored(p.plaquetaIdentificacao?.fotos ?? [], 1));
-    setPlaquetaObs(p.plaquetaIdentificacao?.obs ?? "");
-    setSobra(slotsFromStored(p.sobraTecnica?.fotos ?? [], 1));
-    setSobraObs(p.sobraTecnica?.obs ?? "");
+    setPlaquetaDual(dualFromGrupo(p.plaquetaIdentificacao));
+    setSobraDual(dualFromGrupo(p.sobraTecnica));
     setNovoAterramento(slotsFromStored(p.novoAterramentoPoste?.fotos ?? [], 1));
     setNovoAterramentoObs(p.novoAterramentoPoste?.obs ?? "");
     setPosicao(slotsFromStored(p.posicaoConexaoEstacao?.fotos ?? [], 1));
@@ -689,49 +690,39 @@ function RelatorioPage() {
     });
     setObsAdminGrupos({
       posteConexao: readObsAdmin(p.posteConexao),
-      caixaEmenda: readObsAdmin(p.caixaEmenda),
       dutoSubterraneo: readObsAdmin(p.dutoSubterraneo),
-      plaquetaIdentificacao: readObsAdmin(p.plaquetaIdentificacao),
       novoAterramentoPoste: readObsAdmin(p.novoAterramentoPoste),
       posicaoConexaoEstacao: readObsAdmin(p.posicaoConexaoEstacao),
       etiquetaIdentificacao: readObsAdmin(p.etiquetaIdentificacao),
-      sobraTecnica: readObsAdmin(p.sobraTecnica),
       rcPosteConexao: readObsAdmin(p.rcPosteConexao),
-      rcCaixaEmenda: readObsAdmin(p.rcCaixaEmenda),
       rcTerminacaoCabo: readObsAdmin(p.rcTerminacaoCabo),
-      rcPlaquetaIdentificacao: readObsAdmin(p.rcPlaquetaIdentificacao),
       rcEntradaInterna: readObsAdmin(p.rcEntradaInterna),
       rcEntradaExterna: readObsAdmin(p.rcEntradaExterna),
-      rcSobraTecnica: readObsAdmin(p.rcSobraTecnica),
       rcNovoAterramentoPoste: readObsAdmin(p.rcNovoAterramentoPoste),
       rcDutoSubterraneo: readObsAdmin(p.rcDutoSubterraneo),
     });
     setAmbientesGrupos({
-      caixaEmenda: p.caixaEmenda?.ambiente ?? null,
-      plaquetaIdentificacao: p.plaquetaIdentificacao?.ambiente ?? null,
-      sobraTecnica: p.sobraTecnica?.ambiente ?? null,
-      rcCaixaEmenda: p.rcCaixaEmenda?.ambiente ?? null,
-      rcPlaquetaIdentificacao: p.rcPlaquetaIdentificacao?.ambiente ?? null,
-      rcSobraTecnica: p.rcSobraTecnica?.ambiente ?? null,
+      caixaEmenda: "aereo",
+      plaquetaIdentificacao: "aereo",
+      sobraTecnica: "aereo",
+      rcCaixaEmenda: "aereo",
+      rcPlaquetaIdentificacao: "aereo",
+      rcSobraTecnica: "aereo",
     });
     setTecnologiaAcesso(p.tecnologiaAcesso ?? "");
-    setLancamentoCabosRC(p.lancamentoRc === true ? "sim" : p.lancamentoRc === false ? "nao" : "");
-    setLancamentoRcAmbiente(p.lancamentoRcAmbiente ?? null);
-    setCabosRc(p.metragensCaboRc.length > 0 ? p.metragensCaboRc : [emptyCaboMetragem()]);
+    setLancamentoCabosRc(hydrateLanc(p.lancamentoCabosRc));
+    setLancamentoRcAmbiente(p.lancamentoRcAmbiente ?? "aereo");
     setRcPoste(slotsFromStored(p.rcPosteConexao?.fotos ?? [], 1));
     setRcPosteObs(p.rcPosteConexao?.obs ?? "");
-    setRcCaixa(slotsFromStored(p.rcCaixaEmenda?.fotos ?? [], 1));
-    setRcCaixaObs(p.rcCaixaEmenda?.obs ?? "");
+    setRcCaixaDual(dualFromGrupo(p.rcCaixaEmenda));
     setRcTerminacao(slotsFromStored(p.rcTerminacaoCabo?.fotos ?? [], 1));
     setRcTerminacaoObs(p.rcTerminacaoCabo?.obs ?? "");
-    setRcPlaqueta(slotsFromStored(p.rcPlaquetaIdentificacao?.fotos ?? [], 1));
-    setRcPlaquetaObs(p.rcPlaquetaIdentificacao?.obs ?? "");
+    setRcPlaquetaDual(dualFromGrupo(p.rcPlaquetaIdentificacao));
     setRcEntradaInterna(slotsFromStored(p.rcEntradaInterna?.fotos ?? [], 1));
     setRcEntradaInternaObs(p.rcEntradaInterna?.obs ?? "");
     setRcEntradaExterna(slotsFromStored(p.rcEntradaExterna?.fotos ?? [], 1));
     setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
-    setRcSobra(slotsFromStored(p.rcSobraTecnica?.fotos ?? [], 1));
-    setRcSobraObs(p.rcSobraTecnica?.obs ?? "");
+    setRcSobraDual(dualFromGrupo(p.rcSobraTecnica));
     setRcNovoAterramento(slotsFromStored(p.rcNovoAterramentoPoste?.fotos ?? [], 1));
     setRcNovoAterramentoObs(p.rcNovoAterramentoPoste?.obs ?? "");
     setRcDuto(slotsFromStored(p.rcDutoSubterraneo?.fotos ?? [], 1));
@@ -834,8 +825,9 @@ function RelatorioPage() {
   }, [tipo]);
 
   useEffect(() => {
-    if (abaCampo !== "contatos") return;
-    setAbaCampo("RE");
+    if (abaCampo === "contatos" || abaCampo === "medicoes") {
+      setAbaCampo("RE");
+    }
   }, [abaCampo]);
 
   useEffect(() => {
@@ -902,12 +894,70 @@ function RelatorioPage() {
     }
   };
 
+  const dualSetters: Partial<
+    Record<RelatorioFotoGrupoKey, React.Dispatch<React.SetStateAction<DualFotoUi>>>
+  > = {
+    caixaEmenda: setCaixaDual,
+    plaquetaIdentificacao: setPlaquetaDual,
+    sobraTecnica: setSobraDual,
+    rcCaixaEmenda: setRcCaixaDual,
+    rcPlaquetaIdentificacao: setRcPlaquetaDual,
+    rcSobraTecnica: setRcSobraDual,
+  };
+
   const handleGrupoPhoto = (
     setter: React.Dispatch<React.SetStateAction<FotoSlot[]>>,
     grupoKey: RelatorioFotoGrupoKey,
     slotId: string,
     file: EvidencePhotoRef | null,
+    ambiente?: AmbienteRede | null,
   ) => {
+    const aba: AmbienteRede = ambiente === "subterraneo" ? "subterraneo" : "aereo";
+    const dualSetter = isFotoGrupoPorAmbienteKey(grupoKey) ? dualSetters[grupoKey] : undefined;
+
+    const applySlots = (nextSlots: FotoSlot[]) => {
+      const base = buildPayload();
+      if (dualSetter && isFotoGrupoPorAmbienteKey(grupoKey)) {
+        const dual = base[grupoKey];
+        return {
+          ...base,
+          [grupoKey]: {
+            ...dual,
+            [aba]: { ...dual[aba], fotos: fotosDosSlots(nextSlots) },
+          },
+        };
+      }
+      return {
+        ...base,
+        [grupoKey]: { ...(base[grupoKey] as EscopoPayload["posteConexao"]), fotos: fotosDosSlots(nextSlots) },
+      };
+    };
+
+    if (dualSetter) {
+      if (!file) {
+        let nextSlots: FotoSlot[] = [];
+        dualSetter((prev) => {
+          nextSlots = prev[aba].slots.map((slot) =>
+            slot.id === slotId ? { ...slot, stored: null, file: null } : slot,
+          );
+          return { ...prev, [aba]: { ...prev[aba], slots: nextSlots } };
+        });
+        void persistDraft(applySlots(nextSlots));
+        return;
+      }
+      void uploadFotoImediato(file, `${grupoKey}-${aba}-${slotId.slice(0, 8)}`, (stored) => {
+        let nextSlots: FotoSlot[] = [];
+        dualSetter((prev) => {
+          nextSlots = prev[aba].slots.map((slot) =>
+            slot.id === slotId ? { ...slot, file: null, stored } : slot,
+          );
+          return { ...prev, [aba]: { ...prev[aba], slots: nextSlots } };
+        });
+        return applySlots(nextSlots);
+      });
+      return;
+    }
+
     if (!file) {
       let nextSlots: FotoSlot[] = [];
       setter((prev) => {
@@ -916,11 +966,7 @@ function RelatorioPage() {
         );
         return nextSlots;
       });
-      const base = buildPayload();
-      void persistDraft({
-        ...base,
-        [grupoKey]: { ...base[grupoKey], fotos: fotosDosSlots(nextSlots) },
-      });
+      void persistDraft(applySlots(nextSlots));
       return;
     }
     void uploadFotoImediato(file, `${grupoKey}-${slotId.slice(0, 8)}`, (stored) => {
@@ -931,38 +977,69 @@ function RelatorioPage() {
         );
         return nextSlots;
       });
-      const base = buildPayload();
-      return {
-        ...base,
-        [grupoKey]: { ...base[grupoKey], fotos: fotosDosSlots(nextSlots) },
-      };
+      return applySlots(nextSlots);
     });
   };
 
   const handleCaboPhoto = (
-    setter: React.Dispatch<React.SetStateAction<CaboMetragemPayload[]>>,
-    payloadKey: "metragensCabo" | "metragensCaboRc",
+    setter: React.Dispatch<React.SetStateAction<LancamentoPorAmbientePayload>>,
+    lado: "lancamentoCabosRe" | "lancamentoCabosRc",
+    ambiente: AmbienteRede,
     caboId: string,
     campo: "fotoInicio" | "fotoFim",
     file: EvidencePhotoRef | null,
   ) => {
+    const patchLista = (list: CaboMetragemPayload[], stored: StoredPhoto | null) =>
+      list.map((item) => (item.id === caboId ? { ...item, [campo]: stored } : item));
+
     if (!file) {
-      let nextCabos: CaboMetragemPayload[] = [];
+      let next: LancamentoPorAmbientePayload | null = null;
       setter((prev) => {
-        nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item));
-        return nextCabos;
+        next = {
+          ...prev,
+          [ambiente]: { ...prev[ambiente], metragens: patchLista(prev[ambiente].metragens, null) },
+        };
+        return next;
       });
-      void persistDraft({ ...buildPayload(), [payloadKey]: nextCabos });
+      void persistDraft({ ...buildPayload(), [lado]: next! });
       return;
     }
-    void uploadFotoImediato(file, `${payloadKey}-${campo}-${caboId.slice(0, 8)}`, (stored) => {
-      let nextCabos: CaboMetragemPayload[] = [];
+    void uploadFotoImediato(file, `${lado}-${ambiente}-${campo}-${caboId.slice(0, 8)}`, (stored) => {
+      let next: LancamentoPorAmbientePayload | null = null;
       setter((prev) => {
-        nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: stored } : item));
-        return nextCabos;
+        next = {
+          ...prev,
+          [ambiente]: { ...prev[ambiente], metragens: patchLista(prev[ambiente].metragens, stored) },
+        };
+        return next;
       });
-      return { ...buildPayload(), [payloadKey]: nextCabos };
+      return { ...buildPayload(), [lado]: next! };
     });
+  };
+
+  const patchCaboAmbiente = (
+    setter: React.Dispatch<React.SetStateAction<LancamentoPorAmbientePayload>>,
+    ambiente: AmbienteRede,
+    caboId: string,
+    patch: Partial<CaboMetragemPayload>,
+  ) => {
+    setter((prev) => ({
+      ...prev,
+      [ambiente]: {
+        ...prev[ambiente],
+        metragens: prev[ambiente].metragens.map((item) => {
+          if (item.id !== caboId) return item;
+          const next = { ...item, ...patch };
+          if ("marcacaoInicial" in patch || "marcacaoFinal" in patch) {
+            next.metragem = calcularMetragemCaboTotal(next.marcacaoInicial, next.marcacaoFinal);
+          }
+          if ("tipoCabo" in patch && patch.tipoCabo != null) {
+            next.tipoCabo = apenasDigitos(patch.tipoCabo);
+          }
+          return next;
+        }),
+      },
+    }));
   };
 
   const handleOutraPhoto = (
@@ -1025,26 +1102,6 @@ function RelatorioPage() {
     });
   };
 
-  const patchCabo = (
-    setter: React.Dispatch<React.SetStateAction<CaboMetragemPayload[]>>,
-    caboId: string,
-    patch: Partial<CaboMetragemPayload>,
-  ) => {
-    setter((prev) =>
-      prev.map((item) => {
-        if (item.id !== caboId) return item;
-        const next = { ...item, ...patch };
-        if ("marcacaoInicial" in patch || "marcacaoFinal" in patch) {
-          next.metragem = calcularMetragemCaboTotal(next.marcacaoInicial, next.marcacaoFinal);
-        }
-        if ("tipoCabo" in patch && patch.tipoCabo != null) {
-          next.tipoCabo = apenasDigitos(patch.tipoCabo);
-        }
-        return next;
-      }),
-    );
-  };
-
   const setEqGrupoSlots = (
     key: RelatorioFotoGrupoKeyEq,
   ): React.Dispatch<React.SetStateAction<FotoSlot[]>> => {
@@ -1073,6 +1130,53 @@ function RelatorioPage() {
     setAmbientesGrupos((prev) => ({ ...prev, [key]: ambiente }));
   };
 
+  const abaDe = (key: RelatorioFotoGrupoKey): AmbienteRede =>
+    ambientesGrupos[key] === "subterraneo" ? "subterraneo" : "aereo";
+
+  const bindDualGrupo = (
+    key: RelatorioFotoGrupoKey,
+    dual: DualFotoUi,
+    setDual: React.Dispatch<React.SetStateAction<DualFotoUi>>,
+  ) => {
+    const aba = abaDe(key);
+    return {
+      slots: dual[aba].slots,
+      onChange: (slots: FotoSlot[]) =>
+        setDual((prev) => ({ ...prev, [aba]: { ...prev[aba], slots } })),
+      obs: dual[aba].obs,
+      onObsChange: (obs: string) =>
+        setDual((prev) => ({ ...prev, [aba]: { ...prev[aba], obs } })),
+      obsAdmin: dual[aba].obsAdmin,
+      onObsAdminChange: (obsAdmin: string) =>
+        setDual((prev) => ({ ...prev, [aba]: { ...prev[aba], obsAdmin } })),
+      showAmbienteToggle: true as const,
+      ambiente: aba,
+      onAmbienteChange: patchAmbienteGrupo(key),
+    };
+  };
+
+  const simNaoDe = (isSim: boolean | null): "sim" | "nao" | "" =>
+    isSim === true ? "sim" : isSim === false ? "nao" : "";
+
+  const patchLancamentoSim = (
+    setter: React.Dispatch<React.SetStateAction<LancamentoPorAmbientePayload>>,
+    ambiente: AmbienteRede,
+    value: "sim" | "nao",
+  ) => {
+    setter((prev) => {
+      const lado = prev[ambiente];
+      const isSim = value === "sim";
+      return {
+        ...prev,
+        [ambiente]: {
+          ...lado,
+          isSim,
+          metragens: isSim && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+        },
+      };
+    });
+  };
+
   const patchFiberloop = (
     setter: React.Dispatch<React.SetStateAction<QuantidadesRedePayload>>,
     fiberloopInstalado: QuantidadesRedePayload["fiberloopInstalado"],
@@ -1092,21 +1196,21 @@ function RelatorioPage() {
     React.Dispatch<React.SetStateAction<FotoSlot[]>>
   > = {
     posteConexao: setPoste,
-    caixaEmenda: setCaixa,
+    caixaEmenda: () => {},
     dutoSubterraneo: setDuto,
-    plaquetaIdentificacao: setPlaqueta,
-    sobraTecnica: setSobra,
+    plaquetaIdentificacao: () => {},
+    sobraTecnica: () => {},
     novoAterramentoPoste: setNovoAterramento,
     aterramentoTerrometro: () => {},
     posicaoConexaoEstacao: setPosicao,
     etiquetaIdentificacao: setEtiqueta,
     rcPosteConexao: setRcPoste,
-    rcCaixaEmenda: setRcCaixa,
+    rcCaixaEmenda: () => {},
     rcTerminacaoCabo: setRcTerminacao,
-    rcPlaquetaIdentificacao: setRcPlaqueta,
+    rcPlaquetaIdentificacao: () => {},
     rcEntradaInterna: setRcEntradaInterna,
     rcEntradaExterna: setRcEntradaExterna,
-    rcSobraTecnica: setRcSobra,
+    rcSobraTecnica: () => {},
     rcNovoAterramentoPoste: setRcNovoAterramento,
     rcDutoSubterraneo: setRcDuto,
     eqClienteFachada: setEqGrupoSlots("eqClienteFachada"),
@@ -1310,13 +1414,10 @@ function RelatorioPage() {
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
-                  lancamentoRe={lancamentoRe}
-                  onLancamentoRe={(value) => {
-                    setLancamentoRe(value);
-                    if (value === "sim") {
-                      setCabos((prev) => (prev.length ? prev : [emptyCaboMetragem()]));
-                    }
-                  }}
+                  lancamentoRe={simNaoDe(lancamentoCabosRe[lancamentoReAmbiente].isSim)}
+                  onLancamentoRe={(value) =>
+                    patchLancamentoSim(setLancamentoCabosRe, lancamentoReAmbiente, value)
+                  }
                   lancamentoAmbiente={lancamentoReAmbiente}
                   onLancamentoAmbienteChange={setLancamentoReAmbiente}
                   fiberloopInstalado={redeAcesso.fiberloopInstalado}
@@ -1337,12 +1438,40 @@ function RelatorioPage() {
                   onPostesCordoalhaExistenteChange={(postesCordoalhaExistente) =>
                     setRedeAcesso((prev) => ({ ...prev, postesCordoalhaExistente }))
                   }
-                  cabos={cabos}
-                  onPatchCabo={(id, patch) => patchCabo(setCabos, id, patch)}
-                  onAddCabo={() => setCabos((prev) => [...prev, emptyCaboMetragem()])}
-                  onRemoveCabo={(id) => setCabos((prev) => removeExtraById(prev, id))}
+                  cabos={lancamentoCabosRe[lancamentoReAmbiente].metragens}
+                  onPatchCabo={(id, patch) =>
+                    patchCaboAmbiente(setLancamentoCabosRe, lancamentoReAmbiente, id, patch)
+                  }
+                  onAddCabo={() =>
+                    setLancamentoCabosRe((prev) => ({
+                      ...prev,
+                      [lancamentoReAmbiente]: {
+                        ...prev[lancamentoReAmbiente],
+                        metragens: [
+                          ...prev[lancamentoReAmbiente].metragens,
+                          emptyCaboMetragem(),
+                        ],
+                      },
+                    }))
+                  }
+                  onRemoveCabo={(id) =>
+                    setLancamentoCabosRe((prev) => ({
+                      ...prev,
+                      [lancamentoReAmbiente]: {
+                        ...prev[lancamentoReAmbiente],
+                        metragens: removeExtraById(prev[lancamentoReAmbiente].metragens, id),
+                      },
+                    }))
+                  }
                   onCaboPhoto={(caboId, campo, file) =>
-                    handleCaboPhoto(setCabos, "metragensCabo", caboId, campo, file)
+                    handleCaboPhoto(
+                      setLancamentoCabosRe,
+                      "lancamentoCabosRe",
+                      lancamentoReAmbiente,
+                      caboId,
+                      campo,
+                      file,
+                    )
                   }
                   showObsAdmin={showObsAdmin}
                   grupos={[
@@ -1351,15 +1480,7 @@ function RelatorioPage() {
                       section: "cabos",
                       title: "Sobra técnica / Fiberloop",
                       minSlots: 1,
-                      slots: sobra,
-                      onChange: setSobra,
-                      obs: sobraObs,
-                      onObsChange: setSobraObs,
-                      obsAdmin: obsAdminGrupos.sobraTecnica ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("sobraTecnica"),
-                      showAmbienteToggle: true,
-                      ambiente: ambientesGrupos.sobraTecnica ?? null,
-                      onAmbienteChange: patchAmbienteGrupo("sobraTecnica"),
+                      ...bindDualGrupo("sobraTecnica", sobraDual, setSobraDual),
                     },
                     {
                       grupoKey: "posteConexao",
@@ -1387,22 +1508,24 @@ function RelatorioPage() {
                       grupoKey: "caixaEmenda",
                       section: "caixa",
                       title: "Caixa de emenda",
-                      slots: caixa,
-                      onChange: setCaixa,
-                      obs: caixaObs,
-                      onObsChange: setCaixaObs,
-                      obsAdmin: obsAdminGrupos.caixaEmenda ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("caixaEmenda"),
-                      showAmbienteToggle: true,
-                      ambiente: ambientesGrupos.caixaEmenda ?? null,
-                      onAmbienteChange: patchAmbienteGrupo("caixaEmenda"),
+                      ...bindDualGrupo("caixaEmenda", caixaDual, setCaixaDual),
                       ...(tipo === "empresarial" || tipo === "implantacao"
                         ? {
-                            quantidade: redeAcesso.qtdCaixasEmenda,
+                            quantidade:
+                              redeAcesso.qtdCaixasEmendaPorAmbiente[abaDe("caixaEmenda")],
                             quantidadeLabel: "Quantidade de Caixas de Emenda",
                             quantidadePlaceholder: "Ex: 4",
-                            onQuantidadeChange: (qtdCaixasEmenda: number | null) =>
-                              setRedeAcesso((prev) => ({ ...prev, qtdCaixasEmenda })),
+                            onQuantidadeChange: (qtd: number | null) => {
+                              const aba = abaDe("caixaEmenda");
+                              setRedeAcesso((prev) => {
+                                const por = { ...prev.qtdCaixasEmendaPorAmbiente, [aba]: qtd };
+                                return {
+                                  ...prev,
+                                  qtdCaixasEmendaPorAmbiente: por,
+                                  qtdCaixasEmenda: (por.aereo || 0) + (por.subterraneo || 0) || null,
+                                };
+                              });
+                            },
                           }
                         : {}),
                     },
@@ -1421,19 +1544,11 @@ function RelatorioPage() {
                       grupoKey: "plaquetaIdentificacao",
                       section: "caixa",
                       title: "Plaqueta de Identificação - Caixa de emenda",
-                      slots: plaqueta,
-                      onChange: setPlaqueta,
-                      obs: plaquetaObs,
-                      onObsChange: setPlaquetaObs,
-                      obsAdmin: obsAdminGrupos.plaquetaIdentificacao ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("plaquetaIdentificacao"),
-                      showAmbienteToggle: true,
-                      ambiente: ambientesGrupos.plaquetaIdentificacao ?? null,
-                      onAmbienteChange: patchAmbienteGrupo("plaquetaIdentificacao"),
+                      ...bindDualGrupo("plaquetaIdentificacao", plaquetaDual, setPlaquetaDual),
                     },
                   ]}
-                  onGrupoPhoto={(grupoKey, slotId, file) => {
-                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
+                  onGrupoPhoto={(grupoKey, slotId, file, ambiente) => {
+                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file, ambiente);
                   }}
                   outras={outras}
                   onOutrasChange={setOutras}
@@ -1474,13 +1589,10 @@ function RelatorioPage() {
                     </div>
                   }
                   lancamentoTitle="Lançamento cabos (RC)?"
-                  lancamentoRe={lancamentoCabosRC}
-                  onLancamentoRe={(value) => {
-                    setLancamentoCabosRC(value);
-                    if (value === "sim") {
-                      setCabosRc((prev) => (prev.length ? prev : [emptyCaboMetragem()]));
-                    }
-                  }}
+                  lancamentoRe={simNaoDe(lancamentoCabosRc[lancamentoRcAmbiente].isSim)}
+                  onLancamentoRe={(value) =>
+                    patchLancamentoSim(setLancamentoCabosRc, lancamentoRcAmbiente, value)
+                  }
                   lancamentoAmbiente={lancamentoRcAmbiente}
                   onLancamentoAmbienteChange={setLancamentoRcAmbiente}
                   fiberloopInstalado={redeCliente.fiberloopInstalado}
@@ -1501,12 +1613,40 @@ function RelatorioPage() {
                   onPostesCordoalhaExistenteChange={(postesCordoalhaExistente) =>
                     setRedeCliente((prev) => ({ ...prev, postesCordoalhaExistente }))
                   }
-                  cabos={cabosRc}
-                  onPatchCabo={(id, patch) => patchCabo(setCabosRc, id, patch)}
-                  onAddCabo={() => setCabosRc((prev) => [...prev, emptyCaboMetragem()])}
-                  onRemoveCabo={(id) => setCabosRc((prev) => removeExtraById(prev, id))}
+                  cabos={lancamentoCabosRc[lancamentoRcAmbiente].metragens}
+                  onPatchCabo={(id, patch) =>
+                    patchCaboAmbiente(setLancamentoCabosRc, lancamentoRcAmbiente, id, patch)
+                  }
+                  onAddCabo={() =>
+                    setLancamentoCabosRc((prev) => ({
+                      ...prev,
+                      [lancamentoRcAmbiente]: {
+                        ...prev[lancamentoRcAmbiente],
+                        metragens: [
+                          ...prev[lancamentoRcAmbiente].metragens,
+                          emptyCaboMetragem(),
+                        ],
+                      },
+                    }))
+                  }
+                  onRemoveCabo={(id) =>
+                    setLancamentoCabosRc((prev) => ({
+                      ...prev,
+                      [lancamentoRcAmbiente]: {
+                        ...prev[lancamentoRcAmbiente],
+                        metragens: removeExtraById(prev[lancamentoRcAmbiente].metragens, id),
+                      },
+                    }))
+                  }
                   onCaboPhoto={(caboId, campo, file) =>
-                    handleCaboPhoto(setCabosRc, "metragensCaboRc", caboId, campo, file)
+                    handleCaboPhoto(
+                      setLancamentoCabosRc,
+                      "lancamentoCabosRc",
+                      lancamentoRcAmbiente,
+                      caboId,
+                      campo,
+                      file,
+                    )
                   }
                   showObsAdmin={showObsAdmin}
                   grupos={[
@@ -1515,15 +1655,7 @@ function RelatorioPage() {
                       section: "cabos",
                       title: "Sobra técnica / Fiberloop",
                       minSlots: 1,
-                      slots: rcSobra,
-                      onChange: setRcSobra,
-                      obs: rcSobraObs,
-                      onObsChange: setRcSobraObs,
-                      obsAdmin: obsAdminGrupos.rcSobraTecnica ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcSobraTecnica"),
-                      showAmbienteToggle: true,
-                      ambiente: ambientesGrupos.rcSobraTecnica ?? null,
-                      onAmbienteChange: patchAmbienteGrupo("rcSobraTecnica"),
+                      ...bindDualGrupo("rcSobraTecnica", rcSobraDual, setRcSobraDual),
                     },
                     {
                       grupoKey: "rcPosteConexao",
@@ -1551,41 +1683,46 @@ function RelatorioPage() {
                       grupoKey: "rcCaixaEmenda",
                       section: "caixa",
                       title: "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
-                      slots: rcCaixa,
-                      onChange: setRcCaixa,
-                      obs: rcCaixaObs,
-                      onObsChange: setRcCaixaObs,
-                      obsAdmin: obsAdminGrupos.rcCaixaEmenda ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcCaixaEmenda"),
-                      showAmbienteToggle: true,
-                      ambiente: ambientesGrupos.rcCaixaEmenda ?? null,
-                      onAmbienteChange: patchAmbienteGrupo("rcCaixaEmenda"),
-                      quantidade: redeCliente.qtdCaixasEmenda,
+                      ...bindDualGrupo("rcCaixaEmenda", rcCaixaDual, setRcCaixaDual),
+                      quantidade:
+                        redeCliente.qtdCaixasEmendaPorAmbiente[abaDe("rcCaixaEmenda")],
                       quantidadeLabel: "Quantidade de Caixas de Emenda",
                       quantidadePlaceholder: "Ex: 1",
-                      onQuantidadeChange: (qtdCaixasEmenda) =>
-                        setRedeCliente((prev) => ({ ...prev, qtdCaixasEmenda })),
-                      coordenadas: redeCliente.caixaEmendaAcomodacao.coordenadas,
+                      onQuantidadeChange: (qtd) => {
+                        const aba = abaDe("rcCaixaEmenda");
+                        setRedeCliente((prev) => {
+                          const por = { ...prev.qtdCaixasEmendaPorAmbiente, [aba]: qtd };
+                          return {
+                            ...prev,
+                            qtdCaixasEmendaPorAmbiente: por,
+                            qtdCaixasEmenda: (por.aereo || 0) + (por.subterraneo || 0) || null,
+                          };
+                        });
+                      },
+                      coordenadas:
+                        redeCliente.caixaEmendaAcomodacaoPorAmbiente[abaDe("rcCaixaEmenda")]
+                          .coordenadas,
                       coordenadasTitle: "Coordenadas da Caixa de Emenda",
-                      onCoordenadasChange: (coordenadas) =>
+                      onCoordenadasChange: (coordenadas) => {
+                        const aba = abaDe("rcCaixaEmenda");
                         setRedeCliente((prev) => ({
                           ...prev,
-                          caixaEmendaAcomodacao: { coordenadas },
-                        })),
+                          caixaEmendaAcomodacaoPorAmbiente: {
+                            ...prev.caixaEmendaAcomodacaoPorAmbiente,
+                            [aba]: { coordenadas },
+                          },
+                          caixaEmendaAcomodacao:
+                            aba === "aereo"
+                              ? { coordenadas }
+                              : prev.caixaEmendaAcomodacao,
+                        }));
+                      },
                     },
                     {
                       grupoKey: "rcPlaquetaIdentificacao",
                       section: "caixa",
                       title: "Plaqueta de Identificação - Caixa de emenda",
-                      slots: rcPlaqueta,
-                      onChange: setRcPlaqueta,
-                      obs: rcPlaquetaObs,
-                      onObsChange: setRcPlaquetaObs,
-                      obsAdmin: obsAdminGrupos.rcPlaquetaIdentificacao ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcPlaquetaIdentificacao"),
-                      showAmbienteToggle: true,
-                      ambiente: ambientesGrupos.rcPlaquetaIdentificacao ?? null,
-                      onAmbienteChange: patchAmbienteGrupo("rcPlaquetaIdentificacao"),
+                      ...bindDualGrupo("rcPlaquetaIdentificacao", rcPlaquetaDual, setRcPlaquetaDual),
                     },
                     {
                       grupoKey: "rcDutoSubterraneo",
@@ -1632,8 +1769,8 @@ function RelatorioPage() {
                       onObsAdminChange: patchObsAdminGrupo("rcEntradaExterna"),
                     },
                   ]}
-                  onGrupoPhoto={(grupoKey, slotId, file) => {
-                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
+                  onGrupoPhoto={(grupoKey, slotId, file, ambiente) => {
+                    handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file, ambiente);
                   }}
                   outras={outrasRc}
                   onOutrasChange={setOutrasRc}

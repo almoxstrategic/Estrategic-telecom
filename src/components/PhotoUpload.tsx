@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useEvidencePhotoPasteSlot } from "@/components/EvidencePhotoPasteContext";
 import { ExpandableImage } from "@/components/ExpandableImage";
+import { useApp } from "@/lib/app-store";
 import { waitForImageMemoryRelease } from "@/lib/compress-image";
 import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
+import { hasPainelFullAccess } from "@/lib/roles";
 import type { EvidencePhotoRef } from "@/lib/types";
 
 type BusyMode = "idle" | "camera" | "gallery";
@@ -17,6 +19,8 @@ export function PhotoUpload({
   onBeforePick,
   hideLabel = false,
   compact = false,
+  /** Força ocultar o texto de ajuda (além do RBAC do técnico). */
+  hideHelperText = false,
 }: {
   label: string;
   suffix: "inicio" | "fim";
@@ -25,11 +29,15 @@ export function PhotoUpload({
   onBeforePick?: () => void;
   hideLabel?: boolean;
   compact?: boolean;
+  hideHelperText?: boolean;
 }) {
+  const { user } = useApp();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [busyMode, setBusyMode] = useState<BusyMode>("idle");
   const busy = busyMode !== "idle";
+  const showHelperText =
+    !compact && !hideHelperText && hasPainelFullAccess(user?.role);
 
   useEffect(() => {
     return () => {
@@ -164,13 +172,13 @@ export function PhotoUpload({
         className="hidden"
         onChange={(e) => void handleFile(e.target.files?.[0], "gallery")}
       />
-      {compact ? null : (
+      {showHelperText ? (
         <p className="mt-1 text-[11px] text-muted-foreground">
           Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
           {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio. Fotos da câmera
           recebem data, hora e geolocalização.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

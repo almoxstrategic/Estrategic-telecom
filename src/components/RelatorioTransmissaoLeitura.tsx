@@ -1,5 +1,6 @@
 import { ExpandableImage } from "@/components/ExpandableImage";
 import {
+  type FotoGrupoPorAmbientePayload,
   type RelatorioTransmissao,
   type StoredPhoto,
 } from "@/lib/relatorios-transmissao";
@@ -60,6 +61,29 @@ function Secao({
   );
 }
 
+function SecaoAmbiente({
+  titulo,
+  grupo,
+}: {
+  titulo: string;
+  grupo: FotoGrupoPorAmbientePayload | undefined;
+}) {
+  return (
+    <>
+      <Secao
+        titulo={`${titulo} (Aéreo)`}
+        obs={grupo?.aereo.obs}
+        fotos={grupo?.aereo.fotos ?? []}
+      />
+      <Secao
+        titulo={`${titulo} (Subterrâneo)`}
+        obs={grupo?.subterraneo.obs}
+        fotos={grupo?.subterraneo.fotos ?? []}
+      />
+    </>
+  );
+}
+
 export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao }) {
   const payload = row.payload;
   return (
@@ -73,10 +97,25 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         <Campo label="Tipo" value={tipoLabel(row.tipo_execucao)} />
       </div>
 
-      {(payload?.metragensCabo ?? []).map((cabo, index) => (
+      {(payload?.lancamentoCabosRe?.aereo.metragens ?? payload?.metragensCabo ?? []).map(
+        (cabo, index) => (
         <Secao
-          key={cabo.id}
-          titulo={`Cabo RE ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          key={`re-aereo-${cabo.id}`}
+          titulo={`Cabo RE aéreo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          obs={[
+            cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
+            cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
+            cabo.obs,
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
+        />
+      ))}
+      {(payload?.lancamentoCabosRe?.subterraneo.metragens ?? []).map((cabo, index) => (
+        <Secao
+          key={`re-sub-${cabo.id}`}
+          titulo={`Cabo RE subterrâneo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
           obs={[
             cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
             cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
@@ -92,31 +131,22 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.posteConexao.obs}
         fotos={payload?.posteConexao.fotos ?? []}
       />
-      <Secao
-        titulo="Caixa de emenda"
-        obs={payload?.caixaEmenda.obs}
-        fotos={payload?.caixaEmenda.fotos ?? []}
-      />
+      <SecaoAmbiente titulo="Caixa de emenda" grupo={payload?.caixaEmenda} />
       <Secao
         titulo="Const. de duto subterraneio (MD ou MND)"
         obs={payload?.dutoSubterraneo.obs}
         fotos={payload?.dutoSubterraneo.fotos ?? []}
       />
-      <Secao
+      <SecaoAmbiente
         titulo="Plaqueta de Identificação - Caixa de emenda"
-        obs={payload?.plaquetaIdentificacao.obs}
-        fotos={payload?.plaquetaIdentificacao.fotos ?? []}
+        grupo={payload?.plaquetaIdentificacao}
       />
       <Secao
         titulo="Novo aterramento do poste"
         obs={payload?.novoAterramentoPoste.obs}
         fotos={payload?.novoAterramentoPoste.fotos ?? []}
       />
-      <Secao
-        titulo="Sobra técnica / Fiberloop"
-        obs={payload?.sobraTecnica.obs}
-        fotos={payload?.sobraTecnica.fotos ?? []}
-      />
+      <SecaoAmbiente titulo="Sobra técnica / Fiberloop" grupo={payload?.sobraTecnica} />
       {payload?.redeAcesso?.fiberloopInstalado?.isSim != null ? (
         <Campo
           label="Fiberloop instalado (RE)"
@@ -150,10 +180,25 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
           value={payload.lancamentoRc ? "SIM" : "NÃO"}
         />
       ) : null}
-      {(payload?.metragensCaboRc ?? []).map((cabo, index) => (
+      {(payload?.lancamentoCabosRc?.aereo.metragens ?? payload?.metragensCaboRc ?? []).map(
+        (cabo, index) => (
         <Secao
-          key={cabo.id}
-          titulo={`Cabo RC ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          key={`rc-aereo-${cabo.id}`}
+          titulo={`Cabo RC aéreo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          obs={[
+            cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
+            cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
+            cabo.obs,
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          fotos={[cabo.fotoInicio, cabo.fotoFim].filter((f): f is StoredPhoto => Boolean(f))}
+        />
+      ))}
+      {(payload?.lancamentoCabosRc?.subterraneo.metragens ?? []).map((cabo, index) => (
+        <Secao
+          key={`rc-sub-${cabo.id}`}
+          titulo={`Cabo RC subterrâneo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
           obs={[
             cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
             cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
@@ -174,10 +219,9 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.rcNovoAterramentoPoste.obs}
         fotos={payload?.rcNovoAterramentoPoste.fotos ?? []}
       />
-      <Secao
+      <SecaoAmbiente
         titulo="Caixa de emenda na acomodação (Rede cliente com Rede Externa)"
-        obs={payload?.rcCaixaEmenda.obs}
-        fotos={payload?.rcCaixaEmenda.fotos ?? []}
+        grupo={payload?.rcCaixaEmenda}
       />
       <Secao
         titulo="Const. de duto subterrâneo (RC)"
@@ -189,10 +233,9 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.rcTerminacaoCabo.obs}
         fotos={payload?.rcTerminacaoCabo.fotos ?? []}
       />
-      <Secao
+      <SecaoAmbiente
         titulo="Plaqueta de Identificação - Terminação do cabo no cliente"
-        obs={payload?.rcPlaquetaIdentificacao.obs}
-        fotos={payload?.rcPlaquetaIdentificacao.fotos ?? []}
+        grupo={payload?.rcPlaquetaIdentificacao}
       />
       <Secao
         titulo="Entrada do cabo no cliente (Área interna)"
@@ -204,11 +247,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.rcEntradaExterna.obs}
         fotos={payload?.rcEntradaExterna.fotos ?? []}
       />
-      <Secao
-        titulo="Sobra técnica / Fiberloop (RC)"
-        obs={payload?.rcSobraTecnica.obs}
-        fotos={payload?.rcSobraTecnica.fotos ?? []}
-      />
+      <SecaoAmbiente titulo="Sobra técnica / Fiberloop (RC)" grupo={payload?.rcSobraTecnica} />
       {payload?.redeCliente?.fiberloopInstalado?.isSim != null ? (
         <Campo
           label="Fiberloop instalado (RC)"

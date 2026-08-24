@@ -39,9 +39,9 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "contatos", label: "Contatos" },
 ];
 
-/** App de campo (técnico): mesma lista empresarial sem Contatos (aba só no painel do gestor). */
+/** App de campo (técnico): sem Contatos nem Medições (abas só no painel do gestor). */
 export const ABAS_CAMPO_TECNICO: { id: AbaCampo; label: string }[] = ABAS_CAMPO.filter(
-  (aba) => aba.id !== "contatos",
+  (aba) => aba.id !== "contatos" && aba.id !== "medicoes",
 );
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
@@ -341,17 +341,12 @@ export function AmbienteToggle({
 function AccordionBloco({
   title,
   children,
-  defaultOpen = true,
 }: {
   title: string;
   children: ReactNode;
-  defaultOpen?: boolean;
 }) {
   return (
-    <details
-      open={defaultOpen}
-      className="group rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
-    >
+    <details className="group rounded-2xl border border-border bg-card shadow-sm open:shadow-md">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-base font-bold [&::-webkit-details-marker]:hidden">
         <span>{title}</span>
         <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition group-open:rotate-180" />
@@ -372,12 +367,13 @@ function renderGrupoFotoCard(
       grupoKey: RelatorioFotoGrupoKey,
       slotId: string,
       file: EvidencePhotoRef | null,
+      ambiente?: AmbienteRede | null,
     ) => void;
   },
 ) {
   return (
     <RelatorioFotosBloco
-      key={grupo.grupoKey}
+      key={`${grupo.grupoKey}-${grupo.ambiente ?? "na"}`}
       title={grupo.title}
       hint={grupo.hint}
       headerExtra={
@@ -417,7 +413,7 @@ function renderGrupoFotoCard(
       onObsChange={grupo.onObsChange}
       minSlots={grupo.minSlots}
       readOnly={readOnly}
-      onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+      onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file, grupo.ambiente)}
     />
   );
 }
@@ -590,6 +586,7 @@ export function RelatorioRedeAcesso({
     grupoKey: RelatorioFotoGrupoKey,
     slotId: string,
     file: EvidencePhotoRef | null,
+    ambiente?: AmbienteRede | null,
   ) => void;
   outras: OutraFotoState[];
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
@@ -828,7 +825,9 @@ export function RelatorioRedeAcesso({
             {gruposCabos.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
           </div>
 
-          {fiberloopInstalado && onFiberloopInstaladoChange ? (
+          {fiberloopInstalado &&
+          onFiberloopInstaladoChange &&
+          lancamentoAmbiente !== "subterraneo" ? (
             <CordoalhaSimNaoCard
               title="Fiberloop instalado?"
               quantidadeLabel="Quantidade de Fiberloop instalado"

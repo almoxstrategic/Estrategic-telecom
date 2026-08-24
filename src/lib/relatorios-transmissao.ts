@@ -36,9 +36,40 @@ export type FotoGrupoPayload = {
   fotos: StoredPhoto[];
   obs: string;
   obsAdmin: string;
-  /** Presente nos itens que admitem seletor Aéreo/Subterrâneo. */
-  ambiente?: AmbienteRede | null;
 };
+
+/** Sub-abas independentes: Aéreo e Subterrâneo não se sobrescrevem. */
+export type FotoGrupoPorAmbientePayload = {
+  aereo: FotoGrupoPayload;
+  subterraneo: FotoGrupoPayload;
+};
+
+export type LancamentoBlocoPayload = {
+  isSim: boolean | null;
+  metragens: CaboMetragemPayload[];
+};
+
+export type LancamentoPorAmbientePayload = {
+  aereo: LancamentoBlocoPayload;
+  subterraneo: LancamentoBlocoPayload;
+};
+
+export const FOTO_GRUPO_POR_AMBIENTE_KEYS = [
+  "caixaEmenda",
+  "plaquetaIdentificacao",
+  "sobraTecnica",
+  "rcCaixaEmenda",
+  "rcPlaquetaIdentificacao",
+  "rcSobraTecnica",
+] as const;
+
+export type RelatorioFotoGrupoKeyPorAmbiente = (typeof FOTO_GRUPO_POR_AMBIENTE_KEYS)[number];
+
+export function isFotoGrupoPorAmbienteKey(
+  key: string,
+): key is RelatorioFotoGrupoKeyPorAmbiente {
+  return (FOTO_GRUPO_POR_AMBIENTE_KEYS as readonly string[]).includes(key);
+}
 
 export type OutraFotoPayload = {
   id: string;
@@ -321,8 +352,14 @@ export type CordoalhaBlocoPayload = {
   quantidade: number | null;
 };
 
+export type QuantidadesPorAmbiente = {
+  aereo: number | null;
+  subterraneo: number | null;
+};
+
 export type QuantidadesRedePayload = {
   qtdCaixasEmenda: number | null;
+  qtdCaixasEmendaPorAmbiente: QuantidadesPorAmbiente;
   /**
    * @deprecated Preferir `fiberloopInstalado.quantidade`. Mantido na leitura/escrita
    * para relatórios antigos (espelha a quantidade quando Fiberloop = SIM).
@@ -346,6 +383,10 @@ export type QuantidadesRedePayload = {
   caixaEmendaAcomodacao: {
     coordenadas: CoordenadasPayload;
   };
+  caixaEmendaAcomodacaoPorAmbiente: {
+    aereo: { coordenadas: CoordenadasPayload };
+    subterraneo: { coordenadas: CoordenadasPayload };
+  };
 };
 
 /**
@@ -354,13 +395,14 @@ export type QuantidadesRedePayload = {
  */
 export type EscopoPayload = {
   lancamentoRe: boolean | null;
-  /** Ambiente do lançamento de cabos RE (quando aplicável). */
+  /** Aba visual do lançamento RE (não apaga o outro lado). */
   lancamentoReAmbiente: AmbienteRede | null;
+  lancamentoCabosRe: LancamentoPorAmbientePayload;
   metragensCabo: CaboMetragemPayload[];
   posteConexao: FotoGrupoPayload;
-  caixaEmenda: FotoGrupoPayload;
+  caixaEmenda: FotoGrupoPorAmbientePayload;
   dutoSubterraneo: FotoGrupoPayload;
-  plaquetaIdentificacao: FotoGrupoPayload;
+  plaquetaIdentificacao: FotoGrupoPorAmbientePayload;
   novoAterramentoPoste: FotoGrupoPayload;
   /** @deprecated Removido da UI. Persistido vazio. */
   aterramentoTerrometro: FotoGrupoPayload;
@@ -368,21 +410,21 @@ export type EscopoPayload = {
   posicaoConexaoEstacao: FotoGrupoPayload;
   /** Movido para a aba Equipamento. */
   etiquetaIdentificacao: FotoGrupoPayload;
-  sobraTecnica: FotoGrupoPayload;
+  sobraTecnica: FotoGrupoPorAmbientePayload;
   outrasFotos: OutraFotoPayload[];
   redeAcesso: QuantidadesRedePayload;
   tecnologiaAcesso: string;
   lancamentoRc: boolean | null;
-  /** Ambiente do lançamento de cabos RC (quando aplicável). */
   lancamentoRcAmbiente: AmbienteRede | null;
+  lancamentoCabosRc: LancamentoPorAmbientePayload;
   metragensCaboRc: CaboMetragemPayload[];
   rcPosteConexao: FotoGrupoPayload;
-  rcCaixaEmenda: FotoGrupoPayload;
+  rcCaixaEmenda: FotoGrupoPorAmbientePayload;
   rcTerminacaoCabo: FotoGrupoPayload;
-  rcPlaquetaIdentificacao: FotoGrupoPayload;
+  rcPlaquetaIdentificacao: FotoGrupoPorAmbientePayload;
   rcEntradaInterna: FotoGrupoPayload;
   rcEntradaExterna: FotoGrupoPayload;
-  rcSobraTecnica: FotoGrupoPayload;
+  rcSobraTecnica: FotoGrupoPorAmbientePayload;
   rcNovoAterramentoPoste: FotoGrupoPayload;
   rcDutoSubterraneo: FotoGrupoPayload;
   outrasFotosRc: OutraFotoPayload[];
@@ -643,7 +685,26 @@ export function readObsAdmin(raw: unknown): string {
 }
 
 function emptyFotoGrupo(): FotoGrupoPayload {
-  return { fotos: [], obs: "", obsAdmin: "", ambiente: null };
+  return { fotos: [], obs: "", obsAdmin: "" };
+}
+
+export function emptyFotoGrupoPorAmbiente(): FotoGrupoPorAmbientePayload {
+  return { aereo: emptyFotoGrupo(), subterraneo: emptyFotoGrupo() };
+}
+
+export function emptyLancamentoBloco(): LancamentoBlocoPayload {
+  return { isSim: null, metragens: [] };
+}
+
+export function emptyLancamentoPorAmbiente(): LancamentoPorAmbientePayload {
+  return { aereo: emptyLancamentoBloco(), subterraneo: emptyLancamentoBloco() };
+}
+
+export function looksLikeFotoGrupoPorAmbiente(raw: unknown): raw is FotoGrupoPorAmbientePayload {
+  if (!raw || typeof raw !== "object") return false;
+  const obj = raw as Record<string, unknown>;
+  if (Array.isArray(obj.fotos)) return false;
+  return obj.aereo != null || obj.subterraneo != null;
 }
 
 export function parseAmbienteRede(raw: unknown): AmbienteRede | null {
@@ -663,6 +724,7 @@ export function emptyCordoalhaBloco(): CordoalhaBlocoPayload {
 export function emptyQuantidadesRede(): QuantidadesRedePayload {
   return {
     qtdCaixasEmenda: null,
+    qtdCaixasEmendaPorAmbiente: { aereo: null, subterraneo: null },
     qtdFiberloopInstalado: null,
     fiberloopInstalado: emptyCordoalhaBloco(),
     cordoalhaLancada: emptyCordoalhaBloco(),
@@ -672,7 +734,19 @@ export function emptyQuantidadesRede(): QuantidadesRedePayload {
     aterramento: { totalHastes: null },
     coordenadas: emptyCoordenadas(),
     caixaEmendaAcomodacao: { coordenadas: emptyCoordenadas() },
+    caixaEmendaAcomodacaoPorAmbiente: {
+      aereo: { coordenadas: emptyCoordenadas() },
+      subterraneo: { coordenadas: emptyCoordenadas() },
+    },
   };
+}
+
+export function qtdCaixasTotal(q: QuantidadesRedePayload | null | undefined): number {
+  if (!q) return 0;
+  const por = q.qtdCaixasEmendaPorAmbiente;
+  const soma = (por?.aereo || 0) + (por?.subterraneo || 0);
+  if (soma > 0) return soma;
+  return q.qtdCaixasEmenda || 0;
 }
 
 export function totalEmendasCalculado(
@@ -690,7 +764,7 @@ export function janelaPotenciaDerivada(
   redeAcesso: QuantidadesRedePayload,
   redeCliente: QuantidadesRedePayload,
 ): TestePotenciaJanelaPayload {
-  const emendas = totalEmendasCalculado(redeAcesso.qtdCaixasEmenda, redeCliente.qtdCaixasEmenda);
+  const emendas = totalEmendasCalculado(qtdCaixasTotal(redeAcesso), qtdCaixasTotal(redeCliente));
   return {
     emendas: String(emendas),
     conexoes: String(totalConexoesCalculado(emendas)),
@@ -700,30 +774,32 @@ export function janelaPotenciaDerivada(
 export function emptyEscopoPayload(): EscopoPayload {
   return {
     lancamentoRe: null,
-    lancamentoReAmbiente: null,
+    lancamentoReAmbiente: "aereo",
+    lancamentoCabosRe: emptyLancamentoPorAmbiente(),
     metragensCabo: [],
     posteConexao: emptyFotoGrupo(),
-    caixaEmenda: emptyFotoGrupo(),
+    caixaEmenda: emptyFotoGrupoPorAmbiente(),
     dutoSubterraneo: emptyFotoGrupo(),
-    plaquetaIdentificacao: emptyFotoGrupo(),
+    plaquetaIdentificacao: emptyFotoGrupoPorAmbiente(),
     novoAterramentoPoste: emptyFotoGrupo(),
     aterramentoTerrometro: emptyFotoGrupo(),
     posicaoConexaoEstacao: emptyFotoGrupo(),
     etiquetaIdentificacao: emptyFotoGrupo(),
-    sobraTecnica: emptyFotoGrupo(),
+    sobraTecnica: emptyFotoGrupoPorAmbiente(),
     outrasFotos: [],
     redeAcesso: emptyQuantidadesRede(),
     tecnologiaAcesso: "",
     lancamentoRc: null,
-    lancamentoRcAmbiente: null,
+    lancamentoRcAmbiente: "aereo",
+    lancamentoCabosRc: emptyLancamentoPorAmbiente(),
     metragensCaboRc: [],
     rcPosteConexao: emptyFotoGrupo(),
-    rcCaixaEmenda: emptyFotoGrupo(),
+    rcCaixaEmenda: emptyFotoGrupoPorAmbiente(),
     rcTerminacaoCabo: emptyFotoGrupo(),
-    rcPlaquetaIdentificacao: emptyFotoGrupo(),
+    rcPlaquetaIdentificacao: emptyFotoGrupoPorAmbiente(),
     rcEntradaInterna: emptyFotoGrupo(),
     rcEntradaExterna: emptyFotoGrupo(),
-    rcSobraTecnica: emptyFotoGrupo(),
+    rcSobraTecnica: emptyFotoGrupoPorAmbiente(),
     rcNovoAterramentoPoste: emptyFotoGrupo(),
     rcDutoSubterraneo: emptyFotoGrupo(),
     outrasFotosRc: [],
@@ -889,8 +965,21 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
         : emptyCordoalhaBloco();
   const qtdFiberloopInstalado =
     fiberloopInstalado.isSim === true ? fiberloopInstalado.quantidade : null;
+  const qtdAereo = parseQtdInteiro(src.qtdCaixasEmendaPorAmbiente?.aereo);
+  const qtdSub = parseQtdInteiro(src.qtdCaixasEmendaPorAmbiente?.subterraneo);
+  const qtdLegadoCaixas = parseQtdInteiro(src.qtdCaixasEmenda);
+  const qtdCaixasEmendaPorAmbiente: QuantidadesPorAmbiente =
+    qtdAereo != null || qtdSub != null
+      ? { aereo: qtdAereo, subterraneo: qtdSub }
+      : { aereo: qtdLegadoCaixas, subterraneo: null };
+  const qtdCaixasEmenda =
+    (qtdCaixasEmendaPorAmbiente.aereo || 0) + (qtdCaixasEmendaPorAmbiente.subterraneo || 0) ||
+    qtdLegadoCaixas;
+  const coordsAcomodacao = parseCoordenadas(src.caixaEmendaAcomodacao?.coordenadas);
+  const coordsPor = src.caixaEmendaAcomodacaoPorAmbiente;
   return {
-    qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
+    qtdCaixasEmenda: qtdCaixasEmenda === 0 ? qtdLegadoCaixas : qtdCaixasEmenda,
+    qtdCaixasEmendaPorAmbiente,
     qtdFiberloopInstalado,
     fiberloopInstalado,
     cordoalhaLancada: parseCordoalhaBloco(src.cordoalhaLancada),
@@ -901,8 +990,14 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
       totalHastes: parseQtdInteiro(src.aterramento?.totalHastes),
     },
     coordenadas: parseCoordenadas(src.coordenadas),
-    caixaEmendaAcomodacao: {
-      coordenadas: parseCoordenadas(src.caixaEmendaAcomodacao?.coordenadas),
+    caixaEmendaAcomodacao: { coordenadas: coordsAcomodacao },
+    caixaEmendaAcomodacaoPorAmbiente: {
+      aereo: {
+        coordenadas: parseCoordenadas(coordsPor?.aereo?.coordenadas) ?? coordsAcomodacao,
+      },
+      subterraneo: {
+        coordenadas: parseCoordenadas(coordsPor?.subterraneo?.coordenadas),
+      },
     },
   };
 }
@@ -1024,15 +1119,70 @@ function parseFotoGrupo(
   base: FotoGrupoPayload,
   raw: FotoGrupoPayload | undefined,
 ): FotoGrupoPayload {
-  const src = raw as (FotoGrupoPayload & { ambiente?: unknown }) | undefined;
   return {
-    ...base,
-    ...raw,
-    fotos: raw?.fotos ?? [],
-    obs: raw?.obs ?? "",
-    obsAdmin: readObsAdmin(raw),
-    ambiente: parseAmbienteRede(src?.ambiente ?? base.ambiente),
+    fotos: raw?.fotos ?? base.fotos ?? [],
+    obs: raw?.obs ?? base.obs ?? "",
+    obsAdmin: readObsAdmin(raw) || base.obsAdmin || "",
   };
+}
+
+function parseFotoGrupoPorAmbiente(raw: unknown): FotoGrupoPorAmbientePayload {
+  const empty = emptyFotoGrupoPorAmbiente();
+  if (looksLikeFotoGrupoPorAmbiente(raw)) {
+    return {
+      aereo: parseFotoGrupo(empty.aereo, raw.aereo as FotoGrupoPayload | undefined),
+      subterraneo: parseFotoGrupo(
+        empty.subterraneo,
+        raw.subterraneo as FotoGrupoPayload | undefined,
+      ),
+    };
+  }
+  const flat = parseFotoGrupo(emptyFotoGrupo(), raw as FotoGrupoPayload | undefined);
+  const ambiente = parseAmbienteRede(
+    raw && typeof raw === "object" ? (raw as { ambiente?: unknown }).ambiente : null,
+  );
+  if (ambiente === "subterraneo") {
+    return { aereo: emptyFotoGrupo(), subterraneo: flat };
+  }
+  const temConteudo = (flat.fotos?.length ?? 0) > 0 || Boolean(flat.obs?.trim());
+  if (!temConteudo) return empty;
+  return { aereo: flat, subterraneo: emptyFotoGrupo() };
+}
+
+function parseLancamentoBloco(raw: unknown): LancamentoBlocoPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<LancamentoBlocoPayload>;
+  return {
+    isSim: parseBoolNull(src.isSim),
+    metragens: parseCabosList(src.metragens),
+  };
+}
+
+function parseLancamentoPorAmbiente(
+  nested: unknown,
+  legadoIsSim: boolean | null,
+  legadoMetragens: CaboMetragemPayload[],
+  legadoAmbiente: AmbienteRede | null,
+): LancamentoPorAmbientePayload {
+  if (nested && typeof nested === "object") {
+    const src = nested as Partial<LancamentoPorAmbientePayload>;
+    if (src.aereo || src.subterraneo) {
+      return {
+        aereo: parseLancamentoBloco(src.aereo),
+        subterraneo: parseLancamentoBloco(src.subterraneo),
+      };
+    }
+  }
+  const bloco: LancamentoBlocoPayload = { isSim: legadoIsSim, metragens: legadoMetragens };
+  if (legadoAmbiente === "subterraneo") {
+    return { aereo: emptyLancamentoBloco(), subterraneo: bloco };
+  }
+  return { aereo: bloco, subterraneo: emptyLancamentoBloco() };
+}
+
+export function simDerivadoLancamento(l: LancamentoPorAmbientePayload): boolean | null {
+  if (l.aereo.isSim === true || l.subterraneo.isSim === true) return true;
+  if (l.aereo.isSim === false || l.subterraneo.isSim === false) return false;
+  return null;
 }
 
 function parseStoredPhoto(raw: unknown): StoredPhoto | null {
@@ -1305,37 +1455,67 @@ export function parseEscopoPayload(
     medicoes?: unknown;
     configuracao?: unknown;
   };
+  const lancamentoCabosRe = parseLancamentoPorAmbiente(
+    (src as { lancamentoCabosRe?: unknown }).lancamentoCabosRe,
+    src.lancamentoRe ?? null,
+    parseCabos(raw),
+    parseAmbienteRede((src as { lancamentoReAmbiente?: unknown }).lancamentoReAmbiente),
+  );
+  const lancamentoCabosRc = parseLancamentoPorAmbiente(
+    (src as { lancamentoCabosRc?: unknown }).lancamentoCabosRc,
+    src.lancamentoRc ?? null,
+    parseCabosList(src.metragensCaboRc),
+    parseAmbienteRede((src as { lancamentoRcAmbiente?: unknown }).lancamentoRcAmbiente),
+  );
   return {
     ...base,
-    lancamentoRe: src.lancamentoRe ?? null,
-    lancamentoReAmbiente: parseAmbienteRede(
-      (src as { lancamentoReAmbiente?: unknown }).lancamentoReAmbiente,
+    lancamentoCabosRe,
+    lancamentoRe: simDerivadoLancamento(lancamentoCabosRe),
+    lancamentoReAmbiente:
+      parseAmbienteRede((src as { lancamentoReAmbiente?: unknown }).lancamentoReAmbiente) ?? "aereo",
+    metragensCabo: lancamentoCabosRe.aereo.metragens,
+    posteConexao: parseFotoGrupo(base.posteConexao, src.posteConexao as FotoGrupoPayload | undefined),
+    caixaEmenda: parseFotoGrupoPorAmbiente(src.caixaEmenda),
+    dutoSubterraneo: parseFotoGrupo(base.dutoSubterraneo, src.dutoSubterraneo as FotoGrupoPayload | undefined),
+    plaquetaIdentificacao: parseFotoGrupoPorAmbiente(src.plaquetaIdentificacao),
+    novoAterramentoPoste: parseFotoGrupo(
+      base.novoAterramentoPoste,
+      src.novoAterramentoPoste as FotoGrupoPayload | undefined,
     ),
-    metragensCabo: parseCabos(raw),
-    posteConexao: parseFotoGrupo(base.posteConexao, src.posteConexao),
-    caixaEmenda: parseFotoGrupo(base.caixaEmenda, src.caixaEmenda),
-    dutoSubterraneo: parseFotoGrupo(base.dutoSubterraneo, src.dutoSubterraneo),
-    plaquetaIdentificacao: parseFotoGrupo(base.plaquetaIdentificacao, src.plaquetaIdentificacao),
-    novoAterramentoPoste: parseFotoGrupo(base.novoAterramentoPoste, src.novoAterramentoPoste),
     aterramentoTerrometro: emptyFotoGrupo(),
-    posicaoConexaoEstacao: parseFotoGrupo(base.posicaoConexaoEstacao, src.posicaoConexaoEstacao),
-    etiquetaIdentificacao: parseFotoGrupo(base.etiquetaIdentificacao, src.etiquetaIdentificacao),
-    sobraTecnica: parseFotoGrupo(base.sobraTecnica, src.sobraTecnica),
+    posicaoConexaoEstacao: parseFotoGrupo(
+      base.posicaoConexaoEstacao,
+      src.posicaoConexaoEstacao as FotoGrupoPayload | undefined,
+    ),
+    etiquetaIdentificacao: parseFotoGrupo(
+      base.etiquetaIdentificacao,
+      src.etiquetaIdentificacao as FotoGrupoPayload | undefined,
+    ),
+    sobraTecnica: parseFotoGrupoPorAmbiente(src.sobraTecnica),
     outrasFotos: parseOutrasFotos(src.outrasFotos),
     redeAcesso: parseQuantidadesRede(src.redeAcesso),
     tecnologiaAcesso: src.tecnologiaAcesso ?? "",
-    lancamentoRc: src.lancamentoRc ?? null,
-    lancamentoRcAmbiente: parseAmbienteRede(
-      (src as { lancamentoRcAmbiente?: unknown }).lancamentoRcAmbiente,
+    lancamentoCabosRc,
+    lancamentoRc: simDerivadoLancamento(lancamentoCabosRc),
+    lancamentoRcAmbiente:
+      parseAmbienteRede((src as { lancamentoRcAmbiente?: unknown }).lancamentoRcAmbiente) ?? "aereo",
+    metragensCaboRc: lancamentoCabosRc.aereo.metragens,
+    rcPosteConexao: parseFotoGrupo(base.rcPosteConexao, src.rcPosteConexao as FotoGrupoPayload | undefined),
+    rcCaixaEmenda: parseFotoGrupoPorAmbiente(src.rcCaixaEmenda),
+    rcTerminacaoCabo: parseFotoGrupo(
+      base.rcTerminacaoCabo,
+      src.rcTerminacaoCabo as FotoGrupoPayload | undefined,
     ),
-    metragensCaboRc: parseCabosList(src.metragensCaboRc),
-    rcPosteConexao: parseFotoGrupo(base.rcPosteConexao, src.rcPosteConexao),
-    rcCaixaEmenda: parseFotoGrupo(base.rcCaixaEmenda, src.rcCaixaEmenda),
-    rcTerminacaoCabo: parseFotoGrupo(base.rcTerminacaoCabo, src.rcTerminacaoCabo),
-    rcPlaquetaIdentificacao: parseFotoGrupo(base.rcPlaquetaIdentificacao, src.rcPlaquetaIdentificacao),
-    rcEntradaInterna: parseFotoGrupo(base.rcEntradaInterna, src.rcEntradaInterna),
-    rcEntradaExterna: parseFotoGrupo(base.rcEntradaExterna, src.rcEntradaExterna),
-    rcSobraTecnica: parseFotoGrupo(base.rcSobraTecnica, src.rcSobraTecnica),
+    rcPlaquetaIdentificacao: parseFotoGrupoPorAmbiente(src.rcPlaquetaIdentificacao),
+    rcEntradaInterna: parseFotoGrupo(
+      base.rcEntradaInterna,
+      src.rcEntradaInterna as FotoGrupoPayload | undefined,
+    ),
+    rcEntradaExterna: parseFotoGrupo(
+      base.rcEntradaExterna,
+      src.rcEntradaExterna as FotoGrupoPayload | undefined,
+    ),
+    rcSobraTecnica: parseFotoGrupoPorAmbiente(src.rcSobraTecnica),
     rcNovoAterramentoPoste: parseFotoGrupo(
       base.rcNovoAterramentoPoste,
       (src as { rcNovoAterramentoPoste?: FotoGrupoPayload }).rcNovoAterramentoPoste,
@@ -1399,23 +1579,17 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
   };
 }
 
-const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
+const FOTO_GRUPO_SIMPLES_KEYS = [
   "posteConexao",
-  "caixaEmenda",
   "dutoSubterraneo",
-  "plaquetaIdentificacao",
   "novoAterramentoPoste",
   "aterramentoTerrometro",
   "posicaoConexaoEstacao",
   "etiquetaIdentificacao",
-  "sobraTecnica",
   "rcPosteConexao",
-  "rcCaixaEmenda",
   "rcTerminacaoCabo",
-  "rcPlaquetaIdentificacao",
   "rcEntradaInterna",
   "rcEntradaExterna",
-  "rcSobraTecnica",
   "rcNovoAterramentoPoste",
   "rcDutoSubterraneo",
   "eqClienteFachada",
@@ -1426,7 +1600,7 @@ const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
   "eqEstacaoGeral",
   "eqEstacaoRack",
   "eqEstacaoEtiqueta",
-];
+] as const satisfies readonly RelatorioFotoGrupoKey[];
 
 function mergeById<T extends { id: string }>(
   server: T[],
@@ -1467,10 +1641,30 @@ function mergeFotoGrupo(server: FotoGrupoPayload, local: FotoGrupoPayload): Foto
     fotos: mergeFotosByPath(fromServer.fotos ?? [], fromLocal.fotos ?? []),
     obs: fromLocal.obs || fromServer.obs,
     obsAdmin: fromLocal.obsAdmin || fromServer.obsAdmin,
-    ambiente:
-      fromLocal.ambiente !== undefined && fromLocal.ambiente !== null
-        ? fromLocal.ambiente
-        : fromServer.ambiente ?? null,
+  };
+}
+
+function mergeFotoGrupoPorAmbiente(
+  server: FotoGrupoPorAmbientePayload,
+  local: FotoGrupoPorAmbientePayload,
+): FotoGrupoPorAmbientePayload {
+  return {
+    aereo: mergeFotoGrupo(server.aereo, local.aereo),
+    subterraneo: mergeFotoGrupo(server.subterraneo, local.subterraneo),
+  };
+}
+
+function mergeLancamentoPorAmbiente(
+  server: LancamentoPorAmbientePayload,
+  local: LancamentoPorAmbientePayload,
+): LancamentoPorAmbientePayload {
+  const mergeLado = (s: LancamentoBlocoPayload, l: LancamentoBlocoPayload): LancamentoBlocoPayload => ({
+    isSim: l.isSim !== null ? l.isSim : s.isSim,
+    metragens: mergeById(s.metragens ?? [], l.metragens ?? [], mergeCabo),
+  });
+  return {
+    aereo: mergeLado(server.aereo, local.aereo),
+    subterraneo: mergeLado(server.subterraneo, local.subterraneo),
   };
 }
 
@@ -1675,11 +1869,23 @@ function mergeQuantidadesRede(
     fromServer.fiberloopInstalado,
     fromLocal.fiberloopInstalado,
   );
+  const qtdCaixasEmendaPorAmbiente = {
+    aereo:
+      fromLocal.qtdCaixasEmendaPorAmbiente?.aereo === undefined
+        ? fromServer.qtdCaixasEmendaPorAmbiente?.aereo ?? null
+        : fromLocal.qtdCaixasEmendaPorAmbiente.aereo,
+    subterraneo:
+      fromLocal.qtdCaixasEmendaPorAmbiente?.subterraneo === undefined
+        ? fromServer.qtdCaixasEmendaPorAmbiente?.subterraneo ?? null
+        : fromLocal.qtdCaixasEmendaPorAmbiente.subterraneo,
+  };
   return {
     qtdCaixasEmenda:
-      fromLocal.qtdCaixasEmenda === undefined
+      (qtdCaixasEmendaPorAmbiente.aereo || 0) + (qtdCaixasEmendaPorAmbiente.subterraneo || 0) ||
+      (fromLocal.qtdCaixasEmenda === undefined
         ? fromServer.qtdCaixasEmenda
-        : fromLocal.qtdCaixasEmenda,
+        : fromLocal.qtdCaixasEmenda),
+    qtdCaixasEmendaPorAmbiente,
     fiberloopInstalado,
     qtdFiberloopInstalado:
       fiberloopInstalado.isSim === true ? fiberloopInstalado.quantidade : null,
@@ -1711,6 +1917,20 @@ function mergeQuantidadesRede(
         fromServer.caixaEmendaAcomodacao?.coordenadas,
         fromLocal.caixaEmendaAcomodacao?.coordenadas,
       ),
+    },
+    caixaEmendaAcomodacaoPorAmbiente: {
+      aereo: {
+        coordenadas: mergeCoordenadas(
+          fromServer.caixaEmendaAcomodacaoPorAmbiente?.aereo?.coordenadas,
+          fromLocal.caixaEmendaAcomodacaoPorAmbiente?.aereo?.coordenadas,
+        ),
+      },
+      subterraneo: {
+        coordenadas: mergeCoordenadas(
+          fromServer.caixaEmendaAcomodacaoPorAmbiente?.subterraneo?.coordenadas,
+          fromLocal.caixaEmendaAcomodacaoPorAmbiente?.subterraneo?.coordenadas,
+        ),
+      },
     },
   };
 }
@@ -1845,22 +2065,38 @@ export function mergeEscopoPayload(
 ): EscopoPayload {
   const fromServer = parseEscopoPayload(serverRaw);
   const fromLocal = parseEscopoPayload(localRaw);
-  const grupos = Object.fromEntries(
-    FOTO_GRUPO_KEYS.map((key) => [key, mergeFotoGrupo(fromServer[key], fromLocal[key])]),
-  ) as Pick<EscopoPayload, RelatorioFotoGrupoKey>;
+  const gruposSimples = Object.fromEntries(
+    FOTO_GRUPO_SIMPLES_KEYS.map((key) => [key, mergeFotoGrupo(fromServer[key], fromLocal[key])]),
+  );
+  const gruposAmbiente = Object.fromEntries(
+    FOTO_GRUPO_POR_AMBIENTE_KEYS.map((key) => [
+      key,
+      mergeFotoGrupoPorAmbiente(fromServer[key], fromLocal[key]),
+    ]),
+  );
+  const lancamentoCabosRe = mergeLancamentoPorAmbiente(
+    fromServer.lancamentoCabosRe,
+    fromLocal.lancamentoCabosRe,
+  );
+  const lancamentoCabosRc = mergeLancamentoPorAmbiente(
+    fromServer.lancamentoCabosRc,
+    fromLocal.lancamentoCabosRc,
+  );
 
   return {
     ...fromServer,
     ...fromLocal,
-    lancamentoRe: fromLocal.lancamentoRe ?? fromServer.lancamentoRe,
-    lancamentoRc: fromLocal.lancamentoRc ?? fromServer.lancamentoRc,
+    lancamentoCabosRe,
+    lancamentoCabosRc,
+    lancamentoRe: simDerivadoLancamento(lancamentoCabosRe),
+    lancamentoRc: simDerivadoLancamento(lancamentoCabosRc),
     lancamentoReAmbiente: fromLocal.lancamentoReAmbiente ?? fromServer.lancamentoReAmbiente,
     lancamentoRcAmbiente: fromLocal.lancamentoRcAmbiente ?? fromServer.lancamentoRcAmbiente,
     relatorioEstacao: fromLocal.relatorioEstacao ?? fromServer.relatorioEstacao,
     tecnologiaAcesso: fromLocal.tecnologiaAcesso || fromServer.tecnologiaAcesso,
     estacaoEntregaAcesso: fromLocal.estacaoEntregaAcesso || fromServer.estacaoEntregaAcesso,
-    metragensCabo: mergeById(fromServer.metragensCabo, fromLocal.metragensCabo, mergeCabo),
-    metragensCaboRc: mergeById(fromServer.metragensCaboRc, fromLocal.metragensCaboRc, mergeCabo),
+    metragensCabo: lancamentoCabosRe.aereo.metragens,
+    metragensCaboRc: lancamentoCabosRc.aereo.metragens,
     eqClienteDgo: mergeById(fromServer.eqClienteDgo, fromLocal.eqClienteDgo, mergeDgoClienteItem),
     eqClienteEquipamentos: mergeById(
       fromServer.eqClienteEquipamentos,
@@ -1903,7 +2139,8 @@ export function mergeEscopoPayload(
       fromServer.infraestrutura,
       fromLocal.infraestrutura,
     ),
-    ...grupos,
+    ...gruposSimples,
+    ...gruposAmbiente,
     aterramentoTerrometro: emptyFotoGrupo(),
   };
 }
@@ -2558,16 +2795,35 @@ export function appendStoredPhotoToEscopo(
   payload: EscopoPayload,
   categoria: RelatorioFotoCategoria,
   stored: StoredPhoto,
+  ambiente: AmbienteRede = "aereo",
 ): EscopoPayload {
   if (categoria === "metragensCabo" || categoria === "metragensCaboRc") {
-    const list = (payload[categoria].length
-      ? payload[categoria].map((item) => ({ ...item }))
+    const dualKey = categoria === "metragensCabo" ? "lancamentoCabosRe" : "lancamentoCabosRc";
+    const dual = payload[dualKey];
+    const lado = dual[ambiente];
+    const list = (lado.metragens.length
+      ? lado.metragens.map((item) => ({ ...item }))
       : [emptyCaboMetragem()]);
     const last = list[list.length - 1];
     if (!last.fotoInicio) last.fotoInicio = stored;
     else if (!last.fotoFim) last.fotoFim = stored;
     else list.push({ ...emptyCaboMetragem(), fotoInicio: stored });
-    return { ...payload, [categoria]: list };
+    const nextDual = {
+      ...dual,
+      [ambiente]: { ...lado, metragens: list },
+    };
+    return {
+      ...payload,
+      [dualKey]: nextDual,
+      lancamentoRe:
+        dualKey === "lancamentoCabosRe" ? simDerivadoLancamento(nextDual) : payload.lancamentoRe,
+      lancamentoRc:
+        dualKey === "lancamentoCabosRc" ? simDerivadoLancamento(nextDual) : payload.lancamentoRc,
+      metragensCabo:
+        dualKey === "lancamentoCabosRe" ? nextDual.aereo.metragens : payload.metragensCabo,
+      metragensCaboRc:
+        dualKey === "lancamentoCabosRc" ? nextDual.aereo.metragens : payload.metragensCaboRc,
+    };
   }
   if (categoria === "eqClienteEquipamentos" || categoria === "eqEstacaoEquipamento") {
     const list = payload[categoria].length
@@ -2604,9 +2860,19 @@ export function appendStoredPhotoToEscopo(
     };
   }
   const grupo = payload[categoria];
+  if (looksLikeFotoGrupoPorAmbiente(grupo)) {
+    const lado = grupo[ambiente];
+    return {
+      ...payload,
+      [categoria]: {
+        ...grupo,
+        [ambiente]: { ...lado, fotos: [...lado.fotos, stored] },
+      },
+    };
+  }
   return {
     ...payload,
-    [categoria]: { ...grupo, fotos: [...grupo.fotos, stored] },
+    [categoria]: { ...grupo, fotos: [...(grupo as FotoGrupoPayload).fotos, stored] },
   };
 }
 
@@ -2614,8 +2880,9 @@ export function appendStoredPhotoToPayload(
   payload: RelatorioPayload,
   categoria: RelatorioFotoCategoria,
   stored: StoredPhoto,
+  ambiente: AmbienteRede = "aereo",
 ): RelatorioPayload {
-  const next = appendStoredPhotoToEscopo(payload, categoria, stored);
+  const next = appendStoredPhotoToEscopo(payload, categoria, stored, ambiente);
   return {
     ...next,
     medicoes: payload.medicoes,

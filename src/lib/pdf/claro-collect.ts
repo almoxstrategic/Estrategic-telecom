@@ -9,10 +9,12 @@ import {
   parseNumeroCampo,
   totalConexoesCalculado,
   totalEmendasCalculado,
+  looksLikeFotoGrupoPorAmbiente,
   type CaboMetragemPayload,
   type DgoClienteItemPayload,
   type EquipamentoClienteItemPayload,
   type FotoGrupoPayload,
+  type FotoGrupoPorAmbientePayload,
   type OutraFotoPayload,
   type RelatorioPayload,
   type RelatorioTransmissao,
@@ -176,6 +178,20 @@ function toPhotoItems(
       };
     })
     .filter((x): x is PdfPhotoItem => Boolean(x));
+}
+
+function gruposParaPdf(
+  titulo: string,
+  grupo: FotoGrupoPayload | FotoGrupoPorAmbientePayload | null | undefined,
+): { titulo: string; grupo: FotoGrupoPayload | null | undefined }[] {
+  if (!grupo) return [];
+  if (looksLikeFotoGrupoPorAmbiente(grupo)) {
+    return [
+      { titulo: `${titulo} (Aereo)`, grupo: grupo.aereo },
+      { titulo: `${titulo} (Subterraneo)`, grupo: grupo.subterraneo },
+    ];
+  }
+  return [{ titulo, grupo }];
 }
 
 /** Grade 2 colunas: titulo da categoria no topo, OBS como legenda (vazio = sem texto). */
@@ -598,8 +614,12 @@ export function collectPdfBlocksEscopo(
   pushHeading(blocks, sec("1. Rede Externa (RE)"));
   {
     const meta: PdfAtomicBlock[] = [];
-    pushPara(meta, simNao(p?.lancamentoRe), "Lancamento de cabos (RE)");
-    pushPara(meta, labelAmbiente(p?.lancamentoReAmbiente), "Ambiente lancamento (RE)");
+    pushPara(meta, simNao(p?.lancamentoCabosRe?.aereo.isSim ?? p?.lancamentoRe), "Lancamento de cabos aereo (RE)");
+    pushPara(
+      meta,
+      simNao(p?.lancamentoCabosRe?.subterraneo.isSim),
+      "Lancamento de cabos subterraneo (RE)",
+    );
     pushPara(meta, simNao(p?.redeAcesso?.fiberloopInstalado?.isSim), "Fiberloop instalado (RE)");
     if (
       p?.redeAcesso?.fiberloopInstalado?.isSim &&
@@ -648,18 +668,41 @@ export function collectPdfBlocksEscopo(
         "Qtd. postes com cordoalha existente (RE)",
       );
     }
-    if (p?.redeAcesso?.qtdCaixasEmenda != null) {
+    if (p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.aereo != null) {
+      pushPara(meta, String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.aereo), "Qtd. caixas aereo (RE)");
+    }
+    if (p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.subterraneo != null) {
+      pushPara(
+        meta,
+        String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.subterraneo),
+        "Qtd. caixas subterraneo (RE)",
+      );
+    }
+    if (
+      p?.redeAcesso?.qtdCaixasEmenda != null &&
+      p.redeAcesso.qtdCaixasEmendaPorAmbiente?.aereo == null &&
+      p.redeAcesso.qtdCaixasEmendaPorAmbiente?.subterraneo == null
+    ) {
       pushPara(meta, String(p.redeAcesso.qtdCaixasEmenda), "Qtd. caixas de emenda");
     }
     for (const b of meta) blocks.push(b);
   }
-  if (p?.lancamentoRe === true) collectCabos(blocks, "Metragem de cabos (RE)", p.metragensCabo ?? []);
+  if (p?.lancamentoCabosRe?.aereo.isSim === true) {
+    collectCabos(blocks, "Metragem de cabos aereo (RE)", p.lancamentoCabosRe.aereo.metragens);
+  }
+  if (p?.lancamentoCabosRe?.subterraneo.isSim === true) {
+    collectCabos(
+      blocks,
+      "Metragem de cabos subterraneo (RE)",
+      p.lancamentoCabosRe.subterraneo.metragens,
+    );
+  }
   collectGruposEmGrade(blocks, [
     { titulo: "Poste de conexao", grupo: p?.posteConexao },
-    { titulo: "Caixa de emenda", grupo: p?.caixaEmenda },
+    ...gruposParaPdf("Caixa de emenda", p?.caixaEmenda),
     { titulo: "Const. de duto subterraneo (MD ou MND)", grupo: p?.dutoSubterraneo },
-    { titulo: "Sobra tecnica / Fiberloop", grupo: p?.sobraTecnica },
-    { titulo: "Plaqueta de Identificacao - Caixa de emenda", grupo: p?.plaquetaIdentificacao },
+    ...gruposParaPdf("Sobra tecnica / Fiberloop", p?.sobraTecnica),
+    ...gruposParaPdf("Plaqueta de Identificacao - Caixa de emenda", p?.plaquetaIdentificacao),
     { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
   ]);
   collectOutras(blocks, "Outras fotos (RE)", p?.outrasFotos ?? []);
@@ -668,8 +711,12 @@ export function collectPdfBlocksEscopo(
   {
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, p?.tecnologiaAcesso?.trim() || "-", "Tecnologia de Acesso");
-    pushPara(meta, simNao(p?.lancamentoRc), "Lancamento de cabos (RC)");
-    pushPara(meta, labelAmbiente(p?.lancamentoRcAmbiente), "Ambiente lancamento (RC)");
+    pushPara(meta, simNao(p?.lancamentoCabosRc?.aereo.isSim ?? p?.lancamentoRc), "Lancamento de cabos aereo (RC)");
+    pushPara(
+      meta,
+      simNao(p?.lancamentoCabosRc?.subterraneo.isSim),
+      "Lancamento de cabos subterraneo (RC)",
+    );
     pushPara(meta, simNao(p?.redeCliente?.fiberloopInstalado?.isSim), "Fiberloop instalado (RC)");
     if (
       p?.redeCliente?.fiberloopInstalado?.isSim &&
@@ -730,17 +777,26 @@ export function collectPdfBlocksEscopo(
     }
     for (const b of meta) blocks.push(b);
   }
-  if (p?.lancamentoRc === true) collectCabos(blocks, "Metragem de cabos (RC)", p.metragensCaboRc ?? []);
+  if (p?.lancamentoCabosRc?.aereo.isSim === true) {
+    collectCabos(blocks, "Metragem de cabos aereo (RC)", p.lancamentoCabosRc.aereo.metragens);
+  }
+  if (p?.lancamentoCabosRc?.subterraneo.isSim === true) {
+    collectCabos(
+      blocks,
+      "Metragem de cabos subterraneo (RC)",
+      p.lancamentoCabosRc.subterraneo.metragens,
+    );
+  }
   collectGruposEmGrade(blocks, [
     { titulo: "Poste de conexao (RC)", grupo: p?.rcPosteConexao },
     { titulo: "Novo aterramento do poste (RC)", grupo: p?.rcNovoAterramentoPoste },
-    { titulo: "Caixa de emenda na acomodacao (RC)", grupo: p?.rcCaixaEmenda },
+    ...gruposParaPdf("Caixa de emenda na acomodacao (RC)", p?.rcCaixaEmenda),
     { titulo: "Const. de duto subterraneo (RC)", grupo: p?.rcDutoSubterraneo },
     { titulo: "Terminacao do cabo no cliente", grupo: p?.rcTerminacaoCabo },
-    { titulo: "Plaqueta de Identificacao (RC)", grupo: p?.rcPlaquetaIdentificacao },
+    ...gruposParaPdf("Plaqueta de Identificacao (RC)", p?.rcPlaquetaIdentificacao),
     { titulo: "Entrada do cabo (area interna)", grupo: p?.rcEntradaInterna },
     { titulo: "Entrada do cabo (area externa)", grupo: p?.rcEntradaExterna },
-    { titulo: "Sobra tecnica / Fiberloop (RC)", grupo: p?.rcSobraTecnica },
+    ...gruposParaPdf("Sobra tecnica / Fiberloop (RC)", p?.rcSobraTecnica),
   ]);
   collectOutras(blocks, "Outras fotos (RC)", p?.outrasFotosRc ?? []);
 

@@ -45,6 +45,10 @@ import {
   emptyQuantidadesRede,
   emptyTesteOptico,
   emptyTestePotencia,
+  emptyLancamentoPorAmbiente,
+  isFotoGrupoPorAmbienteKey,
+  looksLikeFotoGrupoPorAmbiente,
+  simDerivadoLancamento,
   apenasDigitos,
   calcularMetragemCaboTotal,
   janelaPotenciaDerivada,
@@ -62,6 +66,8 @@ import {
   type RelatorioTransmissao,
   type StoredPhoto,
   type AmbienteRede,
+  type FotoGrupoPayload,
+  type LancamentoPorAmbientePayload,
 } from "@/lib/relatorios-transmissao";
 
 export function formatDate(value: string | null | undefined) {
@@ -690,7 +696,11 @@ export function RelatorioDetalhe({
 }: {
   row: RelatorioTransmissao;
   canEditPhotos: boolean;
-  onAddPhoto: (categoria: RelatorioFotoCategoria, file: EvidencePhotoRef) => void;
+  onAddPhoto: (
+    categoria: RelatorioFotoCategoria,
+    file: EvidencePhotoRef,
+    ambiente?: AmbienteRede,
+  ) => void;
   onReplacePhoto?: (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
@@ -701,6 +711,7 @@ export function RelatorioDetalhe({
       outraId?: string;
       itemId?: string;
       campoItem?: "foto" | "etiqueta";
+      ambiente?: AmbienteRede;
     },
   ) => void;
   uploadingCategoria: RelatorioFotoCategoria | null;
@@ -711,6 +722,11 @@ export function RelatorioDetalhe({
 }) {
   const [abaAtiva, setAbaAtiva] = useState<AbaCampo>("RE");
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [abaLancamentoRe, setAbaLancamentoRe] = useState<AmbienteRede>("aereo");
+  const [abaLancamentoRc, setAbaLancamentoRc] = useState<AmbienteRede>("aereo");
+  const [abasGrupos, setAbasGrupos] = useState<Partial<Record<RelatorioFotoGrupoKey, AmbienteRede>>>(
+    {},
+  );
   const isEmpresarial = row.tipo_execucao === "empresarial";
   const isImplantacao = row.tipo_execucao === "implantacao";
   const abasVisiveis = isEmpresarial
@@ -731,19 +747,24 @@ export function RelatorioDetalhe({
   }, [isEmpresarial, isImplantacao]);
 
   const payload = row.payload;
-  const cabos = payload?.metragensCabo ?? [];
-  const cabosRc = payload?.metragensCaboRc ?? [];
-  const fotosCabosCount = cabos.reduce(
-    (acc, cabo) => acc + Number(Boolean(cabo.fotoInicio)) + Number(Boolean(cabo.fotoFim)),
-    0,
-  );
-  const fotosCabosRcCount = cabosRc.reduce(
-    (acc, cabo) => acc + Number(Boolean(cabo.fotoInicio)) + Number(Boolean(cabo.fotoFim)),
-    0,
-  );
-  const blocoCount = (categoria: RelatorioFotoCategoria) => {
-    if (categoria === "metragensCabo") return fotosCabosCount;
-    if (categoria === "metragensCaboRc") return fotosCabosRcCount;
+  const lancamentoCabosRe = payload?.lancamentoCabosRe ?? emptyLancamentoPorAmbiente();
+  const lancamentoCabosRc = payload?.lancamentoCabosRc ?? emptyLancamentoPorAmbiente();
+  const countFotosCabos = (list: CaboMetragemPayload[]) =>
+    list.reduce(
+      (acc, cabo) => acc + Number(Boolean(cabo.fotoInicio)) + Number(Boolean(cabo.fotoFim)),
+      0,
+    );
+  const blocoCount = (categoria: RelatorioFotoCategoria, ambiente?: AmbienteRede) => {
+    if (categoria === "metragensCabo") {
+      const dual = payload?.lancamentoCabosRe ?? emptyLancamentoPorAmbiente();
+      const aba = ambiente ?? "aereo";
+      return countFotosCabos(dual[aba].metragens);
+    }
+    if (categoria === "metragensCaboRc") {
+      const dual = payload?.lancamentoCabosRc ?? emptyLancamentoPorAmbiente();
+      const aba = ambiente ?? "aereo";
+      return countFotosCabos(dual[aba].metragens);
+    }
     if (categoria === "outrasFotos") return payload?.outrasFotos.length ?? 0;
     if (categoria === "outrasFotosRc") return payload?.outrasFotosRc.length ?? 0;
     if (categoria === "outrasFotosEqCliente") return payload?.outrasFotosEqCliente.length ?? 0;
@@ -753,12 +774,16 @@ export function RelatorioDetalhe({
     if (categoria === "eqEstacaoDgo") return payload?.eqEstacaoDgo.length ?? 0;
     if (categoria === "eqEstacaoEquipamento") return payload?.eqEstacaoEquipamento.length ?? 0;
     const grupo = payload?.[categoria as RelatorioFotoGrupoKey];
-    return grupo && "fotos" in grupo ? grupo.fotos.length : 0;
+    if (grupo && looksLikeFotoGrupoPorAmbiente(grupo)) {
+      if (ambiente) return grupo[ambiente].fotos.length;
+      return grupo.aereo.fotos.length + grupo.subterraneo.fotos.length;
+    }
+    return grupo && "fotos" in grupo ? (grupo as FotoGrupoPayload).fotos.length : 0;
   };
-  const blocoProps = (categoria: RelatorioFotoCategoria) => ({
+  const blocoProps = (categoria: RelatorioFotoCategoria, ambiente?: AmbienteRede) => ({
     canEdit: canEditPhotos,
-    onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file),
-    uploadKey: `${row.id}-${categoria}-${blocoCount(categoria)}`,
+    onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file, ambiente),
+    uploadKey: `${row.id}-${categoria}-${ambiente ?? "all"}-${blocoCount(categoria, ambiente)}`,
     uploading: uploadingCategoria === categoria,
   });
 
@@ -766,13 +791,49 @@ export function RelatorioDetalhe({
     onUpdatePayload?.(next);
   };
 
-  const patchQtdCaixas = (lado: "redeAcesso" | "redeCliente", qtdCaixasEmenda: number | null) => {
+  const patchLancamentoCabos = (
+    dualKey: "lancamentoCabosRe" | "lancamentoCabosRc",
+    ambiente: AmbienteRede,
+    mutator: LancamentoPorAmbientePayload[AmbienteRede] extends infer B
+      ? (bloco: B) => B
+      : never,
+  ) => {
     if (!payload) return;
+    const dual = payload[dualKey];
+    const nextDual = { ...dual, [ambiente]: mutator(dual[ambiente]) };
+    if (dualKey === "lancamentoCabosRe") {
+      patchPayload({
+        ...payload,
+        lancamentoCabosRe: nextDual,
+        lancamentoRe: simDerivadoLancamento(nextDual),
+        lancamentoReAmbiente: ambiente,
+        metragensCabo: nextDual.aereo.metragens,
+      });
+      return;
+    }
+    patchPayload({
+      ...payload,
+      lancamentoCabosRc: nextDual,
+      lancamentoRc: simDerivadoLancamento(nextDual),
+      lancamentoRcAmbiente: ambiente,
+      metragensCaboRc: nextDual.aereo.metragens,
+    });
+  };
+
+  const patchQtdCaixas = (
+    lado: "redeAcesso" | "redeCliente",
+    ambiente: AmbienteRede,
+    qtd: number | null,
+  ) => {
+    if (!payload) return;
+    const current = payload[lado] ?? emptyQuantidadesRede();
+    const por = { ...current.qtdCaixasEmendaPorAmbiente, [ambiente]: qtd };
     const next: RelatorioPayload = {
       ...payload,
       [lado]: {
-        ...(payload[lado] ?? emptyQuantidadesRede()),
-        qtdCaixasEmenda,
+        ...current,
+        qtdCaixasEmendaPorAmbiente: por,
+        qtdCaixasEmenda: (por.aereo || 0) + (por.subterraneo || 0) || null,
       },
     };
     const janela = janelaPotenciaDerivada(next.redeAcesso, next.redeCliente);
@@ -801,11 +862,6 @@ export function RelatorioDetalhe({
     });
   };
 
-  const patchAmbienteGrupo = (key: RelatorioFotoGrupoKey, ambiente: AmbienteRede) => {
-    if (!payload) return;
-    patchPayload({ ...payload, [key]: { ...payload[key], ambiente } });
-  };
-
   const adicionarOutra = (
     categoria: "outrasFotos" | "outrasFotosRc" | "outrasFotosEqCliente" | "outrasFotosEqEstacao",
   ) => {
@@ -816,29 +872,43 @@ export function RelatorioDetalhe({
     });
   };
 
+  const abaGrupoDe = (key: RelatorioFotoGrupoKey): AmbienteRede =>
+    abasGrupos[key] === "subterraneo" ? "subterraneo" : "aereo";
+
   const renderGrupo = (title: string, key: RelatorioFotoGrupoKey, comAmbiente = false) => {
-    const grupo = payload?.[key];
+    const dualKey = comAmbiente && isFotoGrupoPorAmbienteKey(key);
+    const aba = abaGrupoDe(key);
+    const raw = payload?.[key];
+    const grupo: FotoGrupoPayload | undefined = dualKey
+      ? looksLikeFotoGrupoPorAmbiente(raw)
+        ? raw[aba]
+        : undefined
+      : (raw as FotoGrupoPayload | undefined);
     const redeCliente = payload?.redeCliente ?? emptyQuantidadesRede();
     const redeAcesso = payload?.redeAcesso ?? emptyQuantidadesRede();
     const qtd =
       payload && (isEmpresarial || isImplantacao) && key === "caixaEmenda"
         ? {
-            quantidade: redeAcesso.qtdCaixasEmenda ?? null,
+            quantidade: redeAcesso.qtdCaixasEmendaPorAmbiente[aba] ?? null,
             quantidadeLabel: "Quantidade de Caixas de Emenda",
             quantidadePlaceholder: "Ex: 4",
             onQuantidadeChange: canEditPhotos
-              ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeAcesso", qtdCaixasEmenda)
+              ? (qtdCaixasEmenda: number | null) =>
+                  patchQtdCaixas("redeAcesso", aba, qtdCaixasEmenda)
               : undefined,
           }
         : payload && isEmpresarial && key === "rcCaixaEmenda"
           ? {
-              quantidade: redeCliente.qtdCaixasEmenda ?? null,
+              quantidade: redeCliente.qtdCaixasEmendaPorAmbiente[aba] ?? null,
               quantidadeLabel: "Quantidade de Caixas de Emenda",
               quantidadePlaceholder: "Ex: 1",
               onQuantidadeChange: canEditPhotos
-                ? (qtdCaixasEmenda: number | null) => patchQtdCaixas("redeCliente", qtdCaixasEmenda)
+                ? (qtdCaixasEmenda: number | null) =>
+                    patchQtdCaixas("redeCliente", aba, qtdCaixasEmenda)
                 : undefined,
-              coordenadas: redeCliente.caixaEmendaAcomodacao?.coordenadas ?? emptyCoordenadas(),
+              coordenadas:
+                redeCliente.caixaEmendaAcomodacaoPorAmbiente[aba]?.coordenadas ??
+                emptyCoordenadas(),
               coordenadasTitle: "Coordenadas da Caixa de Emenda",
               onCoordenadasChange: canEditPhotos
                 ? (coordenadas: { latitude: string; longitude: string }) => {
@@ -847,16 +917,32 @@ export function RelatorioDetalhe({
                       ...payload,
                       redeCliente: {
                         ...redeCliente,
-                        caixaEmendaAcomodacao: { coordenadas },
+                        caixaEmendaAcomodacaoPorAmbiente: {
+                          ...redeCliente.caixaEmendaAcomodacaoPorAmbiente,
+                          [aba]: { coordenadas },
+                        },
+                        caixaEmendaAcomodacao:
+                          aba === "aereo" ? { coordenadas } : redeCliente.caixaEmendaAcomodacao,
                       },
                     });
                   }
                 : undefined,
             }
           : {};
+    const patchSlice = (nextSlice: FotoGrupoPayload) => {
+      if (!payload) return;
+      if (dualKey && looksLikeFotoGrupoPorAmbiente(raw)) {
+        patchPayload({
+          ...payload,
+          [key]: { ...raw, [aba]: nextSlice },
+        });
+        return;
+      }
+      patchPayload({ ...payload, [key]: nextSlice });
+    };
     const bloco = (
       <EvidenciaBloco
-        key={key}
+        key={`${key}-${aba}`}
         title={title}
         obs={grupo?.obs}
         fotos={grupo?.fotos ?? []}
@@ -864,38 +950,37 @@ export function RelatorioDetalhe({
         onObsChange={
           canEditPhotos
             ? (obs) => {
-                if (!payload) return;
-                patchPayload({ ...payload, [key]: { ...payload[key], obs } });
+                if (!grupo) return;
+                patchSlice({ ...grupo, obs });
               }
             : undefined
         }
         onRemovePhoto={
           canEditPhotos
             ? (index) => {
-                if (!payload) return;
-                const old = payload[key].fotos[index];
-                patchPayload({ ...payload, [key]: removeFotoGrupoAt(payload[key], index) });
+                if (!grupo) return;
+                const old = grupo.fotos[index];
+                patchSlice(removeFotoGrupoAt(grupo, index));
                 void deleteRelatorioPhoto(old?.path);
               }
             : undefined
         }
         onReplacePhoto={
           canEditPhotos && onReplacePhoto
-            ? (index, file) => onReplacePhoto(key, file, { index })
+            ? (index, file) =>
+                onReplacePhoto(key, file, { index, ambiente: dualKey ? aba : undefined })
             : undefined
         }
-        {...blocoProps(key)}
+        {...blocoProps(key, dualKey ? aba : undefined)}
       />
     );
     if (!comAmbiente) return bloco;
     return (
       <div key={`${key}-ambiente`} className="space-y-3">
         <AmbienteToggle
-          value={grupo?.ambiente ?? null}
-          onChange={
-            canEditPhotos ? (ambiente) => patchAmbienteGrupo(key, ambiente) : undefined
-          }
-          disabled={!canEditPhotos}
+          value={aba}
+          onChange={(ambiente) => setAbasGrupos((prev) => ({ ...prev, [key]: ambiente }))}
+          disabled={false}
         />
         {bloco}
       </div>
@@ -905,14 +990,16 @@ export function RelatorioDetalhe({
   const renderCabo = (
     cabo: CaboMetragemPayload,
     index: number,
-    categoria: "metragensCabo" | "metragensCaboRc",
+    dualKey: "lancamentoCabosRe" | "lancamentoCabosRc",
+    ambiente: AmbienteRede,
     titulo: string,
   ) => {
+    const categoria = dualKey === "lancamentoCabosRe" ? "metragensCabo" : "metragensCaboRc";
     const patchCaboCampos = (patch: Partial<CaboMetragemPayload>) => {
       if (!payload || !canEditPhotos) return;
-      patchPayload({
-        ...payload,
-        [categoria]: payload[categoria].map((item) => {
+      patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+        ...lado,
+        metragens: lado.metragens.map((item) => {
           if (item.id !== cabo.id) return item;
           const next = { ...item, ...patch };
           if ("marcacaoInicial" in patch || "marcacaoFinal" in patch) {
@@ -923,7 +1010,7 @@ export function RelatorioDetalhe({
           }
           return next;
         }),
-      });
+      }));
     };
 
     return (
@@ -990,53 +1077,51 @@ export function RelatorioDetalhe({
           onObsChange={
             canEditPhotos
               ? (obs) => {
-                  if (!payload) return;
-                  patchPayload({
-                    ...payload,
-                    [categoria]: payload[categoria].map((item) =>
+                  patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+                    ...lado,
+                    metragens: lado.metragens.map((item) =>
                       item.id === cabo.id ? { ...item, obs } : item,
                     ),
-                  });
+                  }));
                 }
               : undefined
           }
           onRemove={
             canEditPhotos && index >= 1
               ? () => {
-                  if (!payload) return;
-                  patchPayload({
-                    ...payload,
-                    [categoria]: removeExtraById(payload[categoria], cabo.id),
-                  });
+                  patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+                    ...lado,
+                    metragens: removeExtraById(lado.metragens, cabo.id),
+                  }));
                 }
               : undefined
           }
           onRemoveCaboCampo={
             canEditPhotos
               ? (campo) => {
-                  if (!payload) return;
                   const old = cabo[campo];
-                  patchPayload({
-                    ...payload,
-                    [categoria]: payload[categoria].map((item) =>
+                  patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+                    ...lado,
+                    metragens: lado.metragens.map((item) =>
                       item.id === cabo.id ? { ...item, [campo]: null } : item,
                     ),
-                  });
+                  }));
                   void deleteRelatorioPhoto(old?.path);
                 }
               : undefined
           }
           onReplaceCaboCampo={
             canEditPhotos && onReplacePhoto
-              ? (campo, file) => onReplacePhoto(categoria, file, { caboId: cabo.id, campo })
+              ? (campo, file) =>
+                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo, ambiente })
               : undefined
           }
-          {...blocoProps(categoria)}
+          {...blocoProps(categoria, ambiente)}
           onAdd={
             canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
               ? (file) => {
                   const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
-                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo });
+                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo, ambiente });
                 }
               : undefined
           }
@@ -1220,33 +1305,28 @@ export function RelatorioDetalhe({
         <div className="space-y-6">
           <LancamentoCabosControle
             label="Lançamento cabos (RE)"
-            value={payload?.lancamentoRe}
+            value={lancamentoCabosRe[abaLancamentoRe].isSim}
             disabled={!canEditPhotos}
             onChange={(next) => {
-              if (!payload) return;
-              patchPayload({
-                ...payload,
-                lancamentoRe: next,
-                metragensCabo:
-                  next && payload.metragensCabo.length === 0
-                    ? [emptyCaboMetragem()]
-                    : payload.metragensCabo,
-              });
+              patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
+                ...lado,
+                isSim: next,
+                metragens:
+                  next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+              }));
             }}
           />
           <AmbienteToggle
-            value={payload?.lancamentoReAmbiente ?? null}
-            onChange={
-              canEditPhotos
-                ? (lancamentoReAmbiente) => {
-                    if (!payload) return;
-                    patchPayload({ ...payload, lancamentoReAmbiente });
-                  }
-                : undefined
-            }
-            disabled={!canEditPhotos}
+            value={abaLancamentoRe}
+            onChange={(ambiente) => {
+              setAbaLancamentoRe(ambiente);
+              if (!payload) return;
+              patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
+            }}
+            disabled={false}
           />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {abaLancamentoRe !== "subterraneo" ? (
               <CordoalhaSimNaoCard
                 title="Fiberloop instalado?"
                 quantidadeLabel="Quantidade de Fiberloop instalado"
@@ -1273,6 +1353,7 @@ export function RelatorioDetalhe({
                 }
                 disabled={!canEditPhotos}
               />
+              ) : null}
               <CordoalhaSimNaoCard
                 title="Lançado cordoalha?"
                 quantidadeLabel="Quantidade de cordoalha lançada:"
@@ -1317,13 +1398,14 @@ export function RelatorioDetalhe({
               Postes e metragem
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {payload?.lancamentoRe === true ? (
+              {lancamentoCabosRe[abaLancamentoRe].isSim === true ? (
                 <div className="flex h-full flex-col gap-3">
-                  {cabos.map((cabo, index) =>
+                  {lancamentoCabosRe[abaLancamentoRe].metragens.map((cabo, index) =>
                     renderCabo(
                       cabo,
                       index,
-                      "metragensCabo",
+                      "lancamentoCabosRe",
+                      abaLancamentoRe,
                       `Cabo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal) || "—"} m`,
                     ),
                   )}
@@ -1331,11 +1413,10 @@ export function RelatorioDetalhe({
                     <BotaoAdicionar
                       label="Adicionar cabo"
                       onClick={() => {
-                        if (!payload) return;
-                        patchPayload({
-                          ...payload,
-                          metragensCabo: [...payload.metragensCabo, emptyCaboMetragem()],
-                        });
+                        patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
+                          ...lado,
+                          metragens: [...lado.metragens, emptyCaboMetragem()],
+                        }));
                       }}
                     />
                   ) : null}
@@ -1445,31 +1526,25 @@ export function RelatorioDetalhe({
             <div className="sm:col-span-2 lg:col-span-2">
               <LancamentoCabosControle
                 label="Lançamento cabos (RC)"
-                value={payload?.lancamentoRc}
+                value={lancamentoCabosRc[abaLancamentoRc].isSim}
                 disabled={!canEditPhotos}
                 onChange={(next) => {
-                  if (!payload) return;
-                  patchPayload({
-                    ...payload,
-                    lancamentoRc: next,
-                    metragensCaboRc:
-                      next && payload.metragensCaboRc.length === 0
-                        ? [emptyCaboMetragem()]
-                        : payload.metragensCaboRc,
-                  });
+                  patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
+                    ...lado,
+                    isSim: next,
+                    metragens:
+                      next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+                  }));
                 }}
               />
               <AmbienteToggle
-                value={payload?.lancamentoRcAmbiente ?? null}
-                onChange={
-                  canEditPhotos
-                    ? (lancamentoRcAmbiente) => {
-                        if (!payload) return;
-                        patchPayload({ ...payload, lancamentoRcAmbiente });
-                      }
-                    : undefined
-                }
-                disabled={!canEditPhotos}
+                value={abaLancamentoRc}
+                onChange={(ambiente) => {
+                  setAbaLancamentoRc(ambiente);
+                  if (!payload) return;
+                  patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
+                }}
+                disabled={false}
               />
             </div>
           </div>
@@ -1515,13 +1590,14 @@ export function RelatorioDetalhe({
           </div>
           <section className="space-y-3">
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {payload?.lancamentoRc === true ? (
+              {lancamentoCabosRc[abaLancamentoRc].isSim === true ? (
                 <div className="flex h-full flex-col gap-3">
-                  {cabosRc.map((cabo, index) =>
+                  {lancamentoCabosRc[abaLancamentoRc].metragens.map((cabo, index) =>
                     renderCabo(
                       cabo,
                       index,
-                      "metragensCaboRc",
+                      "lancamentoCabosRc",
+                      abaLancamentoRc,
                       `Cabo RC ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal) || "—"} m`,
                     ),
                   )}
@@ -1529,11 +1605,10 @@ export function RelatorioDetalhe({
                     <BotaoAdicionar
                       label="Adicionar cabo"
                       onClick={() => {
-                        if (!payload) return;
-                        patchPayload({
-                          ...payload,
-                          metragensCaboRc: [...payload.metragensCaboRc, emptyCaboMetragem()],
-                        });
+                        patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
+                          ...lado,
+                          metragens: [...lado.metragens, emptyCaboMetragem()],
+                        }));
                       }}
                     />
                   ) : null}

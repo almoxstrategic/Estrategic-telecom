@@ -27,9 +27,12 @@ import {
   subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   withRetry,
+  looksLikeFotoGrupoPorAmbiente,
+  simDerivadoLancamento,
   type RelatorioFotoCategoria,
   type RelatorioPayload,
   type RelatorioTransmissao,
+  type AmbienteRede,
 } from "@/lib/relatorios-transmissao";
 import type { EvidencePhotoRef } from "@/lib/types";
 
@@ -168,12 +171,18 @@ function AdminLancamentoDetalhePage() {
   const onAdminAddPhoto = async (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
+    ambiente?: AmbienteRede,
   ) => {
     if (!row || !user?.id) return;
     setUploadingCategoria(categoria);
     try {
       const stored = await uploadRelatorioPhoto(user.id, file.file, `admin-${categoria}`);
-      const nextPayload = appendStoredPhotoToPayload(row.payload, categoria, stored);
+      const nextPayload = appendStoredPhotoToPayload(
+        row.payload,
+        categoria,
+        stored,
+        ambiente ?? "aereo",
+      );
       applyingRemoteRef.current = true;
       const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
       lastAppliedUpdatedAtRef.current = saved.updated_at;
@@ -197,6 +206,7 @@ function AdminLancamentoDetalhePage() {
       outraId?: string;
       itemId?: string;
       campoItem?: "foto" | "etiqueta";
+      ambiente?: AmbienteRede;
     },
   ) => {
     if (!row || !user?.id) return;
@@ -207,14 +217,34 @@ function AdminLancamentoDetalhePage() {
       let nextPayload: RelatorioPayload = atual;
       let oldPath: string | undefined;
       if (categoria === "metragensCabo" || categoria === "metragensCaboRc") {
+        const dualKey = categoria === "metragensCabo" ? "lancamentoCabosRe" : "lancamentoCabosRc";
+        const ambiente = meta.ambiente ?? "aereo";
+        const dual = atual[dualKey];
+        const nextMetragens = dual[ambiente].metragens.map((item) => {
+          if (item.id !== meta.caboId) return item;
+          if (meta.campo === "fotoInicio") oldPath = item.fotoInicio?.path;
+          if (meta.campo === "fotoFim") oldPath = item.fotoFim?.path;
+          return meta.campo ? { ...item, [meta.campo]: stored } : item;
+        });
+        const nextDual = {
+          ...dual,
+          [ambiente]: { ...dual[ambiente], metragens: nextMetragens },
+        };
         nextPayload = {
           ...atual,
-          [categoria]: atual[categoria].map((item) => {
-            if (item.id !== meta.caboId) return item;
-            if (meta.campo === "fotoInicio") oldPath = item.fotoInicio?.path;
-            if (meta.campo === "fotoFim") oldPath = item.fotoFim?.path;
-            return meta.campo ? { ...item, [meta.campo]: stored } : item;
-          }),
+          [dualKey]: nextDual,
+          lancamentoRe:
+            dualKey === "lancamentoCabosRe"
+              ? simDerivadoLancamento(nextDual)
+              : atual.lancamentoRe,
+          lancamentoRc:
+            dualKey === "lancamentoCabosRc"
+              ? simDerivadoLancamento(nextDual)
+              : atual.lancamentoRc,
+          metragensCabo:
+            dualKey === "lancamentoCabosRe" ? nextDual.aereo.metragens : atual.metragensCabo,
+          metragensCaboRc:
+            dualKey === "lancamentoCabosRc" ? nextDual.aereo.metragens : atual.metragensCaboRc,
         };
       } else if (
         categoria === "outrasFotos" ||
@@ -259,11 +289,24 @@ function AdminLancamentoDetalhePage() {
           | "eqEstacaoDgo"
           | "eqEstacaoEquipamento"
         >];
-        oldPath = grupo.fotos[meta.index]?.path;
-        nextPayload = {
-          ...atual,
-          [categoria]: replaceFotoGrupoAt(grupo, meta.index, stored),
-        };
+        if (looksLikeFotoGrupoPorAmbiente(grupo)) {
+          const ambiente = meta.ambiente ?? "aereo";
+          const lado = grupo[ambiente];
+          oldPath = lado.fotos[meta.index]?.path;
+          nextPayload = {
+            ...atual,
+            [categoria]: {
+              ...grupo,
+              [ambiente]: replaceFotoGrupoAt(lado, meta.index, stored),
+            },
+          };
+        } else {
+          oldPath = grupo.fotos[meta.index]?.path;
+          nextPayload = {
+            ...atual,
+            [categoria]: replaceFotoGrupoAt(grupo, meta.index, stored),
+          };
+        }
       }
       applyingRemoteRef.current = true;
       const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
