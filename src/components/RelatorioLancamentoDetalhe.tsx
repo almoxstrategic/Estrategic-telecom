@@ -503,7 +503,7 @@ function LancamentoCabosControle({
   return (
     <div className="space-y-2">
       <p className="text-sm text-gray-500">{label}</p>
-      <div className="flex max-w-none gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         <ChoiceButton active={value === true} disabled={disabled} onClick={() => onChange(true)}>
           SIM
         </ChoiceButton>
@@ -1303,33 +1303,29 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "RE" ? (
         <div className="space-y-6">
-          <div className="flex w-full flex-row items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <LancamentoCabosControle
-                label="Lançamento cabos (RE)"
-                value={lancamentoCabosRe[abaLancamentoRe].isSim}
-                disabled={!canEditPhotos}
-                onChange={(next) => {
-                  patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
-                    ...lado,
-                    isSim: next,
-                    metragens:
-                      next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
-                  }));
-                }}
-              />
-            </div>
-            <div className="min-w-0 flex-1 pb-0.5">
-              <AmbienteToggle
-                value={abaLancamentoRe}
-                onChange={(ambiente) => {
-                  setAbaLancamentoRe(ambiente);
-                  if (!payload) return;
-                  patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
-                }}
-                disabled={false}
-              />
-            </div>
+          <div className="flex w-full flex-col gap-3">
+            <LancamentoCabosControle
+              label="Lançamento cabos (RE)"
+              value={lancamentoCabosRe[abaLancamentoRe].isSim}
+              disabled={!canEditPhotos}
+              onChange={(next) => {
+                patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
+                  ...lado,
+                  isSim: next,
+                  metragens:
+                    next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+                }));
+              }}
+            />
+            <AmbienteToggle
+              value={abaLancamentoRe}
+              onChange={(ambiente) => {
+                setAbaLancamentoRe(ambiente);
+                if (!payload) return;
+                patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
+              }}
+              disabled={false}
+            />
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {abaLancamentoRe !== "subterraneo" ? (
@@ -1529,33 +1525,29 @@ export function RelatorioDetalhe({
                 className={inputClass()}
               />
             </div>
-            <div className="flex w-full flex-row items-end gap-2 sm:col-span-2 lg:col-span-2">
-              <div className="min-w-0 flex-1">
-                <LancamentoCabosControle
-                  label="Lançamento cabos (RC)"
-                  value={lancamentoCabosRc[abaLancamentoRc].isSim}
-                  disabled={!canEditPhotos}
-                  onChange={(next) => {
-                    patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
-                      ...lado,
-                      isSim: next,
-                      metragens:
-                        next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
-                    }));
-                  }}
-                />
-              </div>
-              <div className="min-w-0 flex-1 pb-0.5">
-                <AmbienteToggle
-                  value={abaLancamentoRc}
-                  onChange={(ambiente) => {
-                    setAbaLancamentoRc(ambiente);
-                    if (!payload) return;
-                    patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
-                  }}
-                  disabled={false}
-                />
-              </div>
+            <div className="flex w-full flex-col gap-3 sm:col-span-2 lg:col-span-2">
+              <LancamentoCabosControle
+                label="Lançamento cabos (RC)"
+                value={lancamentoCabosRc[abaLancamentoRc].isSim}
+                disabled={!canEditPhotos}
+                onChange={(next) => {
+                  patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
+                    ...lado,
+                    isSim: next,
+                    metragens:
+                      next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+                  }));
+                }}
+              />
+              <AmbienteToggle
+                value={abaLancamentoRc}
+                onChange={(ambiente) => {
+                  setAbaLancamentoRc(ambiente);
+                  if (!payload) return;
+                  patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
+                }}
+                disabled={false}
+              />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

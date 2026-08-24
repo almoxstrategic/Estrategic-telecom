@@ -118,7 +118,7 @@ export function ChoiceButton({
       type="button"
       onClick={bloqueado ? undefined : onClick}
       disabled={bloqueado}
-      className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold leading-tight transition ${
+      className={`w-full min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm font-semibold leading-tight transition ${
         active
           ? `border-primary bg-primary text-primary-foreground ${locked ? "disabled:opacity-100" : ""}`
           : locked
@@ -319,7 +319,11 @@ export function AmbienteToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex w-full gap-1.5" role="radiogroup" aria-label="Ambiente de execução">
+    <div
+      className="grid w-full grid-cols-2 gap-2"
+      role="radiogroup"
+      aria-label="Ambiente de execução"
+    >
       <ChoiceButton
         active={value === "aereo"}
         onClick={() => onChange?.("aereo")}
@@ -481,7 +485,7 @@ export function CordoalhaSimNaoCard({
   return (
     <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-bold">{title}</h2>
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         <ChoiceButton
           active={value.isSim === true}
           onClick={() => onChange?.({ ...value, isSim: true })}
@@ -610,8 +614,8 @@ export function RelatorioRedeAcesso({
         <AccordionBloco title="CABOS">
           <div className="space-y-3 rounded-2xl border border-border bg-background p-5 shadow-sm">
             <h2 className="text-base font-bold">{lancamentoTitle}</h2>
-            <div className="flex w-full flex-row gap-2">
-              <div className="flex min-w-0 flex-1 gap-1.5">
+            <div className="flex w-full flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <ChoiceButton
                   active={lancamentoRe === "sim"}
                   onClick={() => onLancamentoRe("sim")}
@@ -628,13 +632,11 @@ export function RelatorioRedeAcesso({
                 </ChoiceButton>
               </div>
               {onLancamentoAmbienteChange ? (
-                <div className="min-w-0 flex-1">
-                  <AmbienteToggle
-                    value={lancamentoAmbiente}
-                    onChange={onLancamentoAmbienteChange}
-                    disabled={readOnly}
-                  />
-                </div>
+                <AmbienteToggle
+                  value={lancamentoAmbiente}
+                  onChange={onLancamentoAmbienteChange}
+                  disabled={readOnly}
+                />
               ) : null}
             </div>
 
