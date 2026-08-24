@@ -632,16 +632,6 @@ export function collectPdfBlocksEscopo(
       pushPara(meta, String(p.redeAcesso.cordoalhaLancada.quantidade), "Qtd. cordoalha lancada (RE)");
     }
     pushPara(meta, simNao(p?.redeAcesso?.cordoalhaExistente?.isSim), "Cordoalha existente (RE)");
-    if (
-      p?.redeAcesso?.cordoalhaExistente?.isSim &&
-      p.redeAcesso.cordoalhaExistente.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeAcesso.cordoalhaExistente.quantidade),
-        "Qtd. cordoalha existente (RE)",
-      );
-    }
     pushPara(meta, simNao(p?.redeAcesso?.postesNovaCordoalha?.isSim), "Postes novo com nova cordoalha (RE)");
     if (
       p?.redeAcesso?.postesNovaCordoalha?.isSim &&
@@ -736,16 +726,6 @@ export function collectPdfBlocksEscopo(
       );
     }
     pushPara(meta, simNao(p?.redeCliente?.cordoalhaExistente?.isSim), "Cordoalha existente (RC)");
-    if (
-      p?.redeCliente?.cordoalhaExistente?.isSim &&
-      p.redeCliente.cordoalhaExistente.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeCliente.cordoalhaExistente.quantidade),
-        "Qtd. cordoalha existente (RC)",
-      );
-    }
     pushPara(meta, simNao(p?.redeCliente?.postesNovaCordoalha?.isSim), "Postes novo com nova cordoalha (RC)");
     if (
       p?.redeCliente?.postesNovaCordoalha?.isSim &&

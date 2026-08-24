@@ -983,7 +983,10 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
     qtdFiberloopInstalado,
     fiberloopInstalado,
     cordoalhaLancada: parseCordoalhaBloco(src.cordoalhaLancada),
-    cordoalhaExistente: parseCordoalhaBloco(src.cordoalhaExistente),
+    cordoalhaExistente: {
+      isSim: parseCordoalhaBloco(src.cordoalhaExistente).isSim,
+      quantidade: null,
+    },
     postesNovaCordoalha: parseCordoalhaBloco(src.postesNovaCordoalha),
     postesCordoalhaExistente: parseCordoalhaBloco(src.postesCordoalhaExistente),
     aterramento: {
@@ -1893,10 +1896,13 @@ function mergeQuantidadesRede(
       fromServer.cordoalhaLancada,
       fromLocal.cordoalhaLancada,
     ),
-    cordoalhaExistente: mergeCordoalhaBloco(
-      fromServer.cordoalhaExistente,
-      fromLocal.cordoalhaExistente,
-    ),
+    cordoalhaExistente: {
+      isSim: mergeCordoalhaBloco(
+        fromServer.cordoalhaExistente,
+        fromLocal.cordoalhaExistente,
+      ).isSim,
+      quantidade: null,
+    },
     postesNovaCordoalha: mergeCordoalhaBloco(
       fromServer.postesNovaCordoalha,
       fromLocal.postesNovaCordoalha,

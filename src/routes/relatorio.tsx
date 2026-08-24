@@ -271,7 +271,7 @@ function RelatorioPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
-  const cabosRef = useRef<HTMLElement | null>(null);
+  const topBlockRef = useRef<HTMLDivElement | null>(null);
   const [lancamentoCabosRe, setLancamentoCabosRe] = useState<LancamentoPorAmbientePayload>(() =>
     emptyLancamentoPorAmbiente(),
   );
@@ -683,7 +683,10 @@ function RelatorioPage() {
           ? p.redeAcesso.fiberloopInstalado.quantidade
           : null,
       cordoalhaLancada: p.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco(),
-      cordoalhaExistente: p.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco(),
+      cordoalhaExistente: {
+        isSim: (p.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()).isSim,
+        quantidade: null,
+      },
       postesNovaCordoalha: p.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
       postesCordoalhaExistente: p.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
       aterramento: { totalHastes: null },
@@ -737,7 +740,10 @@ function RelatorioPage() {
           ? p.redeCliente.fiberloopInstalado.quantidade
           : null,
       cordoalhaLancada: p.redeCliente?.cordoalhaLancada ?? emptyCordoalhaBloco(),
-      cordoalhaExistente: p.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco(),
+      cordoalhaExistente: {
+        isSim: (p.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco()).isSim,
+        quantidade: null,
+      },
       postesNovaCordoalha: p.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
       postesCordoalhaExistente: p.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
       aterramento: { totalHastes: null },
@@ -825,7 +831,7 @@ function RelatorioPage() {
   }, [tipo]);
 
   useEffect(() => {
-    if (abaCampo === "contatos" || abaCampo === "medicoes") {
+    if (abaCampo === "contatos" || abaCampo === "medicoes" || abaCampo === "infraestrutura") {
       setAbaCampo("RE");
     }
   }, [abaCampo]);
@@ -1311,19 +1317,12 @@ function RelatorioPage() {
 
         <header className="mb-6 flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black tracking-tight">Relatório {osWf}</h1>
+            <h1 className="text-2xl font-black tracking-tight">Relatórios</h1>
             {tecnicosAtribuidos.length > 1 ? (
               <Badge className="mt-2 bg-sky-600 text-white hover:bg-sky-600">
                 OS Colaborativa — {nomesOutros.length ? nomesOutros.join(", ") : "equipe"}
               </Badge>
             ) : null}
-            <p className="mt-2 text-sm text-muted-foreground">
-              {readOnly
-                ? "Somente visualização — este relatório já foi avisado ou fechado."
-                : status === "pendente"
-                  ? "Corrija os pontos indicados e avise novamente a conclusão."
-                  : "Rascunho vivo — salvamento automático. O admin já enxerga este contrato."}
-            </p>
           </div>
           <span className="shrink-0">
             {readOnly
@@ -1369,7 +1368,10 @@ function RelatorioPage() {
           }}
           className="space-y-5"
         >
-          <div className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4 shadow-sm">
+          <div
+            ref={topBlockRef}
+            className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4 shadow-sm"
+          >
             <h2 className="text-base font-bold">Dados da obra</h2>
             <div className="space-y-2">
               <DadoObraCampo label="OS/WF" value={osWf} />
@@ -1413,13 +1415,12 @@ function RelatorioPage() {
                 abaAtiva={abaCampo}
                 onChange={setAbaCampo}
                 abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
-                compactTriggerRef={cabosRef}
+                topBlockRef={topBlockRef}
               />
 
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
-                  cabosRef={cabosRef}
                   lancamentoRe={simNaoDe(lancamentoCabosRe[lancamentoReAmbiente].isSim)}
                   onLancamentoRe={(value) =>
                     patchLancamentoSim(setLancamentoCabosRe, lancamentoReAmbiente, value)
@@ -1434,7 +1435,13 @@ function RelatorioPage() {
                   }
                   cordoalhaExistente={redeAcesso.cordoalhaExistente}
                   onCordoalhaExistenteChange={(cordoalhaExistente) =>
-                    setRedeAcesso((prev) => ({ ...prev, cordoalhaExistente }))
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      cordoalhaExistente: {
+                        isSim: cordoalhaExistente.isSim,
+                        quantidade: null,
+                      },
+                    }))
                   }
                   postesNovaCordoalha={redeAcesso.postesNovaCordoalha}
                   onPostesNovaCordoalhaChange={(postesNovaCordoalha) =>
@@ -1565,7 +1572,6 @@ function RelatorioPage() {
               ) : mostrarRedeCliente ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
-                  cabosRef={cabosRef}
                   header={
                     <div className="space-y-3">
                       <CampoCoordenadas
@@ -1614,7 +1620,13 @@ function RelatorioPage() {
                   }
                   cordoalhaExistente={redeCliente.cordoalhaExistente}
                   onCordoalhaExistenteChange={(cordoalhaExistente) =>
-                    setRedeCliente((prev) => ({ ...prev, cordoalhaExistente }))
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      cordoalhaExistente: {
+                        isSim: cordoalhaExistente.isSim,
+                        quantidade: null,
+                      },
+                    }))
                   }
                   postesNovaCordoalha={redeCliente.postesNovaCordoalha}
                   onPostesNovaCordoalhaChange={(postesNovaCordoalha) =>

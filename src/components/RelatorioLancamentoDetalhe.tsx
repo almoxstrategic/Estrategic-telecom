@@ -1377,8 +1377,7 @@ export function RelatorioDetalhe({
             />
             <CordoalhaSimNaoCard
               title="Cordoalha existente?"
-              quantidadeLabel="Quantidade de cordoalha existente:"
-              quantidadePlaceholder="Ex: 120"
+              hideQuantidade
               value={payload?.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
@@ -1387,7 +1386,13 @@ export function RelatorioDetalhe({
                       const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
                       patchPayload({
                         ...payload,
-                        redeAcesso: { ...redeAcesso, cordoalhaExistente },
+                        redeAcesso: {
+                          ...redeAcesso,
+                          cordoalhaExistente: {
+                            isSim: cordoalhaExistente.isSim,
+                            quantidade: null,
+                          },
+                        },
                       });
                     }
                   : undefined
@@ -1572,8 +1577,7 @@ export function RelatorioDetalhe({
             />
             <CordoalhaSimNaoCard
               title="Cordoalha existente?"
-              quantidadeLabel="Quantidade de cordoalha existente:"
-              quantidadePlaceholder="Ex: 120"
+              hideQuantidade
               value={payload?.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
@@ -1582,7 +1586,13 @@ export function RelatorioDetalhe({
                       const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
                       patchPayload({
                         ...payload,
-                        redeCliente: { ...redeCliente, cordoalhaExistente },
+                        redeCliente: {
+                          ...redeCliente,
+                          cordoalhaExistente: {
+                            isSim: cordoalhaExistente.isSim,
+                            quantidade: null,
+                          },
+                        },
                       });
                     }
                   : undefined

@@ -39,9 +39,9 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "contatos", label: "Contatos" },
 ];
 
-/** App de campo (técnico): sem Contatos nem Medições (abas só no painel do gestor). */
+/** App de campo (técnico): sem Contatos, Medições nem Infraestrutura (abas só no painel do gestor). */
 export const ABAS_CAMPO_TECNICO: { id: AbaCampo; label: string }[] = ABAS_CAMPO.filter(
-  (aba) => aba.id !== "contatos" && aba.id !== "medicoes",
+  (aba) => aba.id !== "contatos" && aba.id !== "medicoes" && aba.id !== "infraestrutura",
 );
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
@@ -177,8 +177,8 @@ export function TipoExecucaoPicker({
   );
 }
 
-/** Header sticky (~64px) + faixa das abas — ponto em que CABOS “toca” o menu. */
-const ABAS_COMPACT_THRESHOLD_PX = 150;
+/** Header sticky (~64px) — colapsa quando o fim de "Dados da obra" passa por aqui. */
+const ABAS_COMPACT_THRESHOLD_PX = 100;
 
 export type SecaoPesquisavel = {
   titulo: string;
@@ -255,14 +255,14 @@ export function RelatorioAbasCampo({
   abaAtiva,
   onChange,
   abas = ABAS_CAMPO,
-  compactTriggerRef,
+  topBlockRef,
   secoesPesquisaveis,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
   abas?: { id: AbaCampo; label: string }[];
-  /** Quando o topo deste elemento chega perto do menu sticky, as abas colapsam. */
-  compactTriggerRef?: RefObject<HTMLElement | null>;
+  /** Bloco superior (ex.: Dados da obra) — colapsa as abas quando o bottom dele passa do header. */
+  topBlockRef?: RefObject<HTMLElement | null>;
   /** Sobrescreve o índice padrão de seções da aba ativa. */
   secoesPesquisaveis?: SecaoPesquisavel[];
 }) {
@@ -300,10 +300,10 @@ export function RelatorioAbasCampo({
 
   useEffect(() => {
     const onScroll = () => {
-      const trigger = compactTriggerRef?.current;
+      const trigger = topBlockRef?.current;
       if (trigger) {
-        const cabosPosition = trigger.getBoundingClientRect().top;
-        setIsScrolled(cabosPosition <= ABAS_COMPACT_THRESHOLD_PX);
+        const topBlockBottom = trigger.getBoundingClientRect().bottom;
+        setIsScrolled(topBlockBottom <= ABAS_COMPACT_THRESHOLD_PX);
         return;
       }
       setIsScrolled(window.scrollY > 50);
@@ -315,7 +315,7 @@ export function RelatorioAbasCampo({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [compactTriggerRef, abaAtiva]);
+  }, [topBlockRef, abaAtiva]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
@@ -699,13 +699,16 @@ export function CordoalhaSimNaoCard({
   value,
   onChange,
   disabled = false,
+  hideQuantidade = false,
 }: {
   title: string;
-  quantidadeLabel: string;
-  quantidadePlaceholder: string;
+  quantidadeLabel?: string;
+  quantidadePlaceholder?: string;
   value: { isSim: boolean | null; quantidade: number | null };
   onChange?: (next: { isSim: boolean | null; quantidade: number | null }) => void;
   disabled?: boolean;
+  /** Só SIM/NÃO — sem campo numérico (ex.: Cordoalha existente). */
+  hideQuantidade?: boolean;
 }) {
   const sim = value.isSim === true;
   return (
@@ -714,7 +717,13 @@ export function CordoalhaSimNaoCard({
       <div className="grid grid-cols-2 gap-2">
         <ChoiceButton
           active={value.isSim === true}
-          onClick={() => onChange?.({ ...value, isSim: true })}
+          onClick={() =>
+            onChange?.(
+              hideQuantidade
+                ? { isSim: true, quantidade: null }
+                : { ...value, isSim: true },
+            )
+          }
           disabled={disabled || !onChange}
         >
           SIM
@@ -727,10 +736,10 @@ export function CordoalhaSimNaoCard({
           NÃO
         </ChoiceButton>
       </div>
-      {sim ? (
+      {!hideQuantidade && sim && quantidadeLabel ? (
         <CampoQuantidade
           label={quantidadeLabel}
-          placeholder={quantidadePlaceholder}
+          placeholder={quantidadePlaceholder ?? "Ex: 0"}
           value={value.quantidade}
           onChange={(quantidade) => onChange?.({ ...value, isSim: true, quantidade })}
           disabled={disabled || !onChange}
@@ -769,7 +778,6 @@ export function RelatorioRedeAcesso({
   onOutrasChange,
   onOutraPhoto,
   showObsAdmin = false,
-  cabosRef,
 }: {
   readOnly: boolean;
   header?: ReactNode;
@@ -823,8 +831,6 @@ export function RelatorioRedeAcesso({
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   showObsAdmin?: boolean;
-  /** Âncora para o menu de abas colapsar ao alcançar o bloco CABOS. */
-  cabosRef?: RefObject<HTMLElement | null>;
 }) {
   void showObsAdmin;
   const mostrarMetragem = lancamentoRe === "sim";
@@ -840,7 +846,7 @@ export function RelatorioRedeAcesso({
       <div className="space-y-5">
         {header}
 
-        <AccordionBloco title="CABOS" id="secao-cabos" rootRef={cabosRef}>
+        <AccordionBloco title="CABOS" id="secao-cabos">
           <div className="space-y-3 rounded-2xl border border-border bg-background p-5 shadow-sm">
             <h2 className="text-base font-bold">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">
@@ -1094,8 +1100,7 @@ export function RelatorioRedeAcesso({
                       />
                       <CordoalhaSimNaoCard
                         title="Cordoalha existente?"
-                        quantidadeLabel="Quantidade de cordoalha existente:"
-                        quantidadePlaceholder="Ex: 120"
+                        hideQuantidade
                         value={cordoalhaExistente!}
                         onChange={onCordoalhaExistenteChange}
                         disabled={readOnly}
