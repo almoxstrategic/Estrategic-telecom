@@ -1,5 +1,5 @@
-import { useId, type ReactNode } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -177,38 +177,82 @@ export function TipoExecucaoPicker({
   );
 }
 
+/** Header sticky (~64px) + faixa das abas — ponto em que CABOS “toca” o menu. */
+const ABAS_COMPACT_THRESHOLD_PX = 150;
+
 export function RelatorioAbasCampo({
   abaAtiva,
   onChange,
   abas = ABAS_CAMPO,
+  compactTriggerRef,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
   abas?: { id: AbaCampo; label: string }[];
+  /** Quando o topo deste elemento chega perto do menu sticky, as abas colapsam. */
+  compactTriggerRef?: RefObject<HTMLElement | null>;
 }) {
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const trigger = compactTriggerRef?.current;
+      if (trigger) {
+        const cabosPosition = trigger.getBoundingClientRect().top;
+        setIsScrolled(cabosPosition <= ABAS_COMPACT_THRESHOLD_PX);
+        return;
+      }
+      setIsScrolled(window.scrollY > 50);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [compactTriggerRef, abaAtiva]);
+
   return (
-    <nav
-      className="flex flex-wrap justify-center gap-2"
-      aria-label="Seções do relatório"
-    >
-      {abas.map((aba) => {
-        const ativa = abaAtiva === aba.id;
-        return (
-          <button
-            key={aba.id}
-            type="button"
-            onClick={() => onChange(aba.id)}
-            className={`w-auto rounded-full border px-3 py-1.5 text-center text-xs font-semibold md:text-sm transition ${
-              ativa
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {aba.label}
-          </button>
-        );
-      })}
-    </nav>
+    <>
+      <nav
+        className={`sticky top-16 z-40 bg-background py-2 shadow-sm transition-all duration-300 ${
+          isScrolled
+            ? "flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            : "flex flex-wrap justify-center gap-2"
+        }`}
+        aria-label="Seções do relatório"
+      >
+        {abas.map((aba) => {
+          const ativa = abaAtiva === aba.id;
+          return (
+            <button
+              key={aba.id}
+              type="button"
+              onClick={() => onChange(aba.id)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:text-sm ${
+                ativa
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {aba.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {isScrolled ? (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-24 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 text-white shadow-lg transition-all hover:bg-gray-700"
+          aria-label="Voltar ao topo"
+        >
+          <ChevronUp className="h-5 w-5" />
+        </button>
+      ) : null}
+    </>
   );
 }
 
@@ -345,12 +389,17 @@ export function AmbienteToggle({
 function AccordionBloco({
   title,
   children,
+  rootRef,
 }: {
   title: string;
   children: ReactNode;
+  rootRef?: RefObject<HTMLElement | null>;
 }) {
   return (
-    <details className="group rounded-2xl border border-border bg-card shadow-sm open:shadow-md">
+    <details
+      ref={rootRef as RefObject<HTMLDetailsElement | null> | undefined}
+      className="group rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+    >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-base font-bold [&::-webkit-details-marker]:hidden">
         <span>{title}</span>
         <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition group-open:rotate-180" />
@@ -543,6 +592,7 @@ export function RelatorioRedeAcesso({
   onOutrasChange,
   onOutraPhoto,
   showObsAdmin = false,
+  cabosRef,
 }: {
   readOnly: boolean;
   header?: ReactNode;
@@ -596,6 +646,8 @@ export function RelatorioRedeAcesso({
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   showObsAdmin?: boolean;
+  /** Âncora para o menu de abas colapsar ao alcançar o bloco CABOS. */
+  cabosRef?: RefObject<HTMLElement | null>;
 }) {
   void showObsAdmin;
   const mostrarMetragem = lancamentoRe === "sim";
@@ -611,7 +663,7 @@ export function RelatorioRedeAcesso({
       <div className="space-y-5">
         {header}
 
-        <AccordionBloco title="CABOS">
+        <AccordionBloco title="CABOS" rootRef={cabosRef}>
           <div className="space-y-3 rounded-2xl border border-border bg-background p-5 shadow-sm">
             <h2 className="text-base font-bold">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">

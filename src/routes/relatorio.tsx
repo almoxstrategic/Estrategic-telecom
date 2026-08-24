@@ -272,6 +272,7 @@ function RelatorioPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
+  const cabosRef = useRef<HTMLElement | null>(null);
   const [lancamentoCabosRe, setLancamentoCabosRe] = useState<LancamentoPorAmbientePayload>(() =>
     emptyLancamentoPorAmbiente(),
   );
@@ -1409,11 +1410,13 @@ function RelatorioPage() {
                 abaAtiva={abaCampo}
                 onChange={setAbaCampo}
                 abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
+                compactTriggerRef={cabosRef}
               />
 
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
+                  cabosRef={cabosRef}
                   lancamentoRe={simNaoDe(lancamentoCabosRe[lancamentoReAmbiente].isSim)}
                   onLancamentoRe={(value) =>
                     patchLancamentoSim(setLancamentoCabosRe, lancamentoReAmbiente, value)
@@ -1559,6 +1562,7 @@ function RelatorioPage() {
               ) : mostrarRedeCliente ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
+                  cabosRef={cabosRef}
                   header={
                     <div className="space-y-3">
                       <CampoCoordenadas
