@@ -1301,7 +1301,7 @@ function RelatorioPage() {
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">
+      <main className="mx-auto max-w-2xl px-5 pb-28 pt-4">
         <Link
           to="/relatorio"
           className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -2018,9 +2018,9 @@ function RelatorioPage() {
       </main>
 
       {readOnly ? null : (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-5 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 pt-1.5 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
           <div className="mx-auto max-w-2xl">
-            <div className="mb-2 flex justify-end">
+            <div className="mb-1 flex justify-end">
               <RelatorioSyncStatus
                 status={
                   saveHint === "saving"
@@ -2037,9 +2037,9 @@ function RelatorioPage() {
               type="button"
               onClick={() => void onAvisar()}
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-4 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             >
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4" />
               {submitting ? "Avisando..." : "Avisar conclusão de relatório"}
             </button>
           </div>
