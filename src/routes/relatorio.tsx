@@ -1406,6 +1406,7 @@ function RelatorioPage() {
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
+                  redeVariant="RE"
                   stickTabsAtViewportTop={headerRolaComPagina}
                   lancamentoRe={simNaoDe(lancamentoCabosRe[lancamentoReAmbiente].isSim)}
                   onLancamentoRe={(value) =>
@@ -1564,6 +1565,7 @@ function RelatorioPage() {
               ) : mostrarRedeCliente ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
+                  redeVariant="RC"
                   stickTabsAtViewportTop={headerRolaComPagina}
                   header={
                     <div className="space-y-3">

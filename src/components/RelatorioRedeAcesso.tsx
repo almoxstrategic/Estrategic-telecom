@@ -1,5 +1,15 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Menu,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -259,42 +269,112 @@ export type SecaoPesquisavel = {
   id: string;
 };
 
+export type IndiceMenuBloco = {
+  titulo: string;
+  subitens: SecaoPesquisavel[];
+};
+
+/** Árvore de navegação do menu lateral (RE / RC). */
+export const INDICE_MENU_POR_ABA: Partial<Record<"RE" | "RC", IndiceMenuBloco[]>> = {
+  RE: [
+    {
+      titulo: "LANÇAMENTO (RE)",
+      subitens: [
+        { titulo: "Lançamento de cabos", id: "secao-cabos" },
+        { titulo: "Sobra técnica / Fiberloop", id: "secao-sobraTecnica" },
+        { titulo: "Const. de duto subterrâneo", id: "secao-dutoSubterraneo" },
+      ],
+    },
+    {
+      titulo: "POSTE (RE)",
+      subitens: [
+        { titulo: "Poste de conexão", id: "secao-posteConexao" },
+        { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
+      ],
+    },
+    {
+      titulo: "CAIXA DE EMENDA (RE)",
+      subitens: [
+        { titulo: "Caixa de emenda", id: "secao-caixaEmenda" },
+        { titulo: "Plaqueta de Identificação", id: "secao-plaquetaIdentificacao" },
+      ],
+    },
+    {
+      titulo: "OUTRAS FOTOS (RE)",
+      subitens: [{ titulo: "Outras fotos", id: "secao-outras-fotos" }],
+    },
+  ],
+  RC: [
+    {
+      titulo: "LANÇAMENTO (RC)",
+      subitens: [
+        { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
+        { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
+        { titulo: "Lançamento de cabos", id: "secao-cabos" },
+        { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
+        { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
+      ],
+    },
+    {
+      titulo: "POSTE (RC)",
+      subitens: [
+        { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
+        { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
+      ],
+    },
+    {
+      titulo: "CAIXA DE EMENDA (RC)",
+      subitens: [
+        { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
+        { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
+        { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
+        { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
+        { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
+      ],
+    },
+    {
+      titulo: "OUTRAS FOTOS (RC)",
+      subitens: [{ titulo: "Outras fotos", id: "secao-outras-fotos" }],
+    },
+  ],
+};
+
 /** Índice de navegação rápida por aba (âncoras no próprio formulário). */
 export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisavel[]>> = {
   RE: [
-    { titulo: "LANÇAMENTO", id: "secao-cabos" },
+    { titulo: "LANÇAMENTO (RE)", id: "secao-cabos" },
     { titulo: "Cabo e Lançamento", id: "secao-cabos" },
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
     { titulo: "Sobra técnica / Fiberloop", id: "secao-sobraTecnica" },
-    { titulo: "Poste", id: "secao-poste" },
+    { titulo: "POSTE (RE)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-posteConexao" },
     { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
-    { titulo: "Caixa de Emenda", id: "secao-caixa-emenda" },
+    { titulo: "CAIXA DE EMENDA (RE)", id: "secao-caixa-emenda" },
     { titulo: "Caixa de emenda (fotos)", id: "secao-caixaEmenda" },
     { titulo: "Const. de duto subterrâneo", id: "secao-dutoSubterraneo" },
     { titulo: "Plaqueta de Identificação", id: "secao-plaquetaIdentificacao" },
-    { titulo: "Outras fotos", id: "secao-outras-fotos" },
+    { titulo: "OUTRAS FOTOS (RE)", id: "secao-outras-fotos" },
   ],
   RC: [
-    { titulo: "LANÇAMENTO", id: "secao-cabos" },
+    { titulo: "LANÇAMENTO (RC)", id: "secao-cabos" },
     { titulo: "Cabo e Lançamento", id: "secao-cabos" },
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
     { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
     { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
     { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
-    { titulo: "Poste", id: "secao-poste" },
+    { titulo: "POSTE (RC)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
     { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
-    { titulo: "Caixa de Emenda", id: "secao-caixa-emenda" },
+    { titulo: "CAIXA DE EMENDA (RC)", id: "secao-caixa-emenda" },
     { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
     { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
     { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
     { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
     { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
     { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
-    { titulo: "Outras fotos", id: "secao-outras-fotos" },
+    { titulo: "OUTRAS FOTOS (RC)", id: "secao-outras-fotos" },
   ],
   equipamento: [
     { titulo: "Equipamentos no Cliente", id: "secao-eq-cliente" },
@@ -329,6 +409,67 @@ export function navegarParaSecaoFormulario(targetId: string) {
   return true;
 }
 
+function RelatorioIndiceLateral({
+  open,
+  onClose,
+  blocos,
+  onNavigate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  blocos: IndiceMenuBloco[];
+  onNavigate: (targetId: string) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[60] bg-black/50"
+        onClick={onClose}
+        aria-label="Fechar menu de índice"
+      />
+      <aside
+        className="fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[75vw] flex-col bg-white shadow-xl animate-in slide-in-from-left duration-300"
+        aria-label="Índice do formulário"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-base font-semibold text-foreground">Índice</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-4 py-3">
+          {blocos.map((bloco) => (
+            <div key={bloco.titulo} className="mb-4 last:mb-0">
+              <p className="text-sm font-bold text-foreground">{bloco.titulo}</p>
+              <ul className="mt-1.5 space-y-0.5">
+                {bloco.subitens.map((item) => (
+                  <li key={`${item.id}-${item.titulo}`}>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(item.id)}
+                      className="w-full rounded-md py-1.5 pl-3 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    >
+                      {item.titulo}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </aside>
+    </>
+  );
+}
+
 export function RelatorioAbasCampo({
   abaAtiva,
   onChange,
@@ -347,11 +488,14 @@ export function RelatorioAbasCampo({
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const abaInicialRef = useRef(true);
   const buscaWrapRef = useRef<HTMLDivElement | null>(null);
   const abasScrollRef = useRef<HTMLNavElement | null>(null);
 
   const secoes = secoesPesquisaveis ?? SECOES_PESQUISAVEIS_POR_ABA[abaAtiva] ?? [];
+  const indiceMenu =
+    abaAtiva === "RE" || abaAtiva === "RC" ? (INDICE_MENU_POR_ABA[abaAtiva] ?? []) : [];
   const resultados = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
     if (!termo) return [];
@@ -371,6 +515,7 @@ export function RelatorioAbasCampo({
     }
     setSearchTerm("");
     setIsDropdownOpen(false);
+    setIsSideMenuOpen(false);
     const timer = window.setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 50);
@@ -402,6 +547,11 @@ export function RelatorioAbasCampo({
     navegarParaSecaoFormulario(targetId);
     setSearchTerm("");
     setIsDropdownOpen(false);
+  };
+
+  const handleIndiceNavigate = (targetId: string) => {
+    setIsSideMenuOpen(false);
+    navegarParaSecaoFormulario(targetId);
   };
 
   const scrollAbas = (direction: "left" | "right") => {
@@ -463,22 +613,34 @@ export function RelatorioAbasCampo({
         </div>
 
         {secoes.length > 0 ? (
-          <div ref={buscaWrapRef} className="relative mt-2 block w-full">
-            <div className="relative w-full">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setIsDropdownOpen(true);
-                }}
-                onFocus={() => setIsDropdownOpen(true)}
-                placeholder="Buscar seção (ex: Caixa de Emenda)"
-                className="box-border w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                aria-label="Busca rápida de seções do formulário"
-                autoComplete="off"
-              />
+          <div ref={buscaWrapRef} className="relative mt-2 w-full">
+            <div className="flex items-center gap-2">
+              {indiceMenu.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSideMenuOpen(true)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-foreground transition hover:bg-muted"
+                  aria-label="Abrir índice de seções"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+              ) : null}
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setIsDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                  placeholder="Buscar seção (ex: Caixa de Emenda)"
+                  className="box-border w-full flex-1 rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  aria-label="Busca rápida de seções do formulário"
+                  autoComplete="off"
+                />
+              </div>
             </div>
             {isDropdownOpen && searchTerm.trim() ? (
               <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-white shadow-lg">
@@ -502,6 +664,13 @@ export function RelatorioAbasCampo({
           </div>
         ) : null}
       </div>
+
+      <RelatorioIndiceLateral
+        open={isSideMenuOpen}
+        onClose={() => setIsSideMenuOpen(false)}
+        blocos={indiceMenu}
+        onNavigate={handleIndiceNavigate}
+      />
 
       {showBackToTop ? (
         <button
@@ -889,6 +1058,7 @@ export function CordoalhaSimNaoCard({
 export function RelatorioRedeAcesso({
   readOnly,
   header,
+  redeVariant = "RE",
   lancamentoTitle = "Lançamento cabos (RE)?",
   lancamentoRe,
   onLancamentoRe,
@@ -919,6 +1089,8 @@ export function RelatorioRedeAcesso({
 }: {
   readOnly: boolean;
   header?: ReactNode;
+  /** Sufixo dos blocos expansíveis: LANÇAMENTO (RE), POSTE (RC), etc. */
+  redeVariant?: "RE" | "RC";
   lancamentoTitle?: string;
   lancamentoRe: "sim" | "nao" | "";
   onLancamentoRe: (value: "sim" | "nao") => void;
@@ -993,7 +1165,7 @@ export function RelatorioRedeAcesso({
         {header}
 
         <AccordionBloco
-          title="LANÇAMENTO"
+          title={`LANÇAMENTO (${redeVariant})`}
           id="secao-cabos"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
         >
@@ -1234,7 +1406,7 @@ export function RelatorioRedeAcesso({
         </AccordionBloco>
 
         <AccordionBloco
-          title="POSTE"
+          title={`POSTE (${redeVariant})`}
           id="secao-poste"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
         >
@@ -1292,7 +1464,7 @@ export function RelatorioRedeAcesso({
         </AccordionBloco>
 
         <AccordionBloco
-          title="CAIXA DE EMENDA"
+          title={`CAIXA DE EMENDA (${redeVariant})`}
           id="secao-caixa-emenda"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
         >
@@ -1300,7 +1472,7 @@ export function RelatorioRedeAcesso({
         </AccordionBloco>
 
         <AccordionBloco
-          title="OUTRAS FOTOS"
+          title={`OUTRAS FOTOS (${redeVariant})`}
           id="secao-outras-fotos"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
         >
