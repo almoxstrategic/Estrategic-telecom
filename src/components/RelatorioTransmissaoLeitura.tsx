@@ -1,6 +1,5 @@
 import { ExpandableImage } from "@/components/ExpandableImage";
 import {
-  getEscopo,
   type RelatorioTransmissao,
   type StoredPhoto,
 } from "@/lib/relatorios-transmissao";
@@ -62,8 +61,7 @@ function Secao({
 }
 
 export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao }) {
-  // TODO(escopos): exibir aéreo e subterrâneo separadamente quando a UI de escopos existir.
-  const payload = row.payload ? getEscopo(row.payload, "aereo") : undefined;
+  const payload = row.payload;
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">

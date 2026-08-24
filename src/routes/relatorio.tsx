@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import {
-  AbaConfiguracao,
-  AbaContatos,
   AbaInfraestrutura,
   AbaMedicoes,
 } from "@/components/RelatorioAbasPlaceholder";
@@ -18,18 +16,14 @@ import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePote
 import { RelatorioSyncStatus } from "@/components/RelatorioSyncStatus";
 import {
   RelatorioAbasCampo,
-  RelatorioAbasFilha,
-  RelatorioAbasPai,
-  abaPaiToEscopo,
   inputClass,
   RelatorioRedeAcesso,
   TipoExecucaoPicker,
+  ABAS_CAMPO_TECNICO,
   ABAS_CAMPO_IMPLANTACAO,
   emptyOutraFoto,
   CampoCoordenadas,
   type AbaCampo,
-  type AbaFilha,
-  type AbaPai,
   type OutraFotoState,
 } from "@/components/RelatorioRedeAcesso";
 import { useApp } from "@/lib/app-store";
@@ -44,15 +38,13 @@ import {
   emptyCordoalhaBloco,
   emptyDgoClienteItem,
   emptyEquipamentoClienteItem,
-  emptyConfiguracao,
+  emptyEquipamentoConexoes,
   emptyContatos,
   emptyInfraestrutura,
   emptyMedicaoTomada,
   emptyMedicoes,
-  emptyEscopoPayload,
   emptyQuantidadesRede,
   emptyRelatorioPayload,
-  getEscopo,
   emptyTesteOptico,
   emptyTestePotencia,
   deleteRelatorioPhoto,
@@ -68,12 +60,11 @@ import {
   subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   type CaboMetragemPayload,
-  type ConfiguracaoPayload,
   type ContatosPayload,
   type DgoClienteItemPayload,
   type EquipamentoClienteItemPayload,
+  type EquipamentoConexoesPayload,
   type EscopoPayload,
-  type EscopoRelatorioKey,
   type InfraestruturaPayload,
   type MedicoesPayload,
   type RelatorioFotoGrupoKey,
@@ -212,14 +203,6 @@ function eqGruposFromPayload(
   return next;
 }
 
-function comEscopo(
-  payload: RelatorioPayload,
-  key: EscopoRelatorioKey,
-  escopo: EscopoPayload,
-): RelatorioPayload {
-  return key === "aereo" ? { ...payload, aereo: escopo } : { ...payload, subterraneo: escopo };
-}
-
 function RelatorioPage() {
   const { user } = useApp();
   const { id: reportIdFromUrl } = Route.useSearch();
@@ -239,8 +222,6 @@ function RelatorioPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
-  const [abaPai, setAbaPai] = useState<AbaPai>("Aereo");
-  const [abaFilha, setAbaFilha] = useState<AbaFilha>("RE");
   const [lancamentoRe, setLancamentoRe] = useState<"sim" | "nao" | "">("");
   const [cabos, setCabos] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
   const [poste, setPoste] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -309,7 +290,9 @@ function RelatorioPage() {
   const [testePotenciaImplantacao, setTestePotenciaImplantacao] = useState<TestePotenciaPayload>(
     () => emptyTestePotencia(),
   );
-  const [configuracao, setConfiguracao] = useState<ConfiguracaoPayload>(() => emptyConfiguracao());
+  const [eqConexoes, setEqConexoes] = useState<EquipamentoConexoesPayload>(() =>
+    emptyEquipamentoConexoes(),
+  );
   const [infraestrutura, setInfraestrutura] = useState<InfraestruturaPayload>(() =>
     emptyInfraestrutura(),
   );
@@ -323,14 +306,9 @@ function RelatorioPage() {
   const lastSavedUpdatedAtRef = useRef<string | null>(null);
   const persistingRef = useRef(false);
   const enableAutosaveTimerRef = useRef<number | null>(null);
-  /** Escopo que a UI está editando agora (Aéreo/Subterrâneo). */
-  const escopoAtivoKeyRef = useRef<EscopoRelatorioKey>("aereo");
-  /** Conteúdo do escopo inativo, preservado enquanto o outro é editado. */
-  const escopoArquivadoRef = useRef<EscopoPayload>(emptyEscopoPayload());
 
   const buildEscopoFromUi = useCallback((): EscopoPayload => {
     return {
-      ...emptyEscopoPayload(),
       lancamentoRe: lancamentoRe === "sim" ? true : lancamentoRe === "nao" ? false : null,
       metragensCabo: cabos,
       posteConexao: grupoPayload(poste, posteObs, obsAdminGrupos.posteConexao),
@@ -430,7 +408,7 @@ function RelatorioPage() {
       testePotenciaImplantacao,
       testePotencia1550: janelaPotenciaDerivada(redeAcesso, redeCliente),
       testePotencia1330: janelaPotenciaDerivada(redeAcesso, redeCliente),
-      configuracao,
+      equipamento: eqConexoes,
       infraestrutura,
     };
   }, [
@@ -488,7 +466,7 @@ function RelatorioPage() {
     testeOptico,
     testePotenciaEmpresarial,
     testePotenciaImplantacao,
-    configuracao,
+    eqConexoes,
     infraestrutura,
   ]);
 
@@ -496,26 +474,12 @@ function RelatorioPage() {
     if (tipo !== "empresarial" && tipo !== "implantacao") {
       return emptyRelatorioPayload();
     }
-    const ativo = escopoAtivoKeyRef.current;
-    const atual = buildEscopoFromUi();
-    const arquivado = escopoArquivadoRef.current ?? emptyEscopoPayload();
     return {
-      aereo: ativo === "aereo" ? atual : arquivado,
-      subterraneo: ativo === "subterraneo" ? atual : arquivado,
+      ...buildEscopoFromUi(),
       medicoes,
       contatos,
     };
   }, [tipo, buildEscopoFromUi, medicoes, contatos]);
-
-  /** Payload completo com um patch aplicado apenas ao escopo ativo. */
-  const payloadComEscopo = useCallback(
-    (mapear: (escopo: EscopoPayload) => EscopoPayload): RelatorioPayload => {
-      const key = escopoAtivoKeyRef.current;
-      const base = buildPayload();
-      return comEscopo(base, key, mapear(getEscopo(base, key)));
-    },
-    [buildPayload],
-  );
 
   const persistDraft = useCallback(
     async (payloadOverride?: RelatorioPayload) => {
@@ -628,17 +592,16 @@ function RelatorioPage() {
       testeOptico,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
-      configuracao,
+      eqConexoes,
       infraestrutura,
       medicoes,
       contatos,
-      abaPai,
     ],
     1500,
     step === 2 && Boolean(currentReportId) && (status === "em_aberto" || status === "pendente"),
   );
 
-  /** Carrega um escopo (aéreo ou subterrâneo) nos campos do formulário. */
+  /** Carrega os campos de campo do payload no formulário. */
   const applyEscopoToUi = (p: EscopoPayload) => {
     setLancamentoRe(p.lancamentoRe === true ? "sim" : p.lancamentoRe === false ? "nao" : "");
     setCabos(p.metragensCabo.length > 0 ? p.metragensCabo : [emptyCaboMetragem()]);
@@ -739,7 +702,7 @@ function RelatorioPage() {
     setTesteOptico(p.testeOptico ?? emptyTesteOptico());
     setTestePotenciaEmpresarial(p.testePotenciaEmpresarial ?? emptyTestePotencia());
     setTestePotenciaImplantacao(p.testePotenciaImplantacao ?? emptyTestePotencia());
-    setConfiguracao(p.configuracao ?? emptyConfiguracao());
+    setEqConexoes(p.equipamento ?? emptyEquipamentoConexoes());
     setInfraestrutura(
       p.infraestrutura?.tomadas?.length
         ? p.infraestrutura
@@ -747,33 +710,10 @@ function RelatorioPage() {
     );
   };
 
-  /**
-   * Troca de aba pai: arquiva o escopo em edição e carrega o outro, para que
-   * Aéreo e Subterrâneo sejam preenchidos de forma independente.
-   */
-  const onChangeAbaPai = (proxima: AbaPai) => {
-    const proximoEscopo = abaPaiToEscopo(proxima);
-    const escopoAtual = escopoAtivoKeyRef.current;
-    if (proximoEscopo && proximoEscopo !== escopoAtual) {
-      const emEdicao = buildEscopoFromUi();
-      const aCarregar = escopoArquivadoRef.current ?? emptyEscopoPayload();
-      escopoArquivadoRef.current = emEdicao;
-      escopoAtivoKeyRef.current = proximoEscopo;
-      applyEscopoToUi(aCarregar);
-    }
-    setAbaPai(proxima);
-  };
-
   const applyRelatorio = (row: RelatorioTransmissao, opts?: { fromRemote?: boolean }) => {
     canAutosaveRef.current = false;
     lastAppliedUpdatedAtRef.current = row.updated_at;
-    const raiz = row.payload ?? emptyRelatorioPayload();
-    const ativo = escopoAtivoKeyRef.current;
-    escopoArquivadoRef.current = getEscopo(
-      raiz,
-      ativo === "aereo" ? "subterraneo" : "aereo",
-    );
-    const p = getEscopo(raiz, ativo);
+    const p = row.payload ?? emptyRelatorioPayload();
     setCurrentReportId(row.id);
     setOsWf(row.os_wf);
     setTecnicosAtribuidos(
@@ -795,7 +735,7 @@ function RelatorioPage() {
     setTipo(row.tipo_execucao ?? "");
     applyEscopoToUi(p);
     setMedicoes(emptyMedicoes());
-    setContatos(raiz.contatos ?? emptyContatos());
+    setContatos(p.contatos ?? emptyContatos());
     setStep(2);
     if (row.status === "em_aberto" || row.status === "pendente") {
       if (enableAutosaveTimerRef.current) window.clearTimeout(enableAutosaveTimerRef.current);
@@ -819,6 +759,11 @@ function RelatorioPage() {
     if (tipo !== "implantacao") return;
     setAbaCampo((atual) => (atual === "RE" || atual === "teste-otdr" ? atual : "RE"));
   }, [tipo]);
+
+  useEffect(() => {
+    if (abaCampo !== "contatos") return;
+    setAbaCampo("RE");
+  }, [abaCampo]);
 
   useEffect(() => {
     if (!reportIdFromUrl || !user?.id) {
@@ -898,12 +843,11 @@ function RelatorioPage() {
         );
         return nextSlots;
       });
-      void persistDraft(
-        payloadComEscopo((escopo) => ({
-          ...escopo,
-          [grupoKey]: { ...escopo[grupoKey], fotos: fotosDosSlots(nextSlots) },
-        })),
-      );
+      const base = buildPayload();
+      void persistDraft({
+        ...base,
+        [grupoKey]: { ...base[grupoKey], fotos: fotosDosSlots(nextSlots) },
+      });
       return;
     }
     void uploadFotoImediato(file, `${grupoKey}-${slotId.slice(0, 8)}`, (stored) => {
@@ -914,10 +858,11 @@ function RelatorioPage() {
         );
         return nextSlots;
       });
-      return payloadComEscopo((escopo) => ({
-        ...escopo,
-        [grupoKey]: { ...escopo[grupoKey], fotos: fotosDosSlots(nextSlots) },
-      }));
+      const base = buildPayload();
+      return {
+        ...base,
+        [grupoKey]: { ...base[grupoKey], fotos: fotosDosSlots(nextSlots) },
+      };
     });
   };
 
@@ -934,9 +879,7 @@ function RelatorioPage() {
         nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: null } : item));
         return nextCabos;
       });
-      void persistDraft(
-        payloadComEscopo((escopo) => ({ ...escopo, [payloadKey]: nextCabos })),
-      );
+      void persistDraft({ ...buildPayload(), [payloadKey]: nextCabos });
       return;
     }
     void uploadFotoImediato(file, `${payloadKey}-${campo}-${caboId.slice(0, 8)}`, (stored) => {
@@ -945,7 +888,7 @@ function RelatorioPage() {
         nextCabos = prev.map((item) => (item.id === caboId ? { ...item, [campo]: stored } : item));
         return nextCabos;
       });
-      return payloadComEscopo((escopo) => ({ ...escopo, [payloadKey]: nextCabos }));
+      return { ...buildPayload(), [payloadKey]: nextCabos };
     });
   };
 
@@ -963,9 +906,7 @@ function RelatorioPage() {
         );
         return next;
       });
-      void persistDraft(
-        payloadComEscopo((escopo) => ({ ...escopo, [payloadKey]: outrasParaPayload(next) })),
-      );
+      void persistDraft({ ...buildPayload(), [payloadKey]: outrasParaPayload(next) });
       return;
     }
     void uploadFotoImediato(file, `${payloadKey}-${itemId.slice(0, 8)}`, (stored) => {
@@ -974,10 +915,7 @@ function RelatorioPage() {
         next = prev.map((row) => (row.id === itemId ? { ...row, file: null, stored } : row));
         return next;
       });
-      return payloadComEscopo((escopo) => ({
-        ...escopo,
-        [payloadKey]: outrasParaPayload(next),
-      }));
+      return { ...buildPayload(), [payloadKey]: outrasParaPayload(next) };
     });
   };
 
@@ -1001,7 +939,7 @@ function RelatorioPage() {
         });
         return next as typeof prev;
       });
-      void persistDraft(payloadComEscopo((escopo) => ({ ...escopo, [payloadKey]: next })));
+      void persistDraft({ ...buildPayload(), [payloadKey]: next });
       return;
     }
     void uploadFotoImediato(file, `${payloadKey}-${campo}-${itemId.slice(0, 8)}`, (stored) => {
@@ -1010,7 +948,7 @@ function RelatorioPage() {
         next = prev.map((item) => (item.id === itemId ? { ...item, [campo]: stored } : item));
         return next as typeof prev;
       });
-      return payloadComEscopo((escopo) => ({ ...escopo, [payloadKey]: next }));
+      return { ...buildPayload(), [payloadKey]: next };
     });
   };
 
@@ -1117,23 +1055,14 @@ function RelatorioPage() {
 
   const readOnly = status === "avisado" || status === "fechado";
   const mostrarFormularioCampo = tipo === "empresarial" || tipo === "implantacao";
-  /** Empresarial: tier 1 escolhe o escopo; Implantação segue com nível único. */
-  const emEscopo =
-    tipo === "implantacao" || abaPai === "Aereo" || abaPai === "Subterraneo";
-  const abaSecao: AbaCampo | AbaFilha | null =
-    tipo === "implantacao" ? abaCampo : emEscopo ? abaFilha : null;
-  const mostrarRedeAcesso = mostrarFormularioCampo && emEscopo && abaSecao === "RE";
-  const mostrarRedeCliente = tipo === "empresarial" && emEscopo && abaSecao === "RC";
-  const mostrarEquipamento = tipo === "empresarial" && emEscopo && abaSecao === "equipamento";
-  const mostrarTesteOptico = tipo === "empresarial" && emEscopo && abaSecao === "teste-optico";
-  const mostrarTesteOtdr = mostrarFormularioCampo && emEscopo && abaSecao === "teste-otdr";
-  const mostrarTestePotencia =
-    tipo === "empresarial" && emEscopo && abaSecao === "teste-potencia";
-  const mostrarConfiguracao = tipo === "empresarial" && emEscopo && abaSecao === "configuracao";
-  const mostrarInfraestrutura =
-    tipo === "empresarial" && emEscopo && abaSecao === "infraestrutura";
-  const mostrarMedicoes = tipo === "empresarial" && abaPai === "Medicoes";
-  const mostrarContatos = tipo === "empresarial" && abaPai === "Contatos";
+  const mostrarRedeAcesso = mostrarFormularioCampo && abaCampo === "RE";
+  const mostrarRedeCliente = tipo === "empresarial" && abaCampo === "RC";
+  const mostrarEquipamento = tipo === "empresarial" && abaCampo === "equipamento";
+  const mostrarTesteOptico = tipo === "empresarial" && abaCampo === "teste-optico";
+  const mostrarTesteOtdr = mostrarFormularioCampo && abaCampo === "teste-otdr";
+  const mostrarTestePotencia = tipo === "empresarial" && abaCampo === "teste-potencia";
+  const mostrarInfraestrutura = tipo === "empresarial" && abaCampo === "infraestrutura";
+  const mostrarMedicoes = tipo === "empresarial" && abaCampo === "medicoes";
   const nomesOutros = tecnicosAtribuidos
     .map((id, index) => (id === user?.id ? "" : tecnicosNomes[index] ?? ""))
     .map((nome) => nome.trim())
@@ -1281,20 +1210,11 @@ function RelatorioPage() {
 
           {mostrarFormularioCampo ? (
             <>
-              {tipo === "empresarial" ? (
-                <div className="space-y-3">
-                  <RelatorioAbasPai abaAtiva={abaPai} onChange={onChangeAbaPai} />
-                  {emEscopo ? (
-                    <RelatorioAbasFilha abaAtiva={abaFilha} onChange={setAbaFilha} />
-                  ) : null}
-                </div>
-              ) : (
-                <RelatorioAbasCampo
-                  abaAtiva={abaCampo}
-                  onChange={setAbaCampo}
-                  abas={ABAS_CAMPO_IMPLANTACAO}
-                />
-              )}
+              <RelatorioAbasCampo
+                abaAtiva={abaCampo}
+                onChange={setAbaCampo}
+                abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
+              />
 
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso
@@ -1762,6 +1682,14 @@ function RelatorioPage() {
                   onGrupoPhoto={(grupoKey, slotId, file) => {
                     handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);
                   }}
+                  configuracaoCliente={eqConexoes.configuracaoCliente}
+                  onConfiguracaoClienteChange={(configuracaoCliente) =>
+                    setEqConexoes((prev) => ({ ...prev, configuracaoCliente }))
+                  }
+                  configuracaoEstacao={eqConexoes.configuracaoEstacao}
+                  onConfiguracaoEstacaoChange={(configuracaoEstacao) =>
+                    setEqConexoes((prev) => ({ ...prev, configuracaoEstacao }))
+                  }
                 />
               ) : mostrarTesteOptico ? (
                 <RelatorioTesteOptico
@@ -1770,9 +1698,7 @@ function RelatorioPage() {
                   onChange={(next, opts) => {
                     setTesteOptico(next);
                     if (opts?.immediate) {
-                      void persistDraft(
-                        payloadComEscopo((escopo) => ({ ...escopo, testeOptico: next })),
-                      );
+                      void persistDraft({ ...buildPayload(), testeOptico: next });
                     }
                   }}
                   onUploadPhoto={async (file) => {
@@ -1789,23 +1715,13 @@ function RelatorioPage() {
                   onChangeEmpresarial={(next, opts) => {
                     setTestePotenciaEmpresarial(next);
                     if (opts?.immediate) {
-                      void persistDraft(
-                        payloadComEscopo((escopo) => ({
-                          ...escopo,
-                          testePotenciaEmpresarial: next,
-                        })),
-                      );
+                      void persistDraft({ ...buildPayload(), testePotenciaEmpresarial: next });
                     }
                   }}
                   onChangeImplantacao={(next, opts) => {
                     setTestePotenciaImplantacao(next);
                     if (opts?.immediate) {
-                      void persistDraft(
-                        payloadComEscopo((escopo) => ({
-                          ...escopo,
-                          testePotenciaImplantacao: next,
-                        })),
-                      );
+                      void persistDraft({ ...buildPayload(), testePotenciaImplantacao: next });
                     }
                   }}
                   onUploadPhoto={async (file) => {
@@ -1824,12 +1740,6 @@ function RelatorioPage() {
                   redeAcesso={redeAcesso ?? emptyQuantidadesRede()}
                   redeCliente={redeCliente ?? emptyQuantidadesRede()}
                 />
-              ) : mostrarConfiguracao ? (
-                <AbaConfiguracao
-                  value={configuracao}
-                  onChange={readOnly ? undefined : setConfiguracao}
-                  readOnly={readOnly}
-                />
               ) : mostrarInfraestrutura ? (
                 <AbaInfraestrutura
                   value={infraestrutura}
@@ -1838,12 +1748,6 @@ function RelatorioPage() {
                 />
               ) : mostrarMedicoes ? (
                 <AbaMedicoes />
-              ) : mostrarContatos ? (
-                <AbaContatos
-                  value={contatos}
-                  onChange={readOnly ? undefined : setContatos}
-                  readOnly={readOnly}
-                />
               ) : null}
             </>
           ) : null}

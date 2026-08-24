@@ -336,21 +336,10 @@ export type QuantidadesRedePayload = {
   };
 };
 
-/** Escopos independentes de execução de um mesmo relatório. */
-export type EscopoRelatorioKey = "aereo" | "subterraneo";
-
-export const ESCOPO_RELATORIO_KEYS: EscopoRelatorioKey[] = ["aereo", "subterraneo"];
-
-export const ESCOPO_RELATORIO_LABELS: Record<EscopoRelatorioKey, string> = {
-  aereo: "Aéreo",
-  subterraneo: "Subterrâneo",
-};
-
-export function isEscopoRelatorioKey(value: unknown): value is EscopoRelatorioKey {
-  return value === "aereo" || value === "subterraneo";
-}
-
-/** Conteúdo de um escopo (RE, RC, equipamentos, testes, configuração, infraestrutura). */
+/**
+ * Campos de campo do relatório (RE/RC/equipamentos/testes/config/infra).
+ * Mantido como alias interno para merge/parse; o JSON persistido é plano em RelatorioPayload.
+ */
 export type EscopoPayload = {
   lancamentoRe: boolean | null;
   metragensCabo: CaboMetragemPayload[];
@@ -398,20 +387,15 @@ export type EscopoPayload = {
   testePotenciaImplantacao: TestePotenciaPayload;
   testePotencia1550: TestePotenciaJanelaPayload;
   testePotencia1330: TestePotenciaJanelaPayload;
-  configuracao: ConfiguracaoPayload;
+  equipamento: EquipamentoConexoesPayload;
   infraestrutura: InfraestruturaPayload;
 };
 
-export type RelatorioPayload = {
-  aereo: EscopoPayload;
-  subterraneo: EscopoPayload;
+/** Payload JSONB plano (raiz). Abas Medições/Contatos ficam na raiz junto com RE/RC/etc. */
+export type RelatorioPayload = EscopoPayload & {
   medicoes: MedicoesPayload;
   contatos: ContatosPayload;
 };
-
-export function getEscopo(payload: RelatorioPayload, key: EscopoRelatorioKey): EscopoPayload {
-  return payload[key] ?? emptyEscopoPayload();
-}
 
 export type EquipamentoRedeIpsPayload = {
   hostName: string;
@@ -420,6 +404,12 @@ export type EquipamentoRedeIpsPayload = {
   ipDmlan: string;
 };
 
+export type EquipamentoConexoesPayload = {
+  configuracaoCliente: EquipamentoRedeIpsPayload;
+  configuracaoEstacao: EquipamentoRedeIpsPayload;
+};
+
+/** @deprecated JSON legado da aba Configuração / Conexões. */
 export type ConfiguracaoPayload = {
   equipamentosCliente: EquipamentoRedeIpsPayload;
   equipamentosEstacao: EquipamentoRedeIpsPayload;
@@ -457,6 +447,13 @@ export type ContatosPayload = {
 
 export function emptyEquipamentoRedeIps(): EquipamentoRedeIpsPayload {
   return { hostName: "", ipEth: "", ipGw: "", ipDmlan: "" };
+}
+
+export function emptyEquipamentoConexoes(): EquipamentoConexoesPayload {
+  return {
+    configuracaoCliente: emptyEquipamentoRedeIps(),
+    configuracaoEstacao: emptyEquipamentoRedeIps(),
+  };
 }
 
 export function emptyConfiguracao(): ConfiguracaoPayload {
@@ -720,15 +717,14 @@ export function emptyEscopoPayload(): EscopoPayload {
     testePotenciaImplantacao: emptyTestePotencia(),
     testePotencia1550: emptyTestePotenciaJanela(),
     testePotencia1330: emptyTestePotenciaJanela(),
-    configuracao: emptyConfiguracao(),
+    equipamento: emptyEquipamentoConexoes(),
     infraestrutura: emptyInfraestrutura(),
   };
 }
 
 export function emptyRelatorioPayload(): RelatorioPayload {
   return {
-    aereo: emptyEscopoPayload(),
-    subterraneo: emptyEscopoPayload(),
+    ...emptyEscopoPayload(),
     medicoes: emptyMedicoes(),
     contatos: emptyContatos(),
   };
@@ -887,11 +883,26 @@ function parseEquipamentoRedeIps(raw: unknown): EquipamentoRedeIpsPayload {
   };
 }
 
+function ipsVazio(ips: EquipamentoRedeIpsPayload): boolean {
+  return !ips.hostName.trim() && !ips.ipEth.trim() && !ips.ipGw.trim() && !ips.ipDmlan.trim();
+}
+
 function parseConfiguracao(raw: unknown): ConfiguracaoPayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<ConfiguracaoPayload>;
   return {
     equipamentosCliente: parseEquipamentoRedeIps(src.equipamentosCliente),
     equipamentosEstacao: parseEquipamentoRedeIps(src.equipamentosEstacao),
+  };
+}
+
+function parseEquipamentoConexoes(raw: unknown, legacyConfiguracao?: unknown): EquipamentoConexoesPayload {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<EquipamentoConexoesPayload>;
+  const legado = parseConfiguracao(legacyConfiguracao);
+  const cliente = parseEquipamentoRedeIps(src.configuracaoCliente);
+  const estacao = parseEquipamentoRedeIps(src.configuracaoEstacao);
+  return {
+    configuracaoCliente: ipsVazio(cliente) ? legado.equipamentosCliente : cliente,
+    configuracaoEstacao: ipsVazio(estacao) ? legado.equipamentosEstacao : estacao,
   };
 }
 
@@ -1246,6 +1257,7 @@ export function parseEscopoPayload(
   const src = raw as Partial<EscopoPayload> & {
     testePotencia?: unknown;
     medicoes?: unknown;
+    configuracao?: unknown;
   };
   return {
     ...base,
@@ -1294,7 +1306,7 @@ export function parseEscopoPayload(
     ...parseTestesPotenciaSeparados(src, tipoExecucao),
     testePotencia1550: parseTestePotenciaJanela(src.testePotencia1550),
     testePotencia1330: parseTestePotenciaJanela(src.testePotencia1330),
-    configuracao: parseConfiguracao(src.configuracao),
+    equipamento: parseEquipamentoConexoes(src.equipamento, src.configuracao),
     infraestrutura: parseInfraestrutura(
       src.infraestrutura,
       legacyTomadasFromMedicoes ?? (src.medicoes as { tomadas?: unknown } | undefined)?.tomadas,
@@ -1302,51 +1314,26 @@ export function parseEscopoPayload(
   };
 }
 
-/** Chaves que só existem no formato plano (pré-escopos) — sinalizam payload legado. */
-const LEGACY_FLAT_KEYS = [
-  "redeAcesso",
-  "lancamentoRe",
-  "posteConexao",
-  "redeCliente",
-  "lancamentoRc",
-  "metragensCabo",
-  "testeOptico",
-  "configuracao",
-  "infraestrutura",
-] as const;
-
-function isLegacyFlatPayload(src: Record<string, unknown>): boolean {
-  return LEGACY_FLAT_KEYS.some((key) => src[key] !== undefined);
-}
-
 function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): RelatorioPayload {
   if (!raw || typeof raw !== "object") return emptyRelatorioPayload();
   const src = raw as Record<string, unknown>;
+  const legacyTomadas = (src.medicoes as { tomadas?: unknown } | undefined)?.tomadas;
 
+  // Retrocompat: JSON aninhado aereo/subterraneo → achata na raiz (aéreo prevalece).
   const temAereo = Boolean(src.aereo && typeof src.aereo === "object");
   const temSubterraneo = Boolean(src.subterraneo && typeof src.subterraneo === "object");
-
   if (temAereo || temSubterraneo) {
+    const aereo = parseEscopoPayload(src.aereo, tipoExecucao, legacyTomadas);
+    const subterraneo = parseEscopoPayload(src.subterraneo, tipoExecucao);
     return {
-      aereo: parseEscopoPayload(src.aereo, tipoExecucao),
-      subterraneo: parseEscopoPayload(src.subterraneo, tipoExecucao),
-      medicoes: parseMedicoes(src.medicoes),
-      contatos: parseContatos(src.contatos),
-    };
-  }
-
-  if (isLegacyFlatPayload(src)) {
-    return {
-      aereo: parseEscopoPayload(src, tipoExecucao, (src.medicoes as { tomadas?: unknown } | undefined)?.tomadas),
-      subterraneo: emptyEscopoPayload(),
+      ...mergeEscopoPayload(subterraneo, aereo),
       medicoes: parseMedicoes(src.medicoes),
       contatos: parseContatos(src.contatos),
     };
   }
 
   return {
-    aereo: emptyEscopoPayload(),
-    subterraneo: emptyEscopoPayload(),
+    ...parseEscopoPayload(src, tipoExecucao, legacyTomadas),
     medicoes: parseMedicoes(src.medicoes),
     contatos: parseContatos(src.contatos),
   };
@@ -1681,18 +1668,18 @@ function mergeEquipamentoRedeIps(
   };
 }
 
-function mergeConfiguracao(
-  server: ConfiguracaoPayload,
-  local: ConfiguracaoPayload,
-): ConfiguracaoPayload {
+function mergeEquipamentoConexoes(
+  server: EquipamentoConexoesPayload,
+  local: EquipamentoConexoesPayload,
+): EquipamentoConexoesPayload {
   return {
-    equipamentosCliente: mergeEquipamentoRedeIps(
-      server.equipamentosCliente,
-      local.equipamentosCliente,
+    configuracaoCliente: mergeEquipamentoRedeIps(
+      server.configuracaoCliente,
+      local.configuracaoCliente,
     ),
-    equipamentosEstacao: mergeEquipamentoRedeIps(
-      server.equipamentosEstacao,
-      local.equipamentosEstacao,
+    configuracaoEstacao: mergeEquipamentoRedeIps(
+      server.configuracaoEstacao,
+      local.configuracaoEstacao,
     ),
   };
 }
@@ -1840,7 +1827,7 @@ export function mergeEscopoPayload(
       fromServer.testePotencia1330,
       fromLocal.testePotencia1330,
     ),
-    configuracao: mergeConfiguracao(fromServer.configuracao, fromLocal.configuracao),
+    equipamento: mergeEquipamentoConexoes(fromServer.equipamento, fromLocal.equipamento),
     infraestrutura: mergeInfraestrutura(
       fromServer.infraestrutura,
       fromLocal.infraestrutura,
@@ -1856,8 +1843,7 @@ export function mergeRelatorioPayload(
   const fromServer = parsePayload(server);
   const fromLocal = parsePayload(local);
   return {
-    aereo: mergeEscopoPayload(fromServer.aereo, fromLocal.aereo),
-    subterraneo: mergeEscopoPayload(fromServer.subterraneo, fromLocal.subterraneo),
+    ...mergeEscopoPayload(fromServer, fromLocal),
     medicoes: mergeMedicoes(fromServer.medicoes, fromLocal.medicoes),
     contatos: mergeContatos(fromServer.contatos, fromLocal.contatos),
   };
@@ -2556,11 +2542,12 @@ export function appendStoredPhotoToPayload(
   payload: RelatorioPayload,
   categoria: RelatorioFotoCategoria,
   stored: StoredPhoto,
-  escopo: EscopoRelatorioKey = "aereo",
 ): RelatorioPayload {
+  const next = appendStoredPhotoToEscopo(payload, categoria, stored);
   return {
-    ...payload,
-    [escopo]: appendStoredPhotoToEscopo(getEscopo(payload, escopo), categoria, stored),
+    ...next,
+    medicoes: payload.medicoes,
+    contatos: payload.contatos,
   };
 }
 

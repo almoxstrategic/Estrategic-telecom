@@ -11,6 +11,7 @@ import {
   type GrupoFotoCampo,
   type OutraFotoState,
 } from "@/components/RelatorioRedeAcesso";
+import { EquipamentosIpsCard } from "@/components/RelatorioAbasPlaceholder";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
@@ -19,6 +20,7 @@ import {
   removeExtraById,
   type DgoClienteItemPayload,
   type EquipamentoClienteItemPayload,
+  type EquipamentoRedeIpsPayload,
   type RelatorioFotoGrupoKey,
   type StoredPhoto,
 } from "@/lib/relatorios-transmissao";
@@ -300,6 +302,10 @@ export function RelatorioEquipamento({
   onOutrasEstacaoChange,
   onOutraEstacaoPhoto,
   onGrupoPhoto,
+  configuracaoCliente,
+  onConfiguracaoClienteChange,
+  configuracaoEstacao,
+  onConfiguracaoEstacaoChange,
 }: {
   readOnly: boolean;
   showObsAdmin?: boolean;
@@ -340,6 +346,10 @@ export function RelatorioEquipamento({
     slotId: string,
     file: EvidencePhotoRef | null,
   ) => void;
+  configuracaoCliente: EquipamentoRedeIpsPayload;
+  onConfiguracaoClienteChange: (next: EquipamentoRedeIpsPayload) => void;
+  configuracaoEstacao: EquipamentoRedeIpsPayload;
+  onConfiguracaoEstacaoChange: (next: EquipamentoRedeIpsPayload) => void;
 }) {
   void showObsAdmin;
 
@@ -509,6 +519,21 @@ export function RelatorioEquipamento({
             />
           </div>
         ) : null}
+
+        <div className="space-y-4">
+          <EquipamentosIpsCard
+            title="Equipamentos Instalados No cliente"
+            value={configuracaoCliente}
+            onChange={onConfiguracaoClienteChange}
+            readOnly={readOnly}
+          />
+          <EquipamentosIpsCard
+            title="Equipamentos Instalados Na estação"
+            value={configuracaoEstacao}
+            onChange={onConfiguracaoEstacaoChange}
+            readOnly={readOnly}
+          />
+        </div>
       </div>
     </EvidencePhotoPasteProvider>
   );

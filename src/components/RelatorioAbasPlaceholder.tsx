@@ -3,7 +3,6 @@ import { Plus } from "lucide-react";
 import { ChoiceButton, inputClass } from "@/components/RelatorioRedeAcesso";
 import {
   emptyMedicaoTomada,
-  type ConfiguracaoPayload,
   type ContatosPayload,
   type EquipamentoRedeIpsPayload,
   type InfraestruturaPayload,
@@ -47,7 +46,7 @@ function TextField({
   );
 }
 
-function EquipamentosIpsCard({
+export function EquipamentosIpsCard({
   title,
   value,
   onChange,
@@ -89,32 +88,6 @@ function EquipamentosIpsCard({
           disabled={readOnly}
         />
       </div>
-    </div>
-  );
-}
-
-export function AbaConfiguracao({
-  value,
-  onChange,
-  readOnly = false,
-}: CommonProps & {
-  value: ConfiguracaoPayload;
-  onChange?: (next: ConfiguracaoPayload) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <EquipamentosIpsCard
-        title="Equipamentos Instalados No cliente"
-        value={value.equipamentosCliente}
-        onChange={(equipamentosCliente) => onChange?.({ ...value, equipamentosCliente })}
-        readOnly={readOnly}
-      />
-      <EquipamentosIpsCard
-        title="Equipamentos Instalados Na estação"
-        value={value.equipamentosEstacao}
-        onChange={(equipamentosEstacao) => onChange?.({ ...value, equipamentosEstacao })}
-        readOnly={readOnly}
-      />
     </div>
   );
 }

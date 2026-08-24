@@ -2,8 +2,6 @@ import { getStoragePublicUrl } from "@/lib/supabase";
 import {
   ATEN_EMENDA,
   ATEN_KM,
-  ESCOPO_RELATORIO_KEYS,
-  ESCOPO_RELATORIO_LABELS,
   PERDA_CONEXAO,
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
@@ -14,9 +12,9 @@ import {
   type CaboMetragemPayload,
   type DgoClienteItemPayload,
   type EquipamentoClienteItemPayload,
-  type EscopoPayload,
   type FotoGrupoPayload,
   type OutraFotoPayload,
+  type RelatorioPayload,
   type RelatorioTransmissao,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
@@ -355,7 +353,7 @@ function appendParJanelasOpticas(
 }
 
 function buildTesteOtdrAtoms(
-  p: EscopoPayload | undefined,
+  p: RelatorioPayload | undefined,
   tipoExecucao: RelatorioTransmissao["tipo_execucao"],
 ): PdfAtomicBlock[] {
   if (!p) return [];
@@ -472,7 +470,7 @@ function buildPotenciaCard(
 
 function collectTestePotenciaTabelas(
   blocks: PdfContentBlock[],
-  p: EscopoPayload | undefined,
+  p: RelatorioPayload | undefined,
   tipoExecucao: RelatorioTransmissao["tipo_execucao"],
 ) {
   // Implantacao nao tem Teste de Potencia — so OTDR (coletado antes).
@@ -585,7 +583,7 @@ export function buildCabecalhoDados(row: RelatorioTransmissao): PdfCabecalhoDado
 
 export function collectPdfBlocksEscopo(
   blocks: PdfContentBlock[],
-  p: EscopoPayload | undefined,
+  p: RelatorioPayload | undefined,
   tipoExecucao: RelatorioTransmissao["tipo_execucao"],
   prefix?: string,
 ): PdfContentBlock[] {
@@ -800,61 +798,8 @@ export function collectPdfBlocksEscopo(
   return blocks;
 }
 
-/** Um escopo entra no PDF apenas se o técnico preencheu algo nele. */
-function escopoTemConteudo(p: EscopoPayload | undefined): boolean {
-  if (!p) return false;
-  if (p.lancamentoRe != null || p.lancamentoRc != null || p.relatorioEstacao) return true;
-  if (p.tecnologiaAcesso?.trim() || p.estacaoEntregaAcesso?.trim()) return true;
-  const listas = [
-    p.metragensCabo,
-    p.metragensCaboRc,
-    p.outrasFotos,
-    p.outrasFotosRc,
-    p.outrasFotosEqCliente,
-    p.outrasFotosEqEstacao,
-  ];
-  if (listas.some((lista) => (lista ?? []).length > 0)) return true;
-  const grupos: (FotoGrupoPayload | undefined)[] = [
-    p.posteConexao,
-    p.caixaEmenda,
-    p.dutoSubterraneo,
-    p.plaquetaIdentificacao,
-    p.novoAterramentoPoste,
-    p.aterramentoTerrometro,
-    p.posicaoConexaoEstacao,
-    p.etiquetaIdentificacao,
-    p.sobraTecnica,
-    p.rcPosteConexao,
-    p.rcCaixaEmenda,
-    p.rcTerminacaoCabo,
-    p.rcPlaquetaIdentificacao,
-    p.rcEntradaInterna,
-    p.rcEntradaExterna,
-    p.rcSobraTecnica,
-    p.eqClienteFachada,
-    p.eqClienteAmbiente,
-    p.eqClienteRack,
-    p.eqClienteEtiqueta,
-    p.eqClienteSgp,
-    p.eqEstacaoGeral,
-    p.eqEstacaoRack,
-    p.eqEstacaoEtiqueta,
-  ];
-  return grupos.some((grupo) => (grupo?.fotos ?? []).length > 0);
-}
-
 export function collectPdfBlocks(row: RelatorioTransmissao): PdfContentBlock[] {
   const blocks: PdfContentBlock[] = [];
-  const payload = row.payload;
-
-  const preenchidos = ESCOPO_RELATORIO_KEYS.filter((key) => escopoTemConteudo(payload?.[key]));
-  const escopos = preenchidos.length ? preenchidos : (["aereo"] as const);
-  const rotular = escopos.length > 1;
-
-  for (const key of escopos) {
-    if (rotular) pushHeading(blocks, ESCOPO_RELATORIO_LABELS[key]);
-    collectPdfBlocksEscopo(blocks, payload?.[key], row.tipo_execucao);
-  }
-
+  collectPdfBlocksEscopo(blocks, row.payload, row.tipo_execucao);
   return coalesceSectionLeads(blocks);
 }

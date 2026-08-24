@@ -22,59 +22,31 @@ export type AbaCampo =
   | "teste-optico"
   | "teste-otdr"
   | "teste-potencia"
-  | "configuracao"
   | "infraestrutura"
   | "medicoes"
   | "contatos";
 
-/** Abas filhas (tier 2) — sem Medições/Contatos (viram abas pai). */
-export type AbaFilha =
-  | "RE"
-  | "RC"
-  | "equipamento"
-  | "teste-optico"
-  | "teste-otdr"
-  | "teste-potencia"
-  | "configuracao"
-  | "infraestrutura";
-
-export type AbaPai = "Aereo" | "Subterraneo" | "Medicoes" | "Contatos";
-
-export const ABAS_PAI: { id: AbaPai; label: string }[] = [
-  { id: "Aereo", label: "Aéreo" },
-  { id: "Subterraneo", label: "Subterrâneo" },
-  { id: "Medicoes", label: "Medições" },
-  { id: "Contatos", label: "Contatos" },
-];
-
-export const ABAS_FILHAS: { id: AbaFilha; label: string }[] = [
+export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "RE", label: "Rede Externa (RE)" },
   { id: "RC", label: "Rede Cliente (RC)" },
   { id: "equipamento", label: "Equipamento" },
   { id: "teste-optico", label: "Teste Óptico" },
   { id: "teste-otdr", label: "Teste OTDR" },
   { id: "teste-potencia", label: "Teste de Potência" },
-  { id: "configuracao", label: "Configuração / Conexões" },
   { id: "infraestrutura", label: "Infraestrutura" },
-];
-
-/** @deprecated Prefer ABAS_FILHAS + ABAS_PAI (Empresarial two-tier). */
-export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
-  ...ABAS_FILHAS,
   { id: "medicoes", label: "Medições" },
   { id: "contatos", label: "Contatos" },
 ];
+
+/** App de campo (técnico): mesma lista empresarial sem Contatos (aba só no painel do gestor). */
+export const ABAS_CAMPO_TECNICO: { id: AbaCampo; label: string }[] = ABAS_CAMPO.filter(
+  (aba) => aba.id !== "contatos",
+);
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
   { id: "RE", label: "Rede Externa (RE)" },
   { id: "teste-otdr", label: "Teste OTDR" },
 ];
-
-export function abaPaiToEscopo(abaPai: AbaPai): "aereo" | "subterraneo" | null {
-  if (abaPai === "Aereo") return "aereo";
-  if (abaPai === "Subterraneo") return "subterraneo";
-  return null;
-}
 
 export type OutraFotoState = {
   id: string;
@@ -217,71 +189,6 @@ export function RelatorioAbasCampo({
     <nav
       className="flex flex-wrap justify-center gap-2"
       aria-label="Seções do relatório"
-    >
-      {abas.map((aba) => {
-        const ativa = abaAtiva === aba.id;
-        return (
-          <button
-            key={aba.id}
-            type="button"
-            onClick={() => onChange(aba.id)}
-            className={`w-auto rounded-full border px-3 py-1.5 text-center text-xs font-semibold md:text-sm transition ${
-              ativa
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {aba.label}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-export function RelatorioAbasPai({
-  abaAtiva,
-  onChange,
-}: {
-  abaAtiva: AbaPai;
-  onChange: (aba: AbaPai) => void;
-}) {
-  return (
-    <nav className="flex flex-wrap justify-center gap-2" aria-label="Escopo do relatório">
-      {ABAS_PAI.map((aba) => {
-        const ativa = abaAtiva === aba.id;
-        return (
-          <button
-            key={aba.id}
-            type="button"
-            onClick={() => onChange(aba.id)}
-            className={`min-w-[7.5rem] rounded-xl border px-4 py-2.5 text-center text-sm font-bold transition ${
-              ativa
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-foreground hover:bg-muted"
-            }`}
-          >
-            {aba.label}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-export function RelatorioAbasFilha({
-  abaAtiva,
-  onChange,
-  abas = ABAS_FILHAS,
-}: {
-  abaAtiva: AbaFilha;
-  onChange: (aba: AbaFilha) => void;
-  abas?: { id: AbaFilha; label: string }[];
-}) {
-  return (
-    <nav
-      className="flex flex-wrap justify-center gap-2"
-      aria-label="Seções do escopo"
     >
       {abas.map((aba) => {
         const ativa = abaAtiva === aba.id;

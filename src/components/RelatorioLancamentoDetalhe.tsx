@@ -10,25 +10,22 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
 import {
-  AbaConfiguracao,
   AbaContatos,
   AbaInfraestrutura,
   AbaMedicoes,
+  EquipamentosIpsCard,
 } from "@/components/RelatorioAbasPlaceholder";
 import {
+  ABAS_CAMPO,
   ABAS_CAMPO_IMPLANTACAO,
   CampoCoordenadas,
   CampoQuantidade,
   ChoiceButton,
   CordoalhaSimNaoCard,
   RefTituloInput,
-  RelatorioAbasFilha,
-  RelatorioAbasPai,
-  abaPaiToEscopo,
+  RelatorioAbasCampo,
   inputClass,
   type AbaCampo,
-  type AbaFilha,
-  type AbaPai,
 } from "@/components/RelatorioRedeAcesso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +38,7 @@ import {
   emptyCordoalhaBloco,
   emptyDgoClienteItem,
   emptyEquipamentoClienteItem,
-  emptyConfiguracao,
+  emptyEquipamentoConexoes,
   emptyContatos,
   emptyInfraestrutura,
   emptyQuantidadesRede,
@@ -49,7 +46,6 @@ import {
   emptyTestePotencia,
   apenasDigitos,
   calcularMetragemCaboTotal,
-  getEscopo,
   janelaPotenciaDerivada,
   labelTecnicosAtribuidos,
   removeExtraById,
@@ -60,7 +56,6 @@ import {
   type RelatorioFotoCategoria,
   type RelatorioFotoGrupoKey,
   type EscopoPayload,
-  type EscopoRelatorioKey,
   type RelatorioPayload,
   type RelatorioStatus,
   type RelatorioTransmissao,
@@ -693,11 +688,7 @@ export function RelatorioDetalhe({
 }: {
   row: RelatorioTransmissao;
   canEditPhotos: boolean;
-  onAddPhoto: (
-    categoria: RelatorioFotoCategoria,
-    file: EvidencePhotoRef,
-    escopo?: EscopoRelatorioKey,
-  ) => void;
+  onAddPhoto: (categoria: RelatorioFotoCategoria, file: EvidencePhotoRef) => void;
   onReplacePhoto?: (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
@@ -708,7 +699,6 @@ export function RelatorioDetalhe({
       outraId?: string;
       itemId?: string;
       campoItem?: "foto" | "etiqueta";
-      escopo?: EscopoRelatorioKey;
     },
   ) => void;
   uploadingCategoria: RelatorioFotoCategoria | null;
@@ -717,41 +707,28 @@ export function RelatorioDetalhe({
   onCadastroSaved?: (saved: RelatorioTransmissao) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
 }) {
-  const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
-  const [abaPai, setAbaPai] = useState<AbaPai>("Aereo");
-  const [abaFilha, setAbaFilha] = useState<AbaFilha>("RE");
+  const [abaAtiva, setAbaAtiva] = useState<AbaCampo>("RE");
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const isEmpresarial = row.tipo_execucao === "empresarial";
   const isImplantacao = row.tipo_execucao === "implantacao";
-  const abasVisiveis = isImplantacao
-    ? ABAS_CAMPO_IMPLANTACAO
-    : ABAS_CAMPO_IMPLANTACAO.filter((aba) => aba.id === "RE");
-  /** Empresarial: escopo escolhido no tier 1. Implantação escreve sempre no aéreo. */
-  const escopoKey: EscopoRelatorioKey = isEmpresarial
-    ? abaPaiToEscopo(abaPai) ?? "aereo"
-    : "aereo";
-  const emEscopo = isEmpresarial ? abaPai === "Aereo" || abaPai === "Subterraneo" : true;
-  const abaAtiva: AbaCampo | AbaFilha | null = isEmpresarial
-    ? emEscopo
-      ? abaFilha
-      : null
-    : abaCampo;
+  const abasVisiveis = isEmpresarial
+    ? ABAS_CAMPO
+    : isImplantacao
+      ? ABAS_CAMPO_IMPLANTACAO
+      : ABAS_CAMPO_IMPLANTACAO.filter((aba) => aba.id === "RE");
 
   useEffect(() => {
-    setAbaCampo("RE");
-    setAbaPai("Aereo");
-    setAbaFilha("RE");
+    setAbaAtiva("RE");
   }, [row.id]);
 
   useEffect(() => {
     if (isEmpresarial) return;
-    setAbaCampo((atual) =>
+    setAbaAtiva((atual) =>
       atual === "RE" || (isImplantacao && atual === "teste-otdr") ? atual : "RE",
     );
   }, [isEmpresarial, isImplantacao]);
 
-  const payloadRaiz = row.payload;
-  const payload = payloadRaiz ? getEscopo(payloadRaiz, escopoKey) : undefined;
+  const payload = row.payload;
   const cabos = payload?.metragensCabo ?? [];
   const cabosRc = payload?.metragensCaboRc ?? [];
   const fotosCabosCount = cabos.reduce(
@@ -778,27 +755,18 @@ export function RelatorioDetalhe({
   };
   const blocoProps = (categoria: RelatorioFotoCategoria) => ({
     canEdit: canEditPhotos,
-    onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file, escopoKey),
-    uploadKey: `${row.id}-${escopoKey}-${categoria}-${blocoCount(categoria)}`,
+    onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file),
+    uploadKey: `${row.id}-${categoria}-${blocoCount(categoria)}`,
     uploading: uploadingCategoria === categoria,
   });
 
-  const patchPayload = (next: EscopoPayload) => {
-    if (!payloadRaiz) return;
-    onUpdatePayload?.(
-      escopoKey === "aereo"
-        ? { ...payloadRaiz, aereo: next }
-        : { ...payloadRaiz, subterraneo: next },
-    );
-  };
-
-  const patchRaiz = (next: RelatorioPayload) => {
+  const patchPayload = (next: RelatorioPayload) => {
     onUpdatePayload?.(next);
   };
 
   const patchQtdCaixas = (lado: "redeAcesso" | "redeCliente", qtdCaixasEmenda: number | null) => {
     if (!payload) return;
-    const next: EscopoPayload = {
+    const next: RelatorioPayload = {
       ...payload,
       [lado]: {
         ...(payload[lado] ?? emptyQuantidadesRede()),
@@ -936,7 +904,7 @@ export function RelatorioDetalhe({
         }
         onReplacePhoto={
           canEditPhotos && onReplacePhoto
-            ? (index, file) => onReplacePhoto(key, file, { index, escopo: escopoKey })
+            ? (index, file) => onReplacePhoto(key, file, { index })
             : undefined
         }
         {...blocoProps(key)}
@@ -1070,12 +1038,7 @@ export function RelatorioDetalhe({
           }
           onReplaceCaboCampo={
             canEditPhotos && onReplacePhoto
-              ? (campo, file) =>
-                  onReplacePhoto(categoria, file, {
-                    caboId: cabo.id,
-                    campo,
-                    escopo: escopoKey,
-                  })
+              ? (campo, file) => onReplacePhoto(categoria, file, { caboId: cabo.id, campo })
               : undefined
           }
           {...blocoProps(categoria)}
@@ -1083,11 +1046,7 @@ export function RelatorioDetalhe({
             canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
               ? (file) => {
                   const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
-                  onReplacePhoto(categoria, file, {
-                    caboId: cabo.id,
-                    campo,
-                    escopo: escopoKey,
-                  });
+                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo });
                 }
               : undefined
           }
@@ -1159,17 +1118,16 @@ export function RelatorioDetalhe({
       }
       onReplacePhoto={
         canEditPhotos && onReplacePhoto
-          ? (_index, file) =>
-              onReplacePhoto(categoria, file, { outraId: item.id, escopo: escopoKey })
+          ? (_index, file) => onReplacePhoto(categoria, file, { outraId: item.id })
           : undefined
       }
       canEdit={canEditPhotos}
       onAdd={
         canEditPhotos && onReplacePhoto && !item.foto
-          ? (file) => onReplacePhoto(categoria, file, { outraId: item.id, escopo: escopoKey })
+          ? (file) => onReplacePhoto(categoria, file, { outraId: item.id })
           : undefined
       }
-      uploadKey={`${row.id}-${escopoKey}-${categoria}-${item.id}`}
+      uploadKey={`${row.id}-${categoria}-${item.id}`}
       uploading={uploadingCategoria === categoria}
     />
   );
@@ -1266,32 +1224,7 @@ export function RelatorioDetalhe({
         </div>
       ) : null}
 
-      {isEmpresarial ? (
-        <div className="space-y-3">
-          <RelatorioAbasPai abaAtiva={abaPai} onChange={setAbaPai} />
-          {emEscopo ? <RelatorioAbasFilha abaAtiva={abaFilha} onChange={setAbaFilha} /> : null}
-        </div>
-      ) : (
-        <nav className="flex w-full border-b border-border" aria-label="Seções do relatório">
-          {abasVisiveis.map((aba) => {
-            const ativa = abaCampo === aba.id;
-            return (
-              <button
-                key={aba.id}
-                type="button"
-                onClick={() => setAbaCampo(aba.id)}
-                className={`${abasVisiveis.length > 1 ? "min-w-0 flex-1" : ""} px-2 py-3 text-center text-xs sm:px-3 sm:text-sm transition ${
-                  ativa
-                    ? "border-b-2 border-green-600 font-bold text-green-700"
-                    : "border-b-2 border-transparent font-medium text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {aba.label}
-              </button>
-            );
-          })}
-        </nav>
-      )}
+      <RelatorioAbasCampo abaAtiva={abaAtiva} onChange={setAbaAtiva} abas={abasVisiveis} />
 
       {abaAtiva === "RE" ? (
         <div className="space-y-6">
@@ -1738,6 +1671,41 @@ export function RelatorioDetalhe({
               Relatório fotográfico da estação/PPC não foi adicionado.
             </p>
           )}
+
+          <EquipamentosIpsCard
+            title="Equipamentos Instalados No cliente"
+            value={payload?.equipamento?.configuracaoCliente ?? emptyEquipamentoConexoes().configuracaoCliente}
+            onChange={
+              canEditPhotos && payload
+                ? (configuracaoCliente) =>
+                    patchPayload({
+                      ...payload,
+                      equipamento: {
+                        ...(payload.equipamento ?? emptyEquipamentoConexoes()),
+                        configuracaoCliente,
+                      },
+                    })
+                : undefined
+            }
+            readOnly={!canEditPhotos}
+          />
+          <EquipamentosIpsCard
+            title="Equipamentos Instalados Na estação"
+            value={payload?.equipamento?.configuracaoEstacao ?? emptyEquipamentoConexoes().configuracaoEstacao}
+            onChange={
+              canEditPhotos && payload
+                ? (configuracaoEstacao) =>
+                    patchPayload({
+                      ...payload,
+                      equipamento: {
+                        ...(payload.equipamento ?? emptyEquipamentoConexoes()),
+                        configuracaoEstacao,
+                      },
+                    })
+                : undefined
+            }
+            readOnly={!canEditPhotos}
+          />
         </div>
       ) : null}
 
@@ -1801,17 +1769,6 @@ export function RelatorioDetalhe({
         />
       ) : null}
 
-      {abaAtiva === "configuracao" ? (
-        <AbaConfiguracao
-          value={payload?.configuracao ?? emptyConfiguracao()}
-          onChange={
-            canEditPhotos && payload
-              ? (configuracao) => patchPayload({ ...payload, configuracao })
-              : undefined
-          }
-          readOnly={!canEditPhotos}
-        />
-      ) : null}
       {abaAtiva === "infraestrutura" ? (
         <AbaInfraestrutura
           value={payload?.infraestrutura ?? emptyInfraestrutura()}
@@ -1823,13 +1780,13 @@ export function RelatorioDetalhe({
           readOnly={!canEditPhotos}
         />
       ) : null}
-      {isEmpresarial && abaPai === "Medicoes" ? <AbaMedicoes /> : null}
-      {isEmpresarial && abaPai === "Contatos" ? (
+      {abaAtiva === "medicoes" ? <AbaMedicoes /> : null}
+      {abaAtiva === "contatos" ? (
         <AbaContatos
-          value={payloadRaiz?.contatos ?? emptyContatos()}
+          value={payload?.contatos ?? emptyContatos()}
           onChange={
-            canEditPhotos && payloadRaiz
-              ? (contatos) => patchRaiz({ ...payloadRaiz, contatos })
+            canEditPhotos && payload
+              ? (contatos) => patchPayload({ ...payload, contatos })
               : undefined
           }
           readOnly={!canEditPhotos}

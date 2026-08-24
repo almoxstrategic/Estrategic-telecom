@@ -21,14 +21,12 @@ import {
   excluirRelatorioTransmissao,
   fecharRelatorioTransmissao,
   fetchRelatorioTransmissaoById,
-  getEscopo,
   patchRelatorioPayloadAdmin,
   replaceFotoGrupoAt,
   sinalizarPendenciaRelatorio,
   subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   withRetry,
-  type EscopoRelatorioKey,
   type RelatorioFotoCategoria,
   type RelatorioPayload,
   type RelatorioTransmissao,
@@ -170,13 +168,12 @@ function AdminLancamentoDetalhePage() {
   const onAdminAddPhoto = async (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
-    escopo: EscopoRelatorioKey = "aereo",
   ) => {
     if (!row || !user?.id) return;
     setUploadingCategoria(categoria);
     try {
       const stored = await uploadRelatorioPhoto(user.id, file.file, `admin-${categoria}`);
-      const nextPayload = appendStoredPhotoToPayload(row.payload, categoria, stored, escopo);
+      const nextPayload = appendStoredPhotoToPayload(row.payload, categoria, stored);
       applyingRemoteRef.current = true;
       const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
       lastAppliedUpdatedAtRef.current = saved.updated_at;
@@ -200,21 +197,19 @@ function AdminLancamentoDetalhePage() {
       outraId?: string;
       itemId?: string;
       campoItem?: "foto" | "etiqueta";
-      escopo?: EscopoRelatorioKey;
     },
   ) => {
     if (!row || !user?.id) return;
     setUploadingCategoria(categoria);
     try {
       const stored = await uploadRelatorioPhoto(user.id, file.file, `admin-replace-${categoria}`);
-      const escopoKey = meta.escopo ?? "aereo";
-      const escopo = getEscopo(row.payload, escopoKey);
-      let nextEscopo = escopo;
+      const atual = row.payload;
+      let nextPayload: RelatorioPayload = atual;
       let oldPath: string | undefined;
       if (categoria === "metragensCabo" || categoria === "metragensCaboRc") {
-        nextEscopo = {
-          ...escopo,
-          [categoria]: escopo[categoria].map((item) => {
+        nextPayload = {
+          ...atual,
+          [categoria]: atual[categoria].map((item) => {
             if (item.id !== meta.caboId) return item;
             if (meta.campo === "fotoInicio") oldPath = item.fotoInicio?.path;
             if (meta.campo === "fotoFim") oldPath = item.fotoFim?.path;
@@ -227,9 +222,9 @@ function AdminLancamentoDetalhePage() {
         categoria === "outrasFotosEqCliente" ||
         categoria === "outrasFotosEqEstacao"
       ) {
-        nextEscopo = {
-          ...escopo,
-          [categoria]: escopo[categoria].map((item) => {
+        nextPayload = {
+          ...atual,
+          [categoria]: atual[categoria].map((item) => {
             if (item.id !== meta.outraId) return item;
             oldPath = item.foto?.path;
             return { ...item, foto: stored };
@@ -241,9 +236,9 @@ function AdminLancamentoDetalhePage() {
         categoria === "eqEstacaoDgo" ||
         categoria === "eqEstacaoEquipamento"
       ) {
-        nextEscopo = {
-          ...escopo,
-          [categoria]: escopo[categoria].map((item) => {
+        nextPayload = {
+          ...atual,
+          [categoria]: atual[categoria].map((item) => {
             if (item.id !== meta.itemId) return item;
             if (meta.campoItem === "foto") oldPath = item.foto?.path;
             if (meta.campoItem === "etiqueta") oldPath = item.etiqueta?.path;
@@ -251,7 +246,7 @@ function AdminLancamentoDetalhePage() {
           }),
         };
       } else if (typeof meta.index === "number") {
-        const grupo = escopo[categoria as Exclude<
+        const grupo = atual[categoria as Exclude<
           RelatorioFotoCategoria,
           | "metragensCabo"
           | "metragensCaboRc"
@@ -265,15 +260,11 @@ function AdminLancamentoDetalhePage() {
           | "eqEstacaoEquipamento"
         >];
         oldPath = grupo.fotos[meta.index]?.path;
-        nextEscopo = {
-          ...escopo,
+        nextPayload = {
+          ...atual,
           [categoria]: replaceFotoGrupoAt(grupo, meta.index, stored),
         };
       }
-      const nextPayload: RelatorioPayload =
-        escopoKey === "aereo"
-          ? { ...row.payload, aereo: nextEscopo }
-          : { ...row.payload, subterraneo: nextEscopo };
       applyingRemoteRef.current = true;
       const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
       lastAppliedUpdatedAtRef.current = saved.updated_at;
@@ -413,9 +404,7 @@ function AdminLancamentoDetalhePage() {
               canEditPhotos={canAudit}
               canEditCadastro={canAudit}
               onCadastroSaved={setRow}
-              onAddPhoto={(categoria, file, escopo) =>
-                void onAdminAddPhoto(categoria, file, escopo)
-              }
+              onAddPhoto={(categoria, file) => void onAdminAddPhoto(categoria, file)}
               onReplacePhoto={(categoria, file, meta) =>
                 void onAdminReplacePhoto(categoria, file, meta)
               }
