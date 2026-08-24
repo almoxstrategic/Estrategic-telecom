@@ -1430,6 +1430,7 @@ function RelatorioPage() {
               {mostrarRedeAcesso ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
+                  stickTabsAtViewportTop={headerRolaComPagina}
                   lancamentoRe={simNaoDe(lancamentoCabosRe[lancamentoReAmbiente].isSim)}
                   onLancamentoRe={(value) =>
                     patchLancamentoSim(setLancamentoCabosRe, lancamentoReAmbiente, value)
@@ -1587,6 +1588,7 @@ function RelatorioPage() {
               ) : mostrarRedeCliente ? (
                 <RelatorioRedeAcesso
                   readOnly={readOnly}
+                  stickTabsAtViewportTop={headerRolaComPagina}
                   header={
                     <div className="space-y-3">
                       <CampoCoordenadas

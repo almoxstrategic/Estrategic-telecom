@@ -180,6 +180,77 @@ export function TipoExecucaoPicker({
 /** Header sticky (~64px) — colapsa quando o fim de "Dados da obra" passa por aqui. */
 const ABAS_COMPACT_THRESHOLD_PX = 100;
 
+/** Âncora DOM da barra sticky (abas + busca) — usada para medir o offset do accordion. */
+export const RELATORIO_ABAS_STICKY_ID = "relatorio-abas-sticky";
+
+const APP_HEADER_STICKY_PX = 64;
+/** Fallback se a barra ainda não estiver no DOM. */
+const ABAS_BAR_FALLBACK_PX = 104;
+
+function useAbasStickyOffsetPx(stickTabsAtViewportTop: boolean): number {
+  const [offsetPx, setOffsetPx] = useState(
+    stickTabsAtViewportTop ? ABAS_BAR_FALLBACK_PX : APP_HEADER_STICKY_PX + ABAS_BAR_FALLBACK_PX,
+  );
+
+  useEffect(() => {
+    const measure = () => {
+      const bar = document.getElementById(RELATORIO_ABAS_STICKY_ID);
+      const barH = bar?.getBoundingClientRect().height ?? ABAS_BAR_FALLBACK_PX;
+      const headerH = stickTabsAtViewportTop ? 0 : APP_HEADER_STICKY_PX;
+      setOffsetPx(Math.round(headerH + barH));
+    };
+
+    measure();
+    const bar = document.getElementById(RELATORIO_ABAS_STICKY_ID);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (bar && ro) ro.observe(bar);
+    window.addEventListener("resize", measure);
+    // Altura muda quando as abas colapsam (wrap → scroll); observa o subtree.
+    const mo =
+      typeof MutationObserver !== "undefined" && bar
+        ? new MutationObserver(measure)
+        : null;
+    if (bar && mo) mo.observe(bar, { attributes: true, childList: true, subtree: true });
+
+    return () => {
+      ro?.disconnect();
+      mo?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [stickTabsAtViewportTop]);
+
+  return offsetPx;
+}
+
+function useAccordionStuck(
+  sentinelRef: RefObject<HTMLElement | null>,
+  stickyOffsetPx: number,
+): boolean {
+  const [isStuck, setIsStuck] = useState(false);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || stickyOffsetPx <= 0) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Sentinela acima da linha sticky (rootMargin) → cabeçalho está "preso".
+        setIsStuck(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0,
+        rootMargin: `-${stickyOffsetPx}px 0px 0px 0px`,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [sentinelRef, stickyOffsetPx]);
+
+  return isStuck;
+}
+
 export type SecaoPesquisavel = {
   titulo: string;
   id: string;
@@ -348,6 +419,7 @@ export function RelatorioAbasCampo({
   return (
     <>
       <div
+        id={RELATORIO_ABAS_STICKY_ID}
         className={
           stickToViewportTop
             ? "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300"
@@ -582,23 +654,44 @@ function AccordionBloco({
   children,
   rootRef,
   id,
+  stickTabsAtViewportTop = true,
 }: {
   title: string;
   children: ReactNode;
   rootRef?: RefObject<HTMLElement | null>;
   id?: string;
+  /** true = abas no topo da viewport (técnico); false = abas abaixo do AppHeader. */
+  stickTabsAtViewportTop?: boolean;
 }) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const stickyOffsetPx = useAbasStickyOffsetPx(stickTabsAtViewportTop);
+  const isStuck = useAccordionStuck(sentinelRef, stickyOffsetPx);
+
   return (
     <details
       id={id}
       ref={rootRef as RefObject<HTMLDetailsElement | null> | undefined}
-      className="group scroll-mt-36 rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+      className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+      style={{ scrollMarginTop: stickyOffsetPx }}
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-base font-bold [&::-webkit-details-marker]:hidden">
+      <summary
+        style={{ top: stickyOffsetPx }}
+        className={
+          isStuck
+            ? "sticky z-30 -mx-5 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-2 text-sm font-bold shadow-sm transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
+            : "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4 text-base font-bold transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
+        }
+      >
         <span>{title}</span>
         <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition group-open:rotate-180" />
       </summary>
-      <div className="flex flex-col gap-6 border-t border-border px-5 pb-5 pt-4">{children}</div>
+      {/* Sentinela no topo do bloco: ao sair acima da linha sticky, ativa o morph. */}
+      <div
+        ref={sentinelRef}
+        className="pointer-events-none absolute left-0 top-0 h-px w-full"
+        aria-hidden
+      />
+      <div className="flex flex-col gap-6 px-5 pb-5 pt-4">{children}</div>
     </details>
   );
 }
@@ -813,6 +906,7 @@ export function RelatorioRedeAcesso({
   onOutrasChange,
   onOutraPhoto,
   showObsAdmin = false,
+  stickTabsAtViewportTop = true,
 }: {
   readOnly: boolean;
   header?: ReactNode;
@@ -866,6 +960,8 @@ export function RelatorioRedeAcesso({
   onOutrasChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   showObsAdmin?: boolean;
+  /** true = abas no topo da viewport (técnico); false = abas abaixo do AppHeader. */
+  stickTabsAtViewportTop?: boolean;
 }) {
   void showObsAdmin;
   const mostrarMetragem = lancamentoRe === "sim";
@@ -887,7 +983,11 @@ export function RelatorioRedeAcesso({
       <div className="space-y-5">
         {header}
 
-        <AccordionBloco title="LANÇAMENTO" id="secao-cabos">
+        <AccordionBloco
+          title="LANÇAMENTO"
+          id="secao-cabos"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
+        >
           <div className={flatSectionClass}>
             <h2 className="mb-3 font-semibold text-gray-800">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">
@@ -1124,7 +1224,11 @@ export function RelatorioRedeAcesso({
           {gruposDuto.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
         </AccordionBloco>
 
-        <AccordionBloco title="POSTE" id="secao-poste">
+        <AccordionBloco
+          title="POSTE"
+          id="secao-poste"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
+        >
           {gruposPoste.map((grupo) => {
             const isPoste =
               grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao";
@@ -1178,11 +1282,19 @@ export function RelatorioRedeAcesso({
           })}
         </AccordionBloco>
 
-        <AccordionBloco title="CAIXA DE EMENDA" id="secao-caixa-emenda">
+        <AccordionBloco
+          title="CAIXA DE EMENDA"
+          id="secao-caixa-emenda"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
+        >
           {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
         </AccordionBloco>
 
-        <AccordionBloco title="OUTRAS FOTOS" id="secao-outras-fotos">
+        <AccordionBloco
+          title="OUTRAS FOTOS"
+          id="secao-outras-fotos"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
+        >
           <RelatorioOutrasFotos
             title="Outras fotos"
             outras={outras}
