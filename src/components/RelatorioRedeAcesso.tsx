@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
@@ -193,6 +193,18 @@ export function RelatorioAbasCampo({
   compactTriggerRef?: RefObject<HTMLElement | null>;
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const abaInicialRef = useRef(true);
+
+  useEffect(() => {
+    if (abaInicialRef.current) {
+      abaInicialRef.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [abaAtiva]);
 
   useEffect(() => {
     const onScroll = () => {
