@@ -358,6 +358,7 @@ export function RelatorioEquipamento({
   return (
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
+        <div id="secao-eq-cliente" className="scroll-mt-36 space-y-5">
         <h2 className="text-base font-bold">Equipamentos no Cliente</h2>
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
           {gruposCliente
@@ -365,6 +366,7 @@ export function RelatorioEquipamento({
             .map((grupo) => (
               <RelatorioFotosBloco
                 key={grupo.grupoKey}
+                id={`secao-${grupo.grupoKey}`}
                 title={grupo.title}
                 hint={grupo.hint}
                 slots={grupo.slots}
@@ -408,6 +410,7 @@ export function RelatorioEquipamento({
             .map((grupo) => (
               <RelatorioFotosBloco
                 key={grupo.grupoKey}
+                id={`secao-${grupo.grupoKey}`}
                 title={grupo.title}
                 hint={grupo.hint}
                 slots={grupo.slots}
@@ -427,9 +430,10 @@ export function RelatorioEquipamento({
           onOutraPhoto={onOutraClientePhoto}
           readOnly={readOnly}
         />
+        </div>
 
         {gruposConexaoEstacao.length ? (
-          <div className="space-y-3">
+          <div id="secao-eq-conexao-estacao" className="scroll-mt-36 space-y-3">
             <h2 className="text-base font-bold">Conexão na Estação/PPC</h2>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {gruposConexaoEstacao.map((grupo) => (
@@ -473,7 +477,7 @@ export function RelatorioEquipamento({
         </div>
 
         {relatorioEstacao === "sim" ? (
-          <div className="space-y-5">
+          <div id="secao-eq-estacao" className="scroll-mt-36 space-y-5">
             <h2 className="text-base font-bold">Equipamentos na Estação/PPC</h2>
             <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <label

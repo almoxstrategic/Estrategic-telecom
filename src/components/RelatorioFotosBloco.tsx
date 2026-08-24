@@ -36,6 +36,7 @@ export function RelatorioFotosBloco({
   onPickPhoto,
   minSlots = 1,
   readOnly = false,
+  id,
 }: {
   title: string;
   hint?: string;
@@ -47,6 +48,7 @@ export function RelatorioFotosBloco({
   onPickPhoto?: (slotId: string, file: EvidencePhotoRef | null) => void;
   minSlots?: number;
   readOnly?: boolean;
+  id?: string;
 }) {
   const updateSlot = (id: string, patch: Partial<FotoSlot>) => {
     onChange(slots.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
@@ -68,7 +70,10 @@ export function RelatorioFotosBloco({
   };
 
   return (
-    <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div
+      id={id}
+      className="flex h-full scroll-mt-36 flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
+    >
       <div>
         <h2 className="text-base font-bold">{title}</h2>
         {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}

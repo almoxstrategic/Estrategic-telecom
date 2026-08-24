@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { ChevronDown, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -180,26 +180,118 @@ export function TipoExecucaoPicker({
 /** Header sticky (~64px) + faixa das abas — ponto em que CABOS “toca” o menu. */
 const ABAS_COMPACT_THRESHOLD_PX = 150;
 
+export type SecaoPesquisavel = {
+  titulo: string;
+  id: string;
+};
+
+/** Índice de navegação rápida por aba (âncoras no próprio formulário). */
+export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisavel[]>> = {
+  RE: [
+    { titulo: "Cabos", id: "secao-cabos" },
+    { titulo: "Lançamento de Cabos", id: "secao-cabos" },
+    { titulo: "Sobra técnica / Fiberloop", id: "secao-sobraTecnica" },
+    { titulo: "Poste", id: "secao-poste" },
+    { titulo: "Poste de conexão", id: "secao-posteConexao" },
+    { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
+    { titulo: "Caixa de Emenda", id: "secao-caixa-emenda" },
+    { titulo: "Caixa de emenda (fotos)", id: "secao-caixaEmenda" },
+    { titulo: "Const. de duto subterrâneo", id: "secao-dutoSubterraneo" },
+    { titulo: "Plaqueta de Identificação", id: "secao-plaquetaIdentificacao" },
+    { titulo: "Outras fotos", id: "secao-outras-fotos" },
+  ],
+  RC: [
+    { titulo: "Cabos", id: "secao-cabos" },
+    { titulo: "Lançamento de Cabos", id: "secao-cabos" },
+    { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
+    { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
+    { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
+    { titulo: "Poste", id: "secao-poste" },
+    { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
+    { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
+    { titulo: "Caixa de Emenda", id: "secao-caixa-emenda" },
+    { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
+    { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
+    { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
+    { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
+    { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
+    { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
+    { titulo: "Outras fotos", id: "secao-outras-fotos" },
+  ],
+  equipamento: [
+    { titulo: "Equipamentos no Cliente", id: "secao-eq-cliente" },
+    { titulo: "Conexão na Estação/PPC", id: "secao-eq-conexao-estacao" },
+    { titulo: "Equipamentos na Estação/PPC", id: "secao-eq-estacao" },
+  ],
+};
+
+function highlightSecaoTemporaria(el: HTMLElement) {
+  el.classList.add("ring-2", "ring-primary", "ring-offset-2", "transition");
+  window.setTimeout(() => {
+    el.classList.remove("ring-2", "ring-primary", "ring-offset-2", "transition");
+  }, 1800);
+}
+
+function abrirDetailsAncestrais(el: HTMLElement) {
+  let node: HTMLElement | null = el;
+  while (node) {
+    if (node instanceof HTMLDetailsElement) node.open = true;
+    node = node.parentElement;
+  }
+}
+
+export function navegarParaSecaoFormulario(targetId: string) {
+  const el = document.getElementById(targetId);
+  if (!el) return false;
+  abrirDetailsAncestrais(el);
+  window.setTimeout(() => {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    highlightSecaoTemporaria(el);
+  }, 50);
+  return true;
+}
+
 export function RelatorioAbasCampo({
   abaAtiva,
   onChange,
   abas = ABAS_CAMPO,
   compactTriggerRef,
+  secoesPesquisaveis,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
   abas?: { id: AbaCampo; label: string }[];
   /** Quando o topo deste elemento chega perto do menu sticky, as abas colapsam. */
   compactTriggerRef?: RefObject<HTMLElement | null>;
+  /** Sobrescreve o índice padrão de seções da aba ativa. */
+  secoesPesquisaveis?: SecaoPesquisavel[];
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const abaInicialRef = useRef(true);
+  const buscaWrapRef = useRef<HTMLDivElement | null>(null);
+
+  const secoes = secoesPesquisaveis ?? SECOES_PESQUISAVEIS_POR_ABA[abaAtiva] ?? [];
+  const resultados = useMemo(() => {
+    const termo = searchTerm.trim().toLowerCase();
+    if (!termo) return [];
+    const vistos = new Set<string>();
+    return secoes.filter((s) => {
+      if (!s.titulo.toLowerCase().includes(termo)) return false;
+      if (vistos.has(s.id)) return false;
+      vistos.add(s.id);
+      return true;
+    });
+  }, [searchTerm, secoes]);
 
   useEffect(() => {
     if (abaInicialRef.current) {
       abaInicialRef.current = false;
       return;
     }
+    setSearchTerm("");
+    setIsDropdownOpen(false);
     const timer = window.setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 50);
@@ -225,34 +317,96 @@ export function RelatorioAbasCampo({
     };
   }, [compactTriggerRef, abaAtiva]);
 
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (!buscaWrapRef.current || !target) return;
+      if (!buscaWrapRef.current.contains(target)) setIsDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, []);
+
+  const handleSelectSearchResult = (targetId: string) => {
+    navegarParaSecaoFormulario(targetId);
+    setSearchTerm("");
+    setIsDropdownOpen(false);
+  };
+
   return (
     <>
-      <nav
-        className={`sticky top-16 z-40 bg-background py-2 shadow-sm transition-all duration-300 ${
-          isScrolled
-            ? "flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-            : "flex flex-wrap justify-center gap-2"
-        }`}
-        aria-label="Seções do relatório"
-      >
-        {abas.map((aba) => {
-          const ativa = abaAtiva === aba.id;
-          return (
-            <button
-              key={aba.id}
-              type="button"
-              onClick={() => onChange(aba.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:text-sm ${
-                ativa
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {aba.label}
-            </button>
-          );
-        })}
-      </nav>
+      <div className="sticky top-16 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm transition-all duration-300">
+        <nav
+          className={
+            isScrolled
+              ? "flex w-full flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              : "flex w-full flex-wrap justify-center gap-2"
+          }
+          aria-label="Seções do relatório"
+        >
+          {abas.map((aba) => {
+            const ativa = abaAtiva === aba.id;
+            return (
+              <button
+                key={aba.id}
+                type="button"
+                onClick={() => onChange(aba.id)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:text-sm ${
+                  ativa
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {aba.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {secoes.length > 0 ? (
+          <div ref={buscaWrapRef} className="relative mt-2 block w-full">
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                onFocus={() => setIsDropdownOpen(true)}
+                placeholder="Buscar seção (ex: Caixa de Emenda)"
+                className="box-border w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                aria-label="Busca rápida de seções do formulário"
+                autoComplete="off"
+              />
+            </div>
+            {isDropdownOpen && searchTerm.trim() ? (
+              <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-white shadow-lg">
+                {resultados.length === 0 ? (
+                  <li className="p-3 text-sm text-muted-foreground">Nenhuma seção encontrada</li>
+                ) : (
+                  resultados.map((item) => (
+                    <li key={`${item.id}-${item.titulo}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSearchResult(item.id)}
+                        className="w-full cursor-pointer border-b border-border px-3 py-3 text-left text-sm last:border-b-0 hover:bg-gray-100"
+                      >
+                        {item.titulo}
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {isScrolled ? (
         <button
@@ -284,6 +438,7 @@ export function CampoCoordenadas({
   onChange,
   disabled = false,
   embedded = false,
+  id,
 }: {
   title?: string;
   value: { latitude: string; longitude: string };
@@ -291,6 +446,7 @@ export function CampoCoordenadas({
   disabled?: boolean;
   /** Sem card externo (quando já está dentro de outro bloco). */
   embedded?: boolean;
+  id?: string;
 }) {
   const idLat = useId();
   const idLng = useId();
@@ -331,9 +487,14 @@ export function CampoCoordenadas({
       </div>
     </>
   );
-  if (embedded) return <div className="space-y-3">{body}</div>;
+  if (embedded) return <div id={id} className="scroll-mt-36 space-y-3">{body}</div>;
   return (
-    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">{body}</div>
+    <div
+      id={id}
+      className="scroll-mt-36 space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+    >
+      {body}
+    </div>
   );
 }
 
@@ -402,15 +563,18 @@ function AccordionBloco({
   title,
   children,
   rootRef,
+  id,
 }: {
   title: string;
   children: ReactNode;
   rootRef?: RefObject<HTMLElement | null>;
+  id?: string;
 }) {
   return (
     <details
+      id={id}
       ref={rootRef as RefObject<HTMLDetailsElement | null> | undefined}
-      className="group rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+      className="group scroll-mt-36 rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-base font-bold [&::-webkit-details-marker]:hidden">
         <span>{title}</span>
@@ -439,6 +603,7 @@ function renderGrupoFotoCard(
   return (
     <RelatorioFotosBloco
       key={`${grupo.grupoKey}-${grupo.ambiente ?? "na"}`}
+      id={`secao-${grupo.grupoKey}`}
       title={grupo.title}
       hint={grupo.hint}
       headerExtra={
@@ -675,7 +840,7 @@ export function RelatorioRedeAcesso({
       <div className="space-y-5">
         {header}
 
-        <AccordionBloco title="CABOS" rootRef={cabosRef}>
+        <AccordionBloco title="CABOS" id="secao-cabos" rootRef={cabosRef}>
           <div className="space-y-3 rounded-2xl border border-border bg-background p-5 shadow-sm">
             <h2 className="text-base font-bold">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">
@@ -909,7 +1074,7 @@ export function RelatorioRedeAcesso({
           ) : null}
         </AccordionBloco>
 
-        <AccordionBloco title="POSTE">
+        <AccordionBloco title="POSTE" id="secao-poste">
           <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
             {gruposPoste.map((grupo) => {
               const isPoste =
@@ -963,13 +1128,13 @@ export function RelatorioRedeAcesso({
           </div>
         </AccordionBloco>
 
-        <AccordionBloco title="CAIXA DE EMENDA">
+        <AccordionBloco title="CAIXA DE EMENDA" id="secao-caixa-emenda">
           <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
             {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
           </div>
         </AccordionBloco>
 
-        <AccordionBloco title="OUTRAS FOTOS">
+        <AccordionBloco title="OUTRAS FOTOS" id="secao-outras-fotos">
           <RelatorioOutrasFotos
             title="Outras fotos"
             outras={outras}

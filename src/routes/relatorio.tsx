@@ -18,7 +18,6 @@ import {
   RelatorioAbasCampo,
   inputClass,
   RelatorioRedeAcesso,
-  TipoExecucaoPicker,
   ABAS_CAMPO_TECNICO,
   ABAS_CAMPO_IMPLANTACAO,
   emptyOutraFoto,
@@ -1302,7 +1301,7 @@ function RelatorioPage() {
   return (
     <div className="min-h-screen bg-surface">
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-5 pb-28 pt-4">
+      <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">
         <Link
           to="/relatorio"
           className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -1389,19 +1388,23 @@ function RelatorioPage() {
             </button>
             {dadosExpandidos ? (
               <div className="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-muted/50 p-3">
-                <DadoObraCampo label="Endereço" value={endereco} className="col-span-2" />
+                <DadoObraCampo label="Endereço" value={endereco} />
+                <DadoObraCampo
+                  label="Tipo de Execução"
+                  value={
+                    tipo === "empresarial"
+                      ? "Empresarial"
+                      : tipo === "implantacao"
+                        ? "Implantação"
+                        : ""
+                  }
+                />
                 <DadoObraCampo label="Cidade" value={cidade} />
                 <DadoObraCampo label="Equipe/Empreiteira" value={equipe} />
                 <DadoObraCampo label="Responsável" value={responsavel} />
                 <DadoObraCampo label="Data de início" value={formatDataObra(dataInicio)} />
               </div>
             ) : null}
-          </div>
-
-          <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-base font-bold">Tipo de execução</h2>
-            <TipoExecucaoPicker value={tipo} locked />
-            <p className="text-xs text-muted-foreground">Definido pelo gestor. Somente visualização.</p>
           </div>
 
           {mostrarFormularioCampo ? (
@@ -1566,6 +1569,7 @@ function RelatorioPage() {
                   header={
                     <div className="space-y-3">
                       <CampoCoordenadas
+                        id="secao-coordenadas-cliente"
                         title="Coordenadas do Cliente"
                         value={redeCliente.coordenadas}
                         onChange={(coordenadas) =>
@@ -1573,7 +1577,10 @@ function RelatorioPage() {
                         }
                         disabled={readOnly}
                       />
-                      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                      <div
+                        id="secao-tecnologia-acesso"
+                        className="scroll-mt-36 rounded-2xl border border-border bg-card p-5 shadow-sm"
+                      >
                         <label
                           htmlFor="tecnologia-acesso"
                           className="mb-1.5 block text-sm font-semibold"
