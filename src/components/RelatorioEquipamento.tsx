@@ -301,6 +301,7 @@ export function RelatorioEquipamento({
   outrasEstacao,
   onOutrasEstacaoChange,
   onOutraEstacaoPhoto,
+  gruposConexaoEstacao = [],
   onGrupoPhoto,
   configuracaoCliente,
   onConfiguracaoClienteChange,
@@ -341,6 +342,7 @@ export function RelatorioEquipamento({
   outrasEstacao: OutraFotoState[];
   onOutrasEstacaoChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraEstacaoPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
+  gruposConexaoEstacao?: GrupoFotoCampo[];
   onGrupoPhoto: (
     grupoKey: RelatorioFotoGrupoKey,
     slotId: string,
@@ -425,6 +427,28 @@ export function RelatorioEquipamento({
           onOutraPhoto={onOutraClientePhoto}
           readOnly={readOnly}
         />
+
+        {gruposConexaoEstacao.length ? (
+          <div className="space-y-3">
+            <h2 className="text-base font-bold">Conexão na Estação/PPC</h2>
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+              {gruposConexaoEstacao.map((grupo) => (
+                <RelatorioFotosBloco
+                  key={grupo.grupoKey}
+                  title={grupo.title}
+                  hint={grupo.hint}
+                  slots={grupo.slots}
+                  onChange={grupo.onChange}
+                  obs={grupo.obs}
+                  onObsChange={grupo.onObsChange}
+                  minSlots={grupo.minSlots}
+                  readOnly={readOnly}
+                  onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-base font-bold">

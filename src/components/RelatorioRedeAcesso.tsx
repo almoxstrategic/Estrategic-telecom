@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -9,6 +9,7 @@ import {
   apenasDigitos,
   calcularMetragemCaboTotal,
   deleteRelatorioPhoto,
+  type AmbienteRede,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
   type StoredPhoto,
@@ -280,6 +281,8 @@ export function CampoCoordenadas({
   );
 }
 
+export type RedeAccordionSection = "cabos" | "poste" | "caixa" | "outras";
+
 export type GrupoFotoCampo = {
   title: string;
   hint?: string;
@@ -291,6 +294,8 @@ export type GrupoFotoCampo = {
   obsAdmin?: string;
   onObsAdminChange?: (obs: string) => void;
   grupoKey: RelatorioFotoGrupoKey;
+  /** Bloco expansível onde o card aparece (RE/RC). */
+  section?: RedeAccordionSection;
   quantidade?: number | null;
   quantidadeLabel?: string;
   quantidadePlaceholder?: string;
@@ -298,7 +303,124 @@ export type GrupoFotoCampo = {
   coordenadas?: { latitude: string; longitude: string };
   coordenadasTitle?: string;
   onCoordenadasChange?: (next: { latitude: string; longitude: string }) => void;
+  /** Seletor Aéreo / Subterrâneo no card. */
+  showAmbienteToggle?: boolean;
+  ambiente?: AmbienteRede | null;
+  onAmbienteChange?: (ambiente: AmbienteRede) => void;
 };
+
+export function AmbienteToggle({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: AmbienteRede | null | undefined;
+  onChange?: (ambiente: AmbienteRede) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-2" role="radiogroup" aria-label="Ambiente de execução">
+      <ChoiceButton
+        active={value === "aereo"}
+        onClick={() => onChange?.("aereo")}
+        disabled={disabled || !onChange}
+      >
+        Aéreo
+      </ChoiceButton>
+      <ChoiceButton
+        active={value === "subterraneo"}
+        onClick={() => onChange?.("subterraneo")}
+        disabled={disabled || !onChange}
+      >
+        Subterrâneo
+      </ChoiceButton>
+    </div>
+  );
+}
+
+function AccordionBloco({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-base font-bold [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition group-open:rotate-180" />
+      </summary>
+      <div className="space-y-4 border-t border-border px-5 pb-5 pt-4">{children}</div>
+    </details>
+  );
+}
+
+function renderGrupoFotoCard(
+  grupo: GrupoFotoCampo,
+  {
+    readOnly,
+    onGrupoPhoto,
+  }: {
+    readOnly: boolean;
+    onGrupoPhoto: (
+      grupoKey: RelatorioFotoGrupoKey,
+      slotId: string,
+      file: EvidencePhotoRef | null,
+    ) => void;
+  },
+) {
+  return (
+    <RelatorioFotosBloco
+      key={grupo.grupoKey}
+      title={grupo.title}
+      hint={grupo.hint}
+      headerExtra={
+        grupo.showAmbienteToggle || grupo.quantidadeLabel || grupo.coordenadas ? (
+          <div className="space-y-3">
+            {grupo.showAmbienteToggle ? (
+              <AmbienteToggle
+                value={grupo.ambiente}
+                onChange={grupo.onAmbienteChange}
+                disabled={readOnly}
+              />
+            ) : null}
+            {grupo.quantidadeLabel ? (
+              <CampoQuantidade
+                label={grupo.quantidadeLabel}
+                placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
+                value={grupo.quantidade ?? null}
+                onChange={grupo.onQuantidadeChange}
+                disabled={readOnly}
+              />
+            ) : null}
+            {grupo.coordenadas ? (
+              <CampoCoordenadas
+                title={grupo.coordenadasTitle ?? "Coordenadas"}
+                value={grupo.coordenadas}
+                onChange={grupo.onCoordenadasChange}
+                disabled={readOnly}
+                embedded
+              />
+            ) : null}
+          </div>
+        ) : null
+      }
+      slots={grupo.slots}
+      onChange={grupo.onChange}
+      obs={grupo.obs}
+      onObsChange={grupo.onObsChange}
+      minSlots={grupo.minSlots}
+      readOnly={readOnly}
+      onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+    />
+  );
+}
 
 export function CampoQuantidade({
   label,
@@ -398,6 +520,10 @@ export function RelatorioRedeAcesso({
   lancamentoTitle = "Lançamento cabos (RE)?",
   lancamentoRe,
   onLancamentoRe,
+  lancamentoAmbiente,
+  onLancamentoAmbienteChange,
+  fiberloopInstalado,
+  onFiberloopInstaladoChange,
   cordoalhaLancada,
   onCordoalhaLancadaChange,
   cordoalhaExistente,
@@ -423,6 +549,13 @@ export function RelatorioRedeAcesso({
   lancamentoTitle?: string;
   lancamentoRe: "sim" | "nao" | "";
   onLancamentoRe: (value: "sim" | "nao") => void;
+  lancamentoAmbiente?: AmbienteRede | null;
+  onLancamentoAmbienteChange?: (ambiente: AmbienteRede) => void;
+  fiberloopInstalado?: { isSim: boolean | null; quantidade: number | null };
+  onFiberloopInstaladoChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
   cordoalhaLancada?: { isSim: boolean | null; quantidade: number | null };
   onCordoalhaLancadaChange?: (next: {
     isSim: boolean | null;
@@ -463,309 +596,319 @@ export function RelatorioRedeAcesso({
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   showObsAdmin?: boolean;
 }) {
+  void showObsAdmin;
   const mostrarMetragem = lancamentoRe === "sim";
   const mostrarCordoalha = Boolean(cordoalhaLancada && cordoalhaExistente);
   const mostrarPostes = Boolean(postesNovaCordoalha && postesCordoalhaExistente);
+  const gruposCabos = grupos.filter((g) => g.section === "cabos");
+  const gruposPoste = grupos.filter((g) => g.section === "poste");
+  const gruposCaixa = grupos.filter((g) => g.section === "caixa");
+  const fotoCtx = { readOnly, onGrupoPhoto };
 
   return (
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
         {header}
-        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-base font-bold">{lancamentoTitle}</h2>
-          <div className="flex gap-2">
-            <ChoiceButton
-              active={lancamentoRe === "sim"}
-              onClick={() => onLancamentoRe("sim")}
-              disabled={readOnly}
-            >
-              SIM
-            </ChoiceButton>
-            <ChoiceButton
-              active={lancamentoRe === "nao"}
-              onClick={() => onLancamentoRe("nao")}
-              disabled={readOnly}
-            >
-              NÃO
-            </ChoiceButton>
-          </div>
 
-          {mostrarMetragem ? (
-            <div className="space-y-4 border-t border-border pt-4">
-              <h2 className="text-base font-bold">Metragem de cabo</h2>
-              {cabos.map((cabo, index) => (
-                <div
-                  key={cabo.id}
-                  className="relative flex flex-col space-y-3 rounded-xl border border-border p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold">Cabo {index + 1}</p>
-                    {!readOnly && index >= 1 && onRemoveCabo ? (
-                      <button
-                        type="button"
-                        onClick={() => onRemoveCabo(cabo.id)}
-                        className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-                        aria-label={`Excluir cabo ${index + 1}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    ) : null}
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={cabo.tipoCabo}
-                      onChange={(e) =>
-                        onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value) })
-                      }
-                      placeholder="Ex: 12"
-                      disabled={readOnly}
-                      className={inputClass()}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-sm font-semibold">
-                        Marcação Inicial (m)
-                      </label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        value={cabo.marcacaoInicial}
-                        onChange={(e) => {
-                          const marcacaoInicial = e.target.value;
-                          onPatchCabo(cabo.id, {
-                            marcacaoInicial,
-                            metragem: calcularMetragemCaboTotal(
-                              marcacaoInicial,
-                              cabo.marcacaoFinal,
-                            ),
-                          });
-                        }}
-                        disabled={readOnly}
-                        className={inputClass()}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-sm font-semibold">
-                        Marcação Final (m)
-                      </label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        value={cabo.marcacaoFinal}
-                        onChange={(e) => {
-                          const marcacaoFinal = e.target.value;
-                          onPatchCabo(cabo.id, {
-                            marcacaoFinal,
-                            metragem: calcularMetragemCaboTotal(
-                              cabo.marcacaoInicial,
-                              marcacaoFinal,
-                            ),
-                          });
-                        }}
-                        disabled={readOnly}
-                        className={inputClass()}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold">Metragem Total (m)</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={
-                        cabo.metragem ||
-                        calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
-                      }
-                      className={`${inputClass()} cursor-default bg-gray-100`}
-                      tabIndex={-1}
-                    />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <FotoLabel>Foto Inicial</FotoLabel>
-                      {cabo.fotoInicio ? (
-                        <RelatorioFotoComControles
-                          src={cabo.fotoInicio.url}
-                          alt="Foto Inicial"
-                          canEdit={!readOnly}
-                          onDelete={() => {
-                            void deleteRelatorioPhoto(cabo.fotoInicio?.path);
-                            onCaboPhoto(cabo.id, "fotoInicio", null);
-                          }}
-                          onReplace={(file) => {
-                            void deleteRelatorioPhoto(cabo.fotoInicio?.path);
-                            onCaboPhoto(cabo.id, "fotoInicio", file);
-                          }}
-                        />
-                      ) : readOnly ? (
-                        <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
-                      ) : (
-                        <PhotoUpload
-                          label="Foto Inicial"
-                          suffix="inicio"
-                          hideLabel
-                          compact
-                          value={null}
-                          onChange={(file) => {
-                            if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <FotoLabel>Foto Final</FotoLabel>
-                      {cabo.fotoFim ? (
-                        <RelatorioFotoComControles
-                          src={cabo.fotoFim.url}
-                          alt="Foto Final"
-                          canEdit={!readOnly}
-                          onDelete={() => {
-                            void deleteRelatorioPhoto(cabo.fotoFim?.path);
-                            onCaboPhoto(cabo.id, "fotoFim", null);
-                          }}
-                          onReplace={(file) => {
-                            void deleteRelatorioPhoto(cabo.fotoFim?.path);
-                            onCaboPhoto(cabo.id, "fotoFim", file);
-                          }}
-                        />
-                      ) : readOnly ? (
-                        <p className="text-sm text-muted-foreground">Sem foto final.</p>
-                      ) : (
-                        <PhotoUpload
-                          label="Foto Final"
-                          suffix="fim"
-                          hideLabel
-                          compact
-                          value={null}
-                          onChange={(file) => {
-                            if (file) onCaboPhoto(cabo.id, "fotoFim", file);
-                          }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-auto w-full">
-                    <label className="mb-1.5 block text-sm font-semibold">OBS</label>
-                    <textarea
-                      value={cabo.obs}
-                      onChange={(e) => onPatchCabo(cabo.id, { obs: e.target.value })}
-                      rows={3}
-                      disabled={readOnly}
-                      className={inputClass()}
-                    />
-                  </div>
-                </div>
-              ))}
-              {readOnly ? null : (
-                <button
-                  type="button"
-                  onClick={onAddCabo}
-                  className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
-                >
-                  <Plus className="h-4 w-4" /> Adicionar mais cabo
-                </button>
-              )}
+        <AccordionBloco title="CABOS">
+          <div className="space-y-3 rounded-2xl border border-border bg-background p-5 shadow-sm">
+            <h2 className="text-base font-bold">{lancamentoTitle}</h2>
+            <div className="flex gap-2">
+              <ChoiceButton
+                active={lancamentoRe === "sim"}
+                onClick={() => onLancamentoRe("sim")}
+                disabled={readOnly}
+              >
+                SIM
+              </ChoiceButton>
+              <ChoiceButton
+                active={lancamentoRe === "nao"}
+                onClick={() => onLancamentoRe("nao")}
+                disabled={readOnly}
+              >
+                NÃO
+              </ChoiceButton>
             </div>
-          ) : null}
-        </div>
-
-        {mostrarCordoalha ? (
-          <div className="space-y-4">
-            <CordoalhaSimNaoCard
-              title="Lançado cordoalha?"
-              quantidadeLabel="Quantidade de cordoalha lançada:"
-              quantidadePlaceholder="Ex: 50"
-              value={cordoalhaLancada!}
-              onChange={onCordoalhaLancadaChange}
-              disabled={readOnly}
-            />
-            <CordoalhaSimNaoCard
-              title="Cordoalha existente?"
-              quantidadeLabel="Quantidade de cordoalha existente:"
-              quantidadePlaceholder="Ex: 120"
-              value={cordoalhaExistente!}
-              onChange={onCordoalhaExistenteChange}
-              disabled={readOnly}
-            />
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-          {grupos.map((grupo) => (
-            <div key={grupo.grupoKey} className="contents">
-              <RelatorioFotosBloco
-                title={grupo.title}
-                hint={grupo.hint}
-                headerExtra={
-                  grupo.quantidadeLabel || grupo.coordenadas ? (
-                    <div className="space-y-3">
-                      {grupo.quantidadeLabel ? (
-                        <CampoQuantidade
-                          label={grupo.quantidadeLabel}
-                          placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
-                          value={grupo.quantidade ?? null}
-                          onChange={grupo.onQuantidadeChange}
-                          disabled={readOnly}
-                        />
-                      ) : null}
-                      {grupo.coordenadas ? (
-                        <CampoCoordenadas
-                          title={grupo.coordenadasTitle ?? "Coordenadas"}
-                          value={grupo.coordenadas}
-                          onChange={grupo.onCoordenadasChange}
-                          disabled={readOnly}
-                          embedded
-                        />
-                      ) : null}
-                    </div>
-                  ) : null
-                }
-                slots={grupo.slots}
-                onChange={grupo.onChange}
-                obs={grupo.obs}
-                onObsChange={grupo.onObsChange}
-                minSlots={grupo.minSlots}
-                readOnly={readOnly}
-                onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+            {onLancamentoAmbienteChange ? (
+              <AmbienteToggle
+                value={lancamentoAmbiente}
+                onChange={onLancamentoAmbienteChange}
+                disabled={readOnly}
               />
-              {mostrarPostes &&
-              (grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao") ? (
-                <>
-                  <CordoalhaSimNaoCard
-                    title="Postes novo com nova cordoalha?"
-                    quantidadeLabel="Quantidade de Poste com nova cordoalha:"
-                    quantidadePlaceholder="Ex: 10"
-                    value={postesNovaCordoalha!}
-                    onChange={onPostesNovaCordoalhaChange}
-                    disabled={readOnly}
-                  />
-                  <CordoalhaSimNaoCard
-                    title="Postes com cordoalha Existente?"
-                    quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
-                    quantidadePlaceholder="Ex: 10"
-                    value={postesCordoalhaExistente!}
-                    onChange={onPostesCordoalhaExistenteChange}
-                    disabled={readOnly}
-                  />
-                </>
-              ) : null}
-            </div>
-          ))}
-        </div>
+            ) : null}
 
-        <RelatorioOutrasFotos
-          title="Outras fotos"
-          outras={outras}
-          onOutrasChange={onOutrasChange}
-          onOutraPhoto={onOutraPhoto}
-          readOnly={readOnly}
-        />
+            {mostrarMetragem ? (
+              <div className="space-y-4 border-t border-border pt-4">
+                <h2 className="text-base font-bold">Metragem de cabo</h2>
+                {cabos.map((cabo, index) => (
+                  <div
+                    key={cabo.id}
+                    className="relative flex flex-col space-y-3 rounded-xl border border-border p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold">Cabo {index + 1}</p>
+                      {!readOnly && index >= 1 && onRemoveCabo ? (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveCabo(cabo.id)}
+                          className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                          aria-label={`Excluir cabo ${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={cabo.tipoCabo}
+                        onChange={(e) =>
+                          onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value) })
+                        }
+                        placeholder="Ex: 12"
+                        disabled={readOnly}
+                        className={inputClass()}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold">
+                          Marcação Inicial (m)
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          value={cabo.marcacaoInicial}
+                          onChange={(e) => {
+                            const marcacaoInicial = e.target.value;
+                            onPatchCabo(cabo.id, {
+                              marcacaoInicial,
+                              metragem: calcularMetragemCaboTotal(
+                                marcacaoInicial,
+                                cabo.marcacaoFinal,
+                              ),
+                            });
+                          }}
+                          disabled={readOnly}
+                          className={inputClass()}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold">
+                          Marcação Final (m)
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          value={cabo.marcacaoFinal}
+                          onChange={(e) => {
+                            const marcacaoFinal = e.target.value;
+                            onPatchCabo(cabo.id, {
+                              marcacaoFinal,
+                              metragem: calcularMetragemCaboTotal(
+                                cabo.marcacaoInicial,
+                                marcacaoFinal,
+                              ),
+                            });
+                          }}
+                          disabled={readOnly}
+                          className={inputClass()}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold">
+                        Metragem Total (m)
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={
+                          cabo.metragem ||
+                          calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
+                        }
+                        className={`${inputClass()} cursor-default bg-gray-100`}
+                        tabIndex={-1}
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <FotoLabel>Foto Inicial</FotoLabel>
+                        {cabo.fotoInicio ? (
+                          <RelatorioFotoComControles
+                            src={cabo.fotoInicio.url}
+                            alt="Foto Inicial"
+                            canEdit={!readOnly}
+                            onDelete={() => {
+                              void deleteRelatorioPhoto(cabo.fotoInicio?.path);
+                              onCaboPhoto(cabo.id, "fotoInicio", null);
+                            }}
+                            onReplace={(file) => {
+                              void deleteRelatorioPhoto(cabo.fotoInicio?.path);
+                              onCaboPhoto(cabo.id, "fotoInicio", file);
+                            }}
+                          />
+                        ) : readOnly ? (
+                          <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
+                        ) : (
+                          <PhotoUpload
+                            label="Foto Inicial"
+                            suffix="inicio"
+                            hideLabel
+                            compact
+                            value={null}
+                            onChange={(file) => {
+                              if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <FotoLabel>Foto Final</FotoLabel>
+                        {cabo.fotoFim ? (
+                          <RelatorioFotoComControles
+                            src={cabo.fotoFim.url}
+                            alt="Foto Final"
+                            canEdit={!readOnly}
+                            onDelete={() => {
+                              void deleteRelatorioPhoto(cabo.fotoFim?.path);
+                              onCaboPhoto(cabo.id, "fotoFim", null);
+                            }}
+                            onReplace={(file) => {
+                              void deleteRelatorioPhoto(cabo.fotoFim?.path);
+                              onCaboPhoto(cabo.id, "fotoFim", file);
+                            }}
+                          />
+                        ) : readOnly ? (
+                          <p className="text-sm text-muted-foreground">Sem foto final.</p>
+                        ) : (
+                          <PhotoUpload
+                            label="Foto Final"
+                            suffix="fim"
+                            hideLabel
+                            compact
+                            value={null}
+                            onChange={(file) => {
+                              if (file) onCaboPhoto(cabo.id, "fotoFim", file);
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-auto w-full">
+                      <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+                      <textarea
+                        value={cabo.obs}
+                        onChange={(e) => onPatchCabo(cabo.id, { obs: e.target.value })}
+                        rows={3}
+                        disabled={readOnly}
+                        className={inputClass()}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {readOnly ? null : (
+                  <button
+                    type="button"
+                    onClick={onAddCabo}
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
+                  >
+                    <Plus className="h-4 w-4" /> Adicionar mais cabo
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+            {gruposCabos.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          </div>
+
+          {fiberloopInstalado && onFiberloopInstaladoChange ? (
+            <CordoalhaSimNaoCard
+              title="Fiberloop instalado?"
+              quantidadeLabel="Quantidade de Fiberloop instalado"
+              quantidadePlaceholder="Ex: 2"
+              value={fiberloopInstalado}
+              onChange={onFiberloopInstaladoChange}
+              disabled={readOnly}
+            />
+          ) : null}
+        </AccordionBloco>
+
+        <AccordionBloco title="POSTE">
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+            {gruposPoste.map((grupo) => {
+              const isPoste =
+                grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao";
+              return (
+                <div key={grupo.grupoKey} className="contents">
+                  {renderGrupoFotoCard(grupo, fotoCtx)}
+                  {isPoste && mostrarCordoalha ? (
+                    <>
+                      <CordoalhaSimNaoCard
+                        title="Lançado cordoalha?"
+                        quantidadeLabel="Quantidade de cordoalha lançada:"
+                        quantidadePlaceholder="Ex: 50"
+                        value={cordoalhaLancada!}
+                        onChange={onCordoalhaLancadaChange}
+                        disabled={readOnly}
+                      />
+                      <CordoalhaSimNaoCard
+                        title="Cordoalha existente?"
+                        quantidadeLabel="Quantidade de cordoalha existente:"
+                        quantidadePlaceholder="Ex: 120"
+                        value={cordoalhaExistente!}
+                        onChange={onCordoalhaExistenteChange}
+                        disabled={readOnly}
+                      />
+                    </>
+                  ) : null}
+                  {isPoste && mostrarPostes ? (
+                    <>
+                      <CordoalhaSimNaoCard
+                        title="Postes novo com nova cordoalha?"
+                        quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+                        quantidadePlaceholder="Ex: 10"
+                        value={postesNovaCordoalha!}
+                        onChange={onPostesNovaCordoalhaChange}
+                        disabled={readOnly}
+                      />
+                      <CordoalhaSimNaoCard
+                        title="Postes com cordoalha Existente?"
+                        quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
+                        quantidadePlaceholder="Ex: 10"
+                        value={postesCordoalhaExistente!}
+                        onChange={onPostesCordoalhaExistenteChange}
+                        disabled={readOnly}
+                      />
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </AccordionBloco>
+
+        <AccordionBloco title="CAIXA DE EMENDA">
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+            {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          </div>
+        </AccordionBloco>
+
+        <AccordionBloco title="OUTRAS FOTOS">
+          <RelatorioOutrasFotos
+            title="Outras fotos"
+            outras={outras}
+            onOutrasChange={onOutrasChange}
+            onOutraPhoto={onOutraPhoto}
+            readOnly={readOnly}
+          />
+        </AccordionBloco>
       </div>
     </EvidencePhotoPasteProvider>
   );

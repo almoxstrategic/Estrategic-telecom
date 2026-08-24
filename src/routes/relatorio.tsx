@@ -77,6 +77,7 @@ import {
   type TesteOpticoPayload,
   type TestePotenciaPayload,
   type TipoExecucao,
+  type AmbienteRede,
 } from "@/lib/relatorios-transmissao";
 
 type RelatorioSearch = {
@@ -105,8 +106,9 @@ function grupoPayload(
   slots: FotoSlot[],
   obs: string,
   obsAdmin = "",
+  ambiente: AmbienteRede | null = null,
 ): EscopoPayload["posteConexao"] {
-  return { fotos: fotosDosSlots(slots), obs, obsAdmin };
+  return { fotos: fotosDosSlots(slots), obs, obsAdmin, ambiente };
 }
 
 function outrasParaPayload(items: OutraFotoState[]): EscopoPayload["outrasFotos"] {
@@ -223,6 +225,7 @@ function RelatorioPage() {
   const [tipo, setTipo] = useState<TipoExecucao | "">("");
   const [abaCampo, setAbaCampo] = useState<AbaCampo>("RE");
   const [lancamentoRe, setLancamentoRe] = useState<"sim" | "nao" | "">("");
+  const [lancamentoReAmbiente, setLancamentoReAmbiente] = useState<AmbienteRede | null>(null);
   const [cabos, setCabos] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
   const [poste, setPoste] = useState<FotoSlot[]>([newFotoSlot()]);
   const [posteObs, setPosteObs] = useState("");
@@ -234,8 +237,6 @@ function RelatorioPage() {
   const [plaquetaObs, setPlaquetaObs] = useState("");
   const [sobra, setSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
   const [sobraObs, setSobraObs] = useState("");
-  const [terrometro, setTerrometro] = useState<FotoSlot[]>([newFotoSlot()]);
-  const [terrometroObs, setTerrometroObs] = useState("");
   const [novoAterramento, setNovoAterramento] = useState<FotoSlot[]>([newFotoSlot()]);
   const [novoAterramentoObs, setNovoAterramentoObs] = useState("");
   const [posicao, setPosicao] = useState<FotoSlot[]>([newFotoSlot()]);
@@ -248,8 +249,12 @@ function RelatorioPage() {
   const [obsAdminGrupos, setObsAdminGrupos] = useState<
     Partial<Record<RelatorioFotoGrupoKey, string>>
   >({});
+  const [ambientesGrupos, setAmbientesGrupos] = useState<
+    Partial<Record<RelatorioFotoGrupoKey, AmbienteRede | null>>
+  >({});
   const [tecnologiaAcesso, setTecnologiaAcesso] = useState("");
   const [lancamentoCabosRC, setLancamentoCabosRC] = useState<"sim" | "nao" | "">("");
+  const [lancamentoRcAmbiente, setLancamentoRcAmbiente] = useState<AmbienteRede | null>(null);
   const [cabosRc, setCabosRc] = useState<CaboMetragemPayload[]>(() => [emptyCaboMetragem()]);
   const [rcPoste, setRcPoste] = useState<FotoSlot[]>([newFotoSlot()]);
   const [rcPosteObs, setRcPosteObs] = useState("");
@@ -265,6 +270,10 @@ function RelatorioPage() {
   const [rcEntradaExternaObs, setRcEntradaExternaObs] = useState("");
   const [rcSobra, setRcSobra] = useState<FotoSlot[]>(() => [newFotoSlot()]);
   const [rcSobraObs, setRcSobraObs] = useState("");
+  const [rcNovoAterramento, setRcNovoAterramento] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcNovoAterramentoObs, setRcNovoAterramentoObs] = useState("");
+  const [rcDuto, setRcDuto] = useState<FotoSlot[]>([newFotoSlot()]);
+  const [rcDutoObs, setRcDutoObs] = useState("");
   const [outrasRc, setOutrasRc] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [eqGrupos, setEqGrupos] = useState<Record<RelatorioFotoGrupoKeyEq, FotoGrupoUi>>(emptyEqGrupos);
   const [eqClienteDgoItens, setEqClienteDgoItens] = useState<DgoClienteItemPayload[]>(() => [
@@ -308,39 +317,59 @@ function RelatorioPage() {
   const enableAutosaveTimerRef = useRef<number | null>(null);
 
   const buildEscopoFromUi = useCallback((): EscopoPayload => {
+    const ambienteDe = (key: RelatorioFotoGrupoKey) => ambientesGrupos[key] ?? null;
     return {
       lancamentoRe: lancamentoRe === "sim" ? true : lancamentoRe === "nao" ? false : null,
+      lancamentoReAmbiente,
       metragensCabo: cabos,
       posteConexao: grupoPayload(poste, posteObs, obsAdminGrupos.posteConexao),
-      caixaEmenda: grupoPayload(caixa, caixaObs, obsAdminGrupos.caixaEmenda),
+      caixaEmenda: grupoPayload(
+        caixa,
+        caixaObs,
+        obsAdminGrupos.caixaEmenda,
+        ambienteDe("caixaEmenda"),
+      ),
       dutoSubterraneo: grupoPayload(duto, dutoObs, obsAdminGrupos.dutoSubterraneo),
-      plaquetaIdentificacao: grupoPayload(plaqueta, plaquetaObs, obsAdminGrupos.plaquetaIdentificacao),
+      plaquetaIdentificacao: grupoPayload(
+        plaqueta,
+        plaquetaObs,
+        obsAdminGrupos.plaquetaIdentificacao,
+        ambienteDe("plaquetaIdentificacao"),
+      ),
       novoAterramentoPoste: grupoPayload(
         novoAterramento,
         novoAterramentoObs,
         obsAdminGrupos.novoAterramentoPoste,
       ),
-      aterramentoTerrometro: grupoPayload(
-        terrometro,
-        terrometroObs,
-        obsAdminGrupos.aterramentoTerrometro,
-      ),
+      aterramentoTerrometro: { fotos: [], obs: "", obsAdmin: "", ambiente: null },
       posicaoConexaoEstacao: grupoPayload(posicao, posicaoObs, obsAdminGrupos.posicaoConexaoEstacao),
       etiquetaIdentificacao: grupoPayload(etiqueta, etiquetaObs, obsAdminGrupos.etiquetaIdentificacao),
-      sobraTecnica: grupoPayload(sobra, sobraObs, obsAdminGrupos.sobraTecnica),
+      sobraTecnica: grupoPayload(
+        sobra,
+        sobraObs,
+        obsAdminGrupos.sobraTecnica,
+        ambienteDe("sobraTecnica"),
+      ),
       outrasFotos: outrasParaPayload(outras),
       redeAcesso,
       tecnologiaAcesso,
       lancamentoRc:
         lancamentoCabosRC === "sim" ? true : lancamentoCabosRC === "nao" ? false : null,
+      lancamentoRcAmbiente,
       metragensCaboRc: cabosRc,
       rcPosteConexao: grupoPayload(rcPoste, rcPosteObs, obsAdminGrupos.rcPosteConexao),
-      rcCaixaEmenda: grupoPayload(rcCaixa, rcCaixaObs, obsAdminGrupos.rcCaixaEmenda),
+      rcCaixaEmenda: grupoPayload(
+        rcCaixa,
+        rcCaixaObs,
+        obsAdminGrupos.rcCaixaEmenda,
+        ambienteDe("rcCaixaEmenda"),
+      ),
       rcTerminacaoCabo: grupoPayload(rcTerminacao, rcTerminacaoObs, obsAdminGrupos.rcTerminacaoCabo),
       rcPlaquetaIdentificacao: grupoPayload(
         rcPlaqueta,
         rcPlaquetaObs,
         obsAdminGrupos.rcPlaquetaIdentificacao,
+        ambienteDe("rcPlaquetaIdentificacao"),
       ),
       rcEntradaInterna: grupoPayload(
         rcEntradaInterna,
@@ -352,7 +381,18 @@ function RelatorioPage() {
         rcEntradaExternaObs,
         obsAdminGrupos.rcEntradaExterna,
       ),
-      rcSobraTecnica: grupoPayload(rcSobra, rcSobraObs, obsAdminGrupos.rcSobraTecnica),
+      rcSobraTecnica: grupoPayload(
+        rcSobra,
+        rcSobraObs,
+        obsAdminGrupos.rcSobraTecnica,
+        ambienteDe("rcSobraTecnica"),
+      ),
+      rcNovoAterramentoPoste: grupoPayload(
+        rcNovoAterramento,
+        rcNovoAterramentoObs,
+        obsAdminGrupos.rcNovoAterramentoPoste,
+      ),
+      rcDutoSubterraneo: grupoPayload(rcDuto, rcDutoObs, obsAdminGrupos.rcDutoSubterraneo),
       outrasFotosRc: outrasParaPayload(outrasRc),
       redeCliente,
       eqClienteFachada: grupoPayload(
@@ -413,6 +453,7 @@ function RelatorioPage() {
     };
   }, [
     lancamentoRe,
+    lancamentoReAmbiente,
     cabos,
     poste,
     posteObs,
@@ -424,8 +465,6 @@ function RelatorioPage() {
     plaquetaObs,
     novoAterramento,
     novoAterramentoObs,
-    terrometro,
-    terrometroObs,
     posicao,
     posicaoObs,
     etiqueta,
@@ -435,8 +474,10 @@ function RelatorioPage() {
     outras,
     redeAcesso,
     obsAdminGrupos,
+    ambientesGrupos,
     tecnologiaAcesso,
     lancamentoCabosRC,
+    lancamentoRcAmbiente,
     cabosRc,
     rcPoste,
     rcPosteObs,
@@ -452,6 +493,10 @@ function RelatorioPage() {
     rcEntradaExternaObs,
     rcSobra,
     rcSobraObs,
+    rcNovoAterramento,
+    rcNovoAterramentoObs,
+    rcDuto,
+    rcDutoObs,
     outrasRc,
     redeCliente,
     eqGrupos,
@@ -540,13 +585,13 @@ function RelatorioPage() {
       responsavel,
       dataInicio,
       lancamentoRe,
+      lancamentoReAmbiente,
       cabos,
       posteObs,
       caixaObs,
       dutoObs,
       plaquetaObs,
       sobraObs,
-      terrometroObs,
       novoAterramentoObs,
       posicaoObs,
       etiquetaObs,
@@ -555,14 +600,15 @@ function RelatorioPage() {
       duto,
       plaqueta,
       sobra,
-      terrometro,
       novoAterramento,
       posicao,
       etiqueta,
       outras,
       redeAcesso,
+      ambientesGrupos,
       tecnologiaAcesso,
       lancamentoCabosRC,
+      lancamentoRcAmbiente,
       cabosRc,
       rcPosteObs,
       rcCaixaObs,
@@ -571,6 +617,8 @@ function RelatorioPage() {
       rcEntradaInternaObs,
       rcEntradaExternaObs,
       rcSobraObs,
+      rcNovoAterramentoObs,
+      rcDutoObs,
       rcPoste,
       rcCaixa,
       rcTerminacao,
@@ -578,6 +626,8 @@ function RelatorioPage() {
       rcEntradaInterna,
       rcEntradaExterna,
       rcSobra,
+      rcNovoAterramento,
+      rcDuto,
       outrasRc,
       redeCliente,
       eqGrupos,
@@ -604,6 +654,7 @@ function RelatorioPage() {
   /** Carrega os campos de campo do payload no formulário. */
   const applyEscopoToUi = (p: EscopoPayload) => {
     setLancamentoRe(p.lancamentoRe === true ? "sim" : p.lancamentoRe === false ? "nao" : "");
+    setLancamentoReAmbiente(p.lancamentoReAmbiente ?? null);
     setCabos(p.metragensCabo.length > 0 ? p.metragensCabo : [emptyCaboMetragem()]);
     setPoste(slotsFromStored(p.posteConexao?.fotos ?? [], 1));
     setPosteObs(p.posteConexao?.obs ?? "");
@@ -615,8 +666,6 @@ function RelatorioPage() {
     setPlaquetaObs(p.plaquetaIdentificacao?.obs ?? "");
     setSobra(slotsFromStored(p.sobraTecnica?.fotos ?? [], 1));
     setSobraObs(p.sobraTecnica?.obs ?? "");
-    setTerrometro(slotsFromStored(p.aterramentoTerrometro?.fotos ?? [], 1));
-    setTerrometroObs(p.aterramentoTerrometro?.obs ?? "");
     setNovoAterramento(slotsFromStored(p.novoAterramentoPoste?.fotos ?? [], 1));
     setNovoAterramentoObs(p.novoAterramentoPoste?.obs ?? "");
     setPosicao(slotsFromStored(p.posicaoConexaoEstacao?.fotos ?? [], 1));
@@ -627,11 +676,16 @@ function RelatorioPage() {
     setRedeAcesso({
       ...emptyQuantidadesRede(),
       ...(p.redeAcesso ?? {}),
+      fiberloopInstalado: p.redeAcesso?.fiberloopInstalado ?? emptyCordoalhaBloco(),
+      qtdFiberloopInstalado:
+        p.redeAcesso?.fiberloopInstalado?.isSim === true
+          ? p.redeAcesso.fiberloopInstalado.quantidade
+          : null,
       cordoalhaLancada: p.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco(),
       cordoalhaExistente: p.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco(),
       postesNovaCordoalha: p.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
       postesCordoalhaExistente: p.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
-      aterramento: p.redeAcesso?.aterramento ?? { totalHastes: null },
+      aterramento: { totalHastes: null },
     });
     setObsAdminGrupos({
       posteConexao: readObsAdmin(p.posteConexao),
@@ -639,7 +693,6 @@ function RelatorioPage() {
       dutoSubterraneo: readObsAdmin(p.dutoSubterraneo),
       plaquetaIdentificacao: readObsAdmin(p.plaquetaIdentificacao),
       novoAterramentoPoste: readObsAdmin(p.novoAterramentoPoste),
-      aterramentoTerrometro: readObsAdmin(p.aterramentoTerrometro),
       posicaoConexaoEstacao: readObsAdmin(p.posicaoConexaoEstacao),
       etiquetaIdentificacao: readObsAdmin(p.etiquetaIdentificacao),
       sobraTecnica: readObsAdmin(p.sobraTecnica),
@@ -650,9 +703,20 @@ function RelatorioPage() {
       rcEntradaInterna: readObsAdmin(p.rcEntradaInterna),
       rcEntradaExterna: readObsAdmin(p.rcEntradaExterna),
       rcSobraTecnica: readObsAdmin(p.rcSobraTecnica),
+      rcNovoAterramentoPoste: readObsAdmin(p.rcNovoAterramentoPoste),
+      rcDutoSubterraneo: readObsAdmin(p.rcDutoSubterraneo),
+    });
+    setAmbientesGrupos({
+      caixaEmenda: p.caixaEmenda?.ambiente ?? null,
+      plaquetaIdentificacao: p.plaquetaIdentificacao?.ambiente ?? null,
+      sobraTecnica: p.sobraTecnica?.ambiente ?? null,
+      rcCaixaEmenda: p.rcCaixaEmenda?.ambiente ?? null,
+      rcPlaquetaIdentificacao: p.rcPlaquetaIdentificacao?.ambiente ?? null,
+      rcSobraTecnica: p.rcSobraTecnica?.ambiente ?? null,
     });
     setTecnologiaAcesso(p.tecnologiaAcesso ?? "");
     setLancamentoCabosRC(p.lancamentoRc === true ? "sim" : p.lancamentoRc === false ? "nao" : "");
+    setLancamentoRcAmbiente(p.lancamentoRcAmbiente ?? null);
     setCabosRc(p.metragensCaboRc.length > 0 ? p.metragensCaboRc : [emptyCaboMetragem()]);
     setRcPoste(slotsFromStored(p.rcPosteConexao?.fotos ?? [], 1));
     setRcPosteObs(p.rcPosteConexao?.obs ?? "");
@@ -668,15 +732,24 @@ function RelatorioPage() {
     setRcEntradaExternaObs(p.rcEntradaExterna?.obs ?? "");
     setRcSobra(slotsFromStored(p.rcSobraTecnica?.fotos ?? [], 1));
     setRcSobraObs(p.rcSobraTecnica?.obs ?? "");
+    setRcNovoAterramento(slotsFromStored(p.rcNovoAterramentoPoste?.fotos ?? [], 1));
+    setRcNovoAterramentoObs(p.rcNovoAterramentoPoste?.obs ?? "");
+    setRcDuto(slotsFromStored(p.rcDutoSubterraneo?.fotos ?? [], 1));
+    setRcDutoObs(p.rcDutoSubterraneo?.obs ?? "");
     setOutrasRc(outrasFromPayload(p.outrasFotosRc));
     setRedeCliente({
       ...emptyQuantidadesRede(),
       ...(p.redeCliente ?? {}),
+      fiberloopInstalado: p.redeCliente?.fiberloopInstalado ?? emptyCordoalhaBloco(),
+      qtdFiberloopInstalado:
+        p.redeCliente?.fiberloopInstalado?.isSim === true
+          ? p.redeCliente.fiberloopInstalado.quantidade
+          : null,
       cordoalhaLancada: p.redeCliente?.cordoalhaLancada ?? emptyCordoalhaBloco(),
       cordoalhaExistente: p.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco(),
       postesNovaCordoalha: p.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco(),
       postesCordoalhaExistente: p.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco(),
-      aterramento: p.redeCliente?.aterramento ?? { totalHastes: null },
+      aterramento: { totalHastes: null },
       coordenadas: p.redeCliente?.coordenadas ?? emptyCoordenadas(),
       caixaEmendaAcomodacao: {
         coordenadas: p.redeCliente?.caixaEmendaAcomodacao?.coordenadas ?? emptyCoordenadas(),
@@ -996,6 +1069,22 @@ function RelatorioPage() {
     setObsAdminGrupos((prev) => ({ ...prev, [key]: obsAdmin }));
   };
 
+  const patchAmbienteGrupo = (key: RelatorioFotoGrupoKey) => (ambiente: AmbienteRede) => {
+    setAmbientesGrupos((prev) => ({ ...prev, [key]: ambiente }));
+  };
+
+  const patchFiberloop = (
+    setter: React.Dispatch<React.SetStateAction<QuantidadesRedePayload>>,
+    fiberloopInstalado: QuantidadesRedePayload["fiberloopInstalado"],
+  ) => {
+    setter((prev) => ({
+      ...prev,
+      fiberloopInstalado,
+      qtdFiberloopInstalado:
+        fiberloopInstalado.isSim === true ? fiberloopInstalado.quantidade : null,
+    }));
+  };
+
   const showObsAdmin = hasPainelFullAccess(user?.role);
 
   const grupoSetters: Record<
@@ -1008,7 +1097,7 @@ function RelatorioPage() {
     plaquetaIdentificacao: setPlaqueta,
     sobraTecnica: setSobra,
     novoAterramentoPoste: setNovoAterramento,
-    aterramentoTerrometro: setTerrometro,
+    aterramentoTerrometro: () => {},
     posicaoConexaoEstacao: setPosicao,
     etiquetaIdentificacao: setEtiqueta,
     rcPosteConexao: setRcPoste,
@@ -1018,6 +1107,8 @@ function RelatorioPage() {
     rcEntradaInterna: setRcEntradaInterna,
     rcEntradaExterna: setRcEntradaExterna,
     rcSobraTecnica: setRcSobra,
+    rcNovoAterramentoPoste: setRcNovoAterramento,
+    rcDutoSubterraneo: setRcDuto,
     eqClienteFachada: setEqGrupoSlots("eqClienteFachada"),
     eqClienteAmbiente: setEqGrupoSlots("eqClienteAmbiente"),
     eqClienteRack: setEqGrupoSlots("eqClienteRack"),
@@ -1226,6 +1317,10 @@ function RelatorioPage() {
                       setCabos((prev) => (prev.length ? prev : [emptyCaboMetragem()]));
                     }
                   }}
+                  lancamentoAmbiente={lancamentoReAmbiente}
+                  onLancamentoAmbienteChange={setLancamentoReAmbiente}
+                  fiberloopInstalado={redeAcesso.fiberloopInstalado}
+                  onFiberloopInstaladoChange={(next) => patchFiberloop(setRedeAcesso, next)}
                   cordoalhaLancada={redeAcesso.cordoalhaLancada}
                   onCordoalhaLancadaChange={(cordoalhaLancada) =>
                     setRedeAcesso((prev) => ({ ...prev, cordoalhaLancada }))
@@ -1252,7 +1347,23 @@ function RelatorioPage() {
                   showObsAdmin={showObsAdmin}
                   grupos={[
                     {
+                      grupoKey: "sobraTecnica",
+                      section: "cabos",
+                      title: "Sobra técnica / Fiberloop",
+                      minSlots: 1,
+                      slots: sobra,
+                      onChange: setSobra,
+                      obs: sobraObs,
+                      onObsChange: setSobraObs,
+                      obsAdmin: obsAdminGrupos.sobraTecnica ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("sobraTecnica"),
+                      showAmbienteToggle: true,
+                      ambiente: ambientesGrupos.sobraTecnica ?? null,
+                      onAmbienteChange: patchAmbienteGrupo("sobraTecnica"),
+                    },
+                    {
                       grupoKey: "posteConexao",
+                      section: "poste",
                       title: "Poste de conexão",
                       slots: poste,
                       onChange: setPoste,
@@ -1262,7 +1373,19 @@ function RelatorioPage() {
                       onObsAdminChange: patchObsAdminGrupo("posteConexao"),
                     },
                     {
+                      grupoKey: "novoAterramentoPoste",
+                      section: "poste",
+                      title: "Novo aterramento do poste",
+                      slots: novoAterramento,
+                      onChange: setNovoAterramento,
+                      obs: novoAterramentoObs,
+                      onObsChange: setNovoAterramentoObs,
+                      obsAdmin: obsAdminGrupos.novoAterramentoPoste ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("novoAterramentoPoste"),
+                    },
+                    {
                       grupoKey: "caixaEmenda",
+                      section: "caixa",
                       title: "Caixa de emenda",
                       slots: caixa,
                       onChange: setCaixa,
@@ -1270,6 +1393,9 @@ function RelatorioPage() {
                       onObsChange: setCaixaObs,
                       obsAdmin: obsAdminGrupos.caixaEmenda ?? "",
                       onObsAdminChange: patchObsAdminGrupo("caixaEmenda"),
+                      showAmbienteToggle: true,
+                      ambiente: ambientesGrupos.caixaEmenda ?? null,
+                      onAmbienteChange: patchAmbienteGrupo("caixaEmenda"),
                       ...(tipo === "empresarial" || tipo === "implantacao"
                         ? {
                             quantidade: redeAcesso.qtdCaixasEmenda,
@@ -1282,7 +1408,8 @@ function RelatorioPage() {
                     },
                     {
                       grupoKey: "dutoSubterraneo",
-                      title: "Const. de duto subterraneio (MD ou MND)",
+                      section: "caixa",
+                      title: "Const. de duto subterrâneo (MD ou MND)",
                       slots: duto,
                       onChange: setDuto,
                       obs: dutoObs,
@@ -1292,77 +1419,17 @@ function RelatorioPage() {
                     },
                     {
                       grupoKey: "plaquetaIdentificacao",
-                      title: "Plaqueta de Identificação",
+                      section: "caixa",
+                      title: "Plaqueta de Identificação - Caixa de emenda",
                       slots: plaqueta,
                       onChange: setPlaqueta,
                       obs: plaquetaObs,
                       onObsChange: setPlaquetaObs,
                       obsAdmin: obsAdminGrupos.plaquetaIdentificacao ?? "",
                       onObsAdminChange: patchObsAdminGrupo("plaquetaIdentificacao"),
-                    },
-                    {
-                      grupoKey: "sobraTecnica",
-                      title: "Sobra técnica / Fiberloop instalado",
-                      minSlots: 1,
-                      slots: sobra,
-                      onChange: setSobra,
-                      obs: sobraObs,
-                      onObsChange: setSobraObs,
-                      obsAdmin: obsAdminGrupos.sobraTecnica ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("sobraTecnica"),
-                      quantidade: redeAcesso.qtdFiberloopInstalado,
-                      quantidadeLabel: "Quantidade de Fiberloop instalado",
-                      quantidadePlaceholder: "Ex: 2",
-                      onQuantidadeChange: (qtdFiberloopInstalado) =>
-                        setRedeAcesso((prev) => ({ ...prev, qtdFiberloopInstalado })),
-                    },
-                    {
-                      grupoKey: "novoAterramentoPoste",
-                      title: "Novo aterramento do poste",
-                      slots: novoAterramento,
-                      onChange: setNovoAterramento,
-                      obs: novoAterramentoObs,
-                      onObsChange: setNovoAterramentoObs,
-                      obsAdmin: obsAdminGrupos.novoAterramentoPoste ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("novoAterramentoPoste"),
-                    },
-                    {
-                      grupoKey: "aterramentoTerrometro",
-                      title: "Aterramento - TERROMETRO",
-                      slots: terrometro,
-                      onChange: setTerrometro,
-                      obs: terrometroObs,
-                      onObsChange: setTerrometroObs,
-                      obsAdmin: obsAdminGrupos.aterramentoTerrometro ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("aterramentoTerrometro"),
-                      quantidade: redeAcesso.aterramento?.totalHastes ?? null,
-                      quantidadeLabel: "Total de Hastes (5/8):",
-                      quantidadePlaceholder: "Ex: 4",
-                      onQuantidadeChange: (totalHastes) =>
-                        setRedeAcesso((prev) => ({
-                          ...prev,
-                          aterramento: { ...prev.aterramento, totalHastes },
-                        })),
-                    },
-                    {
-                      grupoKey: "posicaoConexaoEstacao",
-                      title: "Posição de conexão na Estação/PPC (DGO/DIO)",
-                      slots: posicao,
-                      onChange: setPosicao,
-                      obs: posicaoObs,
-                      onObsChange: setPosicaoObs,
-                      obsAdmin: obsAdminGrupos.posicaoConexaoEstacao ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("posicaoConexaoEstacao"),
-                    },
-                    {
-                      grupoKey: "etiquetaIdentificacao",
-                      title: "ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC",
-                      slots: etiqueta,
-                      onChange: setEtiqueta,
-                      obs: etiquetaObs,
-                      onObsChange: setEtiquetaObs,
-                      obsAdmin: obsAdminGrupos.etiquetaIdentificacao ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("etiquetaIdentificacao"),
+                      showAmbienteToggle: true,
+                      ambiente: ambientesGrupos.plaquetaIdentificacao ?? null,
+                      onAmbienteChange: patchAmbienteGrupo("plaquetaIdentificacao"),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file) => {
@@ -1414,6 +1481,10 @@ function RelatorioPage() {
                       setCabosRc((prev) => (prev.length ? prev : [emptyCaboMetragem()]));
                     }
                   }}
+                  lancamentoAmbiente={lancamentoRcAmbiente}
+                  onLancamentoAmbienteChange={setLancamentoRcAmbiente}
+                  fiberloopInstalado={redeCliente.fiberloopInstalado}
+                  onFiberloopInstaladoChange={(next) => patchFiberloop(setRedeCliente, next)}
                   cordoalhaLancada={redeCliente.cordoalhaLancada}
                   onCordoalhaLancadaChange={(cordoalhaLancada) =>
                     setRedeCliente((prev) => ({ ...prev, cordoalhaLancada }))
@@ -1440,7 +1511,23 @@ function RelatorioPage() {
                   showObsAdmin={showObsAdmin}
                   grupos={[
                     {
+                      grupoKey: "rcSobraTecnica",
+                      section: "cabos",
+                      title: "Sobra técnica / Fiberloop",
+                      minSlots: 1,
+                      slots: rcSobra,
+                      onChange: setRcSobra,
+                      obs: rcSobraObs,
+                      onObsChange: setRcSobraObs,
+                      obsAdmin: obsAdminGrupos.rcSobraTecnica ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcSobraTecnica"),
+                      showAmbienteToggle: true,
+                      ambiente: ambientesGrupos.rcSobraTecnica ?? null,
+                      onAmbienteChange: patchAmbienteGrupo("rcSobraTecnica"),
+                    },
+                    {
                       grupoKey: "rcPosteConexao",
+                      section: "poste",
                       title: "Poste de conexão (Rede cliente com Rede Externa)",
                       slots: rcPoste,
                       onChange: setRcPoste,
@@ -1450,7 +1537,19 @@ function RelatorioPage() {
                       onObsAdminChange: patchObsAdminGrupo("rcPosteConexao"),
                     },
                     {
+                      grupoKey: "rcNovoAterramentoPoste",
+                      section: "poste",
+                      title: "Novo aterramento do poste",
+                      slots: rcNovoAterramento,
+                      onChange: setRcNovoAterramento,
+                      obs: rcNovoAterramentoObs,
+                      onObsChange: setRcNovoAterramentoObs,
+                      obsAdmin: obsAdminGrupos.rcNovoAterramentoPoste ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcNovoAterramentoPoste"),
+                    },
+                    {
                       grupoKey: "rcCaixaEmenda",
+                      section: "caixa",
                       title: "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
                       slots: rcCaixa,
                       onChange: setRcCaixa,
@@ -1458,6 +1557,9 @@ function RelatorioPage() {
                       onObsChange: setRcCaixaObs,
                       obsAdmin: obsAdminGrupos.rcCaixaEmenda ?? "",
                       onObsAdminChange: patchObsAdminGrupo("rcCaixaEmenda"),
+                      showAmbienteToggle: true,
+                      ambiente: ambientesGrupos.rcCaixaEmenda ?? null,
+                      onAmbienteChange: patchAmbienteGrupo("rcCaixaEmenda"),
                       quantidade: redeCliente.qtdCaixasEmenda,
                       quantidadeLabel: "Quantidade de Caixas de Emenda",
                       quantidadePlaceholder: "Ex: 1",
@@ -1472,7 +1574,33 @@ function RelatorioPage() {
                         })),
                     },
                     {
+                      grupoKey: "rcPlaquetaIdentificacao",
+                      section: "caixa",
+                      title: "Plaqueta de Identificação - Caixa de emenda",
+                      slots: rcPlaqueta,
+                      onChange: setRcPlaqueta,
+                      obs: rcPlaquetaObs,
+                      onObsChange: setRcPlaquetaObs,
+                      obsAdmin: obsAdminGrupos.rcPlaquetaIdentificacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcPlaquetaIdentificacao"),
+                      showAmbienteToggle: true,
+                      ambiente: ambientesGrupos.rcPlaquetaIdentificacao ?? null,
+                      onAmbienteChange: patchAmbienteGrupo("rcPlaquetaIdentificacao"),
+                    },
+                    {
+                      grupoKey: "rcDutoSubterraneo",
+                      section: "caixa",
+                      title: "Const. de duto subterrâneo (MD ou MND)",
+                      slots: rcDuto,
+                      onChange: setRcDuto,
+                      obs: rcDutoObs,
+                      onObsChange: setRcDutoObs,
+                      obsAdmin: obsAdminGrupos.rcDutoSubterraneo ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcDutoSubterraneo"),
+                    },
+                    {
                       grupoKey: "rcTerminacaoCabo",
+                      section: "caixa",
                       title: "Terminação do cabo no cliente (PTO/Roseta - área interna)",
                       slots: rcTerminacao,
                       onChange: setRcTerminacao,
@@ -1482,17 +1610,8 @@ function RelatorioPage() {
                       onObsAdminChange: patchObsAdminGrupo("rcTerminacaoCabo"),
                     },
                     {
-                      grupoKey: "rcPlaquetaIdentificacao",
-                      title: "Plaqueta de Identificação - Terminação do cabo no cliente",
-                      slots: rcPlaqueta,
-                      onChange: setRcPlaqueta,
-                      obs: rcPlaquetaObs,
-                      onObsChange: setRcPlaquetaObs,
-                      obsAdmin: obsAdminGrupos.rcPlaquetaIdentificacao ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcPlaquetaIdentificacao"),
-                    },
-                    {
                       grupoKey: "rcEntradaInterna",
+                      section: "caixa",
                       title: "Entrada do cabo no cliente (Área interna)",
                       slots: rcEntradaInterna,
                       onChange: setRcEntradaInterna,
@@ -1503,6 +1622,7 @@ function RelatorioPage() {
                     },
                     {
                       grupoKey: "rcEntradaExterna",
+                      section: "caixa",
                       title: "Entrada do cabo no cliente (Área externa)",
                       slots: rcEntradaExterna,
                       onChange: setRcEntradaExterna,
@@ -1510,22 +1630,6 @@ function RelatorioPage() {
                       onObsChange: setRcEntradaExternaObs,
                       obsAdmin: obsAdminGrupos.rcEntradaExterna ?? "",
                       onObsAdminChange: patchObsAdminGrupo("rcEntradaExterna"),
-                    },
-                    {
-                      grupoKey: "rcSobraTecnica",
-                      title: "Sobra técnica / Fiberloop instalado",
-                      minSlots: 1,
-                      slots: rcSobra,
-                      onChange: setRcSobra,
-                      obs: rcSobraObs,
-                      onObsChange: setRcSobraObs,
-                      obsAdmin: obsAdminGrupos.rcSobraTecnica ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcSobraTecnica"),
-                      quantidade: redeCliente.qtdFiberloopInstalado,
-                      quantidadeLabel: "Quantidade de Fiberloop instalado",
-                      quantidadePlaceholder: "Ex: 2",
-                      onQuantidadeChange: (qtdFiberloopInstalado) =>
-                        setRedeCliente((prev) => ({ ...prev, qtdFiberloopInstalado })),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file) => {
@@ -1618,6 +1722,28 @@ function RelatorioPage() {
                   onOutraClientePhoto={(itemId, file) =>
                     handleOutraPhoto(setOutrasEqCliente, "outrasFotosEqCliente", itemId, file)
                   }
+                  gruposConexaoEstacao={[
+                    {
+                      grupoKey: "posicaoConexaoEstacao",
+                      title: "Posição de conexão na Estação/PPC (DGO/DIO)",
+                      slots: posicao,
+                      onChange: setPosicao,
+                      obs: posicaoObs,
+                      onObsChange: setPosicaoObs,
+                      obsAdmin: obsAdminGrupos.posicaoConexaoEstacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("posicaoConexaoEstacao"),
+                    },
+                    {
+                      grupoKey: "etiquetaIdentificacao",
+                      title: "ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC",
+                      slots: etiqueta,
+                      onChange: setEtiqueta,
+                      obs: etiquetaObs,
+                      onObsChange: setEtiquetaObs,
+                      obsAdmin: obsAdminGrupos.etiquetaIdentificacao ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("etiquetaIdentificacao"),
+                    },
+                  ]}
                   relatorioEstacao={relatorioEstacao}
                   onRelatorioEstacao={setRelatorioEstacao}
                   estacaoEntregaAcesso={estacaoEntregaAcesso}

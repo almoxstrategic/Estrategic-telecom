@@ -22,6 +22,7 @@ import {
   CampoQuantidade,
   ChoiceButton,
   CordoalhaSimNaoCard,
+  AmbienteToggle,
   RefTituloInput,
   RelatorioAbasCampo,
   inputClass,
@@ -60,6 +61,7 @@ import {
   type RelatorioStatus,
   type RelatorioTransmissao,
   type StoredPhoto,
+  type AmbienteRede,
 } from "@/lib/relatorios-transmissao";
 
 export function formatDate(value: string | null | undefined) {
@@ -782,13 +784,26 @@ export function RelatorioDetalhe({
     qtdFiberloopInstalado: number | null,
   ) => {
     if (!payload) return;
+    const current = payload[lado] ?? emptyQuantidadesRede();
+    const fiberloopInstalado = {
+      ...current.fiberloopInstalado,
+      quantidade: qtdFiberloopInstalado,
+      isSim: qtdFiberloopInstalado == null ? current.fiberloopInstalado?.isSim ?? null : true,
+    };
     patchPayload({
       ...payload,
       [lado]: {
-        ...(payload[lado] ?? emptyQuantidadesRede()),
-        qtdFiberloopInstalado,
+        ...current,
+        fiberloopInstalado,
+        qtdFiberloopInstalado:
+          fiberloopInstalado.isSim === true ? fiberloopInstalado.quantidade : null,
       },
     });
+  };
+
+  const patchAmbienteGrupo = (key: RelatorioFotoGrupoKey, ambiente: AmbienteRede) => {
+    if (!payload) return;
+    patchPayload({ ...payload, [key]: { ...payload[key], ambiente } });
   };
 
   const adicionarOutra = (
@@ -801,7 +816,7 @@ export function RelatorioDetalhe({
     });
   };
 
-  const renderGrupo = (title: string, key: RelatorioFotoGrupoKey) => {
+  const renderGrupo = (title: string, key: RelatorioFotoGrupoKey, comAmbiente = false) => {
     const grupo = payload?.[key];
     const redeCliente = payload?.redeCliente ?? emptyQuantidadesRede();
     const redeAcesso = payload?.redeAcesso ?? emptyQuantidadesRede();
@@ -838,46 +853,8 @@ export function RelatorioDetalhe({
                   }
                 : undefined,
             }
-          : payload && key === "sobraTecnica"
-            ? {
-                quantidade: redeAcesso.qtdFiberloopInstalado ?? null,
-                quantidadeLabel: "Quantidade de Fiberloop instalado",
-                quantidadePlaceholder: "Ex: 2",
-                onQuantidadeChange: canEditPhotos
-                  ? (qtdFiberloopInstalado: number | null) =>
-                      patchQtdFiberloop("redeAcesso", qtdFiberloopInstalado)
-                  : undefined,
-              }
-            : payload && isEmpresarial && key === "rcSobraTecnica"
-              ? {
-                  quantidade: redeCliente.qtdFiberloopInstalado ?? null,
-                  quantidadeLabel: "Quantidade de Fiberloop instalado",
-                  quantidadePlaceholder: "Ex: 2",
-                  onQuantidadeChange: canEditPhotos
-                    ? (qtdFiberloopInstalado: number | null) =>
-                        patchQtdFiberloop("redeCliente", qtdFiberloopInstalado)
-                    : undefined,
-                }
-              : payload && key === "aterramentoTerrometro"
-                ? {
-                    quantidade: redeAcesso.aterramento?.totalHastes ?? null,
-                    quantidadeLabel: "Total de Hastes (5/8):",
-                    quantidadePlaceholder: "Ex: 4",
-                    onQuantidadeChange: canEditPhotos
-                      ? (totalHastes: number | null) => {
-                          if (!payload) return;
-                          patchPayload({
-                            ...payload,
-                            redeAcesso: {
-                              ...redeAcesso,
-                              aterramento: { ...redeAcesso.aterramento, totalHastes },
-                            },
-                          });
-                        }
-                      : undefined,
-                  }
-                : {};
-    return (
+          : {};
+    const bloco = (
       <EvidenciaBloco
         key={key}
         title={title}
@@ -909,6 +886,19 @@ export function RelatorioDetalhe({
         }
         {...blocoProps(key)}
       />
+    );
+    if (!comAmbiente) return bloco;
+    return (
+      <div key={`${key}-ambiente`} className="space-y-3">
+        <AmbienteToggle
+          value={grupo?.ambiente ?? null}
+          onChange={
+            canEditPhotos ? (ambiente) => patchAmbienteGrupo(key, ambiente) : undefined
+          }
+          disabled={!canEditPhotos}
+        />
+        {bloco}
+      </div>
     );
   };
 
@@ -1244,12 +1234,50 @@ export function RelatorioDetalhe({
               });
             }}
           />
+          <AmbienteToggle
+            value={payload?.lancamentoReAmbiente ?? null}
+            onChange={
+              canEditPhotos
+                ? (lancamentoReAmbiente) => {
+                    if (!payload) return;
+                    patchPayload({ ...payload, lancamentoReAmbiente });
+                  }
+                : undefined
+            }
+            disabled={!canEditPhotos}
+          />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <CordoalhaSimNaoCard
-              title="Lançado cordoalha?"
-              quantidadeLabel="Quantidade de cordoalha lançada:"
-              quantidadePlaceholder="Ex: 50"
-              value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
+              <CordoalhaSimNaoCard
+                title="Fiberloop instalado?"
+                quantidadeLabel="Quantidade de Fiberloop instalado"
+                quantidadePlaceholder="Ex: 2"
+                value={payload?.redeAcesso?.fiberloopInstalado ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (fiberloopInstalado) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: {
+                            ...redeAcesso,
+                            fiberloopInstalado,
+                            qtdFiberloopInstalado:
+                              fiberloopInstalado.isSim === true
+                                ? fiberloopInstalado.quantidade
+                                : null,
+                          },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+              <CordoalhaSimNaoCard
+                title="Lançado cordoalha?"
+                quantidadeLabel="Quantidade de cordoalha lançada:"
+                quantidadePlaceholder="Ex: 50"
+                value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
                   ? (cordoalhaLancada) => {
@@ -1359,9 +1387,9 @@ export function RelatorioDetalhe({
               Caixas de emenda
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {renderGrupo("Caixa de emenda", "caixaEmenda")}
-              {renderGrupo("Const. de duto subterraneio (MD ou MND)", "dutoSubterraneo")}
-              {renderGrupo("Sobra técnica / Fiberloop instalado", "sobraTecnica")}
+              {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
+              {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
+              {renderGrupo("Sobra técnica / Fiberloop", "sobraTecnica", true)}
             </div>
           </section>
           <section className="space-y-3">
@@ -1369,15 +1397,8 @@ export function RelatorioDetalhe({
               Demais evidências
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {(
-                [
-                  ["Plaqueta de Identificação", "plaquetaIdentificacao"],
-                  ["Novo aterramento do poste", "novoAterramentoPoste"],
-                  ["Aterramento - TERROMETRO", "aterramentoTerrometro"],
-                  ["Posição DGO/DIO", "posicaoConexaoEstacao"],
-                  ["Etiqueta na estação/PPC", "etiquetaIdentificacao"],
-                ] as const
-              ).map(([title, key]) => renderGrupo(title, key))}
+              {renderGrupo("Plaqueta de Identificação - Caixa de emenda", "plaquetaIdentificacao", true)}
+              {renderGrupo("Novo aterramento do poste", "novoAterramentoPoste")}
             </div>
             {renderOutrasSecao("outrasFotos", "Outras fotos")}
           </section>
@@ -1437,6 +1458,18 @@ export function RelatorioDetalhe({
                         : payload.metragensCaboRc,
                   });
                 }}
+              />
+              <AmbienteToggle
+                value={payload?.lancamentoRcAmbiente ?? null}
+                onChange={
+                  canEditPhotos
+                    ? (lancamentoRcAmbiente) => {
+                        if (!payload) return;
+                        patchPayload({ ...payload, lancamentoRcAmbiente });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
               />
             </div>
           </div>
@@ -1548,13 +1581,23 @@ export function RelatorioDetalhe({
               {(
                 [
                   ["Caixa de emenda na acomodação (Rede cliente com Rede Externa)", "rcCaixaEmenda"],
+                  ["Plaqueta de Identificação - Caixa de emenda", "rcPlaquetaIdentificacao"],
+                  ["Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo"],
                   ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
-                  ["Plaqueta de Identificação - Terminação do cabo no cliente", "rcPlaquetaIdentificacao"],
                   ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
                   ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
-                  ["Sobra técnica / Fiberloop instalado", "rcSobraTecnica"],
+                  ["Sobra técnica / Fiberloop", "rcSobraTecnica"],
+                  ["Novo aterramento do poste", "rcNovoAterramentoPoste"],
                 ] as const
-              ).map(([title, key]) => renderGrupo(title, key))}
+              ).map(([title, key]) =>
+                renderGrupo(
+                  title,
+                  key,
+                  key === "rcCaixaEmenda" ||
+                    key === "rcPlaquetaIdentificacao" ||
+                    key === "rcSobraTecnica",
+                ),
+              )}
             </div>
             {renderOutrasSecao("outrasFotosRc", "Outras fotos")}
           </section>
@@ -1573,6 +1616,8 @@ export function RelatorioDetalhe({
                   ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
                   ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
                   ["(Rack ou Local)", "eqClienteRack"],
+                  ["Posição de conexão na Estação/PPC (DGO/DIO)", "posicaoConexaoEstacao"],
+                  ["ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC", "etiquetaIdentificacao"],
                 ] as const
               ).map(([title, key]) => renderGrupo(title, key))}
             </div>

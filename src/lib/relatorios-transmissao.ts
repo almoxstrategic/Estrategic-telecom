@@ -29,10 +29,15 @@ export type StoredPhoto = {
   path: string;
 };
 
+/** Ambiente de execução por item (Aéreo / Subterrâneo) — não é aba global. */
+export type AmbienteRede = "aereo" | "subterraneo";
+
 export type FotoGrupoPayload = {
   fotos: StoredPhoto[];
   obs: string;
   obsAdmin: string;
+  /** Presente nos itens que admitem seletor Aéreo/Subterrâneo. */
+  ambiente?: AmbienteRede | null;
 };
 
 export type OutraFotoPayload = {
@@ -126,7 +131,9 @@ export type RelatorioFotoGrupoKeyRc =
   | "rcPlaquetaIdentificacao"
   | "rcEntradaInterna"
   | "rcEntradaExterna"
-  | "rcSobraTecnica";
+  | "rcSobraTecnica"
+  | "rcNovoAterramentoPoste"
+  | "rcDutoSubterraneo";
 
 export type RelatorioFotoGrupoKeyEqCliente =
   | "eqClienteFachada"
@@ -316,15 +323,20 @@ export type CordoalhaBlocoPayload = {
 
 export type QuantidadesRedePayload = {
   qtdCaixasEmenda: number | null;
-  /** Quantidade de Fiberloop instalado (Sobra técnica). */
+  /**
+   * @deprecated Preferir `fiberloopInstalado.quantidade`. Mantido na leitura/escrita
+   * para relatórios antigos (espelha a quantidade quando Fiberloop = SIM).
+   */
   qtdFiberloopInstalado: number | null;
+  /** Fiberloop instalado? (SIM/NÃO + quantidade) — apenas contexto aéreo. */
+  fiberloopInstalado: CordoalhaBlocoPayload;
   cordoalhaLancada: CordoalhaBlocoPayload;
   cordoalhaExistente: CordoalhaBlocoPayload;
   /** Postes novos com nova cordoalha (após Poste de conexão). */
   postesNovaCordoalha: CordoalhaBlocoPayload;
   /** Postes com cordoalha existente (após Poste de conexão). */
   postesCordoalhaExistente: CordoalhaBlocoPayload;
-  /** Aterramento / terrometro. */
+  /** @deprecated Removido da UI (Aterramento - TERROMETRO). Mantido para parse legado. */
   aterramento: {
     totalHastes: number | null;
   };
@@ -342,20 +354,27 @@ export type QuantidadesRedePayload = {
  */
 export type EscopoPayload = {
   lancamentoRe: boolean | null;
+  /** Ambiente do lançamento de cabos RE (quando aplicável). */
+  lancamentoReAmbiente: AmbienteRede | null;
   metragensCabo: CaboMetragemPayload[];
   posteConexao: FotoGrupoPayload;
   caixaEmenda: FotoGrupoPayload;
   dutoSubterraneo: FotoGrupoPayload;
   plaquetaIdentificacao: FotoGrupoPayload;
   novoAterramentoPoste: FotoGrupoPayload;
+  /** @deprecated Removido da UI. Persistido vazio. */
   aterramentoTerrometro: FotoGrupoPayload;
+  /** Movido para a aba Equipamento. */
   posicaoConexaoEstacao: FotoGrupoPayload;
+  /** Movido para a aba Equipamento. */
   etiquetaIdentificacao: FotoGrupoPayload;
   sobraTecnica: FotoGrupoPayload;
   outrasFotos: OutraFotoPayload[];
   redeAcesso: QuantidadesRedePayload;
   tecnologiaAcesso: string;
   lancamentoRc: boolean | null;
+  /** Ambiente do lançamento de cabos RC (quando aplicável). */
+  lancamentoRcAmbiente: AmbienteRede | null;
   metragensCaboRc: CaboMetragemPayload[];
   rcPosteConexao: FotoGrupoPayload;
   rcCaixaEmenda: FotoGrupoPayload;
@@ -364,6 +383,8 @@ export type EscopoPayload = {
   rcEntradaInterna: FotoGrupoPayload;
   rcEntradaExterna: FotoGrupoPayload;
   rcSobraTecnica: FotoGrupoPayload;
+  rcNovoAterramentoPoste: FotoGrupoPayload;
+  rcDutoSubterraneo: FotoGrupoPayload;
   outrasFotosRc: OutraFotoPayload[];
   redeCliente: QuantidadesRedePayload;
   eqClienteFachada: FotoGrupoPayload;
@@ -622,7 +643,13 @@ export function readObsAdmin(raw: unknown): string {
 }
 
 function emptyFotoGrupo(): FotoGrupoPayload {
-  return { fotos: [], obs: "", obsAdmin: "" };
+  return { fotos: [], obs: "", obsAdmin: "", ambiente: null };
+}
+
+export function parseAmbienteRede(raw: unknown): AmbienteRede | null {
+  if (raw === "aereo" || raw === "Aereo" || raw === "Aéreo") return "aereo";
+  if (raw === "subterraneo" || raw === "Subterraneo" || raw === "Subterrâneo") return "subterraneo";
+  return null;
 }
 
 export function emptyCoordenadas(): CoordenadasPayload {
@@ -637,6 +664,7 @@ export function emptyQuantidadesRede(): QuantidadesRedePayload {
   return {
     qtdCaixasEmenda: null,
     qtdFiberloopInstalado: null,
+    fiberloopInstalado: emptyCordoalhaBloco(),
     cordoalhaLancada: emptyCordoalhaBloco(),
     cordoalhaExistente: emptyCordoalhaBloco(),
     postesNovaCordoalha: emptyCordoalhaBloco(),
@@ -672,6 +700,7 @@ export function janelaPotenciaDerivada(
 export function emptyEscopoPayload(): EscopoPayload {
   return {
     lancamentoRe: null,
+    lancamentoReAmbiente: null,
     metragensCabo: [],
     posteConexao: emptyFotoGrupo(),
     caixaEmenda: emptyFotoGrupo(),
@@ -686,6 +715,7 @@ export function emptyEscopoPayload(): EscopoPayload {
     redeAcesso: emptyQuantidadesRede(),
     tecnologiaAcesso: "",
     lancamentoRc: null,
+    lancamentoRcAmbiente: null,
     metragensCaboRc: [],
     rcPosteConexao: emptyFotoGrupo(),
     rcCaixaEmenda: emptyFotoGrupo(),
@@ -694,6 +724,8 @@ export function emptyEscopoPayload(): EscopoPayload {
     rcEntradaInterna: emptyFotoGrupo(),
     rcEntradaExterna: emptyFotoGrupo(),
     rcSobraTecnica: emptyFotoGrupo(),
+    rcNovoAterramentoPoste: emptyFotoGrupo(),
+    rcDutoSubterraneo: emptyFotoGrupo(),
     outrasFotosRc: [],
     redeCliente: emptyQuantidadesRede(),
     eqClienteFachada: emptyFotoGrupo(),
@@ -845,10 +877,22 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload> & {
     caixaEmendaAcomodacao?: { coordenadas?: unknown };
     aterramento?: { totalHastes?: unknown };
+    fiberloopInstalado?: unknown;
   };
+  const fiberloopParsed = parseCordoalhaBloco(src.fiberloopInstalado);
+  const qtdLegado = parseQtdInteiro(src.qtdFiberloopInstalado);
+  const fiberloopInstalado =
+    fiberloopParsed.isSim != null || fiberloopParsed.quantidade != null
+      ? fiberloopParsed
+      : qtdLegado != null
+        ? { isSim: true as const, quantidade: qtdLegado }
+        : emptyCordoalhaBloco();
+  const qtdFiberloopInstalado =
+    fiberloopInstalado.isSim === true ? fiberloopInstalado.quantidade : null;
   return {
     qtdCaixasEmenda: parseQtdInteiro(src.qtdCaixasEmenda),
-    qtdFiberloopInstalado: parseQtdInteiro(src.qtdFiberloopInstalado),
+    qtdFiberloopInstalado,
+    fiberloopInstalado,
     cordoalhaLancada: parseCordoalhaBloco(src.cordoalhaLancada),
     cordoalhaExistente: parseCordoalhaBloco(src.cordoalhaExistente),
     postesNovaCordoalha: parseCordoalhaBloco(src.postesNovaCordoalha),
@@ -980,12 +1024,14 @@ function parseFotoGrupo(
   base: FotoGrupoPayload,
   raw: FotoGrupoPayload | undefined,
 ): FotoGrupoPayload {
+  const src = raw as (FotoGrupoPayload & { ambiente?: unknown }) | undefined;
   return {
     ...base,
     ...raw,
     fotos: raw?.fotos ?? [],
     obs: raw?.obs ?? "",
     obsAdmin: readObsAdmin(raw),
+    ambiente: parseAmbienteRede(src?.ambiente ?? base.ambiente),
   };
 }
 
@@ -1262,13 +1308,16 @@ export function parseEscopoPayload(
   return {
     ...base,
     lancamentoRe: src.lancamentoRe ?? null,
+    lancamentoReAmbiente: parseAmbienteRede(
+      (src as { lancamentoReAmbiente?: unknown }).lancamentoReAmbiente,
+    ),
     metragensCabo: parseCabos(raw),
     posteConexao: parseFotoGrupo(base.posteConexao, src.posteConexao),
     caixaEmenda: parseFotoGrupo(base.caixaEmenda, src.caixaEmenda),
     dutoSubterraneo: parseFotoGrupo(base.dutoSubterraneo, src.dutoSubterraneo),
     plaquetaIdentificacao: parseFotoGrupo(base.plaquetaIdentificacao, src.plaquetaIdentificacao),
     novoAterramentoPoste: parseFotoGrupo(base.novoAterramentoPoste, src.novoAterramentoPoste),
-    aterramentoTerrometro: parseFotoGrupo(base.aterramentoTerrometro, src.aterramentoTerrometro),
+    aterramentoTerrometro: emptyFotoGrupo(),
     posicaoConexaoEstacao: parseFotoGrupo(base.posicaoConexaoEstacao, src.posicaoConexaoEstacao),
     etiquetaIdentificacao: parseFotoGrupo(base.etiquetaIdentificacao, src.etiquetaIdentificacao),
     sobraTecnica: parseFotoGrupo(base.sobraTecnica, src.sobraTecnica),
@@ -1276,6 +1325,9 @@ export function parseEscopoPayload(
     redeAcesso: parseQuantidadesRede(src.redeAcesso),
     tecnologiaAcesso: src.tecnologiaAcesso ?? "",
     lancamentoRc: src.lancamentoRc ?? null,
+    lancamentoRcAmbiente: parseAmbienteRede(
+      (src as { lancamentoRcAmbiente?: unknown }).lancamentoRcAmbiente,
+    ),
     metragensCaboRc: parseCabosList(src.metragensCaboRc),
     rcPosteConexao: parseFotoGrupo(base.rcPosteConexao, src.rcPosteConexao),
     rcCaixaEmenda: parseFotoGrupo(base.rcCaixaEmenda, src.rcCaixaEmenda),
@@ -1284,6 +1336,14 @@ export function parseEscopoPayload(
     rcEntradaInterna: parseFotoGrupo(base.rcEntradaInterna, src.rcEntradaInterna),
     rcEntradaExterna: parseFotoGrupo(base.rcEntradaExterna, src.rcEntradaExterna),
     rcSobraTecnica: parseFotoGrupo(base.rcSobraTecnica, src.rcSobraTecnica),
+    rcNovoAterramentoPoste: parseFotoGrupo(
+      base.rcNovoAterramentoPoste,
+      (src as { rcNovoAterramentoPoste?: FotoGrupoPayload }).rcNovoAterramentoPoste,
+    ),
+    rcDutoSubterraneo: parseFotoGrupo(
+      base.rcDutoSubterraneo,
+      (src as { rcDutoSubterraneo?: FotoGrupoPayload }).rcDutoSubterraneo,
+    ),
     outrasFotosRc: parseOutrasFotos(src.outrasFotosRc),
     redeCliente: parseQuantidadesRede(src.redeCliente),
     eqClienteFachada: parseFotoGrupo(base.eqClienteFachada, src.eqClienteFachada),
@@ -1356,6 +1416,8 @@ const FOTO_GRUPO_KEYS: RelatorioFotoGrupoKey[] = [
   "rcEntradaInterna",
   "rcEntradaExterna",
   "rcSobraTecnica",
+  "rcNovoAterramentoPoste",
+  "rcDutoSubterraneo",
   "eqClienteFachada",
   "eqClienteAmbiente",
   "eqClienteRack",
@@ -1405,6 +1467,10 @@ function mergeFotoGrupo(server: FotoGrupoPayload, local: FotoGrupoPayload): Foto
     fotos: mergeFotosByPath(fromServer.fotos ?? [], fromLocal.fotos ?? []),
     obs: fromLocal.obs || fromServer.obs,
     obsAdmin: fromLocal.obsAdmin || fromServer.obsAdmin,
+    ambiente:
+      fromLocal.ambiente !== undefined && fromLocal.ambiente !== null
+        ? fromLocal.ambiente
+        : fromServer.ambiente ?? null,
   };
 }
 
@@ -1605,15 +1671,18 @@ function mergeQuantidadesRede(
 ): QuantidadesRedePayload {
   const fromServer = server ?? emptyQuantidadesRede();
   const fromLocal = local ?? emptyQuantidadesRede();
+  const fiberloopInstalado = mergeCordoalhaBloco(
+    fromServer.fiberloopInstalado,
+    fromLocal.fiberloopInstalado,
+  );
   return {
     qtdCaixasEmenda:
       fromLocal.qtdCaixasEmenda === undefined
         ? fromServer.qtdCaixasEmenda
         : fromLocal.qtdCaixasEmenda,
+    fiberloopInstalado,
     qtdFiberloopInstalado:
-      fromLocal.qtdFiberloopInstalado === undefined
-        ? fromServer.qtdFiberloopInstalado
-        : fromLocal.qtdFiberloopInstalado,
+      fiberloopInstalado.isSim === true ? fiberloopInstalado.quantidade : null,
     cordoalhaLancada: mergeCordoalhaBloco(
       fromServer.cordoalhaLancada,
       fromLocal.cordoalhaLancada,
@@ -1785,6 +1854,8 @@ export function mergeEscopoPayload(
     ...fromLocal,
     lancamentoRe: fromLocal.lancamentoRe ?? fromServer.lancamentoRe,
     lancamentoRc: fromLocal.lancamentoRc ?? fromServer.lancamentoRc,
+    lancamentoReAmbiente: fromLocal.lancamentoReAmbiente ?? fromServer.lancamentoReAmbiente,
+    lancamentoRcAmbiente: fromLocal.lancamentoRcAmbiente ?? fromServer.lancamentoRcAmbiente,
     relatorioEstacao: fromLocal.relatorioEstacao ?? fromServer.relatorioEstacao,
     tecnologiaAcesso: fromLocal.tecnologiaAcesso || fromServer.tecnologiaAcesso,
     estacaoEntregaAcesso: fromLocal.estacaoEntregaAcesso || fromServer.estacaoEntregaAcesso,
@@ -1833,6 +1904,7 @@ export function mergeEscopoPayload(
       fromLocal.infraestrutura,
     ),
     ...grupos,
+    aterramentoTerrometro: emptyFotoGrupo(),
   };
 }
 

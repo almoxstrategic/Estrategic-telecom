@@ -116,6 +116,12 @@ function simNao(v: boolean | null | undefined): string {
   return "-";
 }
 
+function labelAmbiente(v: string | null | undefined): string {
+  if (v === "aereo") return "Aereo";
+  if (v === "subterraneo") return "Subterraneo";
+  return "-";
+}
+
 function formatarPtBr(n: number): string {
   return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -593,6 +599,14 @@ export function collectPdfBlocksEscopo(
   {
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, simNao(p?.lancamentoRe), "Lancamento de cabos (RE)");
+    pushPara(meta, labelAmbiente(p?.lancamentoReAmbiente), "Ambiente lancamento (RE)");
+    pushPara(meta, simNao(p?.redeAcesso?.fiberloopInstalado?.isSim), "Fiberloop instalado (RE)");
+    if (
+      p?.redeAcesso?.fiberloopInstalado?.isSim &&
+      p.redeAcesso.fiberloopInstalado.quantidade != null
+    ) {
+      pushPara(meta, String(p.redeAcesso.fiberloopInstalado.quantidade), "Qtd. Fiberloop (RE)");
+    }
     pushPara(meta, simNao(p?.redeAcesso?.cordoalhaLancada?.isSim), "Lancado cordoalha (RE)");
     if (p?.redeAcesso?.cordoalhaLancada?.isSim && p.redeAcesso.cordoalhaLancada.quantidade != null) {
       pushPara(meta, String(p.redeAcesso.cordoalhaLancada.quantidade), "Qtd. cordoalha lancada (RE)");
@@ -637,22 +651,16 @@ export function collectPdfBlocksEscopo(
     if (p?.redeAcesso?.qtdCaixasEmenda != null) {
       pushPara(meta, String(p.redeAcesso.qtdCaixasEmenda), "Qtd. caixas de emenda");
     }
-    if (p?.redeAcesso?.aterramento?.totalHastes != null) {
-      pushPara(meta, String(p.redeAcesso.aterramento.totalHastes), "Total de hastes (5/8)");
-    }
     for (const b of meta) blocks.push(b);
   }
   if (p?.lancamentoRe === true) collectCabos(blocks, "Metragem de cabos (RE)", p.metragensCabo ?? []);
   collectGruposEmGrade(blocks, [
     { titulo: "Poste de conexao", grupo: p?.posteConexao },
     { titulo: "Caixa de emenda", grupo: p?.caixaEmenda },
-    { titulo: "Const. de duto subterraneio (MD ou MND)", grupo: p?.dutoSubterraneo },
+    { titulo: "Const. de duto subterraneo (MD ou MND)", grupo: p?.dutoSubterraneo },
     { titulo: "Sobra tecnica / Fiberloop", grupo: p?.sobraTecnica },
-    { titulo: "Plaqueta de Identificacao", grupo: p?.plaquetaIdentificacao },
+    { titulo: "Plaqueta de Identificacao - Caixa de emenda", grupo: p?.plaquetaIdentificacao },
     { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
-    { titulo: "Aterramento - TERROMETRO", grupo: p?.aterramentoTerrometro },
-    { titulo: "Posicao DGO/DIO", grupo: p?.posicaoConexaoEstacao },
-    { titulo: "Etiqueta na estacao/PPC", grupo: p?.etiquetaIdentificacao },
   ]);
   collectOutras(blocks, "Outras fotos (RE)", p?.outrasFotos ?? []);
 
@@ -661,6 +669,14 @@ export function collectPdfBlocksEscopo(
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, p?.tecnologiaAcesso?.trim() || "-", "Tecnologia de Acesso");
     pushPara(meta, simNao(p?.lancamentoRc), "Lancamento de cabos (RC)");
+    pushPara(meta, labelAmbiente(p?.lancamentoRcAmbiente), "Ambiente lancamento (RC)");
+    pushPara(meta, simNao(p?.redeCliente?.fiberloopInstalado?.isSim), "Fiberloop instalado (RC)");
+    if (
+      p?.redeCliente?.fiberloopInstalado?.isSim &&
+      p.redeCliente.fiberloopInstalado.quantidade != null
+    ) {
+      pushPara(meta, String(p.redeCliente.fiberloopInstalado.quantidade), "Qtd. Fiberloop (RC)");
+    }
     pushPara(meta, simNao(p?.redeCliente?.cordoalhaLancada?.isSim), "Lancado cordoalha (RC)");
     if (
       p?.redeCliente?.cordoalhaLancada?.isSim &&
@@ -717,7 +733,9 @@ export function collectPdfBlocksEscopo(
   if (p?.lancamentoRc === true) collectCabos(blocks, "Metragem de cabos (RC)", p.metragensCaboRc ?? []);
   collectGruposEmGrade(blocks, [
     { titulo: "Poste de conexao (RC)", grupo: p?.rcPosteConexao },
+    { titulo: "Novo aterramento do poste (RC)", grupo: p?.rcNovoAterramentoPoste },
     { titulo: "Caixa de emenda na acomodacao (RC)", grupo: p?.rcCaixaEmenda },
+    { titulo: "Const. de duto subterraneo (RC)", grupo: p?.rcDutoSubterraneo },
     { titulo: "Terminacao do cabo no cliente", grupo: p?.rcTerminacaoCabo },
     { titulo: "Plaqueta de Identificacao (RC)", grupo: p?.rcPlaquetaIdentificacao },
     { titulo: "Entrada do cabo (area interna)", grupo: p?.rcEntradaInterna },
@@ -743,6 +761,8 @@ export function collectPdfBlocksEscopo(
   );
   collectGruposEmGrade(blocks, [
     { titulo: "Identificacao SGP no Cliente", grupo: p?.eqClienteSgp },
+    { titulo: "Posicao DGO/DIO", grupo: p?.posicaoConexaoEstacao },
+    { titulo: "Etiqueta na estacao/PPC", grupo: p?.etiquetaIdentificacao },
   ]);
   collectOutras(blocks, "Outras fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
 

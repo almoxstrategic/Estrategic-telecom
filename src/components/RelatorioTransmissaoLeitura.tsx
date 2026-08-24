@@ -103,7 +103,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         fotos={payload?.dutoSubterraneo.fotos ?? []}
       />
       <Secao
-        titulo="Plaqueta de Identificação"
+        titulo="Plaqueta de Identificação - Caixa de emenda"
         obs={payload?.plaquetaIdentificacao.obs}
         fotos={payload?.plaquetaIdentificacao.fotos ?? []}
       />
@@ -113,35 +113,21 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         fotos={payload?.novoAterramentoPoste.fotos ?? []}
       />
       <Secao
-        titulo="Aterramento - TERROMETRO"
-        obs={payload?.aterramentoTerrometro.obs}
-        fotos={payload?.aterramentoTerrometro.fotos ?? []}
-      />
-      {payload?.redeAcesso?.aterramento?.totalHastes != null ? (
-        <Campo
-          label="Total de Hastes (5/8)"
-          value={String(payload.redeAcesso.aterramento.totalHastes)}
-        />
-      ) : null}
-      <Secao
-        titulo="Posição DGO/DIO"
-        obs={payload?.posicaoConexaoEstacao.obs}
-        fotos={payload?.posicaoConexaoEstacao.fotos ?? []}
-      />
-      <Secao
-        titulo="Etiqueta na estação/PPC"
-        obs={payload?.etiquetaIdentificacao.obs}
-        fotos={payload?.etiquetaIdentificacao.fotos ?? []}
-      />
-      <Secao
         titulo="Sobra técnica / Fiberloop"
         obs={payload?.sobraTecnica.obs}
         fotos={payload?.sobraTecnica.fotos ?? []}
       />
-      {payload?.redeAcesso?.qtdFiberloopInstalado != null ? (
+      {payload?.redeAcesso?.fiberloopInstalado?.isSim != null ? (
+        <Campo
+          label="Fiberloop instalado (RE)"
+          value={payload.redeAcesso.fiberloopInstalado.isSim ? "SIM" : "NÃO"}
+        />
+      ) : null}
+      {payload?.redeAcesso?.fiberloopInstalado?.isSim &&
+      payload.redeAcesso.fiberloopInstalado.quantidade != null ? (
         <Campo
           label="Qtd. Fiberloop (RE)"
-          value={String(payload.redeAcesso.qtdFiberloopInstalado)}
+          value={String(payload.redeAcesso.fiberloopInstalado.quantidade)}
         />
       ) : null}
       {(payload?.outrasFotos ?? [])
@@ -184,9 +170,19 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         fotos={payload?.rcPosteConexao.fotos ?? []}
       />
       <Secao
+        titulo="Novo aterramento do poste (RC)"
+        obs={payload?.rcNovoAterramentoPoste.obs}
+        fotos={payload?.rcNovoAterramentoPoste.fotos ?? []}
+      />
+      <Secao
         titulo="Caixa de emenda na acomodação (Rede cliente com Rede Externa)"
         obs={payload?.rcCaixaEmenda.obs}
         fotos={payload?.rcCaixaEmenda.fotos ?? []}
+      />
+      <Secao
+        titulo="Const. de duto subterrâneo (RC)"
+        obs={payload?.rcDutoSubterraneo.obs}
+        fotos={payload?.rcDutoSubterraneo.fotos ?? []}
       />
       <Secao
         titulo="Terminação do cabo no cliente (PTO/Roseta - área interna)"
@@ -213,10 +209,17 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         obs={payload?.rcSobraTecnica.obs}
         fotos={payload?.rcSobraTecnica.fotos ?? []}
       />
-      {payload?.redeCliente?.qtdFiberloopInstalado != null ? (
+      {payload?.redeCliente?.fiberloopInstalado?.isSim != null ? (
+        <Campo
+          label="Fiberloop instalado (RC)"
+          value={payload.redeCliente.fiberloopInstalado.isSim ? "SIM" : "NÃO"}
+        />
+      ) : null}
+      {payload?.redeCliente?.fiberloopInstalado?.isSim &&
+      payload.redeCliente.fiberloopInstalado.quantidade != null ? (
         <Campo
           label="Qtd. Fiberloop (RC)"
-          value={String(payload.redeCliente.qtdFiberloopInstalado)}
+          value={String(payload.redeCliente.fiberloopInstalado.quantidade)}
         />
       ) : null}
       {(payload?.outrasFotosRc ?? [])
@@ -280,6 +283,16 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         titulo="Identificação SGP no Cliente"
         obs={payload?.eqClienteSgp.obs}
         fotos={payload?.eqClienteSgp.fotos ?? []}
+      />
+      <Secao
+        titulo="Posição de conexão na Estação/PPC (DGO/DIO)"
+        obs={payload?.posicaoConexaoEstacao.obs}
+        fotos={payload?.posicaoConexaoEstacao.fotos ?? []}
+      />
+      <Secao
+        titulo="ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC"
+        obs={payload?.etiquetaIdentificacao.obs}
+        fotos={payload?.etiquetaIdentificacao.fotos ?? []}
       />
       {(payload?.outrasFotosEqCliente ?? [])
         .filter((item) => item.foto || item.ref || item.obs)
