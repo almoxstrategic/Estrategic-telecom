@@ -559,6 +559,10 @@ export function AmbienteToggle({
   );
 }
 
+/** Separação flat entre perguntas dentro do Accordion (sem card aninhado). */
+const flatSectionClass =
+  "border-b border-gray-100 pb-6 last:border-b-0 last:pb-0";
+
 function AccordionBloco({
   title,
   children,
@@ -580,7 +584,7 @@ function AccordionBloco({
         <span>{title}</span>
         <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition group-open:rotate-180" />
       </summary>
-      <div className="space-y-4 border-t border-border px-5 pb-5 pt-4">{children}</div>
+      <div className="flex flex-col gap-6 border-t border-border px-5 pb-5 pt-4">{children}</div>
     </details>
   );
 }
@@ -606,6 +610,7 @@ function renderGrupoFotoCard(
       id={`secao-${grupo.grupoKey}`}
       title={grupo.title}
       hint={grupo.hint}
+      variant="flat"
       headerExtra={
         grupo.showAmbienteToggle || grupo.quantidadeLabel || grupo.coordenadas ? (
           <div className="space-y-3">
@@ -700,6 +705,7 @@ export function CordoalhaSimNaoCard({
   onChange,
   disabled = false,
   hideQuantidade = false,
+  variant = "card",
 }: {
   title: string;
   quantidadeLabel?: string;
@@ -709,11 +715,26 @@ export function CordoalhaSimNaoCard({
   disabled?: boolean;
   /** Só SIM/NÃO — sem campo numérico (ex.: Cordoalha existente). */
   hideQuantidade?: boolean;
+  /** Use `flat` dentro dos acordeões RE/RC. */
+  variant?: "card" | "flat";
 }) {
   const sim = value.isSim === true;
+  const isFlat = variant === "flat";
   return (
-    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold">{title}</h2>
+    <div
+      className={
+        isFlat
+          ? `space-y-3 ${flatSectionClass}`
+          : "space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      }
+    >
+      <h2
+        className={
+          isFlat ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"
+        }
+      >
+        {title}
+      </h2>
       <div className="grid grid-cols-2 gap-2">
         <ChoiceButton
           active={value.isSim === true}
@@ -847,8 +868,8 @@ export function RelatorioRedeAcesso({
         {header}
 
         <AccordionBloco title="CABOS" id="secao-cabos">
-          <div className="space-y-3 rounded-2xl border border-border bg-background p-5 shadow-sm">
-            <h2 className="text-base font-bold">{lancamentoTitle}</h2>
+          <div className={flatSectionClass}>
+            <h2 className="mb-3 font-semibold text-gray-800">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">
               <div className="grid grid-cols-2 gap-2">
                 <ChoiceButton
@@ -874,17 +895,19 @@ export function RelatorioRedeAcesso({
                 />
               ) : null}
             </div>
+          </div>
 
-            {mostrarMetragem ? (
-              <div className="space-y-4 border-t border-border pt-4">
-                <h2 className="text-base font-bold">Metragem de cabo</h2>
+          {mostrarMetragem ? (
+            <div className={flatSectionClass}>
+              <h2 className="mb-3 font-semibold text-gray-800">Metragem de cabo</h2>
+              <div className="flex flex-col gap-4">
                 {cabos.map((cabo, index) => (
                   <div
                     key={cabo.id}
-                    className="relative flex flex-col space-y-3 rounded-xl border border-border p-4"
+                    className="relative flex flex-col space-y-3 border-b border-gray-100 py-2 last:border-b-0 last:pb-0"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-semibold">Cabo {index + 1}</p>
+                      <p className="text-sm font-semibold text-gray-800">Cabo {index + 1}</p>
                       {!readOnly && index >= 1 && onRemoveCabo ? (
                         <button
                           type="button"
@@ -1059,12 +1082,10 @@ export function RelatorioRedeAcesso({
                   </button>
                 )}
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
-          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-            {gruposCabos.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
-          </div>
+          {gruposCabos.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
 
           {fiberloopInstalado &&
           onFiberloopInstaladoChange &&
@@ -1076,67 +1097,68 @@ export function RelatorioRedeAcesso({
               value={fiberloopInstalado}
               onChange={onFiberloopInstaladoChange}
               disabled={readOnly}
+              variant="flat"
             />
           ) : null}
         </AccordionBloco>
 
         <AccordionBloco title="POSTE" id="secao-poste">
-          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-            {gruposPoste.map((grupo) => {
-              const isPoste =
-                grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao";
-              return (
-                <div key={grupo.grupoKey} className="contents">
-                  {renderGrupoFotoCard(grupo, fotoCtx)}
-                  {isPoste && mostrarCordoalha ? (
-                    <>
-                      <CordoalhaSimNaoCard
-                        title="Lançado cordoalha?"
-                        quantidadeLabel="Quantidade de cordoalha lançada:"
-                        quantidadePlaceholder="Ex: 50"
-                        value={cordoalhaLancada!}
-                        onChange={onCordoalhaLancadaChange}
-                        disabled={readOnly}
-                      />
-                      <CordoalhaSimNaoCard
-                        title="Cordoalha existente?"
-                        hideQuantidade
-                        value={cordoalhaExistente!}
-                        onChange={onCordoalhaExistenteChange}
-                        disabled={readOnly}
-                      />
-                    </>
-                  ) : null}
-                  {isPoste && mostrarPostes ? (
-                    <>
-                      <CordoalhaSimNaoCard
-                        title="Postes novo com nova cordoalha?"
-                        quantidadeLabel="Quantidade de Poste com nova cordoalha:"
-                        quantidadePlaceholder="Ex: 10"
-                        value={postesNovaCordoalha!}
-                        onChange={onPostesNovaCordoalhaChange}
-                        disabled={readOnly}
-                      />
-                      <CordoalhaSimNaoCard
-                        title="Postes com cordoalha Existente?"
-                        quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
-                        quantidadePlaceholder="Ex: 10"
-                        value={postesCordoalhaExistente!}
-                        onChange={onPostesCordoalhaExistenteChange}
-                        disabled={readOnly}
-                      />
-                    </>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+          {gruposPoste.map((grupo) => {
+            const isPoste =
+              grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao";
+            return (
+              <div key={grupo.grupoKey} className="contents">
+                {renderGrupoFotoCard(grupo, fotoCtx)}
+                {isPoste && mostrarCordoalha ? (
+                  <>
+                    <CordoalhaSimNaoCard
+                      title="Lançado cordoalha?"
+                      quantidadeLabel="Quantidade de cordoalha lançada:"
+                      quantidadePlaceholder="Ex: 50"
+                      value={cordoalhaLancada!}
+                      onChange={onCordoalhaLancadaChange}
+                      disabled={readOnly}
+                      variant="flat"
+                    />
+                    <CordoalhaSimNaoCard
+                      title="Cordoalha existente?"
+                      hideQuantidade
+                      value={cordoalhaExistente!}
+                      onChange={onCordoalhaExistenteChange}
+                      disabled={readOnly}
+                      variant="flat"
+                    />
+                  </>
+                ) : null}
+                {isPoste && mostrarPostes ? (
+                  <>
+                    <CordoalhaSimNaoCard
+                      title="Postes novo com nova cordoalha?"
+                      quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+                      quantidadePlaceholder="Ex: 10"
+                      value={postesNovaCordoalha!}
+                      onChange={onPostesNovaCordoalhaChange}
+                      disabled={readOnly}
+                      variant="flat"
+                    />
+                    <CordoalhaSimNaoCard
+                      title="Postes com cordoalha Existente?"
+                      quantidadeLabel="Quantidade de Postes com cordoalha Existente:"
+                      quantidadePlaceholder="Ex: 10"
+                      value={postesCordoalhaExistente!}
+                      onChange={onPostesCordoalhaExistenteChange}
+                      disabled={readOnly}
+                      variant="flat"
+                    />
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
         </AccordionBloco>
 
         <AccordionBloco title="CAIXA DE EMENDA" id="secao-caixa-emenda">
-          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-            {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
-          </div>
+          {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
         </AccordionBloco>
 
         <AccordionBloco title="OUTRAS FOTOS" id="secao-outras-fotos">
@@ -1146,6 +1168,7 @@ export function RelatorioRedeAcesso({
             onOutrasChange={onOutrasChange}
             onOutraPhoto={onOutraPhoto}
             readOnly={readOnly}
+            variant="flat"
           />
         </AccordionBloco>
       </div>
@@ -1160,6 +1183,7 @@ export function RelatorioOutrasFotos({
   onOutraPhoto,
   readOnly,
   showObsAdmin = false,
+  variant = "card",
 }: {
   title?: string;
   outras: OutraFotoState[];
@@ -1167,23 +1191,42 @@ export function RelatorioOutrasFotos({
   onOutraPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   readOnly: boolean;
   showObsAdmin?: boolean;
+  variant?: "card" | "flat";
 }) {
   const removerItem = (id: string, path?: string) => {
     void deleteRelatorioPhoto(path);
     onOutrasChange((prev) => prev.filter((row) => row.id !== id));
   };
 
+  const isFlat = variant === "flat";
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-base font-bold">{title}</h2>
+    <div className={isFlat ? "flex flex-col gap-4" : "space-y-4"}>
+      <h2
+        className={
+          isFlat ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"
+        }
+      >
+        {title}
+      </h2>
       {outras.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
       ) : (
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+        <div
+          className={
+            isFlat
+              ? "flex flex-col gap-4"
+              : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2"
+          }
+        >
           {outras.map((item, index) => (
             <div
               key={item.id}
-              className="relative flex h-full flex-col space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+              className={
+                isFlat
+                  ? "relative flex flex-col space-y-3 border-b border-gray-100 pb-4 last:border-b-0 last:pb-0"
+                  : "relative flex h-full flex-col space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+              }
             >
               <div className="flex items-start justify-between gap-2">
                 <RefTituloInput

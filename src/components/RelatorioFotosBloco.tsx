@@ -37,6 +37,7 @@ export function RelatorioFotosBloco({
   minSlots = 1,
   readOnly = false,
   id,
+  variant = "card",
 }: {
   title: string;
   hint?: string;
@@ -49,6 +50,8 @@ export function RelatorioFotosBloco({
   minSlots?: number;
   readOnly?: boolean;
   id?: string;
+  /** Flat: sem card — para uso dentro de Accordion (RE/RC). */
+  variant?: "card" | "flat";
 }) {
   const updateSlot = (id: string, patch: Partial<FotoSlot>) => {
     onChange(slots.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
@@ -69,13 +72,27 @@ export function RelatorioFotosBloco({
     onChange(slots.filter((_, i) => i !== index));
   };
 
+  const isFlat = variant === "flat";
+
   return (
     <div
       id={id}
-      className="flex h-full scroll-mt-36 flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      className={
+        isFlat
+          ? "flex scroll-mt-36 flex-col space-y-3 border-b border-gray-100 pb-6 last:border-b-0 last:pb-0"
+          : "flex h-full scroll-mt-36 flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      }
     >
       <div>
-        <h2 className="text-base font-bold">{title}</h2>
+        <h2
+          className={
+            isFlat
+              ? "mb-3 font-semibold text-gray-800"
+              : "text-base font-bold"
+          }
+        >
+          {title}
+        </h2>
         {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
       </div>
       {headerExtra}
