@@ -1036,7 +1036,7 @@ export function AccordionBloco({
     isAudit ? (isStuck ? "-mx-4 py-2.5 shadow-sm" : "py-3") : isStuck ? "-mx-5 py-2 shadow-sm" : "py-4",
     !isAudit && (isStuck ? "text-sm" : "text-base"),
     hasPendencias
-      ? "border-amber-300 border-l-4 border-l-amber-500 bg-amber-100 text-amber-950"
+      ? "border-amber-200/60 border-l-2 border-l-amber-400 bg-amber-50/50 text-gray-900"
       : isAudit
         ? isStuck
           ? "border-gray-200 bg-gray-50 text-gray-800"
@@ -1055,28 +1055,28 @@ export function AccordionBloco({
         isAudit
           ? cn(
               "group relative overflow-visible rounded-xl border bg-white shadow-sm open:shadow-md",
-              hasPendencias ? "border-amber-300" : "border-gray-100",
+              hasPendencias ? "border-amber-200/60" : "border-gray-100",
             )
           : cn(
               "group relative overflow-visible rounded-2xl border bg-card shadow-sm open:shadow-md",
-              hasPendencias ? "border-amber-300" : "border-border",
+              hasPendencias ? "border-amber-200/60" : "border-border",
             )
       }
       style={{ scrollMarginTop: stickyOffsetPx }}
     >
       <summary style={{ top: stickyOffsetPx }} className={summaryClass}>
-        <span className="min-w-0">
-          {title}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{title}</span>
           {hasPendencias ? (
-            <span className="ml-1.5 font-bold tabular-nums text-amber-800">
-              ({pendenciaCount})
+            <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium tabular-nums text-amber-800">
+              {pendenciaCount}
             </span>
           ) : null}
         </span>
         <ChevronDown
           className={cn(
             "h-5 w-5 shrink-0 transition group-open:rotate-180",
-            hasPendencias ? "text-amber-700" : "text-muted-foreground",
+            hasPendencias ? "text-amber-600/80" : "text-muted-foreground",
           )}
         />
       </summary>
@@ -1086,7 +1086,13 @@ export function AccordionBloco({
         className="pointer-events-none absolute left-0 top-0 h-px w-full"
         aria-hidden
       />
-      <div className={isAudit ? "flex flex-col gap-4 px-4 pb-4 pt-4" : "flex flex-col gap-6 px-5 pb-5 pt-4"}>
+      <div
+        className={
+          isAudit
+            ? "flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-5"
+            : "flex flex-col gap-6 px-4 pb-5 pt-4 sm:px-5"
+        }
+      >
         {children}
       </div>
     </details>

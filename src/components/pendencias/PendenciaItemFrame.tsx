@@ -24,24 +24,24 @@ export function PendenciaItemFrame({
       id={def.anchorId}
       data-pendencia-item={def.itemId}
       className={cn(
-        "scroll-mt-36 rounded-xl border transition-colors",
+        "scroll-mt-36 transition-colors",
         pending
-          ? "border-amber-400 bg-amber-50 text-amber-900"
-          : "border-transparent bg-transparent",
+          ? "mx-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-gray-900 shadow-sm sm:mx-3 sm:p-5"
+          : "rounded-xl border border-transparent bg-transparent",
         className,
       )}
     >
       {canToggle ? (
-        <div className="mb-2 flex justify-end px-1 pt-1">
+        <div className="mb-3 flex justify-end">
           <button
             type="button"
             onClick={() => ctx?.toggleDraft(def)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition",
               isRetirar
-                ? "border-amber-500 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                ? "border-amber-300 bg-amber-100/80 text-amber-900 hover:bg-amber-100"
                 : pending
-                  ? "border-amber-400 bg-white/80 text-amber-800 hover:bg-amber-100"
+                  ? "border-amber-200 bg-white/90 text-amber-800 hover:bg-amber-50"
                   : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
             )}
             aria-pressed={selectedDraft}
@@ -52,8 +52,8 @@ export function PendenciaItemFrame({
           </button>
         </div>
       ) : pending ? (
-        <div className="mb-2 px-1 pt-1">
-          <span className="inline-flex items-center gap-1 rounded-md bg-amber-200/70 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
+        <div className="mb-3">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-800">
             <Pin className="h-3 w-3" />
             Pendência — corrigir antes do envio
           </span>
