@@ -2132,6 +2132,7 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "infraestrutura" ? (
         <AbaInfraestrutura
+          layoutMode="gestor"
           value={payload?.infraestrutura ?? emptyInfraestrutura()}
           onChange={
             canEditPhotos && payload

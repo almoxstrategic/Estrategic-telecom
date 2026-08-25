@@ -159,41 +159,101 @@ function TomadaCard({
   );
 }
 
+function InfraPerguntaSimNao({
+  label,
+  value,
+  onChange,
+  readOnly,
+  compact,
+  className,
+}: {
+  label: string;
+  value: boolean | null;
+  onChange?: (next: boolean) => void;
+  readOnly?: boolean;
+  compact?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={
+        compact
+          ? `flex flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4 ${className ?? ""}`
+          : `space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm ${className ?? ""}`
+      }
+    >
+      {compact ? (
+        <h3 className="text-sm font-semibold text-gray-800">{label}</h3>
+      ) : (
+        <h2 className="text-base font-bold">{label}</h2>
+      )}
+      <div className={compact ? "grid grid-cols-2 gap-2" : "flex gap-2"}>
+        <ChoiceButton
+          active={value === true}
+          onClick={() => onChange?.(true)}
+          disabled={readOnly || !onChange}
+        >
+          SIM
+        </ChoiceButton>
+        <ChoiceButton
+          active={value === false}
+          onClick={() => onChange?.(false)}
+          disabled={readOnly || !onChange}
+        >
+          NÃO
+        </ChoiceButton>
+      </div>
+    </div>
+  );
+}
+
 export function AbaInfraestrutura({
   value,
   onChange,
   readOnly = false,
+  layoutMode = "tecnico",
 }: CommonProps & {
   value: InfraestruturaPayload;
   onChange?: (next: InfraestruturaPayload) => void;
+  /** Gestor desktop: grid 2 colunas com subcards compactos. */
+  layoutMode?: "tecnico" | "gestor";
 }) {
   const tomadas = value.tomadas.length ? value.tomadas : [emptyMedicaoTomada()];
+  const isGestor = layoutMode === "gestor";
+
   return (
     <div className="space-y-3">
-      {INFRA_PERGUNTAS.map(({ key, label }) => (
-        <div
-          key={key}
-          className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
-        >
-          <h2 className="text-base font-bold">{label}</h2>
-          <div className="flex gap-2">
-            <ChoiceButton
-              active={value[key] === true}
-              onClick={() => onChange?.({ ...value, [key]: true })}
-              disabled={readOnly || !onChange}
-            >
-              SIM
-            </ChoiceButton>
-            <ChoiceButton
-              active={value[key] === false}
-              onClick={() => onChange?.({ ...value, [key]: false })}
-              disabled={readOnly || !onChange}
-            >
-              NÃO
-            </ChoiceButton>
-          </div>
+      {isGestor ? (
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
+          {INFRA_PERGUNTAS.map(({ key, label }, index) => (
+            <InfraPerguntaSimNao
+              key={key}
+              label={label}
+              value={value[key]}
+              compact
+              className={index === INFRA_PERGUNTAS.length - 1 ? "md:col-span-2" : undefined}
+              readOnly={readOnly}
+              onChange={
+                onChange
+                  ? (next) => onChange({ ...value, [key]: next })
+                  : undefined
+              }
+            />
+          ))}
         </div>
-      ))}
+      ) : (
+        INFRA_PERGUNTAS.map(({ key, label }) => (
+          <InfraPerguntaSimNao
+            key={key}
+            label={label}
+            value={value[key]}
+            readOnly={readOnly}
+            onChange={
+              onChange ? (next) => onChange({ ...value, [key]: next }) : undefined
+            }
+          />
+        ))
+      )}
 
       <div className="space-y-4 pt-1">
         {tomadas.map((tomada, index) => (
