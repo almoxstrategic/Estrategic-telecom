@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { PhotoUpload } from "@/components/PhotoUpload";
+import { PhotoUpload, FOTO_SLOTS_ROW_CLASS, FOTO_SLOT_WRAP_CLASS } from "@/components/PhotoUpload";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import type { EvidencePhotoRef } from "@/lib/types";
 import { deleteRelatorioPhoto, type StoredPhoto } from "@/lib/relatorios-transmissao";
@@ -97,61 +97,70 @@ export function RelatorioFotosBloco({
       </div>
       {headerExtra}
 
-      {slots.map((slot, index) => {
-        const podeExcluir = !readOnly && index >= minSlots;
-        return (
-          <div key={slot.id} className="relative space-y-2">
-            {podeExcluir ? (
-              <button
-                type="button"
-                onClick={() => removerSlot(index)}
-                className="absolute right-0 top-0 z-10 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
-                aria-label={`Excluir foto ${index + 1}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null}
-            {slot.file && !readOnly ? (
-              <PhotoUpload
-                label={`Foto ${index + 1}`}
-                suffix={index === 0 ? "inicio" : "fim"}
-                value={slot.file}
-                onChange={(file) => handlePick(slot.id, file)}
-              />
-            ) : slot.stored ? (
-              <div>
-                <div className="mb-1 pr-8">
-                  <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
-                </div>
-                <RelatorioFotoComControles
-                  src={slot.stored.url}
-                  alt={`Foto ${index + 1}`}
-                  canEdit={!readOnly}
-                  onDelete={() => {
-                    void deleteRelatorioPhoto(slot.stored?.path);
-                    handlePick(slot.id, null);
-                  }}
-                  onReplace={(file) => {
-                    void deleteRelatorioPhoto(slot.stored?.path);
-                    handlePick(slot.id, file);
-                  }}
+      <div className={FOTO_SLOTS_ROW_CLASS}>
+        {slots.map((slot, index) => {
+          const podeExcluir = !readOnly && index >= minSlots;
+          return (
+            <div key={slot.id} className={`relative ${FOTO_SLOT_WRAP_CLASS}`}>
+              {podeExcluir ? (
+                <button
+                  type="button"
+                  onClick={() => removerSlot(index)}
+                  className="absolute right-0 top-0 z-10 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                  aria-label={`Excluir foto ${index + 1}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
+              {slot.file && !readOnly ? (
+                <PhotoUpload
+                  label={`Foto ${index + 1}`}
+                  suffix={index === 0 ? "inicio" : "fim"}
+                  value={slot.file}
+                  onChange={(file) => handlePick(slot.id, file)}
+                  compact
+                  hideHelperText
                 />
-              </div>
-            ) : readOnly ? (
-              <p className="text-sm text-muted-foreground">Sem foto {index + 1}.</p>
-            ) : (
-              <PhotoUpload
-                label={`Foto ${index + 1}`}
-                suffix={index === 0 ? "inicio" : "fim"}
-                value={null}
-                onChange={(file) => handlePick(slot.id, file)}
-              />
-            )}
-          </div>
-        );
-      })}
+              ) : slot.stored ? (
+                <>
+                  <div className="pr-8">
+                    <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
+                  </div>
+                  <RelatorioFotoComControles
+                    src={slot.stored.url}
+                    alt={`Foto ${index + 1}`}
+                    canEdit={!readOnly}
+                    onDelete={() => {
+                      void deleteRelatorioPhoto(slot.stored?.path);
+                      handlePick(slot.id, null);
+                    }}
+                    onReplace={(file) => {
+                      void deleteRelatorioPhoto(slot.stored?.path);
+                      handlePick(slot.id, file);
+                    }}
+                  />
+                </>
+              ) : readOnly ? (
+                <>
+                  <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
+                  <p className="text-sm text-muted-foreground">Sem foto {index + 1}.</p>
+                </>
+              ) : (
+                <PhotoUpload
+                  label={`Foto ${index + 1}`}
+                  suffix={index === 0 ? "inicio" : "fim"}
+                  value={null}
+                  onChange={(file) => handlePick(slot.id, file)}
+                  compact
+                  hideHelperText
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="mt-auto w-full space-y-3">
+      <div className="mt-4 w-full space-y-3">
         <div>
           <label className="mb-1.5 block text-sm font-semibold">OBS</label>
           <textarea

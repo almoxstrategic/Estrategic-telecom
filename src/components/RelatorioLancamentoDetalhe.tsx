@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { EditarContratoOsDialog } from "@/components/EditarContratoOsDialog";
 import {
@@ -6,7 +6,7 @@ import {
   FotoLabel,
   RelatorioFotoComControles,
 } from "@/components/RelatorioFotoComControles";
-import { PhotoUpload } from "@/components/PhotoUpload";
+import { PhotoUpload, FOTO_SLOTS_ROW_CLASS, FOTO_SLOT_WRAP_CLASS, FOTO_CABO_PAIR_CLASS, FOTO_CABO_SLOT_WRAP_CLASS } from "@/components/PhotoUpload";
 import { RelatorioTesteOptico, RelatorioTestePotencia } from "@/components/RelatorioTestes";
 import { RelatorioTestePotenciaAtenuacao } from "@/components/RelatorioTestePotenciaAtenuacao";
 import {
@@ -18,6 +18,7 @@ import {
 import {
   ABAS_CAMPO,
   ABAS_CAMPO_IMPLANTACAO,
+  AccordionBloco,
   CampoCoordenadas,
   CampoQuantidade,
   ChoiceButton,
@@ -130,6 +131,9 @@ function Photos({
   canEdit,
   onRemovePhoto,
   onReplacePhoto,
+  onAdd,
+  uploadKey,
+  uploading,
 }: {
   fotos: StoredPhoto[];
   labels?: string[];
@@ -138,22 +142,43 @@ function Photos({
   canEdit?: boolean;
   onRemovePhoto?: (index: number) => void;
   onReplacePhoto?: (index: number, file: EvidencePhotoRef) => void;
+  onAdd?: (file: EvidencePhotoRef) => void;
+  uploadKey?: string;
+  uploading?: boolean;
 }) {
+  const legendaTrim = legenda?.trim() || "";
+  const showEmptyUpload = Boolean(canEdit && onAdd && fotos.length === 0);
+
   if (!fotos.length) {
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-1">
+      <div className={`${FOTO_SLOTS_ROW_CLASS} ${uploading ? "pointer-events-none opacity-60" : ""}`}>
+        <div className={FOTO_SLOT_WRAP_CLASS}>
           <FotoLabel>{labels?.[0]}</FotoLabel>
-          <div className={FOTO_SLOT_CLASS}>Sem foto</div>
+          {showEmptyUpload ? (
+            <PhotoUpload
+              key={uploadKey}
+              label={labels?.[0] || "Foto"}
+              hideLabel
+              suffix="inicio"
+              value={null}
+              onChange={(file) => {
+                if (file) onAdd?.(file);
+              }}
+              compact
+              hideHelperText
+            />
+          ) : (
+            <div className={FOTO_SLOT_CLASS}>Sem foto</div>
+          )}
         </div>
       </div>
     );
   }
-  const legendaTrim = legenda?.trim() || "";
+
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div className={FOTO_SLOTS_ROW_CLASS}>
       {fotos.map((foto, index) => (
-        <div key={`${foto.path}-${index}`} className="flex min-w-0 flex-col gap-1">
+        <div key={`${foto.path}-${index}`} className={FOTO_SLOT_WRAP_CLASS}>
           {labels?.[index] ? <FotoLabel>{labels[index]}</FotoLabel> : null}
           <RelatorioFotoComControles
             src={foto.url}
@@ -167,6 +192,23 @@ function Photos({
           ) : null}
         </div>
       ))}
+      {canEdit && onAdd ? (
+        <div className={`${FOTO_SLOT_WRAP_CLASS} ${uploading ? "pointer-events-none opacity-60" : ""}`}>
+          <FotoLabel>{labels?.[fotos.length]}</FotoLabel>
+          <PhotoUpload
+            key={`${uploadKey}-extra`}
+            label="Nova foto"
+            hideLabel
+            suffix="fim"
+            value={null}
+            onChange={(file) => {
+              if (file) onAdd(file);
+            }}
+            compact
+            hideHelperText
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -178,6 +220,8 @@ function CaboFotos({
   canEdit,
   onRemoveCampo,
   onReplaceCampo,
+  uploading,
+  pairLayout = false,
 }: {
   inicio: StoredPhoto | null;
   fim: StoredPhoto | null;
@@ -185,28 +229,49 @@ function CaboFotos({
   canEdit?: boolean;
   onRemoveCampo?: (campo: "fotoInicio" | "fotoFim") => void;
   onReplaceCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
+  uploading?: boolean;
+  /** true = Foto Inicial | Final em grid-cols-2 (card Metragem). */
+  pairLayout?: boolean;
 }) {
   const legendaTrim = legenda?.trim() || "";
+  const rowClass = pairLayout ? FOTO_CABO_PAIR_CLASS : FOTO_SLOTS_ROW_CLASS;
+  const wrapClass = pairLayout ? FOTO_CABO_SLOT_WRAP_CLASS : FOTO_SLOT_WRAP_CLASS;
   return (
-    <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+    <div className={`${rowClass} ${uploading ? "pointer-events-none opacity-60" : ""}`}>
       {(
         [
-          ["Foto Inicial", inicio, "fotoInicio"],
-          ["Foto Final", fim, "fotoFim"],
+          ["Foto Inicial", inicio, "fotoInicio", "inicio"],
+          ["Foto Final", fim, "fotoFim", "fim"],
         ] as const
-      ).map(([label, foto, campo]) => (
-        <div key={campo} className="flex min-w-0 flex-col gap-1">
+      ).map(([label, foto, campo, suffix]) => (
+        <div key={campo} className={wrapClass}>
           <FotoLabel>{label}</FotoLabel>
           {foto ? (
             <RelatorioFotoComControles
               src={foto.url}
               alt={label}
               canEdit={canEdit}
+              fillWidth={pairLayout}
               onDelete={onRemoveCampo ? () => onRemoveCampo(campo) : undefined}
               onReplace={onReplaceCampo ? (file) => onReplaceCampo(campo, file) : undefined}
             />
+          ) : canEdit && onReplaceCampo ? (
+            <PhotoUpload
+              label={label}
+              hideLabel
+              suffix={suffix}
+              value={null}
+              onChange={(file) => {
+                if (file) onReplaceCampo(campo, file);
+              }}
+              compact
+              hideHelperText
+              fillWidth={pairLayout}
+            />
           ) : (
-            <div className={FOTO_SLOT_CLASS}>Sem foto</div>
+            <div className={pairLayout ? `${FOTO_SLOT_CLASS} max-w-none` : FOTO_SLOT_CLASS}>
+              Sem foto
+            </div>
           )}
           {legendaTrim ? (
             <p className="text-center text-sm text-muted-foreground">{legendaTrim}</p>
@@ -294,8 +359,8 @@ function MetaField({ label, value }: { label: string; value: string }) {
   const empty = value === "Não informado";
   return (
     <div className="min-w-0">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={empty ? "mt-0.5 font-normal text-gray-400" : "mt-0.5 font-medium text-gray-900"}>
+      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</p>
+      <p className={empty ? "mt-0.5 text-sm font-normal text-gray-400" : "mt-0.5 text-sm font-medium text-gray-900"}>
         {value}
       </p>
     </div>
@@ -337,6 +402,7 @@ function EvidenciaBloco({
   coordenadas,
   coordenadasTitle,
   onCoordenadasChange,
+  headerExtra,
 }: {
   title: string;
   obs?: string | null;
@@ -360,6 +426,7 @@ function EvidenciaBloco({
   coordenadas?: { latitude: string; longitude: string };
   coordenadasTitle?: string;
   onCoordenadasChange?: (next: { latitude: string; longitude: string }) => void;
+  headerExtra?: ReactNode;
 }) {
   if (
     !fotos.length &&
@@ -370,12 +437,13 @@ function EvidenciaBloco({
     !onObsChange &&
     !onTitleChange &&
     quantidadeLabel == null &&
-    !coordenadas
+    !coordenadas &&
+    !headerExtra
   ) {
     return null;
   }
   return (
-    <div className="flex h-full flex-col rounded-xl border border-border/80 bg-muted/20 p-4">
+    <div className="flex h-full flex-col rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         {onTitleChange ? (
           <RefTituloEditavel value={title} onChange={onTitleChange} />
@@ -393,6 +461,7 @@ function EvidenciaBloco({
           </button>
         ) : null}
       </div>
+      {headerExtra ? <div className="mt-3">{headerExtra}</div> : null}
       {quantidadeLabel ? (
         <CampoQuantidade
           label={quantidadeLabel}
@@ -422,6 +491,7 @@ function EvidenciaBloco({
             canEdit={canEdit}
             onRemoveCampo={onRemoveCaboCampo}
             onReplaceCampo={onReplaceCaboCampo}
+            uploading={uploading}
           />
         ) : (
           <Photos
@@ -430,37 +500,15 @@ function EvidenciaBloco({
             canEdit={canEdit}
             onRemovePhoto={onRemovePhoto}
             onReplacePhoto={onReplacePhoto}
+            onAdd={canEdit ? onAdd : undefined}
+            uploadKey={uploadKey}
+            uploading={uploading}
           />
         )}
       </div>
       {onObsChange ? (
-        <div className="mt-auto w-full space-y-3 pt-4">
+        <div className="mt-4 w-full">
           <ObsEditavel value={obs ?? ""} onChange={onObsChange} />
-          {canEdit && onAdd && !(caboFotos && Boolean(caboFotos.inicio) && Boolean(caboFotos.fim)) ? (
-            <div className={uploading ? "pointer-events-none opacity-60" : undefined}>
-              <PhotoUpload
-                key={uploadKey}
-                label="Adicionar foto"
-                suffix="inicio"
-                value={null}
-                onChange={(file) => {
-                  if (file) onAdd(file);
-                }}
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : canEdit && onAdd && !(caboFotos && Boolean(caboFotos.inicio) && Boolean(caboFotos.fim)) ? (
-        <div className={`mt-auto w-full pt-4 ${uploading ? "pointer-events-none opacity-60" : ""}`}>
-          <PhotoUpload
-            key={uploadKey}
-            label="Adicionar foto"
-            suffix="inicio"
-            value={null}
-            onChange={(file) => {
-              if (file) onAdd(file);
-            }}
-          />
         </div>
       ) : null}
     </div>
@@ -495,8 +543,8 @@ function LancamentoCabosControle({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-gray-500">{label}</p>
+    <div className="space-y-3">
+      <h2 className="font-semibold text-gray-800">{label}</h2>
       <div className="grid grid-cols-2 gap-2">
         <ChoiceButton active={value === true} disabled={disabled} onClick={() => onChange(true)}>
           SIM
@@ -558,12 +606,12 @@ function AdminListaEquipamentos({
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-semibold text-gray-900">{titulo}</h4>
-      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">{titulo}</h4>
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3 lg:grid-cols-3">
         {list.map((item, index) => (
           <div
             key={item.id}
-            className="flex h-full flex-col gap-3 rounded-xl border border-border/80 bg-muted/20 p-4"
+            className="flex h-full flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
           >
             <div className="flex items-start justify-between gap-2">
               <h5 className="text-sm font-semibold text-gray-900">
@@ -941,6 +989,15 @@ export function RelatorioDetalhe({
         obs={grupo?.obs}
         fotos={grupo?.fotos ?? []}
         {...qtd}
+        headerExtra={
+          comAmbiente ? (
+            <AmbienteToggle
+              value={aba}
+              onChange={(ambiente) => setAbasGrupos((prev) => ({ ...prev, [key]: ambiente }))}
+              disabled={false}
+            />
+          ) : undefined
+        }
         onObsChange={
           canEditPhotos
             ? (obs) => {
@@ -968,17 +1025,7 @@ export function RelatorioDetalhe({
         {...blocoProps(key, dualKey ? aba : undefined)}
       />
     );
-    if (!comAmbiente) return bloco;
-    return (
-      <div key={`${key}-ambiente`} className="space-y-3">
-        <AmbienteToggle
-          value={aba}
-          onChange={(ambiente) => setAbasGrupos((prev) => ({ ...prev, [key]: ambiente }))}
-          disabled={false}
-        />
-        {bloco}
-      </div>
-    );
+    return bloco;
   };
 
   const renderCabo = (
@@ -1008,118 +1055,129 @@ export function RelatorioDetalhe({
     };
 
     return (
-      <div key={cabo.id} className="flex h-full flex-col gap-3">
-        <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+      <div
+        key={cabo.id}
+        className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+      >
+        <div className="mb-4 flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-gray-900">{titulo}</p>
-          <div>
-            <p className="text-xs text-gray-500">Tipo do cabo</p>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={cabo.tipoCabo}
-              disabled={!canEditPhotos}
-              onChange={(e) => patchCaboCampos({ tipoCabo: e.target.value })}
-              placeholder="Ex: 12"
-              className={inputClass()}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-gray-500">Marcação Inicial (m)</p>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={cabo.marcacaoInicial}
-                disabled={!canEditPhotos}
-                onChange={(e) => patchCaboCampos({ marcacaoInicial: e.target.value })}
-                className={inputClass()}
-              />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Marcação Final (m)</p>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={cabo.marcacaoFinal}
-                disabled={!canEditPhotos}
-                onChange={(e) => patchCaboCampos({ marcacaoFinal: e.target.value })}
-                className={inputClass()}
-              />
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Metragem Total (m)</p>
-            <input
-              type="text"
-              readOnly
-              value={
-                cabo.metragem ||
-                calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
-              }
-              className={`${inputClass()} cursor-default bg-gray-100`}
-              tabIndex={-1}
-            />
-          </div>
+          {canEditPhotos && index >= 1 ? (
+            <button
+              type="button"
+              onClick={() => {
+                patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+                  ...lado,
+                  metragens: removeExtraById(lado.metragens, cabo.id),
+                }));
+              }}
+              className="shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+              aria-label={`Excluir ${titulo}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
-        <EvidenciaBloco
-          title="Fotos do cabo"
-          obs={cabo.obs}
-          fotos={[]}
-          caboFotos={{ inicio: cabo.fotoInicio, fim: cabo.fotoFim }}
-          onObsChange={
-            canEditPhotos
-              ? (obs) => {
+
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-gray-500">Tipo do cabo</p>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={cabo.tipoCabo}
+                disabled={!canEditPhotos}
+                onChange={(e) => patchCaboCampos({ tipoCabo: e.target.value })}
+                placeholder="Ex: 12"
+                className={inputClass()}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-gray-500">Marcação Inicial (m)</p>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  value={cabo.marcacaoInicial}
+                  disabled={!canEditPhotos}
+                  onChange={(e) => patchCaboCampos({ marcacaoInicial: e.target.value })}
+                  className={inputClass()}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Marcação Final (m)</p>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  value={cabo.marcacaoFinal}
+                  disabled={!canEditPhotos}
+                  onChange={(e) => patchCaboCampos({ marcacaoFinal: e.target.value })}
+                  className={inputClass()}
+                />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Metragem Total (m)</p>
+              <input
+                type="text"
+                readOnly
+                value={
+                  cabo.metragem ||
+                  calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
+                }
+                className={`${inputClass()} cursor-default bg-gray-100`}
+                tabIndex={-1}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <CaboFotos
+              inicio={cabo.fotoInicio}
+              fim={cabo.fotoFim}
+              canEdit={canEditPhotos}
+              pairLayout
+              uploading={uploadingCategoria === categoria}
+              onRemoveCampo={
+                canEditPhotos
+                  ? (campo) => {
+                      const old = cabo[campo];
+                      patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+                        ...lado,
+                        metragens: lado.metragens.map((item) =>
+                          item.id === cabo.id ? { ...item, [campo]: null } : item,
+                        ),
+                      }));
+                      void deleteRelatorioPhoto(old?.path);
+                    }
+                  : undefined
+              }
+              onReplaceCampo={
+                canEditPhotos && onReplacePhoto
+                  ? (campo, file) =>
+                      onReplacePhoto(categoria, file, { caboId: cabo.id, campo, ambiente })
+                  : undefined
+              }
+            />
+            {canEditPhotos ? (
+              <ObsEditavel
+                value={cabo.obs}
+                onChange={(obs) => {
                   patchLancamentoCabos(dualKey, ambiente, (lado) => ({
                     ...lado,
                     metragens: lado.metragens.map((item) =>
                       item.id === cabo.id ? { ...item, obs } : item,
                     ),
                   }));
-                }
-              : undefined
-          }
-          onRemove={
-            canEditPhotos && index >= 1
-              ? () => {
-                  patchLancamentoCabos(dualKey, ambiente, (lado) => ({
-                    ...lado,
-                    metragens: removeExtraById(lado.metragens, cabo.id),
-                  }));
-                }
-              : undefined
-          }
-          onRemoveCaboCampo={
-            canEditPhotos
-              ? (campo) => {
-                  const old = cabo[campo];
-                  patchLancamentoCabos(dualKey, ambiente, (lado) => ({
-                    ...lado,
-                    metragens: lado.metragens.map((item) =>
-                      item.id === cabo.id ? { ...item, [campo]: null } : item,
-                    ),
-                  }));
-                  void deleteRelatorioPhoto(old?.path);
-                }
-              : undefined
-          }
-          onReplaceCaboCampo={
-            canEditPhotos && onReplacePhoto
-              ? (campo, file) =>
-                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo, ambiente })
-              : undefined
-          }
-          {...blocoProps(categoria, ambiente)}
-          onAdd={
-            canEditPhotos && onReplacePhoto && !(cabo.fotoInicio && cabo.fotoFim)
-              ? (file) => {
-                  const campo = cabo.fotoInicio ? "fotoFim" : "fotoInicio";
-                  onReplacePhoto(categoria, file, { caboId: cabo.id, campo, ambiente });
-                }
-              : undefined
-          }
-        />
+                }}
+              />
+            ) : cabo.obs?.trim() ? (
+              <p className="text-sm text-muted-foreground">{cabo.obs}</p>
+            ) : null}
+          </div>
+        </div>
       </div>
     );
   };
@@ -1211,9 +1269,9 @@ export function RelatorioDetalhe({
       : items.filter((item) => item.foto || item.ref || item.obs || item.obsAdmin);
     return (
       <section className="space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{heading}</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">{heading}</h3>
         {visiveis.length ? (
-          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
             {visiveis.map((item) => renderOutra(item, categoria))}
           </div>
         ) : (
@@ -1227,8 +1285,8 @@ export function RelatorioDetalhe({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="relative rounded-2xl border border-border bg-white p-5 shadow-sm md:p-6">
+    <div className="space-y-5">
+      <div className="relative rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
         {canEditCadastro ? (
           <Button
             type="button"
@@ -1241,8 +1299,8 @@ export function RelatorioDetalhe({
             Editar Dados
           </Button>
         ) : null}
-        <p className="text-sm text-gray-500">Endereço</p>
-        <p className="mt-0.5 pr-28 text-lg font-medium">
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Endereço</p>
+        <p className="mt-1 pr-28 text-base font-medium">
           <span className={row.endereco?.trim() ? "text-gray-900" : "font-normal text-gray-400"}>
             {displayCadastral(row.endereco)}
           </span>
@@ -1251,7 +1309,7 @@ export function RelatorioDetalhe({
             {displayCadastral(row.cidade)}
           </span>
         </p>
-        <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 lg:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4 lg:grid-cols-5">
           <MetaField label="Operadora" value={row.cliente_operadora || "Claro"} />
           <MetaField label="Cliente" value={displayCadastral(row.cliente)} />
           <MetaField label="Responsável" value={displayCadastral(row.responsavel)} />
@@ -1278,49 +1336,82 @@ export function RelatorioDetalhe({
         />
       ) : null}
 
-      {row.status === "pendente" ? (
-        <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
-          <p className="font-semibold">Pendência enviada ao técnico</p>
-          <p className="mt-1">
-            {row.motivo_pendencia?.trim() || "A supervisão sinalizou uma pendência."}
-          </p>
-        </div>
-      ) : null}
-
-      <RelatorioAbasCampo abaAtiva={abaAtiva} onChange={setAbaAtiva} abas={abasVisiveis} />
+      <RelatorioAbasCampo
+        abaAtiva={abaAtiva}
+        onChange={setAbaAtiva}
+        abas={abasVisiveis}
+        temPendencia={row.status === "pendente"}
+        motivoPendencia={row.motivo_pendencia}
+      />
 
       {abaAtiva === "RE" ? (
-        <div className="space-y-6">
-          <div className="flex w-full flex-col gap-3">
-            <LancamentoCabosControle
-              label="Lançamento cabos (RE)"
-              value={lancamentoCabosRe[abaLancamentoRe].isSim}
-              disabled={!canEditPhotos}
-              onChange={(next) => {
-                patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
-                  ...lado,
-                  isSim: next,
-                  metragens:
-                    next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
-                }));
-              }}
-            />
-            <AmbienteToggle
-              value={abaLancamentoRe}
-              onChange={(ambiente) => {
-                setAbaLancamentoRe(ambiente);
-                if (!payload) return;
-                patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
-              }}
-              disabled={false}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {abaLancamentoRe !== "subterraneo" ? (
+        <div className="space-y-4">
+          <AccordionBloco
+            title="LANÇAMENTO (RE)"
+            id="secao-cabos"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            <div className="border-b border-gray-100 pb-6">
+              <div className="flex w-full flex-col gap-3">
+                <LancamentoCabosControle
+                  label="Lançamento cabos (RE)?"
+                  value={lancamentoCabosRe[abaLancamentoRe].isSim}
+                  disabled={!canEditPhotos}
+                  onChange={(next) => {
+                    patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
+                      ...lado,
+                      isSim: next,
+                      metragens:
+                        next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+                    }));
+                  }}
+                />
+                <AmbienteToggle
+                  value={abaLancamentoRe}
+                  onChange={(ambiente) => {
+                    setAbaLancamentoRe(ambiente);
+                    if (!payload) return;
+                    patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
+                  }}
+                  disabled={false}
+                />
+              </div>
+            </div>
+            {lancamentoCabosRe[abaLancamentoRe].isSim === true ? (
+              <div className="space-y-4 border-b border-gray-100 pb-6">
+                <h2 className="font-semibold text-gray-800">Metragem de cabo</h2>
+                <div className="flex flex-col gap-4">
+                  {lancamentoCabosRe[abaLancamentoRe].metragens.map((cabo, index) =>
+                    renderCabo(
+                      cabo,
+                      index,
+                      "lancamentoCabosRe",
+                      abaLancamentoRe,
+                      `Cabo ${index + 1}`,
+                    ),
+                  )}
+                  {canEditPhotos ? (
+                    <BotaoAdicionar
+                      label="Adicionar mais cabo"
+                      onClick={() => {
+                        patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
+                          ...lado,
+                          metragens: [...lado.metragens, emptyCaboMetragem()],
+                        }));
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {renderGrupo("Sobra técnica", "sobraTecnica", true)}
+            {abaLancamentoRe !== "subterraneo" ? (
               <CordoalhaSimNaoCard
                 title="Fiberloop instalado?"
                 quantidadeLabel="Quantidade de Fiberloop instalado"
                 quantidadePlaceholder="Ex: 2"
+                variant="flat"
                 value={payload?.redeAcesso?.fiberloopInstalado ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos
@@ -1343,12 +1434,23 @@ export function RelatorioDetalhe({
                 }
                 disabled={!canEditPhotos}
               />
-              ) : null}
-              <CordoalhaSimNaoCard
-                title="Lançado cordoalha?"
-                quantidadeLabel="Quantidade de cordoalha lançada:"
-                quantidadePlaceholder="Ex: 50"
-                value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
+            ) : null}
+            {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="POSTE (RE)"
+            id="secao-poste"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            {renderGrupo("Poste de conexão", "posteConexao")}
+            <CordoalhaSimNaoCard
+              title="Lançado cordoalha?"
+              quantidadeLabel="Quantidade de cordoalha lançada:"
+              quantidadePlaceholder="Ex: 50"
+              variant="flat"
+              value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
                   ? (cordoalhaLancada) => {
@@ -1366,6 +1468,7 @@ export function RelatorioDetalhe({
             <CordoalhaSimNaoCard
               title="Cordoalha existente?"
               hideQuantidade
+              variant="flat"
               value={payload?.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
@@ -1387,112 +1490,85 @@ export function RelatorioDetalhe({
               }
               disabled={!canEditPhotos}
             />
-          </div>
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Postes e metragem
-            </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {lancamentoCabosRe[abaLancamentoRe].isSim === true ? (
-                <div className="flex h-full flex-col gap-3">
-                  {lancamentoCabosRe[abaLancamentoRe].metragens.map((cabo, index) =>
-                    renderCabo(
-                      cabo,
-                      index,
-                      "lancamentoCabosRe",
-                      abaLancamentoRe,
-                      `Cabo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal) || "—"} m`,
-                    ),
-                  )}
-                  {canEditPhotos ? (
-                    <BotaoAdicionar
-                      label="Adicionar cabo"
-                      onClick={() => {
-                        patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
-                          ...lado,
-                          metragens: [...lado.metragens, emptyCaboMetragem()],
-                        }));
-                      }}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-              {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
-              {renderGrupo("Poste de conexão", "posteConexao")}
-              <CordoalhaSimNaoCard
-                title="Postes novo com nova cordoalha?"
-                quantidadeLabel="Quantidade de Poste com nova cordoalha:"
-                quantidadePlaceholder="Ex: 10"
-                value={payload?.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
-                onChange={
-                  canEditPhotos
-                    ? (postesNovaCordoalha) => {
-                        if (!payload) return;
-                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
-                        patchPayload({
-                          ...payload,
-                          redeAcesso: { ...redeAcesso, postesNovaCordoalha },
-                        });
-                      }
-                    : undefined
-                }
-                disabled={!canEditPhotos}
-              />
-              <CordoalhaSimNaoCard
-                title="Postes com cordoalha Existente?"
-                hideQuantidade
-                value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
-                onChange={
-                  canEditPhotos
-                    ? (postesCordoalhaExistente) => {
-                        if (!payload) return;
-                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
-                        patchPayload({
-                          ...payload,
-                          redeAcesso: {
-                            ...redeAcesso,
-                            postesCordoalhaExistente: {
-                              isSim: postesCordoalhaExistente.isSim,
-                              quantidade: null,
-                            },
+            <CordoalhaSimNaoCard
+              title="Postes novo com nova cordoalha?"
+              quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+              quantidadePlaceholder="Ex: 10"
+              variant="flat"
+              value={payload?.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (postesNovaCordoalha) => {
+                      if (!payload) return;
+                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeAcesso: { ...redeAcesso, postesNovaCordoalha },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            <CordoalhaSimNaoCard
+              title="Postes com cordoalha Existente?"
+              hideQuantidade
+              variant="flat"
+              value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (postesCordoalhaExistente) => {
+                      if (!payload) return;
+                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeAcesso: {
+                          ...redeAcesso,
+                          postesCordoalhaExistente: {
+                            isSim: postesCordoalhaExistente.isSim,
+                            quantidade: null,
                           },
-                        });
-                      }
-                    : undefined
-                }
-                disabled={!canEditPhotos}
-              />
-            </div>
-          </section>
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Caixas de emenda
-            </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
-              {renderGrupo("Sobra técnica", "sobraTecnica", true)}
-            </div>
-          </section>
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Demais evidências
-            </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {renderGrupo("Plaqueta de Identificação - Caixa de emenda", "plaquetaIdentificacao", true)}
-              {renderGrupo("Novo aterramento do poste", "novoAterramentoPoste")}
-            </div>
+                        },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            {renderGrupo("Novo aterramento do poste", "novoAterramentoPoste")}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="CAIXA DE EMENDA (RE)"
+            id="secao-caixa-emenda"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
+            {renderGrupo("Plaqueta de Identificação - Caixa de emenda", "plaquetaIdentificacao", true)}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="OUTRAS FOTOS (RE)"
+            id="secao-outras-fotos"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
             {renderOutrasSecao("outrasFotos", "Outras fotos")}
-          </section>
+          </AccordionBloco>
         </div>
       ) : null}
 
       {abaAtiva === "RC" ? (
-        <div className="space-y-6">
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              LOCAL (RC)
-            </h3>
+        <div className="space-y-4">
+          <AccordionBloco
+            title="LOCAL (RC)"
+            id="secao-local"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
             <CampoCoordenadas
+              id="secao-coordenadas-cliente"
               title="Coordenadas do Cliente"
               value={payload?.redeCliente?.coordenadas ?? emptyCoordenadas()}
               onChange={
@@ -1508,48 +1584,128 @@ export function RelatorioDetalhe({
                   : undefined
               }
               disabled={!canEditPhotos}
+              embedded
             />
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {(
-                [
-                  ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
-                  ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
-                  ["(Rack ou Local)", "eqClienteRack"],
-                ] as const
-              ).map(([title, key]) => renderGrupo(title, key))}
+            {(
+              [
+                ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
+                ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
+                ["(Rack ou Local)", "eqClienteRack"],
+              ] as const
+            ).map(([title, key]) => renderGrupo(title, key))}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="LANÇAMENTO (RC)"
+            id="secao-cabos"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            <div className="border-b border-gray-100 pb-6">
+              <div className="flex w-full flex-col gap-3">
+                <LancamentoCabosControle
+                  label="Lançamento cabos (RC)?"
+                  value={lancamentoCabosRc[abaLancamentoRc].isSim}
+                  disabled={!canEditPhotos}
+                  onChange={(next) => {
+                    patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
+                      ...lado,
+                      isSim: next,
+                      metragens:
+                        next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
+                    }));
+                  }}
+                />
+                <AmbienteToggle
+                  value={abaLancamentoRc}
+                  onChange={(ambiente) => {
+                    setAbaLancamentoRc(ambiente);
+                    if (!payload) return;
+                    patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
+                  }}
+                  disabled={false}
+                />
+              </div>
             </div>
-          </section>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex w-full flex-col gap-3 sm:col-span-2 lg:col-span-2">
-              <LancamentoCabosControle
-                label="Lançamento cabos (RC)"
-                value={lancamentoCabosRc[abaLancamentoRc].isSim}
+            {lancamentoCabosRc[abaLancamentoRc].isSim === true ? (
+              <div className="space-y-4 border-b border-gray-100 pb-6">
+                <h2 className="font-semibold text-gray-800">Metragem de cabo</h2>
+                <div className="flex flex-col gap-4">
+                  {lancamentoCabosRc[abaLancamentoRc].metragens.map((cabo, index) =>
+                    renderCabo(
+                      cabo,
+                      index,
+                      "lancamentoCabosRc",
+                      abaLancamentoRc,
+                      `Cabo ${index + 1}`,
+                    ),
+                  )}
+                  {canEditPhotos ? (
+                    <BotaoAdicionar
+                      label="Adicionar mais cabo"
+                      onClick={() => {
+                        patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
+                          ...lado,
+                          metragens: [...lado.metragens, emptyCaboMetragem()],
+                        }));
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {renderGrupo("Entrada do cabo no cliente (Área externa)", "rcEntradaExterna")}
+            {renderGrupo("Entrada do cabo no cliente (Área interna)", "rcEntradaInterna")}
+            {renderGrupo(
+              "Terminação do cabo no cliente (PTO/Roseta - área interna)",
+              "rcTerminacaoCabo",
+            )}
+            {renderGrupo("Sobra técnica", "rcSobraTecnica", true)}
+            {abaLancamentoRc !== "subterraneo" ? (
+              <CordoalhaSimNaoCard
+                id="secao-fiberloopInstalado"
+                title="Fiberloop instalado?"
+                quantidadeLabel="Quantidade de Fiberloop instalado"
+                quantidadePlaceholder="Ex: 2"
+                variant="flat"
+                value={payload?.redeCliente?.fiberloopInstalado ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (fiberloopInstalado) => {
+                        if (!payload) return;
+                        const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeCliente: {
+                            ...redeCliente,
+                            fiberloopInstalado,
+                            qtdFiberloopInstalado:
+                              fiberloopInstalado.isSim === true
+                                ? fiberloopInstalado.quantidade
+                                : null,
+                          },
+                        });
+                      }
+                    : undefined
+                }
                 disabled={!canEditPhotos}
-                onChange={(next) => {
-                  patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
-                    ...lado,
-                    isSim: next,
-                    metragens:
-                      next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
-                  }));
-                }}
               />
-              <AmbienteToggle
-                value={abaLancamentoRc}
-                onChange={(ambiente) => {
-                  setAbaLancamentoRc(ambiente);
-                  if (!payload) return;
-                  patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
-                }}
-                disabled={false}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            ) : null}
+            {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo")}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="POSTE (RC)"
+            id="secao-poste"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            {renderGrupo("Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao")}
             <CordoalhaSimNaoCard
               title="Lançado cordoalha?"
               quantidadeLabel="Quantidade de cordoalha lançada:"
               quantidadePlaceholder="Ex: 50"
+              variant="flat"
               value={payload?.redeCliente?.cordoalhaLancada ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
@@ -1568,6 +1724,7 @@ export function RelatorioDetalhe({
             <CordoalhaSimNaoCard
               title="Cordoalha existente?"
               hideQuantidade
+              variant="flat"
               value={payload?.redeCliente?.cordoalhaExistente ?? emptyCordoalhaBloco()}
               onChange={
                 canEditPhotos
@@ -1589,112 +1746,94 @@ export function RelatorioDetalhe({
               }
               disabled={!canEditPhotos}
             />
-          </div>
-          <section className="space-y-3">
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {lancamentoCabosRc[abaLancamentoRc].isSim === true ? (
-                <div className="flex h-full flex-col gap-3">
-                  {lancamentoCabosRc[abaLancamentoRc].metragens.map((cabo, index) =>
-                    renderCabo(
-                      cabo,
-                      index,
-                      "lancamentoCabosRc",
-                      abaLancamentoRc,
-                      `Cabo RC ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal) || "—"} m`,
-                    ),
-                  )}
-                  {canEditPhotos ? (
-                    <BotaoAdicionar
-                      label="Adicionar cabo"
-                      onClick={() => {
-                        patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
-                          ...lado,
-                          metragens: [...lado.metragens, emptyCaboMetragem()],
-                        }));
-                      }}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-              {renderGrupo("Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao")}
-              <CordoalhaSimNaoCard
-                title="Postes novo com nova cordoalha?"
-                quantidadeLabel="Quantidade de Poste com nova cordoalha:"
-                quantidadePlaceholder="Ex: 10"
-                value={payload?.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
-                onChange={
-                  canEditPhotos
-                    ? (postesNovaCordoalha) => {
-                        if (!payload) return;
-                        const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
-                        patchPayload({
-                          ...payload,
-                          redeCliente: { ...redeCliente, postesNovaCordoalha },
-                        });
-                      }
-                    : undefined
-                }
-                disabled={!canEditPhotos}
-              />
-              <CordoalhaSimNaoCard
-                title="Postes com cordoalha Existente?"
-                hideQuantidade
-                value={payload?.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
-                onChange={
-                  canEditPhotos
-                    ? (postesCordoalhaExistente) => {
-                        if (!payload) return;
-                        const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
-                        patchPayload({
-                          ...payload,
-                          redeCliente: {
-                            ...redeCliente,
-                            postesCordoalhaExistente: {
-                              isSim: postesCordoalhaExistente.isSim,
-                              quantidade: null,
-                            },
+            <CordoalhaSimNaoCard
+              title="Postes novo com nova cordoalha?"
+              quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+              quantidadePlaceholder="Ex: 10"
+              variant="flat"
+              value={payload?.redeCliente?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (postesNovaCordoalha) => {
+                      if (!payload) return;
+                      const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeCliente: { ...redeCliente, postesNovaCordoalha },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            <CordoalhaSimNaoCard
+              title="Postes com cordoalha Existente?"
+              hideQuantidade
+              variant="flat"
+              value={payload?.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
+              onChange={
+                canEditPhotos
+                  ? (postesCordoalhaExistente) => {
+                      if (!payload) return;
+                      const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeCliente: {
+                          ...redeCliente,
+                          postesCordoalhaExistente: {
+                            isSim: postesCordoalhaExistente.isSim,
+                            quantidade: null,
                           },
-                        });
-                      }
-                    : undefined
-                }
-                disabled={!canEditPhotos}
-              />
-              {(
-                [
-                  ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
-                  ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
-                  ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
-                  ["Sobra técnica", "rcSobraTecnica"],
-                  ["Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo"],
-                  ["Caixa de emenda na acomodação (Rede cliente com Rede Externa)", "rcCaixaEmenda"],
-                  ["Plaqueta de Identificação - Caixa de emenda", "rcPlaquetaIdentificacao"],
-                  ["Novo aterramento do poste", "rcNovoAterramentoPoste"],
-                ] as const
-              ).map(([title, key]) =>
-                renderGrupo(
-                  title,
-                  key,
-                  key === "rcCaixaEmenda" ||
-                    key === "rcPlaquetaIdentificacao" ||
-                    key === "rcSobraTecnica",
-                ),
-              )}
-            </div>
+                        },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            {renderGrupo("Novo aterramento do poste", "rcNovoAterramentoPoste")}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="CAIXA DE EMENDA (RC)"
+            id="secao-caixa-emenda"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            {renderGrupo(
+              "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
+              "rcCaixaEmenda",
+              true,
+            )}
+            {renderGrupo(
+              "Plaqueta de Identificação - Caixa de emenda",
+              "rcPlaquetaIdentificacao",
+              true,
+            )}
+          </AccordionBloco>
+
+          <AccordionBloco
+            title="OUTRAS FOTOS (RC)"
+            id="secao-outras-fotos"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
             {renderOutrasSecao("outrasFotosRc", "Outras fotos")}
-          </section>
+          </AccordionBloco>
         </div>
       ) : null}
 
       {abaAtiva === "equipamento" ? (
-        <div className="space-y-6">
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              EQUIPAMENTO NO CLIENTE
-            </h3>
+        <div className="space-y-4">
+          <AccordionBloco
+            title="EQUIPAMENTO NO CLIENTE"
+            id="secao-eq-cliente"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
             <div
               id="secao-tecnologia-acesso"
-              className="scroll-mt-36 space-y-1.5 rounded-2xl border border-border bg-card p-5 shadow-sm"
+              className="scroll-mt-36 space-y-1.5 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
             >
               <label htmlFor="admin-tecnologia-acesso" className="block text-sm font-semibold">
                 Tecnologia de Acesso
@@ -1746,7 +1885,7 @@ export function RelatorioDetalhe({
               emptyItem={emptyEquipamentoClienteItem}
             />
 
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
               {renderGrupo("Identificação SGP no Cliente", "eqClienteSgp")}
             </div>
 
@@ -1770,13 +1909,18 @@ export function RelatorioDetalhe({
               }
               readOnly={!canEditPhotos}
             />
-          </section>
+          </AccordionBloco>
 
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              EQUIPAMENTO NA ESTAÇÃO
-            </h3>
-            <p className="text-sm text-muted-foreground">
+          <AccordionBloco
+            title="EQUIPAMENTO NA ESTAÇÃO"
+            id="secao-eq-estacao"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
+            <p
+              id="secao-estacao-entrega-acesso"
+              className="scroll-mt-36 text-sm text-muted-foreground"
+            >
               Estação Entrega de Acesso
               {payload?.estacaoEntregaAcesso ? `: ${payload.estacaoEntregaAcesso}` : ""}
             </p>
@@ -1796,7 +1940,7 @@ export function RelatorioDetalhe({
               emptyItem={emptyDgoClienteItem}
             />
 
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
               {(
                 [
                   ["Posição de conexão na Estação/PPC (DGO/DIO)", "posicaoConexaoEstacao"],
@@ -1843,14 +1987,16 @@ export function RelatorioDetalhe({
               }
               readOnly={!canEditPhotos}
             />
-          </section>
+          </AccordionBloco>
 
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              OUTRAS FOTOS
-            </h3>
+          <AccordionBloco
+            title="OUTRAS FOTOS"
+            id="secao-outras-fotos"
+            stickTabsAtViewportTop={false}
+            defaultOpen
+          >
             {renderOutrasSecao("outrasFotosEqCliente", "Outras fotos")}
-          </section>
+          </AccordionBloco>
         </div>
       ) : null}
 

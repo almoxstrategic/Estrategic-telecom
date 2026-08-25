@@ -135,12 +135,12 @@ export function ChoiceButton({
       type="button"
       onClick={bloqueado ? undefined : onClick}
       disabled={bloqueado}
-      className={`w-full min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm font-semibold leading-tight transition ${
+      className={`w-full min-w-0 flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium leading-tight transition ${
         active
           ? `border-primary bg-primary text-primary-foreground ${locked ? "disabled:opacity-100" : ""}`
           : locked
-            ? "border-border bg-muted text-muted-foreground opacity-40"
-            : "border-border bg-background text-foreground hover:bg-muted"
+            ? "border-gray-200 bg-gray-100 text-gray-400 opacity-40"
+            : "border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200/80"
       } ${locked ? "pointer-events-none cursor-default" : ""} ${
         bloqueado && !locked ? "disabled:cursor-not-allowed disabled:opacity-60" : ""
       }`}
@@ -624,21 +624,21 @@ export function RelatorioAbasCampo({
         className={
           stickToViewportTop
             ? "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm"
-            : "sticky top-16 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm"
+            : "sticky top-16 z-40 w-full bg-white py-2"
         }
       >
-        <div className="-mx-5 flex w-[calc(100%+2.5rem)] items-center justify-between">
+        <div className="flex w-full items-center gap-1">
           <button
             type="button"
             onClick={() => scrollAbas("left")}
-            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600"
+            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600 md:hidden"
             aria-label="Rolar abas para a esquerda"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <nav
             ref={abasScrollRef}
-            className="flex w-full min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2 overflow-x-auto md:flex-nowrap md:justify-between md:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label="Seções do relatório"
           >
             {abas.map((aba) => {
@@ -648,10 +648,10 @@ export function RelatorioAbasCampo({
                   key={aba.id}
                   type="button"
                   onClick={() => onChange(aba.id)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:text-sm ${
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:px-4 md:text-sm ${
                     ativa
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                      : "border-border bg-white text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   {aba.label}
@@ -662,7 +662,7 @@ export function RelatorioAbasCampo({
           <button
             type="button"
             onClick={() => scrollAbas("right")}
-            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600"
+            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600 md:hidden"
             aria-label="Rolar abas para a direita"
           >
             <ChevronRight className="h-5 w-5" />
@@ -675,7 +675,7 @@ export function RelatorioAbasCampo({
               <button
                 type="button"
                 onClick={() => setIsSideMenuOpen(true)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-foreground transition hover:bg-muted"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-white text-foreground transition hover:bg-muted"
                 aria-label="Abrir índice de seções"
               >
                 <Menu className="h-5 w-5" />
@@ -695,7 +695,7 @@ export function RelatorioAbasCampo({
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
                     placeholder="Buscar seção (ex: Caixa de Emenda)"
-                    className="box-border w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="box-border w-full rounded-lg border border-input bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     aria-label="Busca rápida de seções do formulário"
                     autoComplete="off"
                   />
@@ -707,7 +707,7 @@ export function RelatorioAbasCampo({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition hover:bg-muted ${
+                  className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-white transition hover:bg-muted ${
                     temPendencia ? "text-destructive" : "text-muted-foreground"
                   }`}
                   aria-label={
@@ -853,7 +853,7 @@ export function CampoCoordenadas({
   return (
     <div
       id={id}
-      className="scroll-mt-36 space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      className="scroll-mt-36 space-y-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
     >
       {body}
     </div>
@@ -931,6 +931,8 @@ export function AccordionBloco({
   rootRef,
   id,
   stickTabsAtViewportTop = true,
+  defaultOpen = false,
+  variant = "default",
 }: {
   title: string;
   children: ReactNode;
@@ -938,24 +940,38 @@ export function AccordionBloco({
   id?: string;
   /** true = abas no topo da viewport (técnico); false = abas abaixo do AppHeader. */
   stickTabsAtViewportTop?: boolean;
+  /** Aberto por padrão (ex.: auditoria desktop do gestor). */
+  defaultOpen?: boolean;
+  /** `audit` = tipografia sóbria de dashboard para visão do gestor. */
+  variant?: "default" | "audit";
 }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const stickyOffsetPx = useAbasStickyOffsetPx(stickTabsAtViewportTop);
   const isStuck = useAccordionStuck(sentinelRef, stickyOffsetPx);
+  const isAudit = variant === "audit";
 
   return (
     <details
       id={id}
       ref={rootRef as RefObject<HTMLDetailsElement | null> | undefined}
-      className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+      defaultOpen={defaultOpen}
+      className={
+        isAudit
+          ? "group relative overflow-visible rounded-xl border border-gray-100 bg-white shadow-sm open:shadow-md"
+          : "group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+      }
       style={{ scrollMarginTop: stickyOffsetPx }}
     >
       <summary
         style={{ top: stickyOffsetPx }}
         className={
-          isStuck
-            ? "sticky z-30 -mx-5 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-2 text-sm font-bold shadow-sm transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
-            : "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4 text-base font-bold transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
+          isAudit
+            ? isStuck
+              ? "sticky z-30 -mx-4 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-gray-800 shadow-sm transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
+              : "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 text-sm font-bold uppercase tracking-wider text-gray-800 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
+            : isStuck
+              ? "sticky z-30 -mx-5 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-2 text-sm font-bold shadow-sm transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
+              : "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4 text-base font-bold transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
         }
       >
         <span>{title}</span>
@@ -967,7 +983,9 @@ export function AccordionBloco({
         className="pointer-events-none absolute left-0 top-0 h-px w-full"
         aria-hidden
       />
-      <div className="flex flex-col gap-6 px-5 pb-5 pt-4">{children}</div>
+      <div className={isAudit ? "flex flex-col gap-4 px-4 pb-4 pt-4" : "flex flex-col gap-6 px-5 pb-5 pt-4"}>
+        {children}
+      </div>
     </details>
   );
 }
@@ -1111,12 +1129,12 @@ export function CordoalhaSimNaoCard({
       className={
         isFlat
           ? `scroll-mt-36 space-y-3 ${flatSectionClass}`
-          : "scroll-mt-36 space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          : "scroll-mt-36 space-y-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
       }
     >
       <h2
         className={
-          isFlat ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"
+          isFlat ? "mb-3 font-semibold text-gray-800" : "text-xs font-bold uppercase tracking-wider text-gray-500"
         }
       >
         {title}
@@ -1411,8 +1429,8 @@ export function RelatorioRedeAcesso({
                         tabIndex={-1}
                       />
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex flex-col flex-wrap items-start gap-4 sm:flex-row">
+                      <div className="flex w-full max-w-[360px] shrink-0 flex-col gap-1">
                         <FotoLabel>Foto Inicial</FotoLabel>
                         {cabo.fotoInicio ? (
                           <RelatorioFotoComControles
@@ -1436,6 +1454,7 @@ export function RelatorioRedeAcesso({
                             suffix="inicio"
                             hideLabel
                             compact
+                            hideHelperText
                             value={null}
                             onChange={(file) => {
                               if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
@@ -1443,7 +1462,7 @@ export function RelatorioRedeAcesso({
                           />
                         )}
                       </div>
-                      <div className="flex min-w-0 flex-col gap-1">
+                      <div className="flex w-full max-w-[360px] shrink-0 flex-col gap-1">
                         <FotoLabel>Foto Final</FotoLabel>
                         {cabo.fotoFim ? (
                           <RelatorioFotoComControles
@@ -1467,6 +1486,7 @@ export function RelatorioRedeAcesso({
                             suffix="fim"
                             hideLabel
                             compact
+                            hideHelperText
                             value={null}
                             onChange={(file) => {
                               if (file) onCaboPhoto(cabo.id, "fotoFim", file);
