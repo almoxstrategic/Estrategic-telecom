@@ -32,6 +32,7 @@ import {
   apenasDigitos,
   calcularMetragemCaboTotal,
   deleteRelatorioPhoto,
+  finalizeMedicaoInput,
   type AmbienteRede,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
@@ -1194,10 +1195,9 @@ export function CampoQuantidade({
       </label>
       <input
         id={id}
-        type="number"
-        min={0}
-        step={1}
+        type="text"
         inputMode="numeric"
+        autoComplete="off"
         placeholder={placeholder}
         value={value ?? ""}
         disabled={disabled || !onChange}
@@ -1207,6 +1207,8 @@ export function CampoQuantidade({
             onChange?.(null);
             return;
           }
+          // Digitação livre: não bloqueia estados parciais; só aceita dígitos no valor final.
+          if (!/^\d*$/.test(raw)) return;
           const n = Number(raw);
           if (!Number.isFinite(n) || n < 0) return;
           onChange?.(Math.trunc(n));
@@ -1495,7 +1497,7 @@ export function RelatorioRedeAcesso({
                     <div>
                       <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
                       <input
-                        type="number"
+                        type="text"
                         inputMode="numeric"
                         value={cabo.tipoCabo}
                         onChange={(e) =>
@@ -1512,12 +1514,23 @@ export function RelatorioRedeAcesso({
                           Marcação Inicial (m)
                         </label>
                         <input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          step="any"
+                          autoComplete="off"
                           value={cabo.marcacaoInicial}
                           onChange={(e) => {
                             const marcacaoInicial = e.target.value;
+                            onPatchCabo(cabo.id, {
+                              marcacaoInicial,
+                              metragem: calcularMetragemCaboTotal(
+                                marcacaoInicial,
+                                cabo.marcacaoFinal,
+                              ),
+                            });
+                          }}
+                          onBlur={(e) => {
+                            const marcacaoInicial = finalizeMedicaoInput(e.target.value);
+                            if (marcacaoInicial === cabo.marcacaoInicial) return;
                             onPatchCabo(cabo.id, {
                               marcacaoInicial,
                               metragem: calcularMetragemCaboTotal(
@@ -1535,12 +1548,23 @@ export function RelatorioRedeAcesso({
                           Marcação Final (m)
                         </label>
                         <input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          step="any"
+                          autoComplete="off"
                           value={cabo.marcacaoFinal}
                           onChange={(e) => {
                             const marcacaoFinal = e.target.value;
+                            onPatchCabo(cabo.id, {
+                              marcacaoFinal,
+                              metragem: calcularMetragemCaboTotal(
+                                cabo.marcacaoInicial,
+                                marcacaoFinal,
+                              ),
+                            });
+                          }}
+                          onBlur={(e) => {
+                            const marcacaoFinal = finalizeMedicaoInput(e.target.value);
+                            if (marcacaoFinal === cabo.marcacaoFinal) return;
                             onPatchCabo(cabo.id, {
                               marcacaoFinal,
                               metragem: calcularMetragemCaboTotal(

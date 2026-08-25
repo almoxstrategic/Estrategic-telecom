@@ -11,8 +11,7 @@ import {
   deleteRelatorioPhoto,
   emptyTesteOtdrItem,
   emptyTesteOpticoItem,
-  normalizeMedicaoValue,
-  sanitizeMedicaoInput,
+  finalizeMedicaoInput,
   testeOpticoEstacaoAtivo,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
@@ -25,7 +24,11 @@ import {
 
 type ChangeOpts = { immediate?: boolean };
 
-/** Campo decimal de medição: aceita -, . e ,; normaliza vírgula→ponto no blur. */
+/**
+ * Campo de medição (dBm, km, etc.).
+ * type="text" + inputMode="decimal" — evita teclado/type=number que bloqueia "-" no mobile.
+ * Digitação livre (string); sanitização/normalização só no blur.
+ */
 function CampoMedicaoDecimal({
   id,
   label,
@@ -53,14 +56,17 @@ function CampoMedicaoDecimal({
         id={id}
         type="text"
         inputMode="decimal"
+        enterKeyHint="done"
         autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
         value={value}
         placeholder={placeholder}
         disabled={disabled}
-        onChange={(e) => onChange(sanitizeMedicaoInput(e.target.value))}
+        onChange={(e) => onChange(e.target.value)}
         onBlur={() => {
-          const normalized = normalizeMedicaoValue(value);
-          if (normalized !== value) onChange(normalized, { immediate: true });
+          const next = finalizeMedicaoInput(value);
+          if (next !== value) onChange(next, { immediate: true });
         }}
         className={inputClass()}
       />
@@ -247,26 +253,39 @@ function CampoNumeroFibra({
   onChange: (value: number | null) => void;
   disabled: boolean;
 }) {
+  const [draft, setDraft] = useState(value == null ? "" : String(value));
+
+  useEffect(() => {
+    setDraft(value == null ? "" : String(value));
+  }, [value]);
+
   return (
     <div className="mx-auto w-full max-w-xs">
       <label className="mb-1.5 block text-center text-sm font-semibold">Nº Fibra:</label>
       <input
-        type="number"
-        min={1}
-        step={1}
+        type="text"
         inputMode="numeric"
+        enterKeyHint="done"
+        autoComplete="off"
         placeholder="Ex: 1"
-        value={value ?? ""}
+        value={draft}
         disabled={disabled}
-        onChange={(e) => {
-          const raw = e.target.value;
-          if (raw === "") {
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const digits = draft.replace(/\D/g, "");
+          if (!digits) {
             onChange(null);
+            setDraft("");
             return;
           }
-          const n = Number(raw);
-          if (!Number.isFinite(n) || n < 1) return;
-          onChange(Math.trunc(n));
+          const n = Math.trunc(Number(digits));
+          if (!Number.isFinite(n) || n < 1) {
+            onChange(null);
+            setDraft("");
+            return;
+          }
+          onChange(n);
+          setDraft(String(n));
         }}
         className={inputClass()}
       />

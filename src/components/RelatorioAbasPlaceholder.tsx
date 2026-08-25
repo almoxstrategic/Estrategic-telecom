@@ -36,6 +36,7 @@ function TextField({
       <input
         type={type}
         inputMode={inputMode}
+        autoComplete="off"
         value={value}
         placeholder={placeholder}
         disabled={disabled || !onChange}
@@ -146,7 +147,7 @@ function TomadaCard({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <TextField
           label="Fase - Neutro (V)"
-          type="number"
+          type="text"
           inputMode="decimal"
           value={value.faseNeutro}
           onChange={(faseNeutro) => patch({ faseNeutro })}
@@ -154,7 +155,7 @@ function TomadaCard({
         />
         <TextField
           label="Terra - Fase (V)"
-          type="number"
+          type="text"
           inputMode="decimal"
           value={value.terraFase}
           onChange={(terraFase) => patch({ terraFase })}
@@ -162,7 +163,7 @@ function TomadaCard({
         />
         <TextField
           label="Terra - Neutro (V)"
-          type="number"
+          type="text"
           inputMode="decimal"
           value={value.terraNeutro}
           onChange={(terraNeutro) => patch({ terraNeutro })}

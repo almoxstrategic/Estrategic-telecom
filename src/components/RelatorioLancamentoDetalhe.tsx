@@ -61,6 +61,7 @@ import {
   simDerivadoLancamento,
   apenasDigitos,
   calcularMetragemCaboTotal,
+  finalizeMedicaoInput,
   janelaPotenciaDerivada,
   labelTecnicosAtribuidos,
   removeExtraById,
@@ -1248,11 +1249,15 @@ export function RelatorioDetalhe({
             <div>
               <p className="text-xs text-gray-500">Tipo do cabo</p>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
+                autoComplete="off"
                 value={cabo.tipoCabo}
                 disabled={!canEditPhotos}
                 onChange={(e) => patchCaboCampos({ tipoCabo: e.target.value })}
+                onBlur={(e) =>
+                  patchCaboCampos({ tipoCabo: apenasDigitos(e.target.value) })
+                }
                 placeholder="Ex: 12"
                 className={inputClass()}
               />
@@ -1261,24 +1266,34 @@ export function RelatorioDetalhe({
               <div>
                 <p className="text-xs text-gray-500">Marcação Inicial (m)</p>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="any"
+                  autoComplete="off"
                   value={cabo.marcacaoInicial}
                   disabled={!canEditPhotos}
                   onChange={(e) => patchCaboCampos({ marcacaoInicial: e.target.value })}
+                  onBlur={(e) =>
+                    patchCaboCampos({
+                      marcacaoInicial: finalizeMedicaoInput(e.target.value),
+                    })
+                  }
                   className={inputClass()}
                 />
               </div>
               <div>
                 <p className="text-xs text-gray-500">Marcação Final (m)</p>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="any"
+                  autoComplete="off"
                   value={cabo.marcacaoFinal}
                   disabled={!canEditPhotos}
                   onChange={(e) => patchCaboCampos({ marcacaoFinal: e.target.value })}
+                  onBlur={(e) =>
+                    patchCaboCampos({
+                      marcacaoFinal: finalizeMedicaoInput(e.target.value),
+                    })
+                  }
                   className={inputClass()}
                 />
               </div>

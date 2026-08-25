@@ -109,7 +109,7 @@ export function apenasDigitos(value: string): string {
 /**
  * Sanitiza digitação de medição (dB, dBm, km, etc.):
  * permite sinal "-" só no início e um separador decimal ("." ou ",").
- * Mantém a vírgula na UI enquanto o usuário edita.
+ * Preserva rascunhos parciais: "-", "-1", "-1.", "-1,", "-1.8".
  */
 export function sanitizeMedicaoInput(raw: string): string {
   const s = String(raw ?? "");
@@ -140,6 +140,25 @@ export function normalizeMedicaoValue(raw: string): string {
     .trim()
     .replace(/\s/g, "")
     .replace(",", ".");
+}
+
+/**
+ * Finaliza valor no blur/salvamento sem apagar rascunhos parciais válidos
+ * (`-`, `-1.`, `-1,` → `-1.`).
+ */
+export function finalizeMedicaoInput(raw: string): string {
+  const soft = sanitizeMedicaoInput(raw);
+  if (
+    soft === "" ||
+    soft === "-" ||
+    soft === "." ||
+    soft === "," ||
+    soft === "-." ||
+    soft === "-,"
+  ) {
+    return soft.replace(",", ".");
+  }
+  return normalizeMedicaoValue(soft);
 }
 
 /** Normaliza número decimal (aceita vírgula) para cálculo. */
