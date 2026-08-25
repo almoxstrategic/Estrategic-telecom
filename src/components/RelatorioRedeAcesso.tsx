@@ -1590,6 +1590,12 @@ export function RelatorioRedeAcesso({
                             onChange={(file) => {
                               if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
                             }}
+                            onGalleryFiles={(photos) => {
+                              if (photos[0]) onCaboPhoto(cabo.id, "fotoInicio", photos[0]);
+                              if (photos[1] && !cabo.fotoFim) {
+                                onCaboPhoto(cabo.id, "fotoFim", photos[1]);
+                              }
+                            }}
                           />
                         )}
                       </div>
@@ -1621,6 +1627,9 @@ export function RelatorioRedeAcesso({
                             value={null}
                             onChange={(file) => {
                               if (file) onCaboPhoto(cabo.id, "fotoFim", file);
+                            }}
+                            onGalleryFiles={(photos) => {
+                              if (photos[0]) onCaboPhoto(cabo.id, "fotoFim", photos[0]);
                             }}
                           />
                         )}

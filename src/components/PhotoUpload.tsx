@@ -33,6 +33,7 @@ export function PhotoUpload({
   value,
   onChange,
   onBeforePick,
+  onGalleryFiles,
   hideLabel = false,
   compact = false,
   /** Força ocultar o texto de ajuda (além do RBAC do técnico). */
@@ -45,6 +46,11 @@ export function PhotoUpload({
   value: EvidencePhotoRef | null;
   onChange: (photo: EvidencePhotoRef | null) => void;
   onBeforePick?: () => void;
+  /**
+   * Quando definido, a Galeria aceita múltiplos arquivos e entrega a lista processada
+   * (preenchimento sequencial de slots no bloco pai).
+   */
+  onGalleryFiles?: (photos: EvidencePhotoRef[]) => void;
   hideLabel?: boolean;
   compact?: boolean;
   hideHelperText?: boolean;
@@ -58,6 +64,7 @@ export function PhotoUpload({
   const busy = busyMode !== "idle";
   const showHelperText =
     !compact && !hideHelperText && hasPainelFullAccess(user?.role);
+  const multiGallery = Boolean(onGalleryFiles);
 
   useEffect(() => {
     return () => {
@@ -86,6 +93,33 @@ export function PhotoUpload({
     [onChange, value?.previewUrl],
   );
 
+  const handleGalleryFiles = useCallback(
+    async (fileList: FileList | File[] | null | undefined) => {
+      const files = fileList ? Array.from(fileList).filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|heic|heif)$/i.test(f.name)) : [];
+      if (files.length === 0) return;
+
+      if (files.length === 1 || !onGalleryFiles) {
+        await handleFile(files[0], "gallery");
+        return;
+      }
+
+      setBusyMode("gallery");
+      try {
+        const prepared: EvidencePhotoRef[] = [];
+        for (const file of files) {
+          prepared.push(await prepareEvidencePhotoFile(file, undefined, { withTimestamp: false }));
+        }
+        onGalleryFiles(prepared);
+      } catch (err) {
+        toast.error(`Erro ao processar fotos: ${(err as Error).message || "tente novamente"}`);
+      } finally {
+        setBusyMode("idle");
+        if (galleryRef.current) galleryRef.current.value = "";
+      }
+    },
+    [handleFile, onGalleryFiles],
+  );
+
   useEvidencePhotoPasteSlot({
     priority: suffix === "inicio" ? 0 : 1,
     isEmpty: value === null,
@@ -112,7 +146,13 @@ export function PhotoUpload({
     event.preventDefault();
     setDragOver(false);
     if (busy) return;
-    const file = event.dataTransfer.files?.[0];
+    const dropped = event.dataTransfer.files;
+    if (!dropped?.length) return;
+    if (multiGallery && dropped.length > 1) {
+      void handleGalleryFiles(dropped);
+      return;
+    }
+    const file = dropped[0];
     if (file) void handleFile(file, "gallery");
   };
 
@@ -225,7 +265,7 @@ export function PhotoUpload({
                 openPicker("gallery");
               }}
               className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[10px] font-semibold text-foreground shadow-sm hover:border-primary hover:text-primary"
-              aria-label="Fazer upload"
+              aria-label="Fazer upload da galeria"
             >
               <Upload className="h-3 w-3" />
               Galeria
@@ -245,12 +285,14 @@ export function PhotoUpload({
         ref={galleryRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png,image/heic,image/heif"
+        multiple={multiGallery}
         className="hidden"
-        onChange={(e) => void handleFile(e.target.files?.[0], "gallery")}
+        onChange={(e) => void handleGalleryFiles(e.target.files)}
       />
       {showHelperText ? (
         <p className="mt-1 text-[11px] text-muted-foreground">
           Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
+          {multiGallery ? "A galeria aceita várias fotos de uma vez. " : null}
           {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio. Fotos da câmera
           recebem data, hora e geolocalização.
         </p>
@@ -258,3 +300,4 @@ export function PhotoUpload({
     </div>
   );
 }
+

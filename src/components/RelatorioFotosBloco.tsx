@@ -27,6 +27,10 @@ export function slotsFromStored(fotos: StoredPhoto[], minSlots: number): FotoSlo
   return slots;
 }
 
+function slotIsEmpty(slot: FotoSlot): boolean {
+  return !slot.file && !slot.stored;
+}
+
 export function RelatorioFotosBloco({
   title,
   hint,
@@ -67,6 +71,61 @@ export function RelatorioFotosBloco({
       return;
     }
     updateSlot(slotId, { file, stored: file ? null : undefined });
+  };
+
+  /** Distribui N fotos da galeria nos slots vazios a partir do slot clicado. */
+  const distributeGalleryFiles = (fromSlotId: string, photos: EvidencePhotoRef[]) => {
+    if (photos.length === 0) return;
+    if (photos.length === 1) {
+      handlePick(fromSlotId, photos[0]);
+      return;
+    }
+
+    const startIdx = Math.max(
+      0,
+      slots.findIndex((slot) => slot.id === fromSlotId),
+    );
+    const working = slots.map((slot) => ({ ...slot }));
+    const assignments: { slotId: string; file: EvidencePhotoRef }[] = [];
+    let photoIdx = 0;
+
+    for (let i = startIdx; i < working.length && photoIdx < photos.length; i++) {
+      if (!slotIsEmpty(working[i])) continue;
+      assignments.push({ slotId: working[i].id, file: photos[photoIdx] });
+      photoIdx += 1;
+    }
+
+    while (photoIdx < photos.length) {
+      const slot = newFotoSlot();
+      working.push(slot);
+      assignments.push({ slotId: slot.id, file: photos[photoIdx] });
+      photoIdx += 1;
+    }
+
+    if (onPickPhoto) {
+      if (working.length > slots.length) {
+        onChange(
+          working.map((slot) => {
+            const prev = slots.find((s) => s.id === slot.id);
+            return prev ?? { id: slot.id, file: null, stored: null };
+          }),
+        );
+      }
+      window.setTimeout(() => {
+        for (const item of assignments) {
+          onPickPhoto(item.slotId, item.file);
+        }
+      }, 0);
+      return;
+    }
+
+    onChange(
+      working.map((slot) => {
+        const assigned = assignments.find((a) => a.slotId === slot.id);
+        if (!assigned) return slot;
+        return { ...slot, file: assigned.file, stored: null };
+      }),
+    );
   };
 
   const removerSlot = (index: number) => {
@@ -120,6 +179,7 @@ export function RelatorioFotosBloco({
                   value={slot.file}
                   hideLabel
                   onChange={(file) => handlePick(slot.id, file)}
+                  onGalleryFiles={(photos) => distributeGalleryFiles(slot.id, photos)}
                   compact
                   hideHelperText
                 />
@@ -146,6 +206,7 @@ export function RelatorioFotosBloco({
                   value={null}
                   hideLabel
                   onChange={(file) => handlePick(slot.id, file)}
+                  onGalleryFiles={(photos) => distributeGalleryFiles(slot.id, photos)}
                   compact
                   hideHelperText
                 />

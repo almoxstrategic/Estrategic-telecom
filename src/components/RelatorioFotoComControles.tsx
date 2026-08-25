@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Pencil, Trash2, Upload } from "lucide-react";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import { FOTO_PREVIEW_FRAME_CLASS } from "@/components/PhotoUpload";
 import { toast } from "sonner";
@@ -29,17 +29,23 @@ export function RelatorioFotoComControles({
   compact?: boolean;
   fillWidth?: boolean;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
 
-  const pickReplace = async (file: File | undefined) => {
+  const pickReplace = async (file: File | undefined, source: "camera" | "gallery") => {
     if (!file || !onReplace) return;
     try {
-      const prepared = await prepareEvidencePhotoFile(file);
+      const prepared = await prepareEvidencePhotoFile(file, undefined, {
+        withTimestamp: source === "camera",
+      });
       onReplace(prepared);
     } catch (err) {
       toast.error((err as Error).message || "Não foi possível processar a foto.");
     } finally {
-      if (fileRef.current) fileRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
+      if (galleryRef.current) galleryRef.current.value = "";
+      setChooserOpen(false);
     }
   };
 
@@ -57,29 +63,61 @@ export function RelatorioFotoComControles({
         className={compact ? IMAGE_CLASS_COMPACT : IMAGE_CLASS}
       />
       {canEdit && (onDelete || onReplace) ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-4 rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 pb-2 pt-8 print:hidden">
           {onReplace ? (
-            <button
-              type="button"
-              className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full bg-white text-gray-800 shadow hover:bg-gray-100"
-              aria-label="Substituir foto"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                fileRef.current?.click();
-              }}
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
+            chooserOpen ? (
+              <>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-800 shadow"
+                  aria-label="Tirar foto com a câmera"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cameraRef.current?.click();
+                  }}
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  Câmera
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-800 shadow"
+                  aria-label="Escolher da galeria"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    galleryRef.current?.click();
+                  }}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Galeria
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="grid h-9 w-9 place-items-center rounded-full bg-white text-gray-800 shadow hover:bg-gray-100"
+                aria-label="Substituir foto"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setChooserOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )
           ) : null}
           {onDelete ? (
             <button
               type="button"
-              className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full bg-white text-destructive shadow hover:bg-red-50"
+              className="grid h-9 w-9 place-items-center rounded-full bg-white text-destructive shadow hover:bg-red-50"
               aria-label="Excluir foto"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                setChooserOpen(false);
                 onDelete();
               }}
             >
@@ -89,11 +127,19 @@ export function RelatorioFotoComControles({
         </div>
       ) : null}
       <input
-        ref={fileRef}
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void pickReplace(e.target.files?.[0], "camera")}
+      />
+      <input
+        ref={galleryRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png,image/heic,image/heif"
         className="hidden"
-        onChange={(e) => void pickReplace(e.target.files?.[0])}
+        onChange={(e) => void pickReplace(e.target.files?.[0], "gallery")}
       />
     </div>
   );

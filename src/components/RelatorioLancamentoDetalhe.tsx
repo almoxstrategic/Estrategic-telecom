@@ -272,6 +272,14 @@ function CaboFotos({
               onChange={(file) => {
                 if (file) onReplaceCampo(campo, file);
               }}
+              onGalleryFiles={(photos) => {
+                if (campo === "fotoInicio") {
+                  if (photos[0]) onReplaceCampo("fotoInicio", photos[0]);
+                  if (photos[1] && !fim) onReplaceCampo("fotoFim", photos[1]);
+                  return;
+                }
+                if (photos[0]) onReplaceCampo("fotoFim", photos[0]);
+              }}
               compact
               hideHelperText
               fillWidth={pairLayout}
