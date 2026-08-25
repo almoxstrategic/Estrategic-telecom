@@ -1321,6 +1321,7 @@ export function RelatorioRedeAcesso({
   onAddCabo,
   onRemoveCabo,
   onCaboPhoto,
+  onCaboGalleryFiles,
   grupos,
   onGrupoPhoto,
   outras,
@@ -1371,6 +1372,14 @@ export function RelatorioRedeAcesso({
     caboId: string,
     campo: "fotoInicio" | "fotoFim",
     file: EvidencePhotoRef | null,
+  ) => void;
+  /**
+   * Galeria múltipla na metragem: preenche slots vazios e cria novos cabos (2 fotos/cabo).
+   */
+  onCaboGalleryFiles?: (
+    fromCaboId: string,
+    fromCampo: "fotoInicio" | "fotoFim",
+    photos: EvidencePhotoRef[],
   ) => void;
   grupos: GrupoFotoCampo[];
   onGrupoPhoto: (
@@ -1591,6 +1600,10 @@ export function RelatorioRedeAcesso({
                               if (file) onCaboPhoto(cabo.id, "fotoInicio", file);
                             }}
                             onGalleryFiles={(photos) => {
+                              if (onCaboGalleryFiles) {
+                                onCaboGalleryFiles(cabo.id, "fotoInicio", photos);
+                                return;
+                              }
                               if (photos[0]) onCaboPhoto(cabo.id, "fotoInicio", photos[0]);
                               if (photos[1] && !cabo.fotoFim) {
                                 onCaboPhoto(cabo.id, "fotoFim", photos[1]);
@@ -1629,6 +1642,10 @@ export function RelatorioRedeAcesso({
                               if (file) onCaboPhoto(cabo.id, "fotoFim", file);
                             }}
                             onGalleryFiles={(photos) => {
+                              if (onCaboGalleryFiles) {
+                                onCaboGalleryFiles(cabo.id, "fotoFim", photos);
+                                return;
+                              }
                               if (photos[0]) onCaboPhoto(cabo.id, "fotoFim", photos[0]);
                             }}
                           />

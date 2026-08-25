@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
+import { planCaboMetragemGalleryAssignments } from "@/lib/cabo-metragem-gallery";
 import {
   deleteRelatorioPhoto,
   emptyCaboMetragem,
@@ -228,6 +229,7 @@ function CaboFotos({
   canEdit,
   onRemoveCampo,
   onReplaceCampo,
+  onGalleryFiles,
   uploading,
   pairLayout = false,
 }: {
@@ -237,6 +239,8 @@ function CaboFotos({
   canEdit?: boolean;
   onRemoveCampo?: (campo: "fotoInicio" | "fotoFim") => void;
   onReplaceCampo?: (campo: "fotoInicio" | "fotoFim", file: EvidencePhotoRef) => void;
+  /** Galeria múltipla: distribui fotos e pode criar novos cabos no pai. */
+  onGalleryFiles?: (campo: "fotoInicio" | "fotoFim", photos: EvidencePhotoRef[]) => void;
   uploading?: boolean;
   /** true = Foto Inicial | Final em grid-cols-2 (card Metragem). */
   pairLayout?: boolean;
@@ -273,6 +277,10 @@ function CaboFotos({
                 if (file) onReplaceCampo(campo, file);
               }}
               onGalleryFiles={(photos) => {
+                if (onGalleryFiles) {
+                  onGalleryFiles(campo, photos);
+                  return;
+                }
                 if (campo === "fotoInicio") {
                   if (photos[0]) onReplaceCampo("fotoInicio", photos[0]);
                   if (photos[1] && !fim) onReplaceCampo("fotoFim", photos[1]);
@@ -1265,6 +1273,75 @@ export function RelatorioDetalhe({
                 canEditPhotos && onReplacePhoto
                   ? (campo, file) =>
                       onReplacePhoto(categoria, file, { caboId: cabo.id, campo, ambiente })
+                  : undefined
+              }
+              onGalleryFiles={
+                canEditPhotos && onReplacePhoto
+                  ? (campo, photos) => {
+                      void (async () => {
+                        if (photos.length === 0) return;
+                        if (photos.length === 1) {
+                          onReplacePhoto(categoria, photos[0], {
+                            caboId: cabo.id,
+                            campo,
+                            ambiente,
+                          });
+                          return;
+                        }
+                        const metragensAtuais =
+                          payload?.[dualKey]?.[ambiente]?.metragens ?? [cabo];
+                        const { assignments, newCabos } =
+                          planCaboMetragemGalleryAssignments(metragensAtuais, photos, {
+                            startCaboId: cabo.id,
+                            startCampo: campo,
+                          });
+
+                        if (onUploadPhoto) {
+                          const storedList = await Promise.all(
+                            assignments.map((item) => onUploadPhoto(item.file)),
+                          );
+                          patchLancamentoCabos(dualKey, ambiente, (lado) => {
+                            const ids = new Set(lado.metragens.map((c) => c.id));
+                            let metragens = [
+                              ...lado.metragens,
+                              ...newCabos.filter((c) => !ids.has(c.id)),
+                            ];
+                            for (let i = 0; i < assignments.length; i++) {
+                              const a = assignments[i];
+                              metragens = metragens.map((item) =>
+                                item.id === a.caboId
+                                  ? { ...item, [a.campo]: storedList[i] }
+                                  : item,
+                              );
+                            }
+                            return { ...lado, metragens };
+                          });
+                          return;
+                        }
+
+                        if (newCabos.length > 0) {
+                          patchLancamentoCabos(dualKey, ambiente, (lado) => {
+                            const ids = new Set(lado.metragens.map((c) => c.id));
+                            const extras = newCabos.filter((c) => !ids.has(c.id));
+                            return {
+                              ...lado,
+                              metragens: extras.length
+                                ? [...lado.metragens, ...extras]
+                                : lado.metragens,
+                            };
+                          });
+                        }
+                        window.setTimeout(() => {
+                          for (const item of assignments) {
+                            onReplacePhoto(categoria, item.file, {
+                              caboId: item.caboId,
+                              campo: item.campo,
+                              ambiente,
+                            });
+                          }
+                        }, 0);
+                      })();
+                    }
                   : undefined
               }
             />

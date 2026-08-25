@@ -31,6 +31,7 @@ import {
   withRetry,
   looksLikeFotoGrupoPorAmbiente,
   simDerivadoLancamento,
+  emptyCaboMetragem,
   type RelatorioFotoCategoria,
   type RelatorioPayload,
   type RelatorioTransmissao,
@@ -220,7 +221,11 @@ function AdminLancamentoDetalhePage() {
         const dualKey = categoria === "metragensCabo" ? "lancamentoCabosRe" : "lancamentoCabosRc";
         const ambiente = meta.ambiente ?? "aereo";
         const dual = atual[dualKey];
-        const nextMetragens = dual[ambiente].metragens.map((item) => {
+        let list = dual[ambiente].metragens;
+        if (meta.caboId && !list.some((item) => item.id === meta.caboId)) {
+          list = [...list, { ...emptyCaboMetragem(), id: meta.caboId }];
+        }
+        const nextMetragens = list.map((item) => {
           if (item.id !== meta.caboId) return item;
           if (meta.campo === "fotoInicio") oldPath = item.fotoInicio?.path;
           if (meta.campo === "fotoFim") oldPath = item.fotoFim?.path;

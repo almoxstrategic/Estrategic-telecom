@@ -41,6 +41,7 @@ import { requireTecnicoTransmissao } from "@/lib/auth-guards";
 import { hasPainelFullAccess } from "@/lib/roles";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
+import { planCaboMetragemGalleryAssignments } from "@/lib/cabo-metragem-gallery";
 import {
   avisarConclusaoRelatorio,
   emptyCaboMetragem,
@@ -1053,6 +1054,69 @@ function RelatorioPage() {
     });
   };
 
+  const handleCaboGalleryFiles = (
+    setter: React.Dispatch<React.SetStateAction<LancamentoPorAmbientePayload>>,
+    lado: "lancamentoCabosRe" | "lancamentoCabosRc",
+    ambiente: AmbienteRede,
+    fromCaboId: string,
+    fromCampo: "fotoInicio" | "fotoFim",
+    photos: EvidencePhotoRef[],
+  ) => {
+    if (photos.length === 0) return;
+    if (photos.length === 1) {
+      handleCaboPhoto(setter, lado, ambiente, fromCaboId, fromCampo, photos[0]);
+      return;
+    }
+
+    const cabosAtuais = (
+      lado === "lancamentoCabosRe" ? lancamentoCabosRe : lancamentoCabosRc
+    )[ambiente].metragens;
+
+    const { assignments, newCabos } = planCaboMetragemGalleryAssignments(cabosAtuais, photos, {
+      startCaboId: fromCaboId,
+      startCampo: fromCampo,
+    });
+
+    const ensureCabos = (list: CaboMetragemPayload[]) => {
+      if (newCabos.length === 0) return list;
+      const ids = new Set(list.map((c) => c.id));
+      const extras = newCabos.filter((c) => !ids.has(c.id));
+      return extras.length ? [...list, ...extras] : list;
+    };
+
+    // Garante os novos cards no estado antes/durante os uploads.
+    if (newCabos.length > 0) {
+      setter((prev) => ({
+        ...prev,
+        [ambiente]: {
+          ...prev[ambiente],
+          metragens: ensureCabos(prev[ambiente].metragens),
+        },
+      }));
+    }
+
+    for (const item of assignments) {
+      void uploadFotoImediato(
+        item.file,
+        `${lado}-${ambiente}-${item.campo}-${item.caboId.slice(0, 8)}`,
+        (stored) => {
+          let next: LancamentoPorAmbientePayload | null = null;
+          setter((prev) => {
+            const metragens = ensureCabos(prev[ambiente].metragens).map((cabo) =>
+              cabo.id === item.caboId ? { ...cabo, [item.campo]: stored } : cabo,
+            );
+            next = {
+              ...prev,
+              [ambiente]: { ...prev[ambiente], metragens },
+            };
+            return next;
+          });
+          return { ...buildPayload(), [lado]: next! };
+        },
+      );
+    }
+  };
+
   const patchCaboAmbiente = (
     setter: React.Dispatch<React.SetStateAction<LancamentoPorAmbientePayload>>,
     ambiente: AmbienteRede,
@@ -1493,6 +1557,16 @@ function RelatorioPage() {
                       file,
                     )
                   }
+                  onCaboGalleryFiles={(fromCaboId, fromCampo, photos) =>
+                    handleCaboGalleryFiles(
+                      setLancamentoCabosRe,
+                      "lancamentoCabosRe",
+                      lancamentoReAmbiente,
+                      fromCaboId,
+                      fromCampo,
+                      photos,
+                    )
+                  }
                   showObsAdmin={showObsAdmin}
                   grupos={[
                     {
@@ -1665,6 +1739,16 @@ function RelatorioPage() {
                       caboId,
                       campo,
                       file,
+                    )
+                  }
+                  onCaboGalleryFiles={(fromCaboId, fromCampo, photos) =>
+                    handleCaboGalleryFiles(
+                      setLancamentoCabosRc,
+                      "lancamentoCabosRc",
+                      lancamentoRcAmbiente,
+                      fromCaboId,
+                      fromCampo,
+                      photos,
                     )
                   }
                   showObsAdmin={showObsAdmin}
