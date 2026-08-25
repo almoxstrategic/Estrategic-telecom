@@ -5,7 +5,7 @@ import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFoto
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioFotosBloco } from "@/components/RelatorioFotosBloco";
 import {
-  ChoiceButton,
+  AccordionBloco,
   RelatorioOutrasFotos,
   inputClass,
   textareaObsClass,
@@ -130,7 +130,7 @@ function EquipamentoItemCard({
   onPhoto: (campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
 }) {
   return (
-    <div className="flex h-full flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="flex h-full flex-col space-y-4 border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-bold">
           {title} {index + 1}
@@ -219,7 +219,7 @@ function EquipamentoItemCard({
 }
 
 function ListaItensEquipamento({
-  tituloSecao,
+  id,
   itemLabel,
   itens,
   showIdentificacao,
@@ -229,7 +229,7 @@ function ListaItensEquipamento({
   onPhoto,
   emptyItem,
 }: {
-  tituloSecao: string;
+  id?: string;
   itemLabel: string;
   itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[];
   showIdentificacao: boolean;
@@ -242,9 +242,8 @@ function ListaItensEquipamento({
   const [fallback] = useState(() => emptyItem());
   const list = itens.length ? itens : [fallback];
   return (
-    <div className="space-y-4 md:col-span-2">
-      <h2 className="text-base font-bold">{tituloSecao}</h2>
-      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+    <div id={id} className="scroll-mt-36 space-y-4">
+      <div className="flex flex-col gap-4">
         {list.map((item, index) => (
           <EquipamentoItemCard
             key={item.id}
@@ -275,9 +274,12 @@ function ListaItensEquipamento({
   );
 }
 
+const flatSectionClass = "border-b border-gray-100 pb-6 last:border-b-0 last:pb-0";
+
 export function RelatorioEquipamento({
   readOnly,
   showObsAdmin = false,
+  stickTabsAtViewportTop = true,
   tecnologiaAcesso = "",
   onTecnologiaAcessoChange,
   gruposCliente,
@@ -290,20 +292,14 @@ export function RelatorioEquipamento({
   outrasCliente,
   onOutrasClienteChange,
   onOutraClientePhoto,
-  relatorioEstacao,
-  onRelatorioEstacao,
   estacaoEntregaAcesso,
   onEstacaoEntregaAcesso,
-  gruposEstacao,
   equipamentosEstacao,
   onEquipamentosEstacaoChange,
   onEquipamentoEstacaoPhoto,
   dgosEstacao,
   onDgosEstacaoChange,
   onDgoEstacaoPhoto,
-  outrasEstacao,
-  onOutrasEstacaoChange,
-  onOutraEstacaoPhoto,
   gruposConexaoEstacao = [],
   onGrupoPhoto,
   configuracaoCliente,
@@ -313,6 +309,7 @@ export function RelatorioEquipamento({
 }: {
   readOnly: boolean;
   showObsAdmin?: boolean;
+  stickTabsAtViewportTop?: boolean;
   tecnologiaAcesso?: string;
   onTecnologiaAcessoChange?: (value: string) => void;
   gruposCliente: GrupoFotoCampo[];
@@ -329,11 +326,8 @@ export function RelatorioEquipamento({
   outrasCliente: OutraFotoState[];
   onOutrasClienteChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraClientePhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
-  relatorioEstacao: "sim" | "nao";
-  onRelatorioEstacao: (value: "sim" | "nao") => void;
   estacaoEntregaAcesso: string;
   onEstacaoEntregaAcesso: (value: string) => void;
-  gruposEstacao: GrupoFotoCampo[];
   equipamentosEstacao: EquipamentoClienteItemPayload[];
   onEquipamentosEstacaoChange: (next: EquipamentoClienteItemPayload[]) => void;
   onEquipamentoEstacaoPhoto: (
@@ -344,9 +338,6 @@ export function RelatorioEquipamento({
   dgosEstacao: DgoClienteItemPayload[];
   onDgosEstacaoChange: (next: DgoClienteItemPayload[]) => void;
   onDgoEstacaoPhoto: (itemId: string, campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
-  outrasEstacao: OutraFotoState[];
-  onOutrasEstacaoChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
-  onOutraEstacaoPhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
   gruposConexaoEstacao?: GrupoFotoCampo[];
   onGrupoPhoto: (
     grupoKey: RelatorioFotoGrupoKey,
@@ -359,232 +350,189 @@ export function RelatorioEquipamento({
   onConfiguracaoEstacaoChange: (next: EquipamentoRedeIpsPayload) => void;
 }) {
   void showObsAdmin;
+  const sgpGrupo = gruposCliente.find((g) => g.grupoKey === "eqClienteSgp");
 
   return (
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
-        <div
-          id="secao-tecnologia-acesso"
-          className="scroll-mt-36 rounded-2xl border border-border bg-card p-5 shadow-sm"
+        <AccordionBloco
+          title="EQUIPAMENTO NO CLIENTE"
+          id="secao-eq-cliente"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
         >
-          <label htmlFor="tecnologia-acesso" className="mb-1.5 block text-sm font-semibold">
-            Tecnologia de Acesso
-          </label>
-          <input
-            id="tecnologia-acesso"
-            type="text"
-            value={tecnologiaAcesso}
-            onChange={(e) => onTecnologiaAcessoChange?.(e.target.value)}
-            placeholder="EX: FO ABC"
-            disabled={readOnly || !onTecnologiaAcessoChange}
-            className={inputClass()}
-          />
-        </div>
-
-        <div id="secao-eq-cliente" className="scroll-mt-36 space-y-5">
-        <h2 className="text-base font-bold">Equipamentos no Cliente</h2>
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-          {gruposCliente
-            .filter((grupo) => grupo.grupoKey !== "eqClienteSgp")
-            .map((grupo) => (
-              <RelatorioFotosBloco
-                key={grupo.grupoKey}
-                id={`secao-${grupo.grupoKey}`}
-                title={grupo.title}
-                hint={grupo.hint}
-                slots={grupo.slots}
-                onChange={grupo.onChange}
-                obs={grupo.obs}
-                onObsChange={grupo.onObsChange}
-                minSlots={grupo.minSlots}
-                readOnly={readOnly}
-                onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
-              />
-            ))}
-
-          <ListaItensEquipamento
-            tituloSecao="DGO /DID; Roseta ou Pach panel"
-            itemLabel="DGO/Roseta"
-            itens={dgosCliente}
-            showIdentificacao={false}
-            addLabel="Adicionar mais DGO/Roseta/Patch Panel"
-            readOnly={readOnly}
-            onChange={(next) => onDgosClienteChange(next as DgoClienteItemPayload[])}
-            onPhoto={onDgoClientePhoto}
-            emptyItem={emptyDgoClienteItem}
-          />
-
-          <ListaItensEquipamento
-            tituloSecao="Equipamentos (No Cliente)"
-            itemLabel="Equipamento"
-            itens={equipamentosCliente}
-            showIdentificacao
-            addLabel="Adicionar mais Equipamento"
-            readOnly={readOnly}
-            onChange={(next) =>
-              onEquipamentosClienteChange(next as EquipamentoClienteItemPayload[])
-            }
-            onPhoto={onEquipamentoClientePhoto}
-            emptyItem={emptyEquipamentoClienteItem}
-          />
-
-          {gruposCliente
-            .filter((grupo) => grupo.grupoKey === "eqClienteSgp")
-            .map((grupo) => (
-              <RelatorioFotosBloco
-                key={grupo.grupoKey}
-                id={`secao-${grupo.grupoKey}`}
-                title={grupo.title}
-                hint={grupo.hint}
-                slots={grupo.slots}
-                onChange={grupo.onChange}
-                obs={grupo.obs}
-                onObsChange={grupo.onObsChange}
-                minSlots={grupo.minSlots}
-                readOnly={readOnly}
-                onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
-              />
-            ))}
-        </div>
-        <RelatorioOutrasFotos
-          title="Outras fotos"
-          outras={outrasCliente}
-          onOutrasChange={onOutrasClienteChange}
-          onOutraPhoto={onOutraClientePhoto}
-          readOnly={readOnly}
-        />
-        </div>
-
-        {gruposConexaoEstacao.length ? (
-          <div id="secao-eq-conexao-estacao" className="scroll-mt-36 space-y-3">
-            <h2 className="text-base font-bold">Conexão na Estação/PPC</h2>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {gruposConexaoEstacao.map((grupo) => (
-                <RelatorioFotosBloco
-                  key={grupo.grupoKey}
-                  title={grupo.title}
-                  hint={grupo.hint}
-                  slots={grupo.slots}
-                  onChange={grupo.onChange}
-                  obs={grupo.obs}
-                  onObsChange={grupo.onObsChange}
-                  minSlots={grupo.minSlots}
-                  readOnly={readOnly}
-                  onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-base font-bold">
-            Adicionar Relatório fotográfico (Equipamento de acesso na Estação/PPC)?
-          </h2>
-          <div className="flex gap-2">
-            <ChoiceButton
-              active={relatorioEstacao === "sim"}
-              onClick={() => onRelatorioEstacao("sim")}
-              disabled={readOnly}
-            >
-              SIM
-            </ChoiceButton>
-            <ChoiceButton
-              active={relatorioEstacao === "nao"}
-              onClick={() => onRelatorioEstacao("nao")}
-              disabled={readOnly}
-            >
-              NÃO
-            </ChoiceButton>
-          </div>
-        </div>
-
-        {relatorioEstacao === "sim" ? (
-          <div id="secao-eq-estacao" className="scroll-mt-36 space-y-5">
-            <h2 className="text-base font-bold">Equipamentos na Estação/PPC</h2>
-            <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <label
-                htmlFor="estacao-entrega-acesso"
-                className="mb-1.5 block text-sm font-semibold"
-              >
-                Estação Entrega de Acesso
-              </label>
-              <input
-                id="estacao-entrega-acesso"
-                type="text"
-                value={estacaoEntregaAcesso}
-                onChange={(e) => onEstacaoEntregaAcesso(e.target.value)}
-                placeholder="Nome / identificação da estação"
-                disabled={readOnly}
-                className={inputClass()}
-              />
-            </div>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {gruposEstacao.map((grupo) => (
-                <RelatorioFotosBloco
-                  key={grupo.grupoKey}
-                  title={grupo.title}
-                  hint={grupo.hint}
-                  slots={grupo.slots}
-                  onChange={grupo.onChange}
-                  obs={grupo.obs}
-                  onObsChange={grupo.onObsChange}
-                  minSlots={grupo.minSlots}
-                  readOnly={readOnly}
-                  onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
-                />
-              ))}
-
-              <ListaItensEquipamento
-                tituloSecao="Equipamento instalado (Na estação/PPC)"
-                itemLabel="Equipamento"
-                itens={equipamentosEstacao}
-                showIdentificacao
-                addLabel="Adicionar mais Equipamento"
-                readOnly={readOnly}
-                onChange={(next) =>
-                  onEquipamentosEstacaoChange(next as EquipamentoClienteItemPayload[])
-                }
-                onPhoto={onEquipamentoEstacaoPhoto}
-                emptyItem={emptyEquipamentoClienteItem}
-              />
-
-              <ListaItensEquipamento
-                tituloSecao="DGO / DID / ROUTER (Conexão)"
-                itemLabel="DGO / DID / ROUTER"
-                itens={dgosEstacao}
-                showIdentificacao={false}
-                addLabel="Adicionar DGO / DID / ROUTER"
-                readOnly={readOnly}
-                onChange={(next) => onDgosEstacaoChange(next as DgoClienteItemPayload[])}
-                onPhoto={onDgoEstacaoPhoto}
-                emptyItem={emptyDgoClienteItem}
-              />
-            </div>
-            <RelatorioOutrasFotos
-              title="Outras fotos"
-              outras={outrasEstacao}
-              onOutrasChange={onOutrasEstacaoChange}
-              onOutraPhoto={onOutraEstacaoPhoto}
-              readOnly={readOnly}
+          <div
+            id="secao-tecnologia-acesso"
+            className={`scroll-mt-36 space-y-3 ${flatSectionClass}`}
+          >
+            <label htmlFor="tecnologia-acesso" className="mb-1.5 block text-sm font-semibold">
+              Tecnologia de Acesso
+            </label>
+            <input
+              id="tecnologia-acesso"
+              type="text"
+              value={tecnologiaAcesso}
+              onChange={(e) => onTecnologiaAcessoChange?.(e.target.value)}
+              placeholder="EX: FO ABC"
+              disabled={readOnly || !onTecnologiaAcessoChange}
+              className={inputClass()}
             />
           </div>
-        ) : null}
 
-        <div className="space-y-4">
-          <EquipamentosIpsCard
-            title="Equipamentos Instalados No cliente"
-            value={configuracaoCliente}
-            onChange={onConfiguracaoClienteChange}
+          <div className={flatSectionClass}>
+            <ListaItensEquipamento
+              id="secao-eq-dgo-cliente"
+              itemLabel="DGO/Roseta"
+              itens={dgosCliente}
+              showIdentificacao={false}
+              addLabel="Adicionar mais DGO/Roseta/Patch Panel"
+              readOnly={readOnly}
+              onChange={(next) => onDgosClienteChange(next as DgoClienteItemPayload[])}
+              onPhoto={onDgoClientePhoto}
+              emptyItem={emptyDgoClienteItem}
+            />
+          </div>
+
+          <div className={flatSectionClass}>
+            <ListaItensEquipamento
+              id="secao-eq-equipamentos-cliente"
+              itemLabel="Equipamento"
+              itens={equipamentosCliente}
+              showIdentificacao
+              addLabel="Adicionar mais Equipamento"
+              readOnly={readOnly}
+              onChange={(next) =>
+                onEquipamentosClienteChange(next as EquipamentoClienteItemPayload[])
+              }
+              onPhoto={onEquipamentoClientePhoto}
+              emptyItem={emptyEquipamentoClienteItem}
+            />
+          </div>
+
+          {sgpGrupo ? (
+            <div className={flatSectionClass}>
+              <RelatorioFotosBloco
+                id={`secao-${sgpGrupo.grupoKey}`}
+                title={sgpGrupo.title}
+                hint={sgpGrupo.hint}
+                variant="flat"
+                slots={sgpGrupo.slots}
+                onChange={sgpGrupo.onChange}
+                obs={sgpGrupo.obs}
+                onObsChange={sgpGrupo.onObsChange}
+                minSlots={sgpGrupo.minSlots}
+                readOnly={readOnly}
+                onPickPhoto={(id, file) => onGrupoPhoto(sgpGrupo.grupoKey, id, file)}
+              />
+            </div>
+          ) : null}
+
+          <div id="secao-eq-config-cliente" className="scroll-mt-36">
+            <EquipamentosIpsCard
+              title="Configuração equipamento no cliente"
+              value={configuracaoCliente}
+              onChange={onConfiguracaoClienteChange}
+              readOnly={readOnly}
+              embedded
+            />
+          </div>
+        </AccordionBloco>
+
+        <AccordionBloco
+          title="EQUIPAMENTO NA ESTAÇÃO"
+          id="secao-eq-estacao"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
+        >
+          <div
+            id="secao-estacao-entrega-acesso"
+            className={`scroll-mt-36 space-y-3 ${flatSectionClass}`}
+          >
+            <label htmlFor="estacao-entrega-acesso" className="mb-1.5 block text-sm font-semibold">
+              Estação Entrega de Acesso
+            </label>
+            <input
+              id="estacao-entrega-acesso"
+              type="text"
+              value={estacaoEntregaAcesso}
+              onChange={(e) => onEstacaoEntregaAcesso(e.target.value)}
+              placeholder="Nome / identificação da estação"
+              disabled={readOnly}
+              className={inputClass()}
+            />
+          </div>
+
+          <div className={flatSectionClass}>
+            <ListaItensEquipamento
+              id="secao-eq-dgo-estacao"
+              itemLabel="DGO / DID / ROUTER"
+              itens={dgosEstacao}
+              showIdentificacao={false}
+              addLabel="Adicionar DGO / DID / ROUTER"
+              readOnly={readOnly}
+              onChange={(next) => onDgosEstacaoChange(next as DgoClienteItemPayload[])}
+              onPhoto={onDgoEstacaoPhoto}
+              emptyItem={emptyDgoClienteItem}
+            />
+          </div>
+
+          {gruposConexaoEstacao.map((grupo) => (
+            <div key={grupo.grupoKey} className={flatSectionClass}>
+              <RelatorioFotosBloco
+                id={`secao-${grupo.grupoKey}`}
+                title={grupo.title}
+                hint={grupo.hint}
+                variant="flat"
+                slots={grupo.slots}
+                onChange={grupo.onChange}
+                obs={grupo.obs}
+                onObsChange={grupo.onObsChange}
+                minSlots={grupo.minSlots}
+                readOnly={readOnly}
+                onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file)}
+              />
+            </div>
+          ))}
+
+          <div className={flatSectionClass}>
+            <ListaItensEquipamento
+              id="secao-eq-equipamentos-estacao"
+              itemLabel="Equipamento"
+              itens={equipamentosEstacao}
+              showIdentificacao
+              addLabel="Adicionar mais Equipamento"
+              readOnly={readOnly}
+              onChange={(next) =>
+                onEquipamentosEstacaoChange(next as EquipamentoClienteItemPayload[])
+              }
+              onPhoto={onEquipamentoEstacaoPhoto}
+              emptyItem={emptyEquipamentoClienteItem}
+            />
+          </div>
+
+          <div id="secao-eq-config-estacao" className="scroll-mt-36">
+            <EquipamentosIpsCard
+              title="Configuração equipamento na estação"
+              value={configuracaoEstacao}
+              onChange={onConfiguracaoEstacaoChange}
+              readOnly={readOnly}
+              embedded
+            />
+          </div>
+        </AccordionBloco>
+
+        <AccordionBloco
+          title="OUTRAS FOTOS"
+          id="secao-eq-outras-fotos"
+          stickTabsAtViewportTop={stickTabsAtViewportTop}
+        >
+          <RelatorioOutrasFotos
+            title="Outras fotos"
+            outras={outrasCliente}
+            onOutrasChange={onOutrasClienteChange}
+            onOutraPhoto={onOutraClientePhoto}
             readOnly={readOnly}
+            variant="flat"
           />
-          <EquipamentosIpsCard
-            title="Equipamentos Instalados Na estação"
-            value={configuracaoEstacao}
-            onChange={onConfiguracaoEstacaoChange}
-            readOnly={readOnly}
-          />
-        </div>
+        </AccordionBloco>
       </div>
     </EvidencePhotoPasteProvider>
   );

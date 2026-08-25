@@ -483,12 +483,6 @@ function emptyOutraFoto(): EscopoPayload["outrasFotos"][number] {
   return { id: crypto.randomUUID(), ref: "", foto: null, obs: "", obsAdmin: "" };
 }
 
-function simNao(value: boolean | null | undefined) {
-  if (value === true) return "SIM";
-  if (value === false) return "NÃO";
-  return "—";
-}
-
 function LancamentoCabosControle({
   label,
   value,
@@ -1232,12 +1226,6 @@ export function RelatorioDetalhe({
     );
   };
 
-  const mostrarEstacao =
-    Boolean(payload?.relatorioEstacao) ||
-    Boolean(payload?.estacaoEntregaAcesso?.trim()) ||
-    Boolean(payload?.eqEstacaoGeral?.fotos.length) ||
-    Boolean(payload?.outrasFotosEqEstacao?.length);
-
   return (
     <div className="space-y-6">
       <div className="relative rounded-2xl border border-border bg-white p-5 shadow-sm md:p-6">
@@ -1482,7 +1470,7 @@ export function RelatorioDetalhe({
             </h3>
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
-              {renderGrupo("Sobra técnica / Fiberloop", "sobraTecnica", true)}
+              {renderGrupo("Sobra técnica", "sobraTecnica", true)}
             </div>
           </section>
           <section className="space-y-3">
@@ -1500,23 +1488,37 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "RC" ? (
         <div className="space-y-6">
-          <CampoCoordenadas
-            title="Coordenadas do Cliente"
-            value={payload?.redeCliente?.coordenadas ?? emptyCoordenadas()}
-            onChange={
-              canEditPhotos
-                ? (coordenadas) => {
-                    if (!payload) return;
-                    const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
-                    patchPayload({
-                      ...payload,
-                      redeCliente: { ...redeCliente, coordenadas },
-                    });
-                  }
-                : undefined
-            }
-            disabled={!canEditPhotos}
-          />
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              LOCAL (RC)
+            </h3>
+            <CampoCoordenadas
+              title="Coordenadas do Cliente"
+              value={payload?.redeCliente?.coordenadas ?? emptyCoordenadas()}
+              onChange={
+                canEditPhotos
+                  ? (coordenadas) => {
+                      if (!payload) return;
+                      const redeCliente = payload.redeCliente ?? emptyQuantidadesRede();
+                      patchPayload({
+                        ...payload,
+                        redeCliente: { ...redeCliente, coordenadas },
+                      });
+                    }
+                  : undefined
+              }
+              disabled={!canEditPhotos}
+            />
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+              {(
+                [
+                  ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
+                  ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
+                  ["(Rack ou Local)", "eqClienteRack"],
+                ] as const
+              ).map(([title, key]) => renderGrupo(title, key))}
+            </div>
+          </section>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex w-full flex-col gap-3 sm:col-span-2 lg:col-span-2">
               <LancamentoCabosControle
@@ -1660,13 +1662,13 @@ export function RelatorioDetalhe({
               />
               {(
                 [
+                  ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
+                  ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
+                  ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
+                  ["Sobra técnica", "rcSobraTecnica"],
                   ["Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo"],
                   ["Caixa de emenda na acomodação (Rede cliente com Rede Externa)", "rcCaixaEmenda"],
                   ["Plaqueta de Identificação - Caixa de emenda", "rcPlaquetaIdentificacao"],
-                  ["Terminação do cabo no cliente (PTO/Roseta - área interna)", "rcTerminacaoCabo"],
-                  ["Entrada do cabo no cliente (Área interna)", "rcEntradaInterna"],
-                  ["Entrada do cabo no cliente (Área externa)", "rcEntradaExterna"],
-                  ["Sobra técnica / Fiberloop", "rcSobraTecnica"],
                   ["Novo aterramento do poste", "rcNovoAterramentoPoste"],
                 ] as const
               ).map(([title, key]) =>
@@ -1686,46 +1688,36 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "equipamento" ? (
         <div className="space-y-6">
-          <div
-            id="secao-tecnologia-acesso"
-            className="scroll-mt-36 space-y-1.5 rounded-2xl border border-border bg-card p-5 shadow-sm"
-          >
-            <label htmlFor="admin-tecnologia-acesso" className="block text-sm font-semibold">
-              Tecnologia de Acesso
-            </label>
-            <input
-              id="admin-tecnologia-acesso"
-              type="text"
-              value={payload?.tecnologiaAcesso ?? ""}
-              placeholder="EX: FO ABC"
-              disabled={!canEditPhotos}
-              onChange={(e) => {
-                if (!payload || !canEditPhotos) return;
-                patchPayload({ ...payload, tecnologiaAcesso: e.target.value });
-              }}
-              className={inputClass()}
-            />
-          </div>
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Equipamentos no Cliente
+              EQUIPAMENTO NO CLIENTE
             </h3>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-              {(
-                [
-                  ["Cliente - (Entrada/Fachada)", "eqClienteFachada"],
-                  ["Cliente - Ambiente (geral da sala)", "eqClienteAmbiente"],
-                  ["(Rack ou Local)", "eqClienteRack"],
-                  ["Posição de conexão na Estação/PPC (DGO/DIO)", "posicaoConexaoEstacao"],
-                  ["ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC", "etiquetaIdentificacao"],
-                ] as const
-              ).map(([title, key]) => renderGrupo(title, key))}
+            <div
+              id="secao-tecnologia-acesso"
+              className="scroll-mt-36 space-y-1.5 rounded-2xl border border-border bg-card p-5 shadow-sm"
+            >
+              <label htmlFor="admin-tecnologia-acesso" className="block text-sm font-semibold">
+                Tecnologia de Acesso
+              </label>
+              <input
+                id="admin-tecnologia-acesso"
+                type="text"
+                value={payload?.tecnologiaAcesso ?? ""}
+                placeholder="EX: FO ABC"
+                disabled={!canEditPhotos}
+                onChange={(e) => {
+                  if (!payload || !canEditPhotos) return;
+                  patchPayload({ ...payload, tecnologiaAcesso: e.target.value });
+                }}
+                className={inputClass()}
+              />
             </div>
 
             <AdminListaEquipamentos
-              titulo="DGO /DID; Roseta ou Pach panel"
+              titulo="DGO/Roseta"
               addLabel="Adicionar mais DGO/Roseta/Patch Panel"
               showIdentificacao={false}
+              itemLabel="DGO/Roseta"
               itens={payload?.eqClienteDgo ?? []}
               canEdit={canEditPhotos}
               onUploadPhoto={onUploadPhoto}
@@ -1737,9 +1729,10 @@ export function RelatorioDetalhe({
             />
 
             <AdminListaEquipamentos
-              titulo="Equipamentos (No Cliente)"
+              titulo="Equipamento"
               addLabel="Adicionar mais Equipamento"
               showIdentificacao
+              itemLabel="Equipamento"
               itens={payload?.eqClienteEquipamentos ?? []}
               canEdit={canEditPhotos}
               onUploadPhoto={onUploadPhoto}
@@ -1756,101 +1749,108 @@ export function RelatorioDetalhe({
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {renderGrupo("Identificação SGP no Cliente", "eqClienteSgp")}
             </div>
+
+            <EquipamentosIpsCard
+              title="Configuração equipamento no cliente"
+              value={
+                payload?.equipamento?.configuracaoCliente ??
+                emptyEquipamentoConexoes().configuracaoCliente
+              }
+              onChange={
+                canEditPhotos && payload
+                  ? (configuracaoCliente) =>
+                      patchPayload({
+                        ...payload,
+                        equipamento: {
+                          ...(payload.equipamento ?? emptyEquipamentoConexoes()),
+                          configuracaoCliente,
+                        },
+                      })
+                  : undefined
+              }
+              readOnly={!canEditPhotos}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              EQUIPAMENTO NA ESTAÇÃO
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Estação Entrega de Acesso
+              {payload?.estacaoEntregaAcesso ? `: ${payload.estacaoEntregaAcesso}` : ""}
+            </p>
+
+            <AdminListaEquipamentos
+              titulo="DGO / DID / ROUTER"
+              addLabel="Adicionar DGO / DID / ROUTER"
+              showIdentificacao={false}
+              itemLabel="DGO / DID / ROUTER"
+              itens={payload?.eqEstacaoDgo ?? []}
+              canEdit={canEditPhotos}
+              onUploadPhoto={onUploadPhoto}
+              onPatchList={(next) => {
+                if (!payload) return;
+                patchPayload({ ...payload, eqEstacaoDgo: next as DgoClienteItemPayload[] });
+              }}
+              emptyItem={emptyDgoClienteItem}
+            />
+
+            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+              {(
+                [
+                  ["Posição de conexão na Estação/PPC (DGO/DIO)", "posicaoConexaoEstacao"],
+                  ["ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC", "etiquetaIdentificacao"],
+                ] as const
+              ).map(([title, key]) => renderGrupo(title, key))}
+            </div>
+
+            <AdminListaEquipamentos
+              titulo="Equipamento"
+              addLabel="Adicionar mais Equipamento"
+              showIdentificacao
+              itemLabel="Equipamento"
+              itens={payload?.eqEstacaoEquipamento ?? []}
+              canEdit={canEditPhotos}
+              onUploadPhoto={onUploadPhoto}
+              onPatchList={(next) => {
+                if (!payload) return;
+                patchPayload({
+                  ...payload,
+                  eqEstacaoEquipamento: next as EquipamentoClienteItemPayload[],
+                });
+              }}
+              emptyItem={emptyEquipamentoClienteItem}
+            />
+
+            <EquipamentosIpsCard
+              title="Configuração equipamento na estação"
+              value={
+                payload?.equipamento?.configuracaoEstacao ??
+                emptyEquipamentoConexoes().configuracaoEstacao
+              }
+              onChange={
+                canEditPhotos && payload
+                  ? (configuracaoEstacao) =>
+                      patchPayload({
+                        ...payload,
+                        equipamento: {
+                          ...(payload.equipamento ?? emptyEquipamentoConexoes()),
+                          configuracaoEstacao,
+                        },
+                      })
+                  : undefined
+              }
+              readOnly={!canEditPhotos}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              OUTRAS FOTOS
+            </h3>
             {renderOutrasSecao("outrasFotosEqCliente", "Outras fotos")}
           </section>
-          {mostrarEstacao ? (
-            <section className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Equipamentos na Estação/PPC
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Relatório fotográfico da estação: {simNao(payload?.relatorioEstacao)}
-                {payload?.estacaoEntregaAcesso ? ` · ${payload.estacaoEntregaAcesso}` : ""}
-              </p>
-              <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-                {(
-                  [
-                    ["Estação - (Foto geral da estação/PPC)", "eqEstacaoGeral"],
-                    ["(Rack ou Local Instalação)", "eqEstacaoRack"],
-                  ] as const
-                ).map(([title, key]) => renderGrupo(title, key))}
-              </div>
-
-              <AdminListaEquipamentos
-                titulo="Equipamento instalado (Na estação/PPC)"
-                addLabel="Adicionar mais Equipamento"
-                showIdentificacao
-                itemLabel="Equipamento"
-                itens={payload?.eqEstacaoEquipamento ?? []}
-                canEdit={canEditPhotos}
-                onUploadPhoto={onUploadPhoto}
-                onPatchList={(next) => {
-                  if (!payload) return;
-                  patchPayload({
-                    ...payload,
-                    eqEstacaoEquipamento: next as EquipamentoClienteItemPayload[],
-                  });
-                }}
-                emptyItem={emptyEquipamentoClienteItem}
-              />
-
-              <AdminListaEquipamentos
-                titulo="DGO / DID / ROUTER (Conexão)"
-                addLabel="Adicionar DGO / DID / ROUTER"
-                showIdentificacao={false}
-                itemLabel="DGO / DID / ROUTER"
-                itens={payload?.eqEstacaoDgo ?? []}
-                canEdit={canEditPhotos}
-                onUploadPhoto={onUploadPhoto}
-                onPatchList={(next) => {
-                  if (!payload) return;
-                  patchPayload({ ...payload, eqEstacaoDgo: next as DgoClienteItemPayload[] });
-                }}
-                emptyItem={emptyDgoClienteItem}
-              />
-
-              {renderOutrasSecao("outrasFotosEqEstacao", "Outras fotos")}
-            </section>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Relatório fotográfico da estação/PPC não foi adicionado.
-            </p>
-          )}
-
-          <EquipamentosIpsCard
-            title="Equipamentos Instalados No cliente"
-            value={payload?.equipamento?.configuracaoCliente ?? emptyEquipamentoConexoes().configuracaoCliente}
-            onChange={
-              canEditPhotos && payload
-                ? (configuracaoCliente) =>
-                    patchPayload({
-                      ...payload,
-                      equipamento: {
-                        ...(payload.equipamento ?? emptyEquipamentoConexoes()),
-                        configuracaoCliente,
-                      },
-                    })
-                : undefined
-            }
-            readOnly={!canEditPhotos}
-          />
-          <EquipamentosIpsCard
-            title="Equipamentos Instalados Na estação"
-            value={payload?.equipamento?.configuracaoEstacao ?? emptyEquipamentoConexoes().configuracaoEstacao}
-            onChange={
-              canEditPhotos && payload
-                ? (configuracaoEstacao) =>
-                    patchPayload({
-                      ...payload,
-                      equipamento: {
-                        ...(payload.equipamento ?? emptyEquipamentoConexoes()),
-                        configuracaoEstacao,
-                      },
-                    })
-                : undefined
-            }
-            readOnly={!canEditPhotos}
-          />
         </div>
       ) : null}
 

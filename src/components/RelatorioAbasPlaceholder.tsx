@@ -51,17 +51,28 @@ export function EquipamentosIpsCard({
   value,
   onChange,
   readOnly = false,
+  embedded = false,
 }: {
   title: string;
   value: EquipamentoRedeIpsPayload;
   onChange?: (next: EquipamentoRedeIpsPayload) => void;
   readOnly?: boolean;
+  /** Dentro de accordion: sem card externo. */
+  embedded?: boolean;
 }) {
   const patch = (partial: Partial<EquipamentoRedeIpsPayload>) =>
     onChange?.({ ...value, ...partial });
   return (
-    <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold">{title}</h2>
+    <div
+      className={
+        embedded
+          ? "space-y-3"
+          : "space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      }
+    >
+      <h2 className={embedded ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"}>
+        {title}
+      </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TextField
           label="Host Name"

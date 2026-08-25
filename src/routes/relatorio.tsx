@@ -1484,7 +1484,7 @@ function RelatorioPage() {
                     {
                       grupoKey: "sobraTecnica",
                       section: "cabos",
-                      title: "Sobra técnica / Fiberloop",
+                      title: "Sobra técnica",
                       minSlots: 1,
                       ...bindDualGrupo("sobraTecnica", sobraDual, setSobraDual),
                     },
@@ -1576,6 +1576,7 @@ function RelatorioPage() {
                         setRedeCliente((prev) => ({ ...prev, coordenadas }))
                       }
                       disabled={readOnly}
+                      embedded
                     />
                   }
                   lancamentoTitle="Lançamento cabos (RC)?"
@@ -1653,9 +1654,75 @@ function RelatorioPage() {
                   showObsAdmin={showObsAdmin}
                   grupos={[
                     {
+                      grupoKey: "eqClienteFachada",
+                      section: "local",
+                      title: "Cliente - (Entrada/Fachada)",
+                      slots: eqGrupos.eqClienteFachada.slots,
+                      onChange: setEqGrupoSlots("eqClienteFachada"),
+                      obs: eqGrupos.eqClienteFachada.obs,
+                      onObsChange: setEqGrupoObs("eqClienteFachada"),
+                      obsAdmin: eqGrupos.eqClienteFachada.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteFachada"),
+                    },
+                    {
+                      grupoKey: "eqClienteAmbiente",
+                      section: "local",
+                      title: "Cliente - Ambiente (geral da sala)",
+                      slots: eqGrupos.eqClienteAmbiente.slots,
+                      onChange: setEqGrupoSlots("eqClienteAmbiente"),
+                      obs: eqGrupos.eqClienteAmbiente.obs,
+                      onObsChange: setEqGrupoObs("eqClienteAmbiente"),
+                      obsAdmin: eqGrupos.eqClienteAmbiente.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteAmbiente"),
+                    },
+                    {
+                      grupoKey: "eqClienteRack",
+                      section: "local",
+                      title: "(Rack ou Local)",
+                      slots: eqGrupos.eqClienteRack.slots,
+                      onChange: setEqGrupoSlots("eqClienteRack"),
+                      obs: eqGrupos.eqClienteRack.obs,
+                      onObsChange: setEqGrupoObs("eqClienteRack"),
+                      obsAdmin: eqGrupos.eqClienteRack.obsAdmin,
+                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteRack"),
+                    },
+                    {
+                      grupoKey: "rcEntradaExterna",
+                      section: "cabos",
+                      title: "Entrada do cabo no cliente (Área externa)",
+                      slots: rcEntradaExterna,
+                      onChange: setRcEntradaExterna,
+                      obs: rcEntradaExternaObs,
+                      onObsChange: setRcEntradaExternaObs,
+                      obsAdmin: obsAdminGrupos.rcEntradaExterna ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcEntradaExterna"),
+                    },
+                    {
+                      grupoKey: "rcEntradaInterna",
+                      section: "cabos",
+                      title: "Entrada do cabo no cliente (Área interna)",
+                      slots: rcEntradaInterna,
+                      onChange: setRcEntradaInterna,
+                      obs: rcEntradaInternaObs,
+                      onObsChange: setRcEntradaInternaObs,
+                      obsAdmin: obsAdminGrupos.rcEntradaInterna ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcEntradaInterna"),
+                    },
+                    {
+                      grupoKey: "rcTerminacaoCabo",
+                      section: "cabos",
+                      title: "Terminação do cabo no cliente (PTO/Roseta - área interna)",
+                      slots: rcTerminacao,
+                      onChange: setRcTerminacao,
+                      obs: rcTerminacaoObs,
+                      onObsChange: setRcTerminacaoObs,
+                      obsAdmin: obsAdminGrupos.rcTerminacaoCabo ?? "",
+                      onObsAdminChange: patchObsAdminGrupo("rcTerminacaoCabo"),
+                    },
+                    {
                       grupoKey: "rcSobraTecnica",
                       section: "cabos",
-                      title: "Sobra técnica / Fiberloop",
+                      title: "Sobra técnica",
                       minSlots: 1,
                       ...bindDualGrupo("rcSobraTecnica", rcSobraDual, setRcSobraDual),
                     },
@@ -1737,39 +1804,6 @@ function RelatorioPage() {
                       title: "Plaqueta de Identificação - Caixa de emenda",
                       ...bindDualGrupo("rcPlaquetaIdentificacao", rcPlaquetaDual, setRcPlaquetaDual),
                     },
-                    {
-                      grupoKey: "rcTerminacaoCabo",
-                      section: "caixa",
-                      title: "Terminação do cabo no cliente (PTO/Roseta - área interna)",
-                      slots: rcTerminacao,
-                      onChange: setRcTerminacao,
-                      obs: rcTerminacaoObs,
-                      onObsChange: setRcTerminacaoObs,
-                      obsAdmin: obsAdminGrupos.rcTerminacaoCabo ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcTerminacaoCabo"),
-                    },
-                    {
-                      grupoKey: "rcEntradaInterna",
-                      section: "caixa",
-                      title: "Entrada do cabo no cliente (Área interna)",
-                      slots: rcEntradaInterna,
-                      onChange: setRcEntradaInterna,
-                      obs: rcEntradaInternaObs,
-                      onObsChange: setRcEntradaInternaObs,
-                      obsAdmin: obsAdminGrupos.rcEntradaInterna ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcEntradaInterna"),
-                    },
-                    {
-                      grupoKey: "rcEntradaExterna",
-                      section: "caixa",
-                      title: "Entrada do cabo no cliente (Área externa)",
-                      slots: rcEntradaExterna,
-                      onChange: setRcEntradaExterna,
-                      obs: rcEntradaExternaObs,
-                      onObsChange: setRcEntradaExternaObs,
-                      obsAdmin: obsAdminGrupos.rcEntradaExterna ?? "",
-                      onObsAdminChange: patchObsAdminGrupo("rcEntradaExterna"),
-                    },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file, ambiente) => {
                     handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file, ambiente);
@@ -1784,39 +1818,10 @@ function RelatorioPage() {
                 <RelatorioEquipamento
                   readOnly={readOnly}
                   showObsAdmin={showObsAdmin}
+                  stickTabsAtViewportTop={headerRolaComPagina}
                   tecnologiaAcesso={tecnologiaAcesso}
                   onTecnologiaAcessoChange={setTecnologiaAcesso}
                   gruposCliente={[
-                    {
-                      grupoKey: "eqClienteFachada",
-                      title: "Cliente - (Entrada/Fachada)",
-                      slots: eqGrupos.eqClienteFachada.slots,
-                      onChange: setEqGrupoSlots("eqClienteFachada"),
-                      obs: eqGrupos.eqClienteFachada.obs,
-                      onObsChange: setEqGrupoObs("eqClienteFachada"),
-                      obsAdmin: eqGrupos.eqClienteFachada.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteFachada"),
-                    },
-                    {
-                      grupoKey: "eqClienteAmbiente",
-                      title: "Cliente - Ambiente (geral da sala)",
-                      slots: eqGrupos.eqClienteAmbiente.slots,
-                      onChange: setEqGrupoSlots("eqClienteAmbiente"),
-                      obs: eqGrupos.eqClienteAmbiente.obs,
-                      onObsChange: setEqGrupoObs("eqClienteAmbiente"),
-                      obsAdmin: eqGrupos.eqClienteAmbiente.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteAmbiente"),
-                    },
-                    {
-                      grupoKey: "eqClienteRack",
-                      title: "(Rack ou Local)",
-                      slots: eqGrupos.eqClienteRack.slots,
-                      onChange: setEqGrupoSlots("eqClienteRack"),
-                      obs: eqGrupos.eqClienteRack.obs,
-                      onObsChange: setEqGrupoObs("eqClienteRack"),
-                      obsAdmin: eqGrupos.eqClienteRack.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqClienteRack"),
-                    },
                     {
                       grupoKey: "eqClienteSgp",
                       title: "Identificação SGP no Cliente",
@@ -1885,32 +1890,8 @@ function RelatorioPage() {
                       onObsAdminChange: patchObsAdminGrupo("etiquetaIdentificacao"),
                     },
                   ]}
-                  relatorioEstacao={relatorioEstacao}
-                  onRelatorioEstacao={setRelatorioEstacao}
                   estacaoEntregaAcesso={estacaoEntregaAcesso}
                   onEstacaoEntregaAcesso={setEstacaoEntregaAcesso}
-                  gruposEstacao={[
-                    {
-                      grupoKey: "eqEstacaoGeral",
-                      title: "Estação - (Foto geral da estação/PPC)",
-                      slots: eqGrupos.eqEstacaoGeral.slots,
-                      onChange: setEqGrupoSlots("eqEstacaoGeral"),
-                      obs: eqGrupos.eqEstacaoGeral.obs,
-                      onObsChange: setEqGrupoObs("eqEstacaoGeral"),
-                      obsAdmin: eqGrupos.eqEstacaoGeral.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoGeral"),
-                    },
-                    {
-                      grupoKey: "eqEstacaoRack",
-                      title: "(Rack ou Local Instalação)",
-                      slots: eqGrupos.eqEstacaoRack.slots,
-                      onChange: setEqGrupoSlots("eqEstacaoRack"),
-                      obs: eqGrupos.eqEstacaoRack.obs,
-                      onObsChange: setEqGrupoObs("eqEstacaoRack"),
-                      obsAdmin: eqGrupos.eqEstacaoRack.obsAdmin,
-                      onObsAdminChange: setEqGrupoObsAdmin("eqEstacaoRack"),
-                    },
-                  ]}
                   equipamentosEstacao={eqEstacaoEquipamentoItens}
                   onEquipamentosEstacaoChange={setEqEstacaoEquipamentoItens}
                   onEquipamentoEstacaoPhoto={(itemId, campo, file) =>
@@ -1940,11 +1921,6 @@ function RelatorioPage() {
                       campo,
                       file,
                     )
-                  }
-                  outrasEstacao={outrasEqEstacao}
-                  onOutrasEstacaoChange={setOutrasEqEstacao}
-                  onOutraEstacaoPhoto={(itemId, file) =>
-                    handleOutraPhoto(setOutrasEqEstacao, "outrasFotosEqEstacao", itemId, file)
                   }
                   onGrupoPhoto={(grupoKey, slotId, file) => {
                     handleGrupoPhoto(grupoSetters[grupoKey], grupoKey, slotId, file);

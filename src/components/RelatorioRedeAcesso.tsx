@@ -281,7 +281,7 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       titulo: "LANÇAMENTO (RE)",
       subitens: [
         { titulo: "Lançamento de cabos", id: "secao-cabos" },
-        { titulo: "Sobra técnica / Fiberloop", id: "secao-sobraTecnica" },
+        { titulo: "Sobra técnica", id: "secao-sobraTecnica" },
         { titulo: "Const. de duto subterrâneo", id: "secao-dutoSubterraneo" },
       ],
     },
@@ -306,11 +306,23 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
   ],
   RC: [
     {
-      titulo: "LANÇAMENTO (RC)",
+      titulo: "LOCAL (RC)",
       subitens: [
         { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
+        { titulo: "Cliente - (Entrada/Fachada)", id: "secao-eqClienteFachada" },
+        { titulo: "Cliente - Ambiente (geral da sala)", id: "secao-eqClienteAmbiente" },
+        { titulo: "(Rack ou Local)", id: "secao-eqClienteRack" },
+      ],
+    },
+    {
+      titulo: "LANÇAMENTO (RC)",
+      subitens: [
         { titulo: "Lançamento de cabos", id: "secao-cabos" },
-        { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
+        { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
+        { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
+        { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
+        { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
+        { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
         { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
       ],
     },
@@ -326,9 +338,6 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       subitens: [
         { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
         { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
-        { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
-        { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
-        { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
       ],
     },
     {
@@ -338,19 +347,29 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
   ],
   equipamento: [
     {
-      titulo: "Tecnologia de Acesso",
-      subitens: [{ titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" }],
-    },
-    {
-      titulo: "Equipamentos no Cliente",
-      subitens: [{ titulo: "Equipamentos no Cliente", id: "secao-eq-cliente" }],
-    },
-    {
-      titulo: "Estação/PPC",
+      titulo: "EQUIPAMENTO NO CLIENTE",
       subitens: [
-        { titulo: "Conexão na Estação/PPC", id: "secao-eq-conexao-estacao" },
-        { titulo: "Equipamentos na Estação/PPC", id: "secao-eq-estacao" },
+        { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
+        { titulo: "DGO/Roseta", id: "secao-eq-dgo-cliente" },
+        { titulo: "Equipamento", id: "secao-eq-equipamentos-cliente" },
+        { titulo: "Identificação SGP no Cliente", id: "secao-eqClienteSgp" },
+        { titulo: "Configuração equipamento no cliente", id: "secao-eq-config-cliente" },
       ],
+    },
+    {
+      titulo: "EQUIPAMENTO NA ESTAÇÃO",
+      subitens: [
+        { titulo: "Estação Entrega de Acesso", id: "secao-estacao-entrega-acesso" },
+        { titulo: "DGO / DID / ROUTER", id: "secao-eq-dgo-estacao" },
+        { titulo: "Posição de conexão na Estação/PPC", id: "secao-posicaoConexaoEstacao" },
+        { titulo: "ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC", id: "secao-etiquetaIdentificacao" },
+        { titulo: "Equipamento", id: "secao-eq-equipamentos-estacao" },
+        { titulo: "Configuração equipamento na estação", id: "secao-eq-config-estacao" },
+      ],
+    },
+    {
+      titulo: "OUTRAS FOTOS",
+      subitens: [{ titulo: "Outras fotos", id: "secao-eq-outras-fotos" }],
     },
   ],
 };
@@ -362,7 +381,7 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Cabo e Lançamento", id: "secao-cabos" },
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
-    { titulo: "Sobra técnica / Fiberloop", id: "secao-sobraTecnica" },
+    { titulo: "Sobra técnica", id: "secao-sobraTecnica" },
     { titulo: "POSTE (RE)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-posteConexao" },
     { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
@@ -373,29 +392,44 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "OUTRAS FOTOS (RE)", id: "secao-outras-fotos" },
   ],
   RC: [
+    { titulo: "LOCAL (RC)", id: "secao-local" },
+    { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
+    { titulo: "Cliente - (Entrada/Fachada)", id: "secao-eqClienteFachada" },
+    { titulo: "Cliente - Ambiente (geral da sala)", id: "secao-eqClienteAmbiente" },
+    { titulo: "(Rack ou Local)", id: "secao-eqClienteRack" },
     { titulo: "LANÇAMENTO (RC)", id: "secao-cabos" },
     { titulo: "Cabo e Lançamento", id: "secao-cabos" },
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
-    { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
-    { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
+    { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
+    { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
+    { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
+    { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
+    { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
+    { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
     { titulo: "POSTE (RC)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
     { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
     { titulo: "CAIXA DE EMENDA (RC)", id: "secao-caixa-emenda" },
     { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
     { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
-    { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
-    { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
-    { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
-    { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
     { titulo: "OUTRAS FOTOS (RC)", id: "secao-outras-fotos" },
   ],
   equipamento: [
+    { titulo: "EQUIPAMENTO NO CLIENTE", id: "secao-eq-cliente" },
     { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
-    { titulo: "Equipamentos no Cliente", id: "secao-eq-cliente" },
-    { titulo: "Conexão na Estação/PPC", id: "secao-eq-conexao-estacao" },
-    { titulo: "Equipamentos na Estação/PPC", id: "secao-eq-estacao" },
+    { titulo: "DGO/Roseta", id: "secao-eq-dgo-cliente" },
+    { titulo: "Equipamento", id: "secao-eq-equipamentos-cliente" },
+    { titulo: "Identificação SGP no Cliente", id: "secao-eqClienteSgp" },
+    { titulo: "Configuração equipamento no cliente", id: "secao-eq-config-cliente" },
+    { titulo: "EQUIPAMENTO NA ESTAÇÃO", id: "secao-eq-estacao" },
+    { titulo: "Estação Entrega de Acesso", id: "secao-estacao-entrega-acesso" },
+    { titulo: "DGO / DID / ROUTER", id: "secao-eq-dgo-estacao" },
+    { titulo: "Posição de conexão na Estação/PPC", id: "secao-posicaoConexaoEstacao" },
+    { titulo: "ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC", id: "secao-etiquetaIdentificacao" },
+    { titulo: "Equipamento na estação", id: "secao-eq-equipamentos-estacao" },
+    { titulo: "Configuração equipamento na estação", id: "secao-eq-config-estacao" },
+    { titulo: "OUTRAS FOTOS", id: "secao-eq-outras-fotos" },
   ],
 };
 
@@ -777,7 +811,7 @@ export function CampoCoordenadas({
   );
 }
 
-export type RedeAccordionSection = "cabos" | "poste" | "caixa" | "outras";
+export type RedeAccordionSection = "local" | "cabos" | "poste" | "caixa" | "outras";
 
 export type GrupoFotoCampo = {
   title: string;
@@ -842,7 +876,7 @@ export function AmbienteToggle({
 const flatSectionClass =
   "border-b border-gray-100 pb-6 last:border-b-0 last:pb-0";
 
-function AccordionBloco({
+export function AccordionBloco({
   title,
   children,
   rootRef,
@@ -1006,6 +1040,7 @@ export function CordoalhaSimNaoCard({
   disabled = false,
   hideQuantidade = false,
   variant = "card",
+  id,
 }: {
   title: string;
   quantidadeLabel?: string;
@@ -1017,15 +1052,17 @@ export function CordoalhaSimNaoCard({
   hideQuantidade?: boolean;
   /** Use `flat` dentro dos acordeões RE/RC. */
   variant?: "card" | "flat";
+  id?: string;
 }) {
   const sim = value.isSim === true;
   const isFlat = variant === "flat";
   return (
     <div
+      id={id}
       className={
         isFlat
-          ? `space-y-3 ${flatSectionClass}`
-          : "space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          ? `scroll-mt-36 space-y-3 ${flatSectionClass}`
+          : "scroll-mt-36 space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
       }
     >
       <h2
@@ -1163,6 +1200,7 @@ export function RelatorioRedeAcesso({
   const mostrarMetragem = lancamentoRe === "sim";
   const mostrarCordoalha = Boolean(cordoalhaLancada && cordoalhaExistente);
   const mostrarPostes = Boolean(postesNovaCordoalha && postesCordoalhaExistente);
+  const gruposLocal = grupos.filter((g) => g.section === "local");
   const gruposCabos = grupos.filter((g) => g.section === "cabos");
   const gruposCabosPrincipais = gruposCabos.filter(
     (g) => g.grupoKey !== "dutoSubterraneo" && g.grupoKey !== "rcDutoSubterraneo",
@@ -1173,11 +1211,23 @@ export function RelatorioRedeAcesso({
   const gruposPoste = grupos.filter((g) => g.section === "poste");
   const gruposCaixa = grupos.filter((g) => g.section === "caixa");
   const fotoCtx = { readOnly, onGrupoPhoto };
+  const mostrarLocal = redeVariant === "RC";
 
   return (
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
-        {header}
+        {mostrarLocal ? (
+          <AccordionBloco
+            title="LOCAL (RC)"
+            id="secao-local"
+            stickTabsAtViewportTop={stickTabsAtViewportTop}
+          >
+            {header ? <div className={flatSectionClass}>{header}</div> : null}
+            {gruposLocal.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          </AccordionBloco>
+        ) : (
+          header
+        )}
 
         <AccordionBloco
           title={`LANÇAMENTO (${redeVariant})`}
@@ -1407,6 +1457,7 @@ export function RelatorioRedeAcesso({
           onFiberloopInstaladoChange &&
           lancamentoAmbiente !== "subterraneo" ? (
             <CordoalhaSimNaoCard
+              id="secao-fiberloopInstalado"
               title="Fiberloop instalado?"
               quantidadeLabel="Quantidade de Fiberloop instalado"
               quantidadePlaceholder="Ex: 2"
