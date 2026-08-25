@@ -274,8 +274,8 @@ export type IndiceMenuBloco = {
   subitens: SecaoPesquisavel[];
 };
 
-/** Árvore de navegação do menu lateral (RE / RC). */
-export const INDICE_MENU_POR_ABA: Partial<Record<"RE" | "RC", IndiceMenuBloco[]>> = {
+/** Árvore de navegação do menu lateral por aba. */
+export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> = {
   RE: [
     {
       titulo: "LANÇAMENTO (RE)",
@@ -309,7 +309,6 @@ export const INDICE_MENU_POR_ABA: Partial<Record<"RE" | "RC", IndiceMenuBloco[]>
       titulo: "LANÇAMENTO (RC)",
       subitens: [
         { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
-        { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
         { titulo: "Lançamento de cabos", id: "secao-cabos" },
         { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
         { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
@@ -337,6 +336,23 @@ export const INDICE_MENU_POR_ABA: Partial<Record<"RE" | "RC", IndiceMenuBloco[]>
       subitens: [{ titulo: "Outras fotos", id: "secao-outras-fotos" }],
     },
   ],
+  equipamento: [
+    {
+      titulo: "Tecnologia de Acesso",
+      subitens: [{ titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" }],
+    },
+    {
+      titulo: "Equipamentos no Cliente",
+      subitens: [{ titulo: "Equipamentos no Cliente", id: "secao-eq-cliente" }],
+    },
+    {
+      titulo: "Estação/PPC",
+      subitens: [
+        { titulo: "Conexão na Estação/PPC", id: "secao-eq-conexao-estacao" },
+        { titulo: "Equipamentos na Estação/PPC", id: "secao-eq-estacao" },
+      ],
+    },
+  ],
 };
 
 /** Índice de navegação rápida por aba (âncoras no próprio formulário). */
@@ -362,7 +378,6 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Cabos", id: "secao-cabos" },
     { titulo: "Lançamento de Cabos", id: "secao-cabos" },
     { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
-    { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
     { titulo: "Sobra técnica / Fiberloop", id: "secao-rcSobraTecnica" },
     { titulo: "POSTE (RC)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
@@ -377,6 +392,7 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "OUTRAS FOTOS (RC)", id: "secao-outras-fotos" },
   ],
   equipamento: [
+    { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
     { titulo: "Equipamentos no Cliente", id: "secao-eq-cliente" },
     { titulo: "Conexão na Estação/PPC", id: "secao-eq-conexao-estacao" },
     { titulo: "Equipamentos na Estação/PPC", id: "secao-eq-estacao" },
@@ -494,8 +510,7 @@ export function RelatorioAbasCampo({
   const abasScrollRef = useRef<HTMLNavElement | null>(null);
 
   const secoes = secoesPesquisaveis ?? SECOES_PESQUISAVEIS_POR_ABA[abaAtiva] ?? [];
-  const indiceMenu =
-    abaAtiva === "RE" || abaAtiva === "RC" ? (INDICE_MENU_POR_ABA[abaAtiva] ?? []) : [];
+  const indiceMenu = INDICE_MENU_POR_ABA[abaAtiva] ?? [];
   const resultados = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
     if (!termo) return [];

@@ -278,6 +278,8 @@ function ListaItensEquipamento({
 export function RelatorioEquipamento({
   readOnly,
   showObsAdmin = false,
+  tecnologiaAcesso = "",
+  onTecnologiaAcessoChange,
   gruposCliente,
   equipamentosCliente,
   onEquipamentosClienteChange,
@@ -311,6 +313,8 @@ export function RelatorioEquipamento({
 }: {
   readOnly: boolean;
   showObsAdmin?: boolean;
+  tecnologiaAcesso?: string;
+  onTecnologiaAcessoChange?: (value: string) => void;
   gruposCliente: GrupoFotoCampo[];
   equipamentosCliente: EquipamentoClienteItemPayload[];
   onEquipamentosClienteChange: (next: EquipamentoClienteItemPayload[]) => void;
@@ -359,6 +363,24 @@ export function RelatorioEquipamento({
   return (
     <EvidencePhotoPasteProvider>
       <div className="space-y-5">
+        <div
+          id="secao-tecnologia-acesso"
+          className="scroll-mt-36 rounded-2xl border border-border bg-card p-5 shadow-sm"
+        >
+          <label htmlFor="tecnologia-acesso" className="mb-1.5 block text-sm font-semibold">
+            Tecnologia de Acesso
+          </label>
+          <input
+            id="tecnologia-acesso"
+            type="text"
+            value={tecnologiaAcesso}
+            onChange={(e) => onTecnologiaAcessoChange?.(e.target.value)}
+            placeholder="EX: FO ABC"
+            disabled={readOnly || !onTecnologiaAcessoChange}
+            className={inputClass()}
+          />
+        </div>
+
         <div id="secao-eq-cliente" className="scroll-mt-36 space-y-5">
         <h2 className="text-base font-bold">Equipamentos no Cliente</h2>
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">

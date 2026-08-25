@@ -1518,23 +1518,6 @@ export function RelatorioDetalhe({
             disabled={!canEditPhotos}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1.5 sm:col-span-2">
-              <label htmlFor="admin-tecnologia-acesso" className="block text-sm text-gray-500">
-                Tecnologia de Acesso
-              </label>
-              <input
-                id="admin-tecnologia-acesso"
-                type="text"
-                value={payload?.tecnologiaAcesso ?? ""}
-                placeholder="EX: FO ABC"
-                disabled={!canEditPhotos}
-                onChange={(e) => {
-                  if (!payload || !canEditPhotos) return;
-                  patchPayload({ ...payload, tecnologiaAcesso: e.target.value });
-                }}
-                className={inputClass()}
-              />
-            </div>
             <div className="flex w-full flex-col gap-3 sm:col-span-2 lg:col-span-2">
               <LancamentoCabosControle
                 label="Lançamento cabos (RC)"
@@ -1703,6 +1686,26 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "equipamento" ? (
         <div className="space-y-6">
+          <div
+            id="secao-tecnologia-acesso"
+            className="scroll-mt-36 space-y-1.5 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          >
+            <label htmlFor="admin-tecnologia-acesso" className="block text-sm font-semibold">
+              Tecnologia de Acesso
+            </label>
+            <input
+              id="admin-tecnologia-acesso"
+              type="text"
+              value={payload?.tecnologiaAcesso ?? ""}
+              placeholder="EX: FO ABC"
+              disabled={!canEditPhotos}
+              onChange={(e) => {
+                if (!payload || !canEditPhotos) return;
+                patchPayload({ ...payload, tecnologiaAcesso: e.target.value });
+              }}
+              className={inputClass()}
+            />
+          </div>
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Equipamentos no Cliente

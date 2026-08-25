@@ -1568,37 +1568,15 @@ function RelatorioPage() {
                   redeVariant="RC"
                   stickTabsAtViewportTop={headerRolaComPagina}
                   header={
-                    <div className="space-y-3">
-                      <CampoCoordenadas
-                        id="secao-coordenadas-cliente"
-                        title="Coordenadas do Cliente"
-                        value={redeCliente.coordenadas}
-                        onChange={(coordenadas) =>
-                          setRedeCliente((prev) => ({ ...prev, coordenadas }))
-                        }
-                        disabled={readOnly}
-                      />
-                      <div
-                        id="secao-tecnologia-acesso"
-                        className="scroll-mt-36 rounded-2xl border border-border bg-card p-5 shadow-sm"
-                      >
-                        <label
-                          htmlFor="tecnologia-acesso"
-                          className="mb-1.5 block text-sm font-semibold"
-                        >
-                          Tecnologia de Acesso
-                        </label>
-                        <input
-                          id="tecnologia-acesso"
-                          type="text"
-                          value={tecnologiaAcesso}
-                          onChange={(e) => setTecnologiaAcesso(e.target.value)}
-                          placeholder="EX: FO ABC"
-                          disabled={readOnly}
-                          className={inputClass()}
-                        />
-                      </div>
-                    </div>
+                    <CampoCoordenadas
+                      id="secao-coordenadas-cliente"
+                      title="Coordenadas do Cliente"
+                      value={redeCliente.coordenadas}
+                      onChange={(coordenadas) =>
+                        setRedeCliente((prev) => ({ ...prev, coordenadas }))
+                      }
+                      disabled={readOnly}
+                    />
                   }
                   lancamentoTitle="Lançamento cabos (RC)?"
                   lancamentoRe={simNaoDe(lancamentoCabosRc[lancamentoRcAmbiente].isSim)}
@@ -1806,6 +1784,8 @@ function RelatorioPage() {
                 <RelatorioEquipamento
                   readOnly={readOnly}
                   showObsAdmin={showObsAdmin}
+                  tecnologiaAcesso={tecnologiaAcesso}
+                  onTecnologiaAcessoChange={setTecnologiaAcesso}
                   gruposCliente={[
                     {
                       grupoKey: "eqClienteFachada",
