@@ -179,7 +179,7 @@ function Photos({
     <div className={FOTO_SLOTS_ROW_CLASS}>
       {fotos.map((foto, index) => (
         <div key={`${foto.path}-${index}`} className={FOTO_SLOT_WRAP_CLASS}>
-          {labels?.[index] ? <FotoLabel>{labels[index]}</FotoLabel> : null}
+          <FotoLabel>{labels?.[index]}</FotoLabel>
           <RelatorioFotoComControles
             src={foto.url}
             alt={labels?.[index] || "Evidência"}
@@ -305,7 +305,7 @@ function ObsEditavel({
   );
 
   return (
-    <div className="space-y-1.5">
+    <div className="w-full space-y-1.5">
       <label className="block text-sm font-semibold">OBS</label>
       <textarea
         value={local}
@@ -315,7 +315,7 @@ function ObsEditavel({
         }}
         rows={2}
         disabled={!onChange}
-        className="w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+        className="box-border w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
       />
     </div>
   );
@@ -507,9 +507,65 @@ function EvidenciaBloco({
         )}
       </div>
       {onObsChange ? (
-        <div className="mt-4 w-full">
+        <div className="mt-4 w-full min-w-0">
           <ObsEditavel value={obs ?? ""} onChange={onObsChange} />
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PostePerguntaQuadrante({
+  title,
+  value,
+  onChange,
+  disabled,
+  quantidadeLabel,
+  quantidadePlaceholder,
+  hideQuantidade = false,
+}: {
+  title: string;
+  value: { isSim: boolean | null; quantidade: number | null };
+  onChange?: (next: { isSim: boolean | null; quantidade: number | null }) => void;
+  disabled?: boolean;
+  quantidadeLabel?: string;
+  quantidadePlaceholder?: string;
+  hideQuantidade?: boolean;
+}) {
+  const sim = value.isSim === true;
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+      <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+      <div className="grid grid-cols-2 gap-2">
+        <ChoiceButton
+          active={value.isSim === true}
+          disabled={disabled || !onChange}
+          onClick={() =>
+            onChange?.(
+              hideQuantidade
+                ? { isSim: true, quantidade: null }
+                : { ...value, isSim: true },
+            )
+          }
+        >
+          SIM
+        </ChoiceButton>
+        <ChoiceButton
+          active={value.isSim === false}
+          disabled={disabled || !onChange}
+          onClick={() => onChange?.({ isSim: false, quantidade: null })}
+        >
+          NÃO
+        </ChoiceButton>
+      </div>
+      {!hideQuantidade && sim && quantidadeLabel ? (
+        <CampoQuantidade
+          label={quantidadeLabel}
+          placeholder={quantidadePlaceholder ?? "Ex: 0"}
+          value={value.quantidade}
+          onChange={(quantidade) => onChange?.({ ...value, isSim: true, quantidade })}
+          disabled={disabled || !onChange}
+        />
       ) : null}
     </div>
   );
@@ -1133,7 +1189,7 @@ export function RelatorioDetalhe({
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="min-w-0">
             <CaboFotos
               inicio={cabo.fotoInicio}
               fim={cabo.fotoFim}
@@ -1161,22 +1217,25 @@ export function RelatorioDetalhe({
                   : undefined
               }
             />
-            {canEditPhotos ? (
-              <ObsEditavel
-                value={cabo.obs}
-                onChange={(obs) => {
-                  patchLancamentoCabos(dualKey, ambiente, (lado) => ({
-                    ...lado,
-                    metragens: lado.metragens.map((item) =>
-                      item.id === cabo.id ? { ...item, obs } : item,
-                    ),
-                  }));
-                }}
-              />
-            ) : cabo.obs?.trim() ? (
-              <p className="text-sm text-muted-foreground">{cabo.obs}</p>
-            ) : null}
           </div>
+        </div>
+
+        <div className="mt-4 w-full min-w-0">
+          {canEditPhotos ? (
+            <ObsEditavel
+              value={cabo.obs}
+              onChange={(obs) => {
+                patchLancamentoCabos(dualKey, ambiente, (lado) => ({
+                  ...lado,
+                  metragens: lado.metragens.map((item) =>
+                    item.id === cabo.id ? { ...item, obs } : item,
+                  ),
+                }));
+              }}
+            />
+          ) : cabo.obs?.trim() ? (
+            <p className="text-sm text-muted-foreground">{cabo.obs}</p>
+          ) : null}
         </div>
       </div>
     );
@@ -1445,96 +1504,94 @@ export function RelatorioDetalhe({
             defaultOpen
           >
             {renderGrupo("Poste de conexão", "posteConexao")}
-            <CordoalhaSimNaoCard
-              title="Lançado cordoalha?"
-              quantidadeLabel="Quantidade de cordoalha lançada:"
-              quantidadePlaceholder="Ex: 50"
-              variant="flat"
-              value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
-              onChange={
-                canEditPhotos
-                  ? (cordoalhaLancada) => {
-                      if (!payload) return;
-                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
-                      patchPayload({
-                        ...payload,
-                        redeAcesso: { ...redeAcesso, cordoalhaLancada },
-                      });
-                    }
-                  : undefined
-              }
-              disabled={!canEditPhotos}
-            />
-            <CordoalhaSimNaoCard
-              title="Cordoalha existente?"
-              hideQuantidade
-              variant="flat"
-              value={payload?.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()}
-              onChange={
-                canEditPhotos
-                  ? (cordoalhaExistente) => {
-                      if (!payload) return;
-                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
-                      patchPayload({
-                        ...payload,
-                        redeAcesso: {
-                          ...redeAcesso,
-                          cordoalhaExistente: {
-                            isSim: cordoalhaExistente.isSim,
-                            quantidade: null,
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <PostePerguntaQuadrante
+                title="Cordoalha existente?"
+                hideQuantidade
+                value={payload?.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (cordoalhaExistente) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: {
+                            ...redeAcesso,
+                            cordoalhaExistente: {
+                              isSim: cordoalhaExistente.isSim,
+                              quantidade: null,
+                            },
                           },
-                        },
-                      });
-                    }
-                  : undefined
-              }
-              disabled={!canEditPhotos}
-            />
-            <CordoalhaSimNaoCard
-              title="Postes novo com nova cordoalha?"
-              quantidadeLabel="Quantidade de Poste com nova cordoalha:"
-              quantidadePlaceholder="Ex: 10"
-              variant="flat"
-              value={payload?.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
-              onChange={
-                canEditPhotos
-                  ? (postesNovaCordoalha) => {
-                      if (!payload) return;
-                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
-                      patchPayload({
-                        ...payload,
-                        redeAcesso: { ...redeAcesso, postesNovaCordoalha },
-                      });
-                    }
-                  : undefined
-              }
-              disabled={!canEditPhotos}
-            />
-            <CordoalhaSimNaoCard
-              title="Postes com cordoalha Existente?"
-              hideQuantidade
-              variant="flat"
-              value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
-              onChange={
-                canEditPhotos
-                  ? (postesCordoalhaExistente) => {
-                      if (!payload) return;
-                      const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
-                      patchPayload({
-                        ...payload,
-                        redeAcesso: {
-                          ...redeAcesso,
-                          postesCordoalhaExistente: {
-                            isSim: postesCordoalhaExistente.isSim,
-                            quantidade: null,
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+              <PostePerguntaQuadrante
+                title="Postes com cordoalha existente?"
+                hideQuantidade
+                value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (postesCordoalhaExistente) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: {
+                            ...redeAcesso,
+                            postesCordoalhaExistente: {
+                              isSim: postesCordoalhaExistente.isSim,
+                              quantidade: null,
+                            },
                           },
-                        },
-                      });
-                    }
-                  : undefined
-              }
-              disabled={!canEditPhotos}
-            />
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+              <PostePerguntaQuadrante
+                title="Lançado cordoalha?"
+                quantidadeLabel="Quantidade de cordoalha lançada:"
+                quantidadePlaceholder="Ex: 50"
+                value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (cordoalhaLancada) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: { ...redeAcesso, cordoalhaLancada },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+              <PostePerguntaQuadrante
+                title="Postes novo com nova cordoalha?"
+                quantidadeLabel="Quantidade de Poste com nova cordoalha:"
+                quantidadePlaceholder="Ex: 10"
+                value={payload?.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
+                onChange={
+                  canEditPhotos
+                    ? (postesNovaCordoalha) => {
+                        if (!payload) return;
+                        const redeAcesso = payload.redeAcesso ?? emptyQuantidadesRede();
+                        patchPayload({
+                          ...payload,
+                          redeAcesso: { ...redeAcesso, postesNovaCordoalha },
+                        });
+                      }
+                    : undefined
+                }
+                disabled={!canEditPhotos}
+              />
+            </div>
             {renderGrupo("Novo aterramento do poste", "novoAterramentoPoste")}
           </AccordionBloco>
 

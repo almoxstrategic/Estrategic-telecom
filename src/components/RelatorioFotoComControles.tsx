@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const IMAGE_CLASS = "h-full w-full rounded-lg object-cover";
 const IMAGE_CLASS_COMPACT =
-  "h-full max-h-40 w-full rounded-lg object-contain print:max-h-[300px]";
+  "h-full w-full rounded-lg object-contain print:max-h-[300px]";
 
 export function RelatorioFotoComControles({
   src,
@@ -47,7 +47,7 @@ export function RelatorioFotoComControles({
     <div
       className={cn(
         FOTO_PREVIEW_FRAME_CLASS,
-        fillWidth && "mx-0 max-w-none",
+        fillWidth && "max-w-none",
         "group break-inside-avoid p-0 print:break-inside-avoid",
       )}
     >
@@ -105,4 +105,4 @@ export function FotoLabel({ children }: { children?: string }) {
 
 /** Slot vazio estático (somente leitura). Preferir PhotoUpload quando editável. */
 export const FOTO_SLOT_CLASS =
-  "mx-auto flex h-48 max-h-48 w-full max-w-[360px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-xs text-muted-foreground";
+  "flex h-48 max-h-48 w-full max-w-[360px] shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-xs text-muted-foreground";

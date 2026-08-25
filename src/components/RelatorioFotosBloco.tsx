@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { PhotoUpload, FOTO_SLOTS_ROW_CLASS, FOTO_SLOT_WRAP_CLASS } from "@/components/PhotoUpload";
-import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
+import { FOTO_SLOT_CLASS, FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import type { EvidencePhotoRef } from "@/lib/types";
 import { deleteRelatorioPhoto, type StoredPhoto } from "@/lib/relatorios-transmissao";
 
@@ -112,44 +112,41 @@ export function RelatorioFotosBloco({
                   <Trash2 className="h-4 w-4" />
                 </button>
               ) : null}
+              <div className="pr-8">
+                <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
+              </div>
               {slot.file && !readOnly ? (
                 <PhotoUpload
                   label={`Foto ${index + 1}`}
                   suffix={index === 0 ? "inicio" : "fim"}
                   value={slot.file}
+                  hideLabel
                   onChange={(file) => handlePick(slot.id, file)}
                   compact
                   hideHelperText
                 />
               ) : slot.stored ? (
-                <>
-                  <div className="pr-8">
-                    <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
-                  </div>
-                  <RelatorioFotoComControles
-                    src={slot.stored.url}
-                    alt={`Foto ${index + 1}`}
-                    canEdit={!readOnly}
-                    onDelete={() => {
-                      void deleteRelatorioPhoto(slot.stored?.path);
-                      handlePick(slot.id, null);
-                    }}
-                    onReplace={(file) => {
-                      void deleteRelatorioPhoto(slot.stored?.path);
-                      handlePick(slot.id, file);
-                    }}
-                  />
-                </>
+                <RelatorioFotoComControles
+                  src={slot.stored.url}
+                  alt={`Foto ${index + 1}`}
+                  canEdit={!readOnly}
+                  onDelete={() => {
+                    void deleteRelatorioPhoto(slot.stored?.path);
+                    handlePick(slot.id, null);
+                  }}
+                  onReplace={(file) => {
+                    void deleteRelatorioPhoto(slot.stored?.path);
+                    handlePick(slot.id, file);
+                  }}
+                />
               ) : readOnly ? (
-                <>
-                  <FotoLabel>{`Foto ${index + 1}`}</FotoLabel>
-                  <p className="text-sm text-muted-foreground">Sem foto {index + 1}.</p>
-                </>
+                <div className={FOTO_SLOT_CLASS}>Sem foto {index + 1}</div>
               ) : (
                 <PhotoUpload
                   label={`Foto ${index + 1}`}
                   suffix={index === 0 ? "inicio" : "fim"}
                   value={null}
+                  hideLabel
                   onChange={(file) => handlePick(slot.id, file)}
                   compact
                   hideHelperText
@@ -160,15 +157,15 @@ export function RelatorioFotosBloco({
         })}
       </div>
 
-      <div className="mt-4 w-full space-y-3">
-        <div>
+      <div className="mt-4 w-full min-w-0 space-y-3">
+        <div className="w-full">
           <label className="mb-1.5 block text-sm font-semibold">OBS</label>
           <textarea
             value={obs}
             onChange={(e) => onObsChange(e.target.value)}
             rows={2}
             disabled={readOnly}
-            className="w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+            className="box-border w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
           />
         </div>
 

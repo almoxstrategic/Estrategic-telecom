@@ -16,7 +16,7 @@ export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="block h-full w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label={`Abrir ${alt}`}
       >
         <img
@@ -25,7 +25,7 @@ export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
           decoding="async"
           loading="lazy"
           className={cn(
-            "h-48 w-full cursor-zoom-in rounded-md object-cover transition hover:opacity-95",
+            "h-full w-full cursor-zoom-in rounded-lg object-cover transition hover:opacity-95",
             className,
           )}
         />
