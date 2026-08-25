@@ -11,6 +11,8 @@ import {
   deleteRelatorioPhoto,
   emptyTesteOtdrItem,
   emptyTesteOpticoItem,
+  normalizeMedicaoValue,
+  sanitizeMedicaoInput,
   testeOpticoEstacaoAtivo,
   type StoredPhoto,
   type TesteOpticoFaixaPayload,
@@ -22,6 +24,49 @@ import {
 } from "@/lib/relatorios-transmissao";
 
 type ChangeOpts = { immediate?: boolean };
+
+/** Campo decimal de medição: aceita -, . e ,; normaliza vírgula→ponto no blur. */
+function CampoMedicaoDecimal({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  id?: string;
+  label: string;
+  value: string;
+  onChange: (next: string, opts?: ChangeOpts) => void;
+  disabled: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) => onChange(sanitizeMedicaoInput(e.target.value))}
+        onBlur={() => {
+          const normalized = normalizeMedicaoValue(value);
+          if (normalized !== value) onChange(normalized, { immediate: true });
+        }}
+        className={inputClass()}
+      />
+    </div>
+  );
+}
 
 function BotaoAdicionar({ label, onClick }: { label: string; onClick: () => void }) {
   return (
@@ -115,17 +160,13 @@ function CardMedicaoCliente({
   return (
     <div className="flex h-full break-inside-avoid flex-col space-y-3 rounded-xl border border-border p-4 print:break-inside-avoid print:space-y-1 print:p-2">
       <h3 className="text-sm font-bold print:mb-0 print:text-xs">{titulo}</h3>
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs">Digite o dBm</label>
-        <input
-          inputMode="decimal"
-          value={faixa.dbm}
-          onChange={(e) => onPatch({ ...faixa, dbm: e.target.value })}
-          placeholder="dBm"
-          disabled={readOnly}
-          className={inputClass()}
-        />
-      </div>
+      <CampoMedicaoDecimal
+        label="Digite o dBm"
+        value={faixa.dbm}
+        placeholder="Ex: -18,5"
+        disabled={readOnly}
+        onChange={(dbm, opts) => onPatch({ ...faixa, dbm }, opts)}
+      />
       <div className="flex-1">
         <FotoLabel>Foto</FotoLabel>
         <FotoUnica foto={foto} alt={alt} readOnly={readOnly} onPick={(file) => void pickFoto(file)} />
@@ -172,17 +213,13 @@ function CardMedicaoEstacao({
   return (
     <div className="flex h-full break-inside-avoid flex-col space-y-3 rounded-xl border border-border p-4 print:break-inside-avoid print:space-y-1 print:p-2">
       <h3 className="text-sm font-bold print:mb-0 print:text-xs">{titulo}</h3>
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs">Digite o dBm</label>
-        <input
-          inputMode="decimal"
-          value={item.dbm}
-          onChange={(e) => onPatch({ ...item, dbm: e.target.value })}
-          placeholder="dBm"
-          disabled={readOnly}
-          className={inputClass()}
-        />
-      </div>
+      <CampoMedicaoDecimal
+        label="Digite o dBm"
+        value={item.dbm}
+        placeholder="Ex: -18,5"
+        disabled={readOnly}
+        onChange={(dbm, opts) => onPatch({ ...item, dbm }, opts)}
+      />
       <div className="flex-1">
         <FotoLabel>Foto</FotoLabel>
         <FotoUnica foto={item.foto} alt={alt} readOnly={readOnly} onPick={(file) => void pickFoto(file)} />
@@ -453,20 +490,15 @@ export function RelatorioTestePotencia({
     <div className="space-y-4 break-inside-avoid rounded-2xl border border-border bg-card p-5 shadow-sm print:break-before-avoid print:break-inside-avoid print:space-y-1 print:border-0 print:p-2 print:shadow-none">
       <h2 className="text-base font-bold print:mb-1 print:text-sm">Teste OTDR</h2>
       <div className="print:mb-1">
-        <label className="mb-1.5 block text-sm font-semibold print:mb-0.5 print:text-xs" htmlFor="comprimento-trecho-otdr">
-          Comprimento do trecho óptico testado (km):
-        </label>
-        <input
+        <CampoMedicaoDecimal
           id="comprimento-trecho-otdr"
-          type="number"
-          min={0}
-          step={0.001}
-          inputMode="decimal"
-          placeholder="EX, 2,9"
+          label="Comprimento do trecho óptico testado (km):"
           value={value.comprimentoTrechoKm ?? ""}
+          placeholder="Ex: 2,9"
           disabled={readOnly}
-          onChange={(e) => onChange({ ...value, comprimentoTrechoKm: e.target.value })}
-          className={inputClass()}
+          onChange={(comprimentoTrechoKm, opts) =>
+            onChange({ ...value, comprimentoTrechoKm }, opts)
+          }
         />
       </div>
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 print:gap-2">

@@ -64,7 +64,6 @@ export function PhotoUpload({
   const busy = busyMode !== "idle";
   const showHelperText =
     !compact && !hideHelperText && hasPainelFullAccess(user?.role);
-  const multiGallery = Boolean(onGalleryFiles);
 
   useEffect(() => {
     return () => {
@@ -95,7 +94,9 @@ export function PhotoUpload({
 
   const handleGalleryFiles = useCallback(
     async (fileList: FileList | File[] | null | undefined) => {
-      const files = fileList ? Array.from(fileList).filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|heic|heif)$/i.test(f.name)) : [];
+      const files = Array.from(fileList ?? []).filter(
+        (f) => f.type.startsWith("image/") || /\.(jpe?g|png|heic|heif)$/i.test(f.name),
+      );
       if (files.length === 0) return;
 
       if (files.length === 1 || !onGalleryFiles) {
@@ -148,7 +149,7 @@ export function PhotoUpload({
     if (busy) return;
     const dropped = event.dataTransfer.files;
     if (!dropped?.length) return;
-    if (multiGallery && dropped.length > 1) {
+    if (dropped.length > 1 && onGalleryFiles) {
       void handleGalleryFiles(dropped);
       return;
     }
@@ -285,14 +286,14 @@ export function PhotoUpload({
         ref={galleryRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png,image/heic,image/heif"
-        multiple={multiGallery}
+        multiple={true}
         className="hidden"
         onChange={(e) => void handleGalleryFiles(e.target.files)}
       />
       {showHelperText ? (
         <p className="mt-1 text-[11px] text-muted-foreground">
           Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
-          {multiGallery ? "A galeria aceita várias fotos de uma vez. " : null}
+          {onGalleryFiles ? "A galeria aceita várias fotos de uma vez. " : null}
           {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio. Fotos da câmera
           recebem data, hora e geolocalização.
         </p>

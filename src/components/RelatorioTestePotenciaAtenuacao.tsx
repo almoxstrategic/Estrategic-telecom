@@ -46,7 +46,7 @@ export function RelatorioTestePotenciaAtenuacao({
   const otdr = testeOtdr ?? emptyTestePotencia();
   const re = redeAcesso ?? emptyQuantidadesRede();
   const rc = redeCliente ?? emptyQuantidadesRede();
-  const km = numeroSeguro(String(otdr.comprimentoTrechoKm ?? "0").replace(",", "."), 0);
+  const km = parseNumeroCampo(String(otdr.comprimentoTrechoKm ?? "")) ?? 0;
   const totalEmendas = totalEmendasCalculado(re.qtdCaixasEmenda, rc.qtdCaixasEmenda);
   const totalConexoes = totalConexoesCalculado(totalEmendas);
 
@@ -210,7 +210,7 @@ function LinhaFibra({
 }) {
   const piEmBranco = campoEmBranco(referenciaPi);
   const valPo = -Math.abs(numeroSeguro(atenMaxima, 0));
-  const valPi = numeroSeguro(String(referenciaPi || "0").replace(",", "."), 0);
+  const valPi = parseNumeroCampo(String(referenciaPi || "0")) ?? 0;
   const atenuacao = valPo - valPi;
   const status =
     piEmBranco || valorMinimoAdmissivel == null

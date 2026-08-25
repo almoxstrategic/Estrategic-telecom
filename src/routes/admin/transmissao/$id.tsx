@@ -197,6 +197,37 @@ function AdminLancamentoDetalhePage() {
     }
   };
 
+  const onAdminAddPhotos = async (
+    categoria: RelatorioFotoCategoria,
+    files: EvidencePhotoRef[],
+    ambiente?: AmbienteRede,
+  ) => {
+    if (!row || !user?.id || files.length === 0) return;
+    if (files.length === 1) {
+      await onAdminAddPhoto(categoria, files[0], ambiente);
+      return;
+    }
+    setUploadingCategoria(categoria);
+    try {
+      let nextPayload = row.payload;
+      const amb = ambiente ?? "aereo";
+      for (const file of files) {
+        const stored = await uploadRelatorioPhoto(user.id, file.file, `admin-${categoria}`);
+        nextPayload = appendStoredPhotoToPayload(nextPayload, categoria, stored, amb);
+      }
+      applyingRemoteRef.current = true;
+      const saved = await patchRelatorioPayloadAdmin(row.id, nextPayload);
+      lastAppliedUpdatedAtRef.current = saved.updated_at;
+      setRow(saved);
+      toast.success(`${files.length} fotos anexadas ao relatório.`);
+    } catch (err) {
+      toast.error((err as Error).message || "Não foi possível anexar as fotos.");
+    } finally {
+      applyingRemoteRef.current = false;
+      setUploadingCategoria(null);
+    }
+  };
+
   const onAdminReplacePhoto = async (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
@@ -453,7 +484,12 @@ function AdminLancamentoDetalhePage() {
                 canEditPhotos={canAudit}
                 canEditCadastro={canAudit}
                 onCadastroSaved={setRow}
-                onAddPhoto={(categoria, file) => void onAdminAddPhoto(categoria, file)}
+                onAddPhoto={(categoria, file, ambiente) =>
+                  void onAdminAddPhoto(categoria, file, ambiente)
+                }
+                onAddPhotos={(categoria, files, ambiente) =>
+                  void onAdminAddPhotos(categoria, files, ambiente)
+                }
                 onReplacePhoto={(categoria, file, meta) =>
                   void onAdminReplacePhoto(categoria, file, meta)
                 }

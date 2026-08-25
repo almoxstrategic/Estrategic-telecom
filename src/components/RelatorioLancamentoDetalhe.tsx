@@ -141,6 +141,7 @@ function Photos({
   onRemovePhoto,
   onReplacePhoto,
   onAdd,
+  onAddMany,
   uploadKey,
   uploading,
 }: {
@@ -152,11 +153,28 @@ function Photos({
   onRemovePhoto?: (index: number) => void;
   onReplacePhoto?: (index: number, file: EvidencePhotoRef) => void;
   onAdd?: (file: EvidencePhotoRef) => void;
+  /** Upload múltiplo da galeria (gestor/técnico) — processa toda a seleção. */
+  onAddMany?: (files: EvidencePhotoRef[]) => void;
   uploadKey?: string;
   uploading?: boolean;
 }) {
   const legendaTrim = legenda?.trim() || "";
   const showEmptyUpload = Boolean(canEdit && onAdd && fotos.length === 0);
+
+  const handleGalleryFiles = (photos: EvidencePhotoRef[]) => {
+    if (photos.length === 0) return;
+    if (photos.length === 1) {
+      onAdd?.(photos[0]);
+      return;
+    }
+    if (onAddMany) {
+      onAddMany(photos);
+      return;
+    }
+    for (const photo of photos) {
+      onAdd?.(photo);
+    }
+  };
 
   if (!fotos.length) {
     return (
@@ -173,6 +191,7 @@ function Photos({
               onChange={(file) => {
                 if (file) onAdd?.(file);
               }}
+              onGalleryFiles={handleGalleryFiles}
               compact
               hideHelperText
             />
@@ -195,6 +214,19 @@ function Photos({
             canEdit={canEdit}
             onDelete={onRemovePhoto ? () => onRemovePhoto(index) : undefined}
             onReplace={onReplacePhoto ? (file) => onReplacePhoto(index, file) : undefined}
+            onGalleryFiles={
+              onAdd || onAddMany
+                ? (photos) => {
+                    if (photos.length === 0) return;
+                    // 1ª foto substitui o slot atual; demais entram como novas.
+                    if (onReplacePhoto && photos[0]) onReplacePhoto(index, photos[0]);
+                    const rest = photos.slice(1);
+                    if (rest.length === 0) return;
+                    if (onAddMany) onAddMany(rest);
+                    else for (const photo of rest) onAdd?.(photo);
+                  }
+                : undefined
+            }
           />
           {legendaTrim ? (
             <p className="text-center text-sm text-muted-foreground">{legendaTrim}</p>
@@ -213,6 +245,7 @@ function Photos({
             onChange={(file) => {
               if (file) onAdd(file);
             }}
+            onGalleryFiles={handleGalleryFiles}
             compact
             hideHelperText
           />
@@ -266,6 +299,11 @@ function CaboFotos({
               fillWidth={pairLayout}
               onDelete={onRemoveCampo ? () => onRemoveCampo(campo) : undefined}
               onReplace={onReplaceCampo ? (file) => onReplaceCampo(campo, file) : undefined}
+              onGalleryFiles={
+                onGalleryFiles
+                  ? (photos) => onGalleryFiles(campo, photos)
+                  : undefined
+              }
             />
           ) : canEdit && onReplaceCampo ? (
             <PhotoUpload
@@ -410,6 +448,7 @@ function EvidenciaBloco({
   caboFotos,
   canEdit,
   onAdd,
+  onAddMany,
   uploadKey,
   uploading,
   onObsChange,
@@ -435,6 +474,7 @@ function EvidenciaBloco({
   caboFotos?: { inicio: StoredPhoto | null; fim: StoredPhoto | null };
   canEdit?: boolean;
   onAdd?: (file: EvidencePhotoRef) => void;
+  onAddMany?: (files: EvidencePhotoRef[]) => void;
   uploadKey?: string;
   uploading?: boolean;
   onObsChange?: (value: string) => void;
@@ -527,6 +567,7 @@ function EvidenciaBloco({
             onRemovePhoto={onRemovePhoto}
             onReplacePhoto={onReplacePhoto}
             onAdd={canEdit ? onAdd : undefined}
+            onAddMany={canEdit ? onAddMany : undefined}
             uploadKey={uploadKey}
             uploading={uploading}
           />
@@ -817,6 +858,7 @@ export function RelatorioDetalhe({
   row,
   canEditPhotos,
   onAddPhoto,
+  onAddPhotos,
   onReplacePhoto,
   uploadingCategoria,
   onUpdatePayload,
@@ -829,6 +871,11 @@ export function RelatorioDetalhe({
   onAddPhoto: (
     categoria: RelatorioFotoCategoria,
     file: EvidencePhotoRef,
+    ambiente?: AmbienteRede,
+  ) => void;
+  onAddPhotos?: (
+    categoria: RelatorioFotoCategoria,
+    files: EvidencePhotoRef[],
     ambiente?: AmbienteRede,
   ) => void;
   onReplacePhoto?: (
@@ -918,6 +965,9 @@ export function RelatorioDetalhe({
   const blocoProps = (categoria: RelatorioFotoCategoria, ambiente?: AmbienteRede) => ({
     canEdit: canEditPhotos,
     onAdd: (file: EvidencePhotoRef) => onAddPhoto(categoria, file, ambiente),
+    onAddMany: onAddPhotos
+      ? (files: EvidencePhotoRef[]) => onAddPhotos(categoria, files, ambiente)
+      : undefined,
     uploadKey: `${row.id}-${categoria}-${ambiente ?? "all"}-${blocoCount(categoria, ambiente)}`,
     uploading: uploadingCategoria === categoria,
   });

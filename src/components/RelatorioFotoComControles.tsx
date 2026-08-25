@@ -17,6 +17,7 @@ export function RelatorioFotoComControles({
   canEdit = false,
   onDelete,
   onReplace,
+  onGalleryFiles,
   compact = false,
   fillWidth = false,
 }: {
@@ -25,6 +26,8 @@ export function RelatorioFotoComControles({
   canEdit?: boolean;
   onDelete?: () => void;
   onReplace?: (file: EvidencePhotoRef) => void;
+  /** Quando definido, a Galeria aceita N arquivos e entrega a lista processada. */
+  onGalleryFiles?: (photos: EvidencePhotoRef[]) => void;
   /** Imagens menores (Teste Optico / OTDR) — object-contain para preservar watermark. */
   compact?: boolean;
   fillWidth?: boolean;
@@ -44,6 +47,31 @@ export function RelatorioFotoComControles({
       toast.error((err as Error).message || "Não foi possível processar a foto.");
     } finally {
       if (cameraRef.current) cameraRef.current.value = "";
+      if (galleryRef.current) galleryRef.current.value = "";
+      setChooserOpen(false);
+    }
+  };
+
+  const handleGalleryFiles = async (fileList: FileList | null) => {
+    const files = Array.from(fileList ?? []).filter(
+      (f) => f.type.startsWith("image/") || /\.(jpe?g|png|heic|heif)$/i.test(f.name),
+    );
+    if (files.length === 0) return;
+
+    if (files.length === 1 || !onGalleryFiles) {
+      await pickReplace(files[0], "gallery");
+      return;
+    }
+
+    try {
+      const prepared: EvidencePhotoRef[] = [];
+      for (const file of files) {
+        prepared.push(await prepareEvidencePhotoFile(file, undefined, { withTimestamp: false }));
+      }
+      onGalleryFiles(prepared);
+    } catch (err) {
+      toast.error((err as Error).message || "Não foi possível processar as fotos.");
+    } finally {
       if (galleryRef.current) galleryRef.current.value = "";
       setChooserOpen(false);
     }
@@ -138,8 +166,9 @@ export function RelatorioFotoComControles({
         ref={galleryRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png,image/heic,image/heif"
+        multiple={true}
         className="hidden"
-        onChange={(e) => void pickReplace(e.target.files?.[0], "gallery")}
+        onChange={(e) => void handleGalleryFiles(e.target.files)}
       />
     </div>
   );

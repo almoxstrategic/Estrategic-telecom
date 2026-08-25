@@ -106,10 +106,46 @@ export function apenasDigitos(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+/**
+ * Sanitiza digitação de medição (dB, dBm, km, etc.):
+ * permite sinal "-" só no início e um separador decimal ("." ou ",").
+ * Mantém a vírgula na UI enquanto o usuário edita.
+ */
+export function sanitizeMedicaoInput(raw: string): string {
+  const s = String(raw ?? "");
+  let out = "";
+  let seenSep = false;
+  let i = 0;
+  if (s.startsWith("-")) {
+    out = "-";
+    i = 1;
+  }
+  for (; i < s.length; i++) {
+    const ch = s[i]!;
+    if (ch >= "0" && ch <= "9") {
+      out += ch;
+      continue;
+    }
+    if ((ch === "." || ch === ",") && !seenSep) {
+      seenSep = true;
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/** Converte vírgula em ponto para cálculo/persistência (ex.: "-18,5" → "-18.5"). */
+export function normalizeMedicaoValue(raw: string): string {
+  return String(raw ?? "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(",", ".");
+}
+
 /** Normaliza número decimal (aceita vírgula) para cálculo. */
 export function parseMarcacaoNumero(value: string): number | null {
-  const raw = value.trim().replace(",", ".");
-  if (!raw) return null;
+  const raw = normalizeMedicaoValue(value);
+  if (!raw || raw === "-" || raw === "." || raw === "-.") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
@@ -248,10 +284,7 @@ export function emptyTestePotenciaJanela(): TestePotenciaJanelaPayload {
 }
 
 export function parseNumeroCampo(raw: string): number | null {
-  const texto = String(raw ?? "")
-    .trim()
-    .replace(/\s/g, "")
-    .replace(",", ".");
+  const texto = normalizeMedicaoValue(raw);
   if (!texto || texto === "-" || texto === "+" || texto === "." || texto === "-.") return null;
   const n = Number(texto);
   return Number.isFinite(n) ? n : null;
