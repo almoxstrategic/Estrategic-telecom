@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
+  Bell,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -14,6 +15,7 @@ import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteConte
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { RelatorioFotosBloco, type FotoSlot } from "@/components/RelatorioFotosBloco";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   apenasDigitos,
@@ -526,6 +528,8 @@ export function RelatorioAbasCampo({
   abas = ABAS_CAMPO,
   secoesPesquisaveis,
   stickToViewportTop = false,
+  temPendencia = false,
+  motivoPendencia = null,
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
@@ -534,6 +538,10 @@ export function RelatorioAbasCampo({
   secoesPesquisaveis?: SecaoPesquisavel[];
   /** Técnico no relatório: gruda no topo da viewport (header da app não é sticky). */
   stickToViewportTop?: boolean;
+  /** Exibe badge no sino quando o relatório está em pendência. */
+  temPendencia?: boolean;
+  /** Texto detalhado da pendência (exibido no popover do sino). */
+  motivoPendencia?: string | null;
 }) {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -661,57 +669,98 @@ export function RelatorioAbasCampo({
           </button>
         </div>
 
-        {secoes.length > 0 ? (
-          <div ref={buscaWrapRef} className="relative mt-2 w-full">
-            <div className="flex items-center gap-2">
-              {indiceMenu.length > 0 ? (
+        <div ref={buscaWrapRef} className="relative mt-2 w-full">
+          <div className="flex items-center gap-2">
+            {indiceMenu.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsSideMenuOpen(true)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-foreground transition hover:bg-muted"
+                aria-label="Abrir índice de seções"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            ) : null}
+
+            <div className="relative min-w-0 flex-1">
+              {secoes.length > 0 ? (
+                <>
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    placeholder="Buscar seção (ex: Caixa de Emenda)"
+                    className="box-border w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    aria-label="Busca rápida de seções do formulário"
+                    autoComplete="off"
+                  />
+                </>
+              ) : null}
+            </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
                 <button
                   type="button"
-                  onClick={() => setIsSideMenuOpen(true)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-foreground transition hover:bg-muted"
-                  aria-label="Abrir índice de seções"
+                  className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition hover:bg-muted ${
+                    temPendencia ? "text-destructive" : "text-muted-foreground"
+                  }`}
+                  aria-label={
+                    temPendencia ? "Ver pendência do relatório" : "Notificações do relatório"
+                  }
                 >
-                  <Menu className="h-5 w-5" />
+                  <Bell className="h-5 w-5" />
+                  {temPendencia ? (
+                    <span
+                      className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background"
+                      aria-hidden
+                    />
+                  ) : null}
                 </button>
-              ) : null}
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setIsDropdownOpen(true);
-                  }}
-                  onFocus={() => setIsDropdownOpen(true)}
-                  placeholder="Buscar seção (ex: Caixa de Emenda)"
-                  className="box-border w-full flex-1 rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  aria-label="Busca rápida de seções do formulário"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-            {isDropdownOpen && searchTerm.trim() ? (
-              <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-white shadow-lg">
-                {resultados.length === 0 ? (
-                  <li className="p-3 text-sm text-muted-foreground">Nenhuma seção encontrada</li>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-4">
+                {temPendencia ? (
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-semibold text-destructive">
+                      Relatório com pendência
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {motivoPendencia?.trim() ||
+                        "A supervisão solicitou correções neste relatório."}
+                    </p>
+                  </div>
                 ) : (
-                  resultados.map((item) => (
-                    <li key={`${item.id}-${item.titulo}`}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectSearchResult(item.id)}
-                        className="w-full cursor-pointer border-b border-border px-3 py-3 text-left text-sm last:border-b-0 hover:bg-gray-100"
-                      >
-                        {item.titulo}
-                      </button>
-                    </li>
-                  ))
+                  <p className="text-sm text-muted-foreground">Nenhuma pendência no momento.</p>
                 )}
-              </ul>
-            ) : null}
+              </PopoverContent>
+            </Popover>
           </div>
-        ) : null}
+
+          {secoes.length > 0 && isDropdownOpen && searchTerm.trim() ? (
+            <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-white shadow-lg">
+              {resultados.length === 0 ? (
+                <li className="p-3 text-sm text-muted-foreground">Nenhuma seção encontrada</li>
+              ) : (
+                resultados.map((item) => (
+                  <li key={`${item.id}-${item.titulo}`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSearchResult(item.id)}
+                      className="w-full cursor-pointer border-b border-border px-3 py-3 text-left text-sm last:border-b-0 hover:bg-gray-100"
+                    >
+                      {item.titulo}
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          ) : null}
+        </div>
       </div>
 
       <RelatorioIndiceLateral

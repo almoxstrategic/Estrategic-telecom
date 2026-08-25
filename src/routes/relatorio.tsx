@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell, Info, X } from "lucide-react";
+import { ArrowLeft, Bell, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { MeusRelatoriosTransmissao } from "@/components/MeusRelatoriosTransmissao";
@@ -1373,19 +1373,6 @@ function RelatorioPage() {
           ) : null}
         </header>
 
-        {status === "pendente" ? (
-          <div
-            role="alert"
-            className="mb-5 flex gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              <span className="font-semibold">Relatório com pendência: </span>
-              {motivoPendencia?.trim() || "A supervisão solicitou correções neste relatório."}
-            </p>
-          </div>
-        ) : null}
-
         <form
           id="relatorio-form"
           onSubmit={(e) => {
@@ -1401,6 +1388,8 @@ function RelatorioPage() {
                 onChange={setAbaCampo}
                 abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
                 stickToViewportTop={headerRolaComPagina}
+                temPendencia={status === "pendente"}
+                motivoPendencia={motivoPendencia}
               />
 
               {mostrarRedeAcesso ? (
