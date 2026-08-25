@@ -565,6 +565,8 @@ export function RelatorioAbasCampo({
   layoutMode?: "tecnico" | "gestor";
 }) {
   const isGestor = layoutMode === "gestor";
+  /** Técnico mobile: setas nas bordas e abas com largura máxima entre elas. */
+  const tabsFullBleed = !isGestor;
   const pendenciasCtx = usePendencias();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -646,11 +648,22 @@ export function RelatorioAbasCampo({
         id={RELATORIO_ABAS_STICKY_ID}
         className={
           stickToViewportTop
-            ? "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background px-5 py-2 shadow-sm"
-            : "sticky top-16 z-40 w-full bg-white py-2"
+            ? cn(
+                "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background py-2 shadow-sm",
+                tabsFullBleed ? "px-0" : "px-5",
+              )
+            : cn(
+                "sticky top-16 z-40 w-full bg-white py-2",
+                tabsFullBleed ? "-mx-5 w-[calc(100%+2.5rem)] max-w-none px-0" : "",
+              )
         }
       >
-        <div className="flex w-full items-center gap-1">
+        <div
+          className={cn(
+            "flex w-full items-center",
+            tabsFullBleed ? "gap-0" : "gap-1",
+          )}
+        >
           {!isGestor ? (
             <button
               type="button"
@@ -666,7 +679,7 @@ export function RelatorioAbasCampo({
             className={
               isGestor
                 ? "flex w-full min-w-0 flex-1 flex-wrap items-center justify-between gap-2"
-                : "flex w-full min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                : "mx-0 flex w-full min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto whitespace-nowrap px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             }
             aria-label="Seções do relatório"
           >
@@ -702,7 +715,10 @@ export function RelatorioAbasCampo({
           ) : null}
         </div>
 
-        <div ref={buscaWrapRef} className="relative mt-2 w-full">
+        <div
+          ref={buscaWrapRef}
+          className={cn("relative mt-2 w-full", tabsFullBleed && "px-5")}
+        >
           <div className="flex items-center gap-2">
             {indiceMenu.length > 0 ? (
               <button
