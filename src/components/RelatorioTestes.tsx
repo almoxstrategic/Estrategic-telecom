@@ -471,6 +471,7 @@ export function RelatorioTesteOptico({
         value={padrao}
         onChange={readOnly ? undefined : onPadraoCoresFibraChange}
         readOnly={readOnly}
+        showLegenda={false}
       />
       <BlocoTesteOpticoCliente
         value={value.cliente}

@@ -1425,11 +1425,10 @@ function RelatorioPage() {
         </Link>
 
         <header className="mb-6">
-          <h1 className="text-2xl font-black tracking-tight text-gray-900">Relatório</h1>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-lg font-semibold text-gray-700">
-              OS - {osWf.trim() || "—"}
-            </p>
+          <div className="flex flex-row flex-wrap items-center justify-between gap-2">
+            <h1 className="min-w-0 truncate text-2xl font-black tracking-tight text-gray-900">
+              Relatório - {osWf.trim() || "—"}
+            </h1>
             <div className="flex shrink-0 items-center gap-3">
               <button
                 type="button"
