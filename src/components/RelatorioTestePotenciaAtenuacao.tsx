@@ -1,5 +1,5 @@
-import { useMemo, type ReactNode } from "react";
-import { inputClass } from "@/components/RelatorioRedeAcesso";
+import { useMemo, useState, type ReactNode } from "react";
+import { ChoiceButton, inputClass } from "@/components/RelatorioRedeAcesso";
 import { FIBER_COLORS, corFibraPorNumero } from "@/lib/fiber-colors";
 import {
   ATEN_EMENDA,
@@ -22,6 +22,7 @@ import {
 
 type JanelaNm = "1550" | "1330";
 type PontoMedicao = "cliente" | "estacao";
+type PadraoCoresFibra = "br" | "eua";
 
 const CARDS: { janela: JanelaNm; ponto: PontoMedicao; titulo: string }[] = [
   { janela: "1550", ponto: "cliente", titulo: "TESTE DE POTÊNCIA - 1550nm (No Cliente)" },
@@ -331,22 +332,45 @@ function LinhaRef({
 }
 
 function LegendaCoresFibra() {
+  const [padrao, setPadrao] = useState<PadraoCoresFibra>("br");
+  const titulo =
+    padrao === "br"
+      ? "Padrão de cores da fibra (Telebrás/ABNT) — repete a cada 12 fibras"
+      : "Padrão de cores da fibra (EUA) — em breve";
+
   return (
     <div className="my-6 flex w-full flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center">
-      <p className="mb-2 text-xs font-semibold text-gray-700">
-        Padrão de cores da fibra (Telebrás/ABNT) — repete a cada 12 fibras
-      </p>
+      <div
+        className="mb-3 grid w-full max-w-sm grid-cols-2 gap-2"
+        role="radiogroup"
+        aria-label="Padrão de cores da fibra"
+      >
+        <ChoiceButton active={padrao === "br"} onClick={() => setPadrao("br")}>
+          Padrão BR
+        </ChoiceButton>
+        <ChoiceButton active={padrao === "eua"} onClick={() => setPadrao("eua")}>
+          Padrão EUA
+        </ChoiceButton>
+      </div>
+      <p className="mb-2 text-xs font-semibold text-gray-700">{titulo}</p>
       <div className="flex flex-wrap justify-center gap-2">
         {FIBER_COLORS.map((cor, index) => (
           <span
             key={cor.sigla}
             title={`${String(index + 1).padStart(2, "0")} · ${cor.label}`}
-            className={`inline-flex h-7 min-w-7 items-center justify-center rounded-sm px-1.5 text-[10px] font-bold ${cor.bg}`}
+            className={`inline-flex h-7 min-w-7 items-center justify-center rounded-sm px-1.5 text-[10px] font-bold ${cor.bg} ${
+              padrao === "eua" ? "opacity-50" : ""
+            }`}
           >
             {cor.sigla}
           </span>
         ))}
       </div>
+      {padrao === "eua" ? (
+        <p className="mt-2 text-[11px] text-gray-500">
+          Paleta EUA ainda não disponível — exibindo referência BR.
+        </p>
+      ) : null}
     </div>
   );
 }

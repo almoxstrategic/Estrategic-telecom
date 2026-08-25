@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { ChoiceButton, inputClass } from "@/components/RelatorioRedeAcesso";
 import {
   emptyMedicaoTomada,
@@ -117,18 +117,32 @@ function TomadaCard({
   index,
   value,
   onChange,
+  onRemove,
   readOnly,
 }: {
   index: number;
   value: MedicaoTomadaPayload;
   onChange?: (next: MedicaoTomadaPayload) => void;
+  onRemove?: () => void;
   readOnly?: boolean;
 }) {
   const patch = (partial: Partial<MedicaoTomadaPayload>) =>
     onChange?.({ ...value, ...partial });
   return (
     <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold">Tomada {index + 1}</h2>
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-base font-bold">Tomada {index + 1}</h2>
+        {onRemove && !readOnly ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+            aria-label={`Apagar Tomada ${index + 1}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <TextField
           label="Fase - Neutro (V)"
@@ -267,6 +281,17 @@ export function AbaInfraestrutura({
                 ...value,
                 tomadas: tomadas.map((t) => (t.id === next.id ? next : t)),
               })
+            }
+            onRemove={
+              onChange && !readOnly
+                ? () => {
+                    const restantes = tomadas.filter((t) => t.id !== tomada.id);
+                    onChange({
+                      ...value,
+                      tomadas: restantes.length > 0 ? restantes : [emptyMedicaoTomada()],
+                    });
+                  }
+                : undefined
             }
           />
         ))}
