@@ -9,7 +9,8 @@ import {
 } from "react";
 import { navegarParaSecaoFormulario } from "@/components/RelatorioRedeAcesso";
 import type { AbaCampo } from "@/components/RelatorioRedeAcesso";
-import type { PendenciaItem, PendenciaItemDef } from "@/lib/pendencias-itens";
+import type { PendenciaItem, PendenciaItemDef, PendenciaBlocoId } from "@/lib/pendencias-itens";
+import { countPendenciasNoBloco } from "@/lib/pendencias-itens";
 
 type AbaController = {
   setAba: (aba: AbaCampo) => void;
@@ -21,8 +22,11 @@ type PendenciasContextValue = {
   draft: PendenciaItemDef[];
   draftCount: number;
   hasAnyPendencia: boolean;
+  /** IDs ativos (confirmados ∪ rascunho do gestor), sem duplicata. */
+  activeItemIds: Set<string>;
   isPending: (itemId: string) => boolean;
   isDraftSelected: (itemId: string) => boolean;
+  countInBloco: (bloco: PendenciaBlocoId) => number;
   toggleDraft: (def: PendenciaItemDef) => void;
   clearDraft: () => void;
   goToItem: (item: PendenciaItem | PendenciaItemDef) => void;
@@ -50,14 +54,25 @@ export function PendenciasProvider({
 
   const draft = useMemo(() => [...draftMap.values()], [draftMap]);
 
+  const activeItemIds = useMemo(() => {
+    const ids = new Set<string>(confirmedIds);
+    for (const item of draft) ids.add(item.itemId);
+    return ids;
+  }, [confirmedIds, draft]);
+
   const isPending = useCallback(
-    (itemId: string) => confirmedIds.has(itemId) || draftMap.has(itemId),
-    [confirmedIds, draftMap],
+    (itemId: string) => activeItemIds.has(itemId),
+    [activeItemIds],
   );
 
   const isDraftSelected = useCallback(
     (itemId: string) => draftMap.has(itemId),
     [draftMap],
+  );
+
+  const countInBloco = useCallback(
+    (bloco: PendenciaBlocoId) => countPendenciasNoBloco(activeItemIds, bloco),
+    [activeItemIds],
   );
 
   const toggleDraft = useCallback(
@@ -92,9 +107,11 @@ export function PendenciasProvider({
       confirmed,
       draft,
       draftCount: draft.length,
-      hasAnyPendencia: confirmed.length > 0 || draft.length > 0,
+      hasAnyPendencia: activeItemIds.size > 0,
+      activeItemIds,
       isPending,
       isDraftSelected,
+      countInBloco,
       toggleDraft,
       clearDraft,
       goToItem,
@@ -104,8 +121,10 @@ export function PendenciasProvider({
       mode,
       confirmed,
       draft,
+      activeItemIds,
       isPending,
       isDraftSelected,
+      countInBloco,
       toggleDraft,
       clearDraft,
       goToItem,

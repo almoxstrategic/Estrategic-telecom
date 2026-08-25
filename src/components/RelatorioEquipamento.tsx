@@ -359,6 +359,7 @@ export function RelatorioEquipamento({
           title="EQUIPAMENTO NO CLIENTE"
           id="secao-eq-cliente"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco="EQ.cliente"
         >
           <div
             id="secao-tecnologia-acesso"
@@ -441,6 +442,7 @@ export function RelatorioEquipamento({
           title="EQUIPAMENTO NA ESTAÇÃO"
           id="secao-eq-estacao"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco="EQ.estacao"
         >
           <div
             id="secao-estacao-entrega-acesso"
@@ -523,6 +525,7 @@ export function RelatorioEquipamento({
           title="OUTRAS FOTOS"
           id="secao-eq-outras-fotos"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco="EQ.outras"
         >
           <RelatorioOutrasFotos
             title="Outras fotos"

@@ -23,9 +23,11 @@ import {
   pendenciaFotoGrupo,
   pendenciaMetragemCabo,
   pendenciaPergunta,
+  type PendenciaBlocoId,
   type PendenciaItem,
   type PendenciaItemDef,
 } from "@/lib/pendencias-itens";
+import { cn } from "@/lib/utils";
 import {
   apenasDigitos,
   calcularMetragemCaboTotal,
@@ -1001,6 +1003,7 @@ export function AccordionBloco({
   stickTabsAtViewportTop = true,
   defaultOpen = false,
   variant = "default",
+  pendenciaBloco,
 }: {
   title: string;
   children: ReactNode;
@@ -1012,11 +1015,36 @@ export function AccordionBloco({
   defaultOpen?: boolean;
   /** `audit` = tipografia sóbria de dashboard para visão do gestor. */
   variant?: "default" | "audit";
+  /** Agrega contagem de pendências filhas no cabeçalho. */
+  pendenciaBloco?: PendenciaBlocoId;
 }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const stickyOffsetPx = useAbasStickyOffsetPx(stickTabsAtViewportTop);
   const isStuck = useAccordionStuck(sentinelRef, stickyOffsetPx);
   const isAudit = variant === "audit";
+  const pendenciasCtx = usePendencias();
+  const pendenciaCount = pendenciaBloco
+    ? (pendenciasCtx?.countInBloco(pendenciaBloco) ?? 0)
+    : 0;
+  const hasPendencias = pendenciaCount > 0;
+
+  const summaryClass = cn(
+    "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden",
+    isAudit
+      ? "border-b px-4 text-sm font-bold uppercase tracking-wider"
+      : "border-b px-5 font-bold",
+    isAudit ? (isStuck ? "-mx-4 py-2.5 shadow-sm" : "py-3") : isStuck ? "-mx-5 py-2 shadow-sm" : "py-4",
+    !isAudit && (isStuck ? "text-sm" : "text-base"),
+    hasPendencias
+      ? "border-amber-300 border-l-4 border-l-amber-500 bg-amber-100 text-amber-950"
+      : isAudit
+        ? isStuck
+          ? "border-gray-200 bg-gray-50 text-gray-800"
+          : "border-gray-200 bg-white text-gray-800"
+        : isStuck
+          ? "border-gray-200 bg-gray-50"
+          : "border-gray-100 bg-white",
+  );
 
   return (
     <details
@@ -1025,25 +1053,32 @@ export function AccordionBloco({
       defaultOpen={defaultOpen}
       className={
         isAudit
-          ? "group relative overflow-visible rounded-xl border border-gray-100 bg-white shadow-sm open:shadow-md"
-          : "group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm open:shadow-md"
+          ? cn(
+              "group relative overflow-visible rounded-xl border bg-white shadow-sm open:shadow-md",
+              hasPendencias ? "border-amber-300" : "border-gray-100",
+            )
+          : cn(
+              "group relative overflow-visible rounded-2xl border bg-card shadow-sm open:shadow-md",
+              hasPendencias ? "border-amber-300" : "border-border",
+            )
       }
       style={{ scrollMarginTop: stickyOffsetPx }}
     >
-      <summary
-        style={{ top: stickyOffsetPx }}
-        className={
-          isAudit
-            ? isStuck
-              ? "sticky z-30 -mx-4 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-gray-800 shadow-sm transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
-              : "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 text-sm font-bold uppercase tracking-wider text-gray-800 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
-            : isStuck
-              ? "sticky z-30 -mx-5 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-2 text-sm font-bold shadow-sm transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
-              : "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4 text-base font-bold transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden"
-        }
-      >
-        <span>{title}</span>
-        <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition group-open:rotate-180" />
+      <summary style={{ top: stickyOffsetPx }} className={summaryClass}>
+        <span className="min-w-0">
+          {title}
+          {hasPendencias ? (
+            <span className="ml-1.5 font-bold tabular-nums text-amber-800">
+              ({pendenciaCount})
+            </span>
+          ) : null}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-5 w-5 shrink-0 transition group-open:rotate-180",
+            hasPendencias ? "text-amber-700" : "text-muted-foreground",
+          )}
+        />
       </summary>
       {/* Sentinela no topo do bloco: ao sair acima da linha sticky, ativa o morph. */}
       <div
@@ -1370,6 +1405,7 @@ export function RelatorioRedeAcesso({
             title="LOCAL (RC)"
             id="secao-local"
             stickTabsAtViewportTop={stickTabsAtViewportTop}
+            pendenciaBloco="RC.local"
           >
             {header ? <div className={flatSectionClass}>{header}</div> : null}
             {gruposLocal.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
@@ -1382,6 +1418,7 @@ export function RelatorioRedeAcesso({
           title={`LANÇAMENTO (${redeVariant})`}
           id="secao-cabos"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco={redeVariant === "RC" ? "RC.lancamento" : "RE.lancamento"}
         >
           <div className={flatSectionClass}>
             <h2 className="mb-3 font-semibold text-gray-800">{lancamentoTitle}</h2>
@@ -1640,6 +1677,7 @@ export function RelatorioRedeAcesso({
           title={`POSTE (${redeVariant})`}
           id="secao-poste"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco={redeVariant === "RC" ? "RC.poste" : "RE.poste"}
         >
           {gruposPoste.map((grupo) => {
             const isPoste =
@@ -1722,6 +1760,7 @@ export function RelatorioRedeAcesso({
           title={`CAIXA DE EMENDA (${redeVariant})`}
           id="secao-caixa-emenda"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco={redeVariant === "RC" ? "RC.caixa" : "RE.caixa"}
         >
           {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
         </AccordionBloco>
@@ -1730,6 +1769,7 @@ export function RelatorioRedeAcesso({
           title={`OUTRAS FOTOS (${redeVariant})`}
           id="secao-outras-fotos"
           stickTabsAtViewportTop={stickTabsAtViewportTop}
+          pendenciaBloco={redeVariant === "RC" ? "RC.outras" : "RE.outras"}
         >
           <RelatorioOutrasFotos
             title="Outras fotos"

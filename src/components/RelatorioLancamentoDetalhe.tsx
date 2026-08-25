@@ -1456,6 +1456,7 @@ export function RelatorioDetalhe({
             id="secao-cabos"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RE.lancamento"
           >
             <div className="border-b border-gray-100 pb-6">
               <div className="flex w-full flex-col gap-3">
@@ -1548,6 +1549,7 @@ export function RelatorioDetalhe({
             id="secao-poste"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RE.poste"
           >
             {renderGrupo("Poste de conexão", "posteConexao")}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -1670,6 +1672,7 @@ export function RelatorioDetalhe({
             id="secao-caixa-emenda"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RE.caixa"
           >
             {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
             {renderGrupo(
@@ -1685,6 +1688,7 @@ export function RelatorioDetalhe({
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RE.outras"
           >
             {renderOutrasSecao("outrasFotos", "Outras fotos")}
           </AccordionBloco>
@@ -1698,6 +1702,7 @@ export function RelatorioDetalhe({
             id="secao-local"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RC.local"
           >
             <CampoCoordenadas
               id="secao-coordenadas-cliente"
@@ -1732,6 +1737,7 @@ export function RelatorioDetalhe({
             id="secao-cabos"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RC.lancamento"
           >
             <div className="border-b border-gray-100 pb-6">
               <div className="flex w-full flex-col gap-3">
@@ -1831,6 +1837,7 @@ export function RelatorioDetalhe({
             id="secao-poste"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RC.poste"
           >
             {renderGrupo("Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao")}
             <CordoalhaSimNaoCard
@@ -1931,6 +1938,7 @@ export function RelatorioDetalhe({
             id="secao-caixa-emenda"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RC.caixa"
           >
             {renderGrupo(
               "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
@@ -1950,6 +1958,7 @@ export function RelatorioDetalhe({
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="RC.outras"
           >
             {renderOutrasSecao("outrasFotosRc", "Outras fotos")}
           </AccordionBloco>
@@ -1963,6 +1972,7 @@ export function RelatorioDetalhe({
             id="secao-eq-cliente"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="EQ.cliente"
           >
             <div
               id="secao-tecnologia-acesso"
@@ -2049,6 +2059,7 @@ export function RelatorioDetalhe({
             id="secao-eq-estacao"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="EQ.estacao"
           >
             <p
               id="secao-estacao-entrega-acesso"
@@ -2127,6 +2138,7 @@ export function RelatorioDetalhe({
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
             defaultOpen
+            pendenciaBloco="EQ.outras"
           >
             {renderOutrasSecao("outrasFotosEqCliente", "Outras fotos")}
           </AccordionBloco>

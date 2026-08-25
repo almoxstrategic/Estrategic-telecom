@@ -177,3 +177,95 @@ export function motivoPendenciaFromItens(itens: PendenciaItem[]): string {
   if (itens.length === 1) return `Pendência em: ${itens[0].label}`;
   return `Pendências (${itens.length}): ${itens.map((i) => i.label).join("; ")}`;
 }
+
+/** Identificador do accordion/seção pai para agregação do contador no cabeçalho. */
+export type PendenciaBlocoId =
+  | "RE.lancamento"
+  | "RE.poste"
+  | "RE.caixa"
+  | "RE.outras"
+  | "RC.local"
+  | "RC.lancamento"
+  | "RC.poste"
+  | "RC.caixa"
+  | "RC.outras"
+  | "EQ.cliente"
+  | "EQ.estacao"
+  | "EQ.outras";
+
+const FOTO_RE_LANCAMENTO = new Set(["dutoSubterraneo", "sobraTecnica"]);
+const FOTO_RE_POSTE = new Set(["posteConexao", "novoAterramentoPoste"]);
+const FOTO_RE_CAIXA = new Set(["caixaEmenda", "plaquetaIdentificacao"]);
+const FOTO_RC_LOCAL = new Set(["rcEntradaInterna", "rcEntradaExterna", "rcTerminacaoCabo"]);
+const FOTO_RC_LANCAMENTO = new Set(["rcDutoSubterraneo", "rcSobraTecnica"]);
+const FOTO_RC_POSTE = new Set(["rcPosteConexao", "rcNovoAterramentoPoste"]);
+const FOTO_RC_CAIXA = new Set(["rcCaixaEmenda", "rcPlaquetaIdentificacao"]);
+const FOTO_EQ_ESTACAO_LEGADO = new Set(["posicaoConexaoEstacao", "etiquetaIdentificacao"]);
+
+function fotoKeyFromItemId(itemId: string): string | null {
+  const m = itemId.match(/^(?:RE|RC|equipamento)\.foto\.(.+)$/);
+  return m?.[1] ?? null;
+}
+
+/** Indica se um itemId pertence ao bloco accordion informado. */
+export function itemMatchesPendenciaBloco(itemId: string, bloco: PendenciaBlocoId): boolean {
+  const foto = fotoKeyFromItemId(itemId);
+  switch (bloco) {
+    case "RE.lancamento":
+      return (
+        itemId.startsWith("RE.lancamento.") ||
+        (foto != null && FOTO_RE_LANCAMENTO.has(foto))
+      );
+    case "RE.poste":
+      return itemId.startsWith("RE.poste.") || (foto != null && FOTO_RE_POSTE.has(foto));
+    case "RE.caixa":
+      return foto != null && FOTO_RE_CAIXA.has(foto);
+    case "RE.outras":
+      return itemId.startsWith("RE.outra.") || itemId.startsWith("RE.outras.");
+    case "RC.local":
+      return itemId.startsWith("RC.local.") || (foto != null && FOTO_RC_LOCAL.has(foto));
+    case "RC.lancamento":
+      return (
+        itemId.startsWith("RC.lancamento.") ||
+        (foto != null && FOTO_RC_LANCAMENTO.has(foto))
+      );
+    case "RC.poste":
+      return itemId.startsWith("RC.poste.") || (foto != null && FOTO_RC_POSTE.has(foto));
+    case "RC.caixa":
+      return foto != null && FOTO_RC_CAIXA.has(foto);
+    case "RC.outras":
+      return itemId.startsWith("RC.outra.") || itemId.startsWith("RC.outras.");
+    case "EQ.cliente":
+      return (
+        itemId.startsWith("equipamento.foto.eqCliente") ||
+        itemId.startsWith("EQ.cliente.") ||
+        itemId.startsWith("equipamento.cliente.")
+      );
+    case "EQ.estacao":
+      return (
+        itemId.startsWith("equipamento.foto.eqEstacao") ||
+        itemId.startsWith("EQ.estacao.") ||
+        itemId.startsWith("equipamento.estacao.") ||
+        (foto != null && FOTO_EQ_ESTACAO_LEGADO.has(foto))
+      );
+    case "EQ.outras":
+      return (
+        itemId.startsWith("equipamento.outra.") ||
+        itemId.startsWith("EQ.outras.") ||
+        itemId.startsWith("equipamento.foto.outras")
+      );
+    default:
+      return false;
+  }
+}
+
+export function countPendenciasNoBloco(
+  itemIds: Iterable<string>,
+  bloco: PendenciaBlocoId,
+): number {
+  let n = 0;
+  for (const id of itemIds) {
+    if (itemMatchesPendenciaBloco(id, bloco)) n += 1;
+  }
+  return n;
+}
