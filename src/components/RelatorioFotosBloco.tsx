@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { PhotoUpload, FOTO_SLOTS_ROW_CLASS, FOTO_SLOT_WRAP_CLASS } from "@/components/PhotoUpload";
 import { FOTO_SLOT_CLASS, FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
+import { PendenciaItemFrame } from "@/components/pendencias/PendenciaItemFrame";
 import type { EvidencePhotoRef } from "@/lib/types";
+import type { PendenciaItemDef } from "@/lib/pendencias-itens";
 import { deleteRelatorioPhoto, type StoredPhoto } from "@/lib/relatorios-transmissao";
 
 export type FotoSlot = {
@@ -38,6 +40,7 @@ export function RelatorioFotosBloco({
   readOnly = false,
   id,
   variant = "card",
+  pendencia,
 }: {
   title: string;
   hint?: string;
@@ -52,17 +55,18 @@ export function RelatorioFotosBloco({
   id?: string;
   /** Flat: sem card — para uso dentro de Accordion (RE/RC). */
   variant?: "card" | "flat";
+  pendencia?: PendenciaItemDef;
 }) {
-  const updateSlot = (id: string, patch: Partial<FotoSlot>) => {
-    onChange(slots.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
+  const updateSlot = (slotId: string, patch: Partial<FotoSlot>) => {
+    onChange(slots.map((slot) => (slot.id === slotId ? { ...slot, ...patch } : slot)));
   };
 
-  const handlePick = (id: string, file: EvidencePhotoRef | null) => {
+  const handlePick = (slotId: string, file: EvidencePhotoRef | null) => {
     if (onPickPhoto) {
-      onPickPhoto(id, file);
+      onPickPhoto(slotId, file);
       return;
     }
-    updateSlot(id, { file, stored: file ? null : undefined });
+    updateSlot(slotId, { file, stored: file ? null : undefined });
   };
 
   const removerSlot = (index: number) => {
@@ -74,9 +78,9 @@ export function RelatorioFotosBloco({
 
   const isFlat = variant === "flat";
 
-  return (
+  const body = (
     <div
-      id={id}
+      id={pendencia ? undefined : id}
       className={
         isFlat
           ? "flex scroll-mt-36 flex-col space-y-3 border-b border-gray-100 pb-6 last:border-b-0 last:pb-0"
@@ -84,13 +88,7 @@ export function RelatorioFotosBloco({
       }
     >
       <div>
-        <h2
-          className={
-            isFlat
-              ? "mb-3 font-semibold text-gray-800"
-              : "text-base font-bold"
-          }
-        >
+        <h2 className={isFlat ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"}>
           {title}
         </h2>
         {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
@@ -181,4 +179,7 @@ export function RelatorioFotosBloco({
       </div>
     </div>
   );
+
+  if (!pendencia) return body;
+  return <PendenciaItemFrame def={pendencia}>{body}</PendenciaItemFrame>;
 }

@@ -1,5 +1,13 @@
 import { getStoragePublicUrl, getSupabaseClient } from "./supabase";
+import {
+  mergePendenciasItens,
+  motivoPendenciaFromItens,
+  parsePendenciasItens,
+  type PendenciaItem,
+  type PendenciaItemDef,
+} from "./pendencias-itens";
 
+export type { PendenciaItem, PendenciaItemDef } from "./pendencias-itens";
 export type RelatorioStatus = "em_aberto" | "avisado" | "fechado" | "pendente";
 export type TipoExecucao = "implantacao" | "empresarial";
 
@@ -458,6 +466,8 @@ export type EscopoPayload = {
 export type RelatorioPayload = EscopoPayload & {
   medicoes: MedicoesPayload;
   contatos: ContatosPayload;
+  /** Pendências granulares confirmadas pela supervisão (anti-dupe por itemId). */
+  pendenciasItens?: PendenciaItem[];
 };
 
 export type EquipamentoRedeIpsPayload = {
@@ -835,6 +845,7 @@ export function emptyRelatorioPayload(): RelatorioPayload {
     ...emptyEscopoPayload(),
     medicoes: emptyMedicoes(),
     contatos: emptyContatos(),
+    pendenciasItens: [],
   };
 }
 
@@ -1575,6 +1586,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
       ...mergeEscopoPayload(subterraneo, aereo),
       medicoes: parseMedicoes(src.medicoes),
       contatos: parseContatos(src.contatos),
+      pendenciasItens: parsePendenciasItens(src.pendenciasItens),
     };
   }
 
@@ -1582,6 +1594,7 @@ function parsePayload(raw: unknown, tipoExecucao?: TipoExecucao | null): Relator
     ...parseEscopoPayload(src, tipoExecucao, legacyTomadas),
     medicoes: parseMedicoes(src.medicoes),
     contatos: parseContatos(src.contatos),
+    pendenciasItens: parsePendenciasItens(src.pendenciasItens),
   };
 }
 
@@ -2167,6 +2180,10 @@ export function mergeRelatorioPayload(
     ...mergeEscopoPayload(fromServer, fromLocal),
     medicoes: mergeMedicoes(fromServer.medicoes, fromLocal.medicoes),
     contatos: mergeContatos(fromServer.contatos, fromLocal.contatos),
+    pendenciasItens: mergePendenciasItens(
+      fromServer.pendenciasItens ?? [],
+      fromLocal.pendenciasItens ?? [],
+    ),
   };
 }
 
@@ -2695,6 +2712,51 @@ export async function sinalizarPendenciaRelatorio(
     .eq("id", id)
     .neq("status", "fechado");
   if (error) throw error;
+}
+
+/** Confirma pendências granulares: merge anti-dupe no payload + status pendente. */
+export async function confirmarPendenciasItensRelatorio(
+  id: string,
+  novas: PendenciaItemDef[],
+): Promise<RelatorioTransmissao> {
+  const latest = await fetchRelatorioTransmissaoById(id);
+  const merged = mergePendenciasItens(latest.payload.pendenciasItens ?? [], novas);
+  const nextPayload: RelatorioPayload = {
+    ...latest.payload,
+    pendenciasItens: merged,
+  };
+  const motivo = motivoPendenciaFromItens(merged);
+  const supabase = getSupabaseClient();
+  const safePayload = jsonSafePayload(nextPayload, latest.tipo_execucao);
+  const { data, error } = await supabase
+    .from("relatorios_transmissao")
+    .update({
+      payload: safePayload,
+      status: "pendente",
+      motivo_pendencia: motivo,
+      data_pendencia: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .neq("status", "fechado")
+    .select(SELECT_COLS)
+    .single();
+  if (error) {
+    const fallback = await supabase
+      .from("relatorios_transmissao")
+      .update({
+        payload: safePayload,
+        status: "pendente",
+        motivo_pendencia: motivo,
+        data_pendencia: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .neq("status", "fechado")
+      .select(SELECT_COLS_PLAIN)
+      .single();
+    if (fallback.error) throw fallback.error;
+    return mapRow(fallback.data as DbRow);
+  }
+  return mapRow(data as DbRow);
 }
 
 export async function patchRelatorioPayloadAdmin(

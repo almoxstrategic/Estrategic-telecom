@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, FileDown, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, FileDown, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
+import { PendenciasProvider } from "@/components/pendencias/PendenciasContext";
+import { PendenciasFooterActions } from "@/components/pendencias/PendenciasFooterActions";
 import { RelatorioSyncStatus } from "@/components/RelatorioSyncStatus";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import {
@@ -11,20 +13,19 @@ import {
   StatusBadge,
 } from "@/components/RelatorioLancamentoDetalhe";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-store";
 import { gerarPDFRelatorio } from "@/lib/pdf/gerar-pdf-relatorio";
 import { hasPainelFullAccess } from "@/lib/roles";
 import {
   appendStoredPhotoToPayload,
+  confirmarPendenciasItensRelatorio,
   deleteRelatorioPhoto,
   excluirRelatorioTransmissao,
   fecharRelatorioTransmissao,
   fetchRelatorioTransmissaoById,
   patchRelatorioPayloadAdmin,
   replaceFotoGrupoAt,
-  sinalizarPendenciaRelatorio,
   subscribeRelatorioTransmissaoById,
   uploadRelatorioPhoto,
   withRetry,
@@ -55,8 +56,6 @@ function AdminLancamentoDetalhePage() {
   const [row, setRow] = useState<RelatorioTransmissao | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [mostrarMotivo, setMostrarMotivo] = useState(false);
-  const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [uploadingCategoria, setUploadingCategoria] = useState<RelatorioFotoCategoria | null>(
@@ -95,8 +94,6 @@ function AdminLancamentoDetalhePage() {
   );
 
   useEffect(() => {
-    setMostrarMotivo(false);
-    setMotivo("");
     void carregar();
   }, [carregar]);
 
@@ -123,15 +120,17 @@ function AdminLancamentoDetalhePage() {
     }
   };
 
-  const onSinalizarPendencia = async () => {
-    if (!row) return;
+  const onConfirmarPendencias = async (itens: import("@/lib/pendencias-itens").PendenciaItemDef[]) => {
+    if (!row || itens.length === 0) return;
     setSaving(true);
     try {
-      await sinalizarPendenciaRelatorio(row.id, motivo);
-      toast.success("Pendência enviada ao técnico. O card ficou marcado como Pendenciado.");
+      const updated = await confirmarPendenciasItensRelatorio(row.id, itens);
+      lastAppliedUpdatedAtRef.current = updated.updated_at;
+      setRow(updated);
+      toast.success("Pendências confirmadas e enviadas ao técnico.");
       voltarParaLista();
     } catch (err) {
-      toast.error((err as Error).message || "Não foi possível sinalizar a pendência.");
+      toast.error((err as Error).message || "Não foi possível confirmar as pendências.");
     } finally {
       setSaving(false);
     }
@@ -374,173 +373,128 @@ function AdminLancamentoDetalhePage() {
   const mostrarFooter = Boolean(row && (row.status === "fechado" || podeAuditar));
 
   return (
-    <div className="min-h-screen bg-white">
-      <AppHeader />
-      <header className="border-b border-gray-200 bg-white">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3 px-6 py-4 lg:px-10">
-          <div className="min-w-0 space-y-1.5">
-            <Link
-              to="/admin/transmissao"
-              className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" /> Voltar para a lista
-            </Link>
-            {row ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-gray-900">OS/WF {row.os_wf}</h1>
-                <StatusBadge status={row.status} />
-              </div>
-            ) : (
-              <h1 className="text-xl font-bold tracking-tight text-gray-900">Detalhes do relatório</h1>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {refreshing ? "Atualizando dados..." : "Dashboard de auditoria"}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {canAudit && row && row.status !== "fechado" ? (
-              <RelatorioSyncStatus
-                status={
-                  saveHint === "saving"
-                    ? "saving"
-                    : saveHint === "error"
-                      ? "error"
-                      : saveHint === "saved"
-                        ? "saved"
-                        : "idle"
-                }
-              />
-            ) : null}
-            {canAudit && row ? (
+    <PendenciasProvider mode="gestor" confirmed={row?.payload.pendenciasItens ?? []}>
+      <div className="min-h-screen bg-white">
+        <AppHeader />
+        <header className="border-b border-gray-200 bg-white">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3 px-6 py-4 lg:px-10">
+            <div className="min-w-0 space-y-1.5">
+              <Link
+                to="/admin/transmissao"
+                className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" /> Voltar para a lista
+              </Link>
+              {row ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-bold tracking-tight text-gray-900">OS/WF {row.os_wf}</h1>
+                  <StatusBadge status={row.status} />
+                </div>
+              ) : (
+                <h1 className="text-xl font-bold tracking-tight text-gray-900">Detalhes do relatório</h1>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {refreshing ? "Atualizando dados..." : "Dashboard de auditoria"}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {canAudit && row && row.status !== "fechado" ? (
+                <RelatorioSyncStatus
+                  status={
+                    saveHint === "saving"
+                      ? "saving"
+                      : saveHint === "error"
+                        ? "error"
+                        : saveHint === "saved"
+                          ? "saved"
+                          : "idle"
+                  }
+                />
+              ) : null}
+              {canAudit && row ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => void onExcluir()}
+                  disabled={saving}
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  Excluir
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                onClick={() => void onExcluir()}
-                disabled={saving}
+                onClick={() => void carregar(true)}
+                disabled={loading || refreshing}
               >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Excluir
+                <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                Atualizar
               </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void carregar(true)}
-              disabled={loading || refreshing}
-            >
-              <RefreshCw className="mr-1 h-3.5 w-3.5" />
-              Atualizar
-            </Button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className={cn("w-full px-6 py-4 lg:px-10", mostrarFooter ? "pb-36" : "pb-10")}>
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Carregando relatório...</p>
-        ) : row ? (
-          <EvidencePhotoPasteProvider>
-            <RelatorioDetalhe
-              row={row}
-              canEditPhotos={canAudit}
-              canEditCadastro={canAudit}
-              onCadastroSaved={setRow}
-              onAddPhoto={(categoria, file) => void onAdminAddPhoto(categoria, file)}
-              onReplacePhoto={(categoria, file, meta) =>
-                void onAdminReplacePhoto(categoria, file, meta)
-              }
-              uploadingCategoria={uploadingCategoria}
-              onUpdatePayload={onUpdatePayload}
-              onUploadPhoto={async (file) => {
-                if (!user?.id) throw new Error("Sessão inválida.");
-                return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
-              }}
-            />
-          </EvidencePhotoPasteProvider>
-        ) : (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-muted-foreground">
-            Relatório não encontrado.
-          </div>
-        )}
-      </main>
+        <main className={cn("w-full px-6 py-4 lg:px-10", mostrarFooter ? "pb-36" : "pb-10")}>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Carregando relatório...</p>
+          ) : row ? (
+            <EvidencePhotoPasteProvider>
+              <RelatorioDetalhe
+                row={row}
+                canEditPhotos={canAudit}
+                canEditCadastro={canAudit}
+                onCadastroSaved={setRow}
+                onAddPhoto={(categoria, file) => void onAdminAddPhoto(categoria, file)}
+                onReplacePhoto={(categoria, file, meta) =>
+                  void onAdminReplacePhoto(categoria, file, meta)
+                }
+                uploadingCategoria={uploadingCategoria}
+                onUpdatePayload={onUpdatePayload}
+                onUploadPhoto={async (file) => {
+                  if (!user?.id) throw new Error("Sessão inválida.");
+                  return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
+                }}
+              />
+            </EvidencePhotoPasteProvider>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-muted-foreground">
+              Relatório não encontrado.
+            </div>
+          )}
+        </main>
 
-      {mostrarFooter && row ? (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/90 p-4 backdrop-blur-md">
-          <div className="mx-auto flex w-full flex-col gap-3 px-6 lg:px-10">
-            {row.status === "fechado" ? (
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
-                  onClick={() => void onGerarPdf()}
-                  disabled={gerandoPdf}
-                >
-                  <FileDown className="h-4 w-4" />
-                  {gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
-                </Button>
-              </div>
-            ) : null}
-            {podeAuditar ? (
-              mostrarMotivo ? (
-                <div className="ml-auto w-full max-w-2xl space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Descreva o que precisa ser corrigido
-                  </label>
-                  <Textarea
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Descreva o que precisa ser corrigido..."
-                    rows={3}
-                    className="rounded-lg border-gray-200 bg-white text-sm"
-                  />
-                  <div className="flex justify-end gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-lg px-5 py-2 text-sm font-semibold"
-                      onClick={() => setMostrarMotivo(false)}
-                      disabled={saving}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="button"
-                      className="rounded-lg border border-red-200 bg-red-50 px-5 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-                      onClick={() => void onSinalizarPendencia()}
-                      disabled={saving}
-                    >
-                      Confirmar pendência
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-                  <Button
-                    type="button"
-                    className="rounded-lg border border-red-200 bg-red-50 px-5 py-2 text-sm font-semibold text-red-700 shadow-none hover:bg-red-100"
-                    onClick={() => setMostrarMotivo(true)}
-                    disabled={saving}
-                  >
-                    Sinalizar Pendência
-                  </Button>
+        {mostrarFooter && row ? (
+          <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/90 p-4 backdrop-blur-md">
+            <div className="mx-auto flex w-full flex-col gap-3 px-6 lg:px-10">
+              {row.status === "fechado" ? (
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
-                    onClick={() => void onAprovar()}
-                    disabled={saving}
+                    onClick={() => void onGerarPdf()}
+                    disabled={gerandoPdf}
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Aprovar e Fechar
+                    <FileDown className="h-4 w-4" />
+                    {gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
                   </Button>
                 </div>
-              )
-            ) : null}
+              ) : null}
+              {podeAuditar ? (
+                <PendenciasFooterActions
+                  contratoLabel={row.os_wf}
+                  saving={saving}
+                  onConfirmar={(itens) => onConfirmarPendencias(itens)}
+                  onAprovar={() => void onAprovar()}
+                />
+              ) : null}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </PendenciasProvider>
   );
 }

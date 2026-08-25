@@ -1,5 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { PendenciaItemFrame } from "@/components/pendencias/PendenciaItemFrame";
+import { usePendencias } from "@/components/pendencias/PendenciasContext";
+import {
+  pendenciaFotoGrupo,
+  pendenciaMetragemCabo,
+  pendenciaPergunta,
+  type PendenciaItemDef,
+} from "@/lib/pendencias-itens";
 import { EditarContratoOsDialog } from "@/components/EditarContratoOsDialog";
 import {
   FOTO_SLOT_CLASS,
@@ -403,6 +411,7 @@ function EvidenciaBloco({
   coordenadasTitle,
   onCoordenadasChange,
   headerExtra,
+  pendencia,
 }: {
   title: string;
   obs?: string | null;
@@ -427,6 +436,7 @@ function EvidenciaBloco({
   coordenadasTitle?: string;
   onCoordenadasChange?: (next: { latitude: string; longitude: string }) => void;
   headerExtra?: ReactNode;
+  pendencia?: PendenciaItemDef;
 }) {
   if (
     !fotos.length &&
@@ -442,7 +452,7 @@ function EvidenciaBloco({
   ) {
     return null;
   }
-  return (
+  const body = (
     <div className="flex h-full flex-col rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         {onTitleChange ? (
@@ -513,6 +523,8 @@ function EvidenciaBloco({
       ) : null}
     </div>
   );
+  if (!pendencia) return body;
+  return <PendenciaItemFrame def={pendencia}>{body}</PendenciaItemFrame>;
 }
 
 function PostePerguntaQuadrante({
@@ -523,6 +535,7 @@ function PostePerguntaQuadrante({
   quantidadeLabel,
   quantidadePlaceholder,
   hideQuantidade = false,
+  pendencia,
 }: {
   title: string;
   value: { isSim: boolean | null; quantidade: number | null };
@@ -531,9 +544,10 @@ function PostePerguntaQuadrante({
   quantidadeLabel?: string;
   quantidadePlaceholder?: string;
   hideQuantidade?: boolean;
+  pendencia?: PendenciaItemDef;
 }) {
   const sim = value.isSim === true;
-  return (
+  const inner = (
     <div className="flex flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
       <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
@@ -569,6 +583,8 @@ function PostePerguntaQuadrante({
       ) : null}
     </div>
   );
+  if (!pendencia) return inner;
+  return <PendenciaItemFrame def={pendencia}>{inner}</PendenciaItemFrame>;
 }
 
 function BotaoAdicionar({ label, onClick }: { label: string; onClick: () => void }) {
@@ -825,6 +841,11 @@ export function RelatorioDetalhe({
   const [abasGrupos, setAbasGrupos] = useState<Partial<Record<RelatorioFotoGrupoKey, AmbienteRede>>>(
     {},
   );
+  const pendenciasCtx = usePendencias();
+  useEffect(() => {
+    pendenciasCtx?.registerAbaController({ setAba: setAbaAtiva });
+    return () => pendenciasCtx?.registerAbaController(null);
+  }, [pendenciasCtx]);
   const isEmpresarial = row.tipo_execucao === "empresarial";
   const isImplantacao = row.tipo_execucao === "implantacao";
   const abasVisiveis = isEmpresarial
@@ -1051,6 +1072,15 @@ export function RelatorioDetalhe({
         obs={grupo?.obs}
         fotos={grupo?.fotos ?? []}
         {...qtd}
+        pendencia={pendenciaFotoGrupo({
+          aba: key.startsWith("rc")
+            ? "RC"
+            : key.startsWith("eq")
+              ? "equipamento"
+              : "RE",
+          grupoKey: key,
+          title,
+        })}
         headerExtra={
           comAmbiente ? (
             <AmbienteToggle
@@ -1117,8 +1147,15 @@ export function RelatorioDetalhe({
     };
 
     return (
-      <div
+      <PendenciaItemFrame
         key={cabo.id}
+        def={pendenciaMetragemCabo({
+          aba: dualKey === "lancamentoCabosRe" ? "RE" : "RC",
+          caboId: cabo.id,
+          index,
+        })}
+      >
+      <div
         className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
       >
         <div className="mb-4 flex items-start justify-between gap-2">
@@ -1244,6 +1281,7 @@ export function RelatorioDetalhe({
           ) : null}
         </div>
       </div>
+      </PendenciaItemFrame>
     );
   };
 
@@ -1405,8 +1443,9 @@ export function RelatorioDetalhe({
         abaAtiva={abaAtiva}
         onChange={setAbaAtiva}
         abas={abasVisiveis}
-        temPendencia={row.status === "pendente"}
+        temPendencia={row.status === "pendente" || (payload?.pendenciasItens?.length ?? 0) > 0}
         motivoPendencia={row.motivo_pendencia}
+        pendenciasItens={payload?.pendenciasItens ?? []}
         layoutMode="gestor"
       />
 
@@ -1515,6 +1554,12 @@ export function RelatorioDetalhe({
               <PostePerguntaQuadrante
                 title="Cordoalha existente?"
                 hideQuantidade
+                pendencia={pendenciaPergunta({
+                  aba: "RE",
+                  secao: "Poste (RE)",
+                  subbloco: "Cordoalha existente?",
+                  key: "poste.cordoalhaExistente",
+                })}
                 value={payload?.redeAcesso?.cordoalhaExistente ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos
@@ -1539,6 +1584,12 @@ export function RelatorioDetalhe({
               <PostePerguntaQuadrante
                 title="Postes com cordoalha existente?"
                 hideQuantidade
+                pendencia={pendenciaPergunta({
+                  aba: "RE",
+                  secao: "Poste (RE)",
+                  subbloco: "Postes com cordoalha existente?",
+                  key: "poste.postesCordoalhaExistente",
+                })}
                 value={payload?.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos
@@ -1564,6 +1615,12 @@ export function RelatorioDetalhe({
                 title="Lançado cordoalha?"
                 quantidadeLabel="Quantidade de cordoalha lançada:"
                 quantidadePlaceholder="Ex: 50"
+                pendencia={pendenciaPergunta({
+                  aba: "RE",
+                  secao: "Poste (RE)",
+                  subbloco: "Lançado cordoalha?",
+                  key: "poste.cordoalhaLancada",
+                })}
                 value={payload?.redeAcesso?.cordoalhaLancada ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos
@@ -1583,6 +1640,12 @@ export function RelatorioDetalhe({
                 title="Postes novo com nova cordoalha?"
                 quantidadeLabel="Quantidade de Poste com nova cordoalha:"
                 quantidadePlaceholder="Ex: 10"
+                pendencia={pendenciaPergunta({
+                  aba: "RE",
+                  secao: "Poste (RE)",
+                  subbloco: "Postes novo com nova cordoalha?",
+                  key: "poste.postesNovaCordoalha",
+                })}
                 value={payload?.redeAcesso?.postesNovaCordoalha ?? emptyCordoalhaBloco()}
                 onChange={
                   canEditPhotos

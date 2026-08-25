@@ -15,6 +15,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { PendenciasProvider, usePendencias } from "@/components/pendencias/PendenciasContext";
 import { newFotoSlot, slotsFromStored, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { RelatorioEquipamento } from "@/components/RelatorioEquipamento";
 import {
@@ -223,6 +224,15 @@ function DadoObraCampo({
 
 type FotoGrupoUi = { slots: FotoSlot[]; obs: string; obsAdmin: string };
 
+function PendenciasAbaBridge({ setAba }: { setAba: (aba: AbaCampo) => void }) {
+  const ctx = usePendencias();
+  useEffect(() => {
+    ctx?.registerAbaController({ setAba });
+    return () => ctx?.registerAbaController(null);
+  }, [ctx, setAba]);
+  return null;
+}
+
 const EQ_GRUPO_KEYS: RelatorioFotoGrupoKeyEq[] = [
   "eqClienteFachada",
   "eqClienteAmbiente",
@@ -272,6 +282,9 @@ function RelatorioPage() {
   const [tecnicosNomes, setTecnicosNomes] = useState<string[]>([]);
   const [status, setStatus] = useState<RelatorioStatus>("em_aberto");
   const [motivoPendencia, setMotivoPendencia] = useState<string | null>(null);
+  const [pendenciasItens, setPendenciasItens] = useState<
+    import("@/lib/pendencias-itens").PendenciaItem[]
+  >([]);
   const [loadingById, setLoadingById] = useState(Boolean(reportIdFromUrl));
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
@@ -537,8 +550,9 @@ function RelatorioPage() {
       ...buildEscopoFromUi(),
       medicoes,
       contatos,
+      pendenciasItens,
     };
-  }, [tipo, buildEscopoFromUi, medicoes, contatos]);
+  }, [tipo, buildEscopoFromUi, medicoes, contatos, pendenciasItens]);
 
   const persistDraft = useCallback(
     async (payloadOverride?: RelatorioPayload) => {
@@ -811,6 +825,7 @@ function RelatorioPage() {
     setTecnicosNomes(row.tecnicos_nomes ?? (row.tecnico_nome ? [row.tecnico_nome] : []));
     setStatus(row.status);
     setMotivoPendencia(row.motivo_pendencia);
+    setPendenciasItens(p.pendenciasItens ?? []);
     setCliente(row.cliente);
     setEndereco(row.endereco);
     setCidade(row.cidade);
@@ -1263,6 +1278,7 @@ function RelatorioPage() {
       const saved = await avisarConclusaoRelatorio(currentReportId);
       setStatus(saved.status);
       setMotivoPendencia(null);
+      setPendenciasItens([]);
       canAutosaveRef.current = false;
       toast.success(
         status === "pendente"
@@ -1327,6 +1343,8 @@ function RelatorioPage() {
   }
 
   return (
+    <PendenciasProvider mode="tecnico" confirmed={pendenciasItens}>
+    <PendenciasAbaBridge setAba={setAbaCampo} />
     <div className="min-h-screen bg-surface">
       <AppHeader sticky={!headerRolaComPagina} />
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">
@@ -1393,8 +1411,9 @@ function RelatorioPage() {
                 onChange={setAbaCampo}
                 abas={tipo === "empresarial" ? ABAS_CAMPO_TECNICO : ABAS_CAMPO_IMPLANTACAO}
                 stickToViewportTop={headerRolaComPagina}
-                temPendencia={status === "pendente"}
+                temPendencia={status === "pendente" || pendenciasItens.length > 0}
                 motivoPendencia={motivoPendencia}
+                pendenciasItens={pendenciasItens}
                 layoutMode="tecnico"
               />
 
@@ -2082,5 +2101,6 @@ function RelatorioPage() {
         </div>
       )}
     </div>
+    </PendenciasProvider>
   );
 }

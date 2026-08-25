@@ -14,9 +14,18 @@ import {
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { PendenciaItemFrame } from "@/components/pendencias/PendenciaItemFrame";
+import { usePendencias } from "@/components/pendencias/PendenciasContext";
 import { RelatorioFotosBloco, type FotoSlot } from "@/components/RelatorioFotosBloco";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { EvidencePhotoRef } from "@/lib/types";
+import {
+  pendenciaFotoGrupo,
+  pendenciaMetragemCabo,
+  pendenciaPergunta,
+  type PendenciaItem,
+  type PendenciaItemDef,
+} from "@/lib/pendencias-itens";
 import {
   apenasDigitos,
   calcularMetragemCaboTotal,
@@ -530,6 +539,7 @@ export function RelatorioAbasCampo({
   stickToViewportTop = false,
   temPendencia = false,
   motivoPendencia = null,
+  pendenciasItens = [],
   layoutMode = "tecnico",
 }: {
   abaAtiva: AbaCampo;
@@ -543,6 +553,8 @@ export function RelatorioAbasCampo({
   temPendencia?: boolean;
   /** Texto detalhado da pendência (exibido no popover do sino). */
   motivoPendencia?: string | null;
+  /** Itens granulares confirmados (cards clicáveis no sininho). */
+  pendenciasItens?: PendenciaItem[];
   /**
    * `tecnico` = linha única + scroll horizontal (mobile).
    * `gestor` = abas distribuídas sem scroll (desktop auditoria).
@@ -550,6 +562,7 @@ export function RelatorioAbasCampo({
   layoutMode?: "tecnico" | "gestor";
 }) {
   const isGestor = layoutMode === "gestor";
+  const pendenciasCtx = usePendencias();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -740,9 +753,45 @@ export function RelatorioAbasCampo({
                   ) : null}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 p-4">
-                {temPendencia ? (
-                  <div className="space-y-1.5">
+              <PopoverContent align="end" className="w-80 p-0">
+                {pendenciasItens.length > 0 ? (
+                  <div className="max-h-80 overflow-y-auto">
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="text-sm font-semibold text-destructive">
+                        Pendências ({pendenciasItens.length})
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Toque para ir ao item
+                      </p>
+                    </div>
+                    <ul className="divide-y divide-border">
+                      {pendenciasItens.map((item) => (
+                        <li key={item.itemId}>
+                          <button
+                            type="button"
+                            className="w-full px-4 py-3 text-left transition hover:bg-amber-50"
+                            onClick={() => {
+                              if (pendenciasCtx) pendenciasCtx.goToItem(item);
+                              else {
+                                onChange(item.aba as AbaCampo);
+                                window.setTimeout(
+                                  () => navegarParaSecaoFormulario(item.anchorId),
+                                  120,
+                                );
+                              }
+                            }}
+                          >
+                            <p className="text-sm font-medium text-foreground">{item.label}</p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                              {item.aba} · Seção - Subbloco
+                            </p>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : temPendencia ? (
+                  <div className="space-y-1.5 p-4">
                     <p className="text-sm font-semibold text-destructive">
                       Relatório com pendência
                     </p>
@@ -752,7 +801,9 @@ export function RelatorioAbasCampo({
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Nenhuma pendência no momento.</p>
+                  <p className="p-4 text-sm text-muted-foreground">
+                    Nenhuma pendência no momento.
+                  </p>
                 )}
               </PopoverContent>
             </Popover>
@@ -1029,6 +1080,16 @@ function renderGrupoFotoCard(
       title={grupo.title}
       hint={grupo.hint}
       variant="flat"
+      pendencia={pendenciaFotoGrupo({
+        aba: grupo.grupoKey.startsWith("rc")
+          ? "RC"
+          : grupo.grupoKey.startsWith("eq")
+            ? "equipamento"
+            : "RE",
+        grupoKey: grupo.grupoKey,
+        title: grupo.title,
+        section: grupo.section,
+      })}
       headerExtra={
         grupo.showAmbienteToggle || grupo.quantidadeLabel || grupo.coordenadas ? (
           <div className="space-y-3">
@@ -1125,6 +1186,7 @@ export function CordoalhaSimNaoCard({
   hideQuantidade = false,
   variant = "card",
   id,
+  pendencia,
 }: {
   title: string;
   quantidadeLabel?: string;
@@ -1137,12 +1199,13 @@ export function CordoalhaSimNaoCard({
   /** Use `flat` dentro dos acordeões RE/RC. */
   variant?: "card" | "flat";
   id?: string;
+  pendencia?: PendenciaItemDef;
 }) {
   const sim = value.isSim === true;
   const isFlat = variant === "flat";
-  return (
+  const body = (
     <div
-      id={id}
+      id={pendencia ? undefined : id}
       className={
         isFlat
           ? `scroll-mt-36 space-y-3 ${flatSectionClass}`
@@ -1189,6 +1252,8 @@ export function CordoalhaSimNaoCard({
       ) : null}
     </div>
   );
+  if (!pendencia) return body;
+  return <PendenciaItemFrame def={pendencia}>{body}</PendenciaItemFrame>;
 }
 
 export function RelatorioRedeAcesso({
@@ -1351,9 +1416,15 @@ export function RelatorioRedeAcesso({
             <div className={flatSectionClass}>
               <h2 className="mb-3 font-semibold text-gray-800">Metragem de cabo</h2>
               <div className="flex flex-col gap-4">
-                {cabos.map((cabo, index) => (
+                {cabos.map((cabo, index) => {
+                  const pendDef = pendenciaMetragemCabo({
+                    aba: redeVariant,
+                    caboId: cabo.id,
+                    index,
+                  });
+                  return (
+                  <PendenciaItemFrame key={cabo.id} def={pendDef}>
                   <div
-                    key={cabo.id}
                     className="relative flex flex-col space-y-3 border-b border-gray-100 py-2 last:border-b-0 last:pb-0"
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -1523,7 +1594,9 @@ export function RelatorioRedeAcesso({
                       />
                     </div>
                   </div>
-                ))}
+                  </PendenciaItemFrame>
+                  );
+                })}
                 {readOnly ? null : (
                   <button
                     type="button"
@@ -1551,6 +1624,12 @@ export function RelatorioRedeAcesso({
               onChange={onFiberloopInstaladoChange}
               disabled={readOnly}
               variant="flat"
+              pendencia={pendenciaPergunta({
+                aba: redeVariant,
+                secao: `Lançamento (${redeVariant})`,
+                subbloco: "Fiberloop instalado?",
+                key: "lancamento.fiberloop",
+              })}
             />
           ) : null}
 
@@ -1578,6 +1657,12 @@ export function RelatorioRedeAcesso({
                       onChange={onCordoalhaLancadaChange}
                       disabled={readOnly}
                       variant="flat"
+                      pendencia={pendenciaPergunta({
+                        aba: redeVariant,
+                        secao: `Poste (${redeVariant})`,
+                        subbloco: "Lançado cordoalha?",
+                        key: "poste.cordoalhaLancada",
+                      })}
                     />
                     <CordoalhaSimNaoCard
                       title="Cordoalha existente?"
@@ -1586,6 +1671,12 @@ export function RelatorioRedeAcesso({
                       onChange={onCordoalhaExistenteChange}
                       disabled={readOnly}
                       variant="flat"
+                      pendencia={pendenciaPergunta({
+                        aba: redeVariant,
+                        secao: `Poste (${redeVariant})`,
+                        subbloco: "Cordoalha existente?",
+                        key: "poste.cordoalhaExistente",
+                      })}
                     />
                   </>
                 ) : null}
@@ -1599,6 +1690,12 @@ export function RelatorioRedeAcesso({
                       onChange={onPostesNovaCordoalhaChange}
                       disabled={readOnly}
                       variant="flat"
+                      pendencia={pendenciaPergunta({
+                        aba: redeVariant,
+                        secao: `Poste (${redeVariant})`,
+                        subbloco: "Postes novo com nova cordoalha?",
+                        key: "poste.postesNovaCordoalha",
+                      })}
                     />
                     <CordoalhaSimNaoCard
                       title="Postes com cordoalha Existente?"
@@ -1607,6 +1704,12 @@ export function RelatorioRedeAcesso({
                       onChange={onPostesCordoalhaExistenteChange}
                       disabled={readOnly}
                       variant="flat"
+                      pendencia={pendenciaPergunta({
+                        aba: redeVariant,
+                        secao: `Poste (${redeVariant})`,
+                        subbloco: "Postes com cordoalha Existente?",
+                        key: "poste.postesCordoalhaExistente",
+                      })}
                     />
                   </>
                 ) : null}
