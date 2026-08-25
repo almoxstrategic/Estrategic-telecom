@@ -1158,8 +1158,9 @@ function RelatorioPage() {
     key: RelatorioFotoGrupoKey,
     dual: DualFotoUi,
     setDual: React.Dispatch<React.SetStateAction<DualFotoUi>>,
+    options?: { herdarAmbienteDe?: RelatorioFotoGrupoKey },
   ) => {
-    const aba = abaDe(key);
+    const aba = abaDe(options?.herdarAmbienteDe ?? key);
     return {
       slots: dual[aba].slots,
       onChange: (slots: FotoSlot[]) =>
@@ -1170,9 +1171,13 @@ function RelatorioPage() {
       obsAdmin: dual[aba].obsAdmin,
       onObsAdminChange: (obsAdmin: string) =>
         setDual((prev) => ({ ...prev, [aba]: { ...prev[aba], obsAdmin } })),
-      showAmbienteToggle: true as const,
       ambiente: aba,
-      onAmbienteChange: patchAmbienteGrupo(key),
+      ...(options?.herdarAmbienteDe
+        ? { showAmbienteToggle: false as const }
+        : {
+            showAmbienteToggle: true as const,
+            onAmbienteChange: patchAmbienteGrupo(key),
+          }),
     };
   };
 
@@ -1540,7 +1545,9 @@ function RelatorioPage() {
                       grupoKey: "plaquetaIdentificacao",
                       section: "caixa",
                       title: "Plaqueta de Identificação - Caixa de emenda",
-                      ...bindDualGrupo("plaquetaIdentificacao", plaquetaDual, setPlaquetaDual),
+                      ...bindDualGrupo("plaquetaIdentificacao", plaquetaDual, setPlaquetaDual, {
+                        herdarAmbienteDe: "caixaEmenda",
+                      }),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file, ambiente) => {
@@ -1792,7 +1799,12 @@ function RelatorioPage() {
                       grupoKey: "rcPlaquetaIdentificacao",
                       section: "caixa",
                       title: "Plaqueta de Identificação - Caixa de emenda",
-                      ...bindDualGrupo("rcPlaquetaIdentificacao", rcPlaquetaDual, setRcPlaquetaDual),
+                      ...bindDualGrupo(
+                        "rcPlaquetaIdentificacao",
+                        rcPlaquetaDual,
+                        setRcPlaquetaDual,
+                        { herdarAmbienteDe: "rcCaixaEmenda" },
+                      ),
                     },
                   ]}
                   onGrupoPhoto={(grupoKey, slotId, file, ambiente) => {

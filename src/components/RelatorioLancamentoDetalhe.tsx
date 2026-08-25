@@ -973,9 +973,15 @@ export function RelatorioDetalhe({
   const abaGrupoDe = (key: RelatorioFotoGrupoKey): AmbienteRede =>
     abasGrupos[key] === "subterraneo" ? "subterraneo" : "aereo";
 
-  const renderGrupo = (title: string, key: RelatorioFotoGrupoKey, comAmbiente = false) => {
-    const dualKey = comAmbiente && isFotoGrupoPorAmbienteKey(key);
-    const aba = abaGrupoDe(key);
+  const renderGrupo = (
+    title: string,
+    key: RelatorioFotoGrupoKey,
+    comAmbiente = false,
+    herdarAmbienteDe?: RelatorioFotoGrupoKey,
+  ) => {
+    const dualKey =
+      (comAmbiente || !!herdarAmbienteDe) && isFotoGrupoPorAmbienteKey(key);
+    const aba = herdarAmbienteDe ? abaGrupoDe(herdarAmbienteDe) : abaGrupoDe(key);
     const raw = payload?.[key];
     const grupo: FotoGrupoPayload | undefined = dualKey
       ? looksLikeFotoGrupoPorAmbiente(raw)
@@ -1603,7 +1609,12 @@ export function RelatorioDetalhe({
             defaultOpen
           >
             {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
-            {renderGrupo("Plaqueta de Identificação - Caixa de emenda", "plaquetaIdentificacao", true)}
+            {renderGrupo(
+              "Plaqueta de Identificação - Caixa de emenda",
+              "plaquetaIdentificacao",
+              false,
+              "caixaEmenda",
+            )}
           </AccordionBloco>
 
           <AccordionBloco
@@ -1866,7 +1877,8 @@ export function RelatorioDetalhe({
             {renderGrupo(
               "Plaqueta de Identificação - Caixa de emenda",
               "rcPlaquetaIdentificacao",
-              true,
+              false,
+              "rcCaixaEmenda",
             )}
           </AccordionBloco>
 
