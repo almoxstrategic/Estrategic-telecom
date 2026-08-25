@@ -2302,6 +2302,14 @@ export function RelatorioDetalhe({
               <RelatorioTesteOptico
                 readOnly={!canEditPhotos}
                 value={payload?.testeOptico ?? emptyTesteOptico()}
+                padraoCoresFibra={
+                  payload?.padraoCoresFibra === "eua" ? "eua" : "br"
+                }
+                onPadraoCoresFibraChange={
+                  canEditPhotos && payload
+                    ? (padraoCoresFibra) => patchPayload({ ...payload, padraoCoresFibra })
+                    : undefined
+                }
                 onChange={(next) => {
                   if (!payload) return;
                   patchPayload({ ...payload, testeOptico: next });
@@ -2332,6 +2340,7 @@ export function RelatorioDetalhe({
             <RelatorioTesteOptico
               readOnly
               value={payload?.testeOptico ?? emptyTesteOptico()}
+              padraoCoresFibra={payload?.padraoCoresFibra === "eua" ? "eua" : "br"}
               onChange={() => undefined}
             />
             <RelatorioTestePotencia
@@ -2352,6 +2361,13 @@ export function RelatorioDetalhe({
           testeOtdr={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
           redeAcesso={payload?.redeAcesso ?? emptyQuantidadesRede()}
           redeCliente={payload?.redeCliente ?? emptyQuantidadesRede()}
+          padraoCoresFibra={payload?.padraoCoresFibra === "eua" ? "eua" : "br"}
+          readOnly={!canEditPhotos}
+          onPadraoCoresFibraChange={
+            canEditPhotos && payload
+              ? (padraoCoresFibra) => patchPayload({ ...payload, padraoCoresFibra })
+              : undefined
+          }
         />
       ) : null}
 

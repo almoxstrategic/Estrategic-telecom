@@ -506,6 +506,11 @@ export type EscopoPayload = {
   eqEstacaoDgo: DgoClienteItemPayload[];
   outrasFotosEqEstacao: OutraFotoPayload[];
   testeOptico: TesteOpticoPayload;
+  /**
+   * Padrão de cores da fibra compartilhado entre Teste Óptico e Teste de Potência.
+   * `br` = Telebrás/ABNT (padrão); `eua` = EIA598-A.
+   */
+  padraoCoresFibra?: "br" | "eua";
   testePotenciaEmpresarial: TestePotenciaPayload;
   testePotenciaImplantacao: TestePotenciaPayload;
   testePotencia1550: TestePotenciaJanelaPayload;
@@ -883,6 +888,7 @@ export function emptyEscopoPayload(): EscopoPayload {
     eqEstacaoDgo: [emptyDgoClienteItem()],
     outrasFotosEqEstacao: [],
     testeOptico: emptyTesteOptico(),
+    padraoCoresFibra: "br",
     testePotenciaEmpresarial: emptyTestePotencia(),
     testePotenciaImplantacao: emptyTestePotencia(),
     testePotencia1550: emptyTestePotenciaJanela(),
@@ -1612,6 +1618,7 @@ export function parseEscopoPayload(
     eqEstacaoDgo: parseDgoClienteLista(src.eqEstacaoDgo),
     outrasFotosEqEstacao: parseOutrasFotos(src.outrasFotosEqEstacao),
     testeOptico: parseTesteOptico(src.testeOptico),
+    padraoCoresFibra: src.padraoCoresFibra === "eua" ? "eua" : "br",
     ...parseTestesPotenciaSeparados(src, tipoExecucao),
     testePotencia1550: parseTestePotenciaJanela(src.testePotencia1550),
     testePotencia1330: parseTestePotenciaJanela(src.testePotencia1330),
@@ -2201,6 +2208,12 @@ export function mergeEscopoPayload(
       mergeOutra,
     ),
     testeOptico: fromLocal.testeOptico,
+    padraoCoresFibra:
+      fromLocal.padraoCoresFibra === "eua" || fromLocal.padraoCoresFibra === "br"
+        ? fromLocal.padraoCoresFibra
+        : fromServer.padraoCoresFibra === "eua"
+          ? "eua"
+          : "br",
     testePotenciaEmpresarial: fromLocal.testePotenciaEmpresarial,
     testePotenciaImplantacao: fromLocal.testePotenciaImplantacao,
     testePotencia1550: mergeTestePotenciaJanela(

@@ -56,6 +56,8 @@ export type PdfPotenciaCard = {
   pi: string;
   linhasAten: PdfPotenciaLinhaAten[];
   fibras: PdfPotenciaFibra[];
+  /** Padrão de cores BR/EUA para o badge da fibra. */
+  padraoCoresFibra?: "br" | "eua";
 };
 
 export type PdfAtomicBlock =
@@ -428,6 +430,7 @@ function buildPotenciaCard(
   totalEmendas: number,
   totalConexoes: number,
   testeOptico: TesteOpticoPayload,
+  padraoCoresFibra: "br" | "eua" = "br",
 ): PdfPotenciaCard {
   const local = ponto === "cliente" ? testeOptico.cliente : testeOptico.estacao;
   const piTexto = janela === "1550" ? primeiroDbm(local?.nm1550) : primeiroDbm(local?.nm1330);
@@ -487,6 +490,7 @@ function buildPotenciaCard(
       },
     ],
     fibras,
+    padraoCoresFibra,
   };
 }
 
@@ -508,6 +512,7 @@ function collectTestePotenciaTabelas(
   const totalConexoes = totalConexoesCalculado(totalEmendas);
   const optico = p.testeOptico;
   if (!optico) return;
+  const padraoCoresFibra = p.padraoCoresFibra === "eua" ? "eua" : "br";
 
   pushHeading(blocks, "7. Teste de Potencia");
 
@@ -516,7 +521,16 @@ function collectTestePotenciaTabelas(
     janela: "1550" | "1330",
     ponto: "cliente" | "estacao",
   ): PdfPotenciaCard =>
-    buildPotenciaCard(titulo, janela, ponto, km, totalEmendas, totalConexoes, optico);
+    buildPotenciaCard(
+      titulo,
+      janela,
+      ponto,
+      km,
+      totalEmendas,
+      totalConexoes,
+      optico,
+      padraoCoresFibra,
+    );
 
   // Apenas No Cliente (1550 + 1330) — Estacao omitida na visualizacao final.
   pushGroup(blocks, [

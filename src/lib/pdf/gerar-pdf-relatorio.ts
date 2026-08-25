@@ -837,7 +837,10 @@ async function drawPotenciaCard(ctx: LayoutCtx, card: PdfPotenciaCard): Promise<
       });
 
       // Coluna Fibra No: badge + numero (flex-like, text-left)
-      const telebras = corFibraPorNumero(fibra.numeroFibra);
+      const telebras = corFibraPorNumero(
+        fibra.numeroFibra,
+        card.padraoCoresFibra === "eua" ? "eua" : "br",
+      );
       const badgeW = 18;
       const badgeH = 11;
       const badgeX = MARGIN_X + 4;

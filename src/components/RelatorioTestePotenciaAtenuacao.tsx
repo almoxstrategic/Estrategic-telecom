@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { ChoiceButton, inputClass } from "@/components/RelatorioRedeAcesso";
-import { FIBER_COLORS, corFibraPorNumero } from "@/lib/fiber-colors";
+import { useMemo, type ReactNode } from "react";
+import { inputClass } from "@/components/RelatorioRedeAcesso";
+import { SeletorPadraoCoresFibra } from "@/components/SeletorPadraoCoresFibra";
+import { corFibraPorNumero, type PadraoCoresFibra } from "@/lib/fiber-colors";
 import {
   ATEN_EMENDA,
   ATEN_KM,
@@ -22,7 +23,6 @@ import {
 
 type JanelaNm = "1550" | "1330";
 type PontoMedicao = "cliente" | "estacao";
-type PadraoCoresFibra = "br" | "eua";
 
 const CARDS: { janela: JanelaNm; ponto: PontoMedicao; titulo: string }[] = [
   { janela: "1550", ponto: "cliente", titulo: "TESTE DE POTÊNCIA - 1550nm (No Cliente)" },
@@ -36,11 +36,17 @@ export function RelatorioTestePotenciaAtenuacao({
   testeOtdr,
   redeAcesso,
   redeCliente,
+  padraoCoresFibra = "br",
+  onPadraoCoresFibraChange,
+  readOnly = false,
 }: {
   testeOptico?: TesteOpticoPayload | null;
   testeOtdr?: TestePotenciaPayload | null;
   redeAcesso?: QuantidadesRedePayload | null;
   redeCliente?: QuantidadesRedePayload | null;
+  padraoCoresFibra?: PadraoCoresFibra;
+  onPadraoCoresFibraChange?: (next: PadraoCoresFibra) => void;
+  readOnly?: boolean;
 }) {
   const optico = testeOptico ?? emptyTesteOptico();
   const otdr = testeOtdr ?? emptyTestePotencia();
@@ -49,10 +55,15 @@ export function RelatorioTestePotenciaAtenuacao({
   const km = parseNumeroCampo(String(otdr.comprimentoTrechoKm ?? "")) ?? 0;
   const totalEmendas = totalEmendasCalculado(re.qtdCaixasEmenda, rc.qtdCaixasEmenda);
   const totalConexoes = totalConexoesCalculado(totalEmendas);
+  const padrao = padraoCoresFibra === "eua" ? "eua" : "br";
 
   return (
     <div className="space-y-4">
-      <LegendaCoresFibra />
+      <SeletorPadraoCoresFibra
+        value={padrao}
+        onChange={readOnly ? undefined : onPadraoCoresFibraChange}
+        readOnly={readOnly}
+      />
       {CARDS.filter((card) => card.ponto === "cliente").map((card) => (
         <JanelaCard
           key={card.titulo}
@@ -63,6 +74,7 @@ export function RelatorioTestePotenciaAtenuacao({
           testeOptico={optico}
           totalEmendas={totalEmendas}
           totalConexoes={totalConexoes}
+          padraoCoresFibra={padrao}
         />
       ))}
     </div>
@@ -119,6 +131,7 @@ function JanelaCard({
   testeOptico,
   totalEmendas,
   totalConexoes,
+  padraoCoresFibra,
 }: {
   titulo: string;
   janela: JanelaNm;
@@ -127,6 +140,7 @@ function JanelaCard({
   testeOptico: TesteOpticoPayload;
   totalEmendas: number;
   totalConexoes: number;
+  padraoCoresFibra: PadraoCoresFibra;
 }) {
   const referenciaPi = piTextoDoPonto(testeOptico, janela, ponto);
   const pi = parseNumeroCampo(referenciaPi);
@@ -187,6 +201,7 @@ function JanelaCard({
               atenMaxima={atenMaxima}
               referenciaPi={referenciaPi}
               valorMinimoAdmissivel={valorMinimoAdmissivel}
+              padraoCoresFibra={padraoCoresFibra}
             />
           )}
         </div>
@@ -201,12 +216,14 @@ function LinhaFibra({
   atenMaxima,
   referenciaPi,
   valorMinimoAdmissivel,
+  padraoCoresFibra,
 }: {
   numero: string;
   numeroFibra: number;
   atenMaxima: number;
   referenciaPi: string;
   valorMinimoAdmissivel: number | null;
+  padraoCoresFibra: PadraoCoresFibra;
 }) {
   const piEmBranco = campoEmBranco(referenciaPi);
   const valPo = -Math.abs(numeroSeguro(atenMaxima, 0));
@@ -218,7 +235,7 @@ function LinhaFibra({
       : valPo >= valorMinimoAdmissivel
         ? "aprovado"
         : "reprovado";
-  const colorCode = corFibraPorNumero(numeroFibra);
+  const colorCode = corFibraPorNumero(numeroFibra, padraoCoresFibra);
   const poFormatado = formatarPtBr(valPo);
   const atenuacaoFormatada = `${formatarPtBr(atenuacao)} dB`;
 
@@ -328,50 +345,6 @@ function LinhaRef({
       <td className="w-1/6 px-3 py-2 text-right font-bold tabular-nums">{valor}</td>
       <td className="w-1/6 px-3 py-2 pl-2 text-left text-gray-600">{unidade}</td>
     </tr>
-  );
-}
-
-function LegendaCoresFibra() {
-  const [padrao, setPadrao] = useState<PadraoCoresFibra>("br");
-  const titulo =
-    padrao === "br"
-      ? "Padrão de cores da fibra (Telebrás/ABNT) — repete a cada 12 fibras"
-      : "Padrão de cores da fibra (EUA) — em breve";
-
-  return (
-    <div className="my-6 flex w-full flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center">
-      <div
-        className="mb-3 grid w-full max-w-sm grid-cols-2 gap-2"
-        role="radiogroup"
-        aria-label="Padrão de cores da fibra"
-      >
-        <ChoiceButton active={padrao === "br"} onClick={() => setPadrao("br")}>
-          Padrão BR
-        </ChoiceButton>
-        <ChoiceButton active={padrao === "eua"} onClick={() => setPadrao("eua")}>
-          Padrão EUA
-        </ChoiceButton>
-      </div>
-      <p className="mb-2 text-xs font-semibold text-gray-700">{titulo}</p>
-      <div className="flex flex-wrap justify-center gap-2">
-        {FIBER_COLORS.map((cor, index) => (
-          <span
-            key={cor.sigla}
-            title={`${String(index + 1).padStart(2, "0")} · ${cor.label}`}
-            className={`inline-flex h-7 min-w-7 items-center justify-center rounded-sm px-1.5 text-[10px] font-bold ${cor.bg} ${
-              padrao === "eua" ? "opacity-50" : ""
-            }`}
-          >
-            {cor.sigla}
-          </span>
-        ))}
-      </div>
-      {padrao === "eua" ? (
-        <p className="mt-2 text-[11px] text-gray-500">
-          Paleta EUA ainda não disponível — exibindo referência BR.
-        </p>
-      ) : null}
-    </div>
   );
 }
 

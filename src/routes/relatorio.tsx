@@ -41,6 +41,7 @@ import { requireTecnicoTransmissao } from "@/lib/auth-guards";
 import { hasPainelFullAccess } from "@/lib/roles";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
+import { parsePadraoCoresFibra, type PadraoCoresFibra } from "@/lib/fiber-colors";
 import { planCaboMetragemGalleryAssignments } from "@/lib/cabo-metragem-gallery";
 import {
   avisarConclusaoRelatorio,
@@ -361,6 +362,7 @@ function RelatorioPage() {
   const [estacaoEntregaAcesso, setEstacaoEntregaAcesso] = useState("");
   const [outrasEqEstacao, setOutrasEqEstacao] = useState<OutraFotoState[]>(() => [emptyOutraFoto()]);
   const [testeOptico, setTesteOptico] = useState<TesteOpticoPayload>(() => emptyTesteOptico());
+  const [padraoCoresFibra, setPadraoCoresFibra] = useState<PadraoCoresFibra>("br");
   const [testePotenciaEmpresarial, setTestePotenciaEmpresarial] = useState<TestePotenciaPayload>(
     () => emptyTestePotencia(),
   );
@@ -481,6 +483,7 @@ function RelatorioPage() {
       eqEstacaoDgo: eqEstacaoDgoItens,
       outrasFotosEqEstacao: outrasParaPayload(outrasEqEstacao),
       testeOptico,
+      padraoCoresFibra,
       testePotenciaEmpresarial,
       testePotenciaImplantacao,
       testePotencia1550: janelaPotenciaDerivada(redeAcesso, redeCliente),
@@ -537,6 +540,7 @@ function RelatorioPage() {
     estacaoEntregaAcesso,
     outrasEqEstacao,
     testeOptico,
+    padraoCoresFibra,
     testePotenciaEmpresarial,
     testePotenciaImplantacao,
     eqConexoes,
@@ -800,6 +804,7 @@ function RelatorioPage() {
     setEstacaoEntregaAcesso(p.estacaoEntregaAcesso ?? "");
     setOutrasEqEstacao(outrasFromPayload(p.outrasFotosEqEstacao));
     setTesteOptico(p.testeOptico ?? emptyTesteOptico());
+    setPadraoCoresFibra(parsePadraoCoresFibra(p.padraoCoresFibra));
     setTestePotenciaEmpresarial(p.testePotenciaEmpresarial ?? emptyTestePotencia());
     setTestePotenciaImplantacao(p.testePotenciaImplantacao ?? emptyTestePotencia());
     setEqConexoes(p.equipamento ?? emptyEquipamentoConexoes());
@@ -2043,6 +2048,11 @@ function RelatorioPage() {
                 <RelatorioTesteOptico
                   readOnly={readOnly}
                   value={testeOptico}
+                  padraoCoresFibra={padraoCoresFibra}
+                  onPadraoCoresFibraChange={(next) => {
+                    setPadraoCoresFibra(next);
+                    void persistDraft({ ...buildPayload(), padraoCoresFibra: next });
+                  }}
                   onChange={(next, opts) => {
                     setTesteOptico(next);
                     if (opts?.immediate) {
@@ -2087,6 +2097,12 @@ function RelatorioPage() {
                   testeOtdr={testePotenciaEmpresarial ?? emptyTestePotencia()}
                   redeAcesso={redeAcesso ?? emptyQuantidadesRede()}
                   redeCliente={redeCliente ?? emptyQuantidadesRede()}
+                  padraoCoresFibra={padraoCoresFibra}
+                  readOnly={readOnly}
+                  onPadraoCoresFibraChange={(next) => {
+                    setPadraoCoresFibra(next);
+                    void persistDraft({ ...buildPayload(), padraoCoresFibra: next });
+                  }}
                 />
               ) : mostrarInfraestrutura ? (
                 <AbaInfraestrutura

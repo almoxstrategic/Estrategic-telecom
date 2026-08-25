@@ -6,6 +6,8 @@ import {
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { inputClass, textareaObsClass } from "@/components/RelatorioRedeAcesso";
+import { SeletorPadraoCoresFibra } from "@/components/SeletorPadraoCoresFibra";
+import { corFibraPorNumero, type PadraoCoresFibra } from "@/lib/fiber-colors";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
@@ -248,12 +250,15 @@ function CampoNumeroFibra({
   value,
   onChange,
   disabled,
+  padraoCoresFibra = "br",
 }: {
   value: number | null;
   onChange: (value: number | null) => void;
   disabled: boolean;
+  padraoCoresFibra?: PadraoCoresFibra;
 }) {
   const [draft, setDraft] = useState(value == null ? "" : String(value));
+  const cor = value != null && value >= 1 ? corFibraPorNumero(value, padraoCoresFibra) : null;
 
   useEffect(() => {
     setDraft(value == null ? "" : String(value));
@@ -262,33 +267,43 @@ function CampoNumeroFibra({
   return (
     <div className="mx-auto w-full max-w-xs">
       <label className="mb-1.5 block text-center text-sm font-semibold">Nº Fibra:</label>
-      <input
-        type="text"
-        inputMode="numeric"
-        enterKeyHint="done"
-        autoComplete="off"
-        placeholder="Ex: 1"
-        value={draft}
-        disabled={disabled}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          const digits = draft.replace(/\D/g, "");
-          if (!digits) {
-            onChange(null);
-            setDraft("");
-            return;
-          }
-          const n = Math.trunc(Number(digits));
-          if (!Number.isFinite(n) || n < 1) {
-            onChange(null);
-            setDraft("");
-            return;
-          }
-          onChange(n);
-          setDraft(String(n));
-        }}
-        className={inputClass()}
-      />
+      <div className="flex items-center gap-2">
+        {cor ? (
+          <span
+            title={cor.label}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-sm text-xs font-bold ${cor.bg}`}
+          >
+            {cor.sigla}
+          </span>
+        ) : null}
+        <input
+          type="text"
+          inputMode="numeric"
+          enterKeyHint="done"
+          autoComplete="off"
+          placeholder="Ex: 1"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            const digits = draft.replace(/\D/g, "");
+            if (!digits) {
+              onChange(null);
+              setDraft("");
+              return;
+            }
+            const n = Math.trunc(Number(digits));
+            if (!Number.isFinite(n) || n < 1) {
+              onChange(null);
+              setDraft("");
+              return;
+            }
+            onChange(n);
+            setDraft(String(n));
+          }}
+          className={inputClass()}
+        />
+      </div>
     </div>
   );
 }
@@ -298,11 +313,13 @@ function BlocoTesteOpticoCliente({
   readOnly,
   onChange,
   onUploadPhoto,
+  padraoCoresFibra,
 }: {
   value: TesteOpticoPayload["cliente"];
   readOnly: boolean;
   onChange: (next: TesteOpticoPayload["cliente"], opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
+  padraoCoresFibra: PadraoCoresFibra;
 }) {
   const nm1550 = value.nm1550[0];
   const nm1330 = value.nm1330[0];
@@ -314,6 +331,7 @@ function BlocoTesteOpticoCliente({
       <CampoNumeroFibra
         value={value.numeroFibra}
         disabled={readOnly}
+        padraoCoresFibra={padraoCoresFibra}
         onChange={(numeroFibra) => onChange({ ...value, numeroFibra })}
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 print:gap-2">
@@ -348,12 +366,14 @@ function BlocoTesteOpticoEstacao({
   onChange,
   onUploadPhoto,
   onRemover,
+  padraoCoresFibra,
 }: {
   value: TesteOpticoPayload["estacao"];
   readOnly: boolean;
   onChange: (next: TesteOpticoPayload["estacao"], opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
   onRemover?: () => void;
+  padraoCoresFibra: PadraoCoresFibra;
 }) {
   const nm1550 = value.nm1550[0];
   const nm1330 = value.nm1330[0];
@@ -377,6 +397,7 @@ function BlocoTesteOpticoEstacao({
       <CampoNumeroFibra
         value={value.numeroFibra}
         disabled={readOnly}
+        padraoCoresFibra={padraoCoresFibra}
         onChange={(numeroFibra) => onChange({ ...value, numeroFibra })}
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -410,13 +431,18 @@ export function RelatorioTesteOptico({
   onChange,
   onUploadPhoto,
   readOnly,
+  padraoCoresFibra = "br",
+  onPadraoCoresFibraChange,
 }: {
   value: TesteOpticoPayload;
   onChange: (next: TesteOpticoPayload, opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
   readOnly: boolean;
+  padraoCoresFibra?: PadraoCoresFibra;
+  onPadraoCoresFibraChange?: (next: PadraoCoresFibra) => void;
 }) {
   const [mostrarEstacao, setMostrarEstacao] = useState(() => testeOpticoEstacaoAtivo(value.estacao));
+  const padrao = padraoCoresFibra === "eua" ? "eua" : "br";
 
   useEffect(() => {
     if (testeOpticoEstacaoAtivo(value.estacao)) setMostrarEstacao(true);
@@ -441,10 +467,16 @@ export function RelatorioTesteOptico({
 
   return (
     <div className="space-y-5 break-inside-avoid print:break-inside-avoid print:space-y-2">
+      <SeletorPadraoCoresFibra
+        value={padrao}
+        onChange={readOnly ? undefined : onPadraoCoresFibraChange}
+        readOnly={readOnly}
+      />
       <BlocoTesteOpticoCliente
         value={value.cliente}
         readOnly={readOnly}
         onUploadPhoto={onUploadPhoto}
+        padraoCoresFibra={padrao}
         onChange={(cliente, opts) => onChange({ ...value, cliente }, opts)}
       />
       {mostrarEstacao ? (
@@ -453,6 +485,7 @@ export function RelatorioTesteOptico({
             value={value.estacao}
             readOnly={readOnly}
             onUploadPhoto={onUploadPhoto}
+            padraoCoresFibra={padrao}
             onChange={(estacao, opts) => onChange({ ...value, estacao }, opts)}
             onRemover={readOnly ? undefined : removerEstacao}
           />
