@@ -1401,6 +1401,7 @@ export function RelatorioDetalhe({
         abas={abasVisiveis}
         temPendencia={row.status === "pendente"}
         motivoPendencia={row.motivo_pendencia}
+        layoutMode="gestor"
       />
 
       {abaAtiva === "RE" ? (

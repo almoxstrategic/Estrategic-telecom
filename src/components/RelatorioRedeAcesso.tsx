@@ -530,6 +530,7 @@ export function RelatorioAbasCampo({
   stickToViewportTop = false,
   temPendencia = false,
   motivoPendencia = null,
+  layoutMode = "tecnico",
 }: {
   abaAtiva: AbaCampo;
   onChange: (aba: AbaCampo) => void;
@@ -542,7 +543,13 @@ export function RelatorioAbasCampo({
   temPendencia?: boolean;
   /** Texto detalhado da pendência (exibido no popover do sino). */
   motivoPendencia?: string | null;
+  /**
+   * `tecnico` = linha única + scroll horizontal (mobile).
+   * `gestor` = abas distribuídas sem scroll (desktop auditoria).
+   */
+  layoutMode?: "tecnico" | "gestor";
 }) {
+  const isGestor = layoutMode === "gestor";
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -628,17 +635,23 @@ export function RelatorioAbasCampo({
         }
       >
         <div className="flex w-full items-center gap-1">
-          <button
-            type="button"
-            onClick={() => scrollAbas("left")}
-            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600 md:hidden"
-            aria-label="Rolar abas para a esquerda"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
+          {!isGestor ? (
+            <button
+              type="button"
+              onClick={() => scrollAbas("left")}
+              className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600"
+              aria-label="Rolar abas para a esquerda"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          ) : null}
           <nav
             ref={abasScrollRef}
-            className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2 overflow-x-auto md:flex-nowrap md:justify-between md:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className={
+              isGestor
+                ? "flex w-full min-w-0 flex-1 flex-wrap items-center justify-between gap-2"
+                : "flex w-full min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            }
             aria-label="Seções do relatório"
           >
             {abas.map((aba) => {
@@ -648,7 +661,9 @@ export function RelatorioAbasCampo({
                   key={aba.id}
                   type="button"
                   onClick={() => onChange(aba.id)}
-                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition md:px-4 md:text-sm ${
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition ${
+                    isGestor ? "md:px-4 md:text-sm" : ""
+                  } ${
                     ativa
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-white text-muted-foreground hover:bg-muted"
@@ -659,14 +674,16 @@ export function RelatorioAbasCampo({
               );
             })}
           </nav>
-          <button
-            type="button"
-            onClick={() => scrollAbas("right")}
-            className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600 md:hidden"
-            aria-label="Rolar abas para a direita"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
+          {!isGestor ? (
+            <button
+              type="button"
+              onClick={() => scrollAbas("right")}
+              className="shrink-0 px-1 py-1 text-gray-400 transition hover:text-gray-600"
+              aria-label="Rolar abas para a direita"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
 
         <div ref={buscaWrapRef} className="relative mt-2 w-full">

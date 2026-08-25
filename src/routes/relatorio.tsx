@@ -1390,6 +1390,7 @@ function RelatorioPage() {
                 stickToViewportTop={headerRolaComPagina}
                 temPendencia={status === "pendente"}
                 motivoPendencia={motivoPendencia}
+                layoutMode="tecnico"
               />
 
               {mostrarRedeAcesso ? (
