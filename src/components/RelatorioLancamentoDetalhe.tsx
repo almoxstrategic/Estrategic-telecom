@@ -2585,6 +2585,7 @@ export function RelatorioDetalhe({
 
       {abaAtiva === "teste-potencia" ? (
         <RelatorioTestePotenciaAtenuacao
+          layoutMode="gestor"
           testeOptico={payload?.testeOptico ?? emptyTesteOptico()}
           testeOtdr={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}
           redeAcesso={payload?.redeAcesso ?? emptyQuantidadesRede()}
