@@ -390,7 +390,7 @@ function buildTesteOtdrAtoms(
   const ativos = otdrItens.filter((item) => hasPhoto(item.foto) || andamentoTexto(item.obs, item.obsAdmin));
   if (!kmRaw && !ativos.length) return [];
 
-  const tituloSecao = isImplantacao ? "6. Teste OTDR (Implantacao)" : "6. Teste OTDR (Empresarial)";
+  const tituloSecao = isImplantacao ? "2. Teste OTDR (Implantacao)" : "2. Teste OTDR (Empresarial)";
   const children: PdfAtomicBlock[] = [{ kind: "heading", text: tituloSecao }];
 
   if (kmRaw) {
@@ -514,7 +514,7 @@ function collectTestePotenciaTabelas(
   if (!optico) return;
   const padraoCoresFibra = p.padraoCoresFibra === "eua" ? "eua" : "br";
 
-  pushHeading(blocks, "7. Teste de Potencia");
+  pushHeading(blocks, "1. Teste de Potencia");
 
   const buildCard = (
     titulo: string,
@@ -625,7 +625,37 @@ export function collectPdfBlocksEscopo(
 ): PdfContentBlock[] {
   const sec = (titulo: string) => (prefix ? `${prefix} · ${titulo}` : titulo);
 
-  pushHeading(blocks, sec("1. Rede Externa (RE)"));
+  // —— Ordem: Potência → OTDR → evidências fotográficas (RE/RC/Equipamentos) ——
+
+  // 1. Teste de Potência (empresarial)
+  collectTestePotenciaTabelas(blocks, p, tipoExecucao);
+
+  // 2. Teste OTDR
+  {
+    const otdrAtoms = buildTesteOtdrAtoms(p, tipoExecucao);
+    if (otdrAtoms.length) pushGroup(blocks, otdrAtoms);
+  }
+
+  // 2b / 7. Teste Óptico — medições técnicas (após OTDR, antes das fotos de campo)
+  {
+    const to = p?.testeOptico;
+    if (to) {
+      const optico: PdfAtomicBlock[] = [{ kind: "heading", text: sec("2.1. Teste Optico") }];
+      if (to.cliente?.numeroFibra != null) {
+        pushPara(optico, String(to.cliente.numeroFibra), "No Fibra (Cliente)");
+      }
+      appendParJanelasOpticas(
+        optico,
+        "No Cliente",
+        to.cliente?.nm1550?.[0],
+        to.cliente?.nm1330?.[0],
+      );
+      if (optico.length > 1) pushGroup(blocks, optico);
+    }
+  }
+
+  // 3. Rede Externa (RE) — evidências
+  pushHeading(blocks, sec("3. Rede Externa (RE)"));
   {
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, simNao(p?.lancamentoCabosRe?.aereo.isSim ?? p?.lancamentoRe), "Lancamento de cabos aereo (RE)");
@@ -701,7 +731,8 @@ export function collectPdfBlocksEscopo(
   ]);
   collectOutras(blocks, "Outras fotos (RE)", p?.outrasFotos ?? []);
 
-  pushHeading(blocks, sec("2. Rede Cliente (RC)"));
+  // 4. Rede Cliente (RC)
+  pushHeading(blocks, sec("4. Rede Cliente (RC)"));
   {
     const meta: PdfAtomicBlock[] = [];
     pushPara(meta, p?.tecnologiaAcesso?.trim() || "-", "Tecnologia de Acesso");
@@ -774,7 +805,8 @@ export function collectPdfBlocksEscopo(
   ]);
   collectOutras(blocks, "Outras fotos (RC)", p?.outrasFotosRc ?? []);
 
-  pushHeading(blocks, sec("3. Equipamentos no Cliente"));
+  // 5. Equipamentos no Cliente
+  pushHeading(blocks, sec("5. Equipamentos no Cliente"));
   collectGruposEmGrade(blocks, [
     { titulo: "Cliente - Entrada/Fachada", grupo: p?.eqClienteFachada },
     { titulo: "Cliente - Ambiente", grupo: p?.eqClienteAmbiente },
@@ -796,8 +828,9 @@ export function collectPdfBlocksEscopo(
   ]);
   collectOutras(blocks, "Outras fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
 
+  // 6. Equipamentos na Estação/PPC
   if (p?.relatorioEstacao) {
-    pushHeading(blocks, sec("4. Equipamentos na Estacao/PPC"));
+    pushHeading(blocks, sec("6. Equipamentos na Estacao/PPC"));
     {
       const meta: PdfAtomicBlock[] = [];
       pushPara(meta, simNao(p.relatorioEstacao), "Relatorio fotografico da estacao");
@@ -821,29 +854,6 @@ export function collectPdfBlocksEscopo(
     });
     collectOutras(blocks, "Outras fotos (Estacao)", p.outrasFotosEqEstacao ?? []);
   }
-
-  // Secoes 5 (Optico — so Cliente) e 6 (OTDR) no mesmo grupo: fluem na mesma pagina.
-  {
-    const combined: PdfAtomicBlock[] = [];
-    const to = p?.testeOptico;
-    if (to) {
-      combined.push({ kind: "heading", text: sec("5. Teste Optico") });
-      if (to.cliente?.numeroFibra != null) {
-        pushPara(combined, String(to.cliente.numeroFibra), "No Fibra (Cliente)");
-      }
-      appendParJanelasOpticas(
-        combined,
-        "No Cliente",
-        to.cliente?.nm1550?.[0],
-        to.cliente?.nm1330?.[0],
-      );
-    }
-    combined.push(...buildTesteOtdrAtoms(p, tipoExecucao));
-    if (combined.length) pushGroup(blocks, combined);
-  }
-
-  // Potencia so em Empresarial (apenas No Cliente).
-  collectTestePotenciaTabelas(blocks, p, tipoExecucao);
 
   return blocks;
 }
