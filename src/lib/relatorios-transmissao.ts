@@ -674,7 +674,7 @@ export function emptyEquipamentoClienteItem(): EquipamentoClienteItemPayload {
 export function emptyDgoClienteItem(): DgoClienteItemPayload {
   return {
     id: crypto.randomUUID(),
-    tipoEquipamento: "",
+    tipoEquipamento: "Roseta",
     modelo: "",
     fabricante: "",
     sgp: SGP_DEFAULT,

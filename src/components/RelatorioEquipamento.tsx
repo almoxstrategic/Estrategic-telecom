@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
 import { FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
@@ -114,6 +114,7 @@ function EquipamentoItemCard({
   index,
   item,
   showIdentificacao,
+  tipoEquipamentoFixo,
   readOnly,
   canRemove,
   onPatch,
@@ -124,12 +125,21 @@ function EquipamentoItemCard({
   index: number;
   item: EquipamentoClienteItemPayload | DgoClienteItemPayload;
   showIdentificacao: boolean;
+  /** Quando definido, trava o tipo (ex.: bloco Roseta → Roseta). */
+  tipoEquipamentoFixo?: string;
   readOnly: boolean;
   canRemove: boolean;
   onPatch: (patch: Partial<EquipamentoClienteItemPayload & DgoClienteItemPayload>) => void;
   onRemove: () => void;
   onPhoto: (campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
 }) {
+  useEffect(() => {
+    if (!tipoEquipamentoFixo || readOnly) return;
+    if (item.tipoEquipamento?.trim() === tipoEquipamentoFixo) return;
+    onPatch({ tipoEquipamento: tipoEquipamentoFixo });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- normaliza tipo fixo do card
+  }, [item.id, tipoEquipamentoFixo, readOnly]);
+
   return (
     <div className="flex h-full flex-col space-y-4 border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
       <div className="flex items-start justify-between gap-2">
@@ -153,13 +163,21 @@ function EquipamentoItemCard({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
+        <div className="min-w-0">
           <label className="mb-1.5 block text-sm font-semibold">Tipo equipamento</label>
-          <TipoEquipamentoCombobox
-            value={item.tipoEquipamento}
-            onChange={(tipoEquipamento) => onPatch({ tipoEquipamento })}
-            disabled={readOnly}
-          />
+          {tipoEquipamentoFixo ? (
+            <TipoEquipamentoCombobox
+              value={item.tipoEquipamento?.trim() || tipoEquipamentoFixo}
+              onChange={() => {}}
+              disabled
+            />
+          ) : (
+            <TipoEquipamentoCombobox
+              value={item.tipoEquipamento}
+              onChange={(tipoEquipamento) => onPatch({ tipoEquipamento })}
+              disabled={readOnly}
+            />
+          )}
         </div>
         <CampoTexto
           label="Modelo"
@@ -205,7 +223,7 @@ function EquipamentoItemCard({
         />
       </div>
 
-      <div>
+      <div className="w-full min-w-0">
         <label className="mb-1.5 block text-sm font-semibold">OBS</label>
         <textarea
           value={item.obs}
@@ -225,6 +243,7 @@ function ListaItensEquipamento({
   itemLabel,
   itens,
   showIdentificacao,
+  tipoEquipamentoFixo,
   addLabel,
   readOnly,
   onChange,
@@ -235,6 +254,7 @@ function ListaItensEquipamento({
   itemLabel: string;
   itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[];
   showIdentificacao: boolean;
+  tipoEquipamentoFixo?: string;
   addLabel: string;
   readOnly: boolean;
   onChange: (next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[]) => void;
@@ -253,6 +273,7 @@ function ListaItensEquipamento({
             index={index}
             item={item}
             showIdentificacao={showIdentificacao}
+            tipoEquipamentoFixo={tipoEquipamentoFixo}
             readOnly={readOnly}
             canRemove={index >= 1}
             onPatch={(patch) =>
@@ -382,12 +403,16 @@ export function RelatorioEquipamento({
           </div>
 
           <div className={flatSectionClass}>
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Roseta
+            </h4>
             <ListaItensEquipamento
               id="secao-eq-dgo-cliente"
-              itemLabel="DGO/Roseta"
+              itemLabel="Roseta"
               itens={dgosCliente}
               showIdentificacao={false}
-              addLabel="Adicionar mais DGO/Roseta/Patch Panel"
+              tipoEquipamentoFixo="Roseta"
+              addLabel="Adicionar mais Roseta"
               readOnly={readOnly}
               onChange={(next) => onDgosClienteChange(next as DgoClienteItemPayload[])}
               onPhoto={onDgoClientePhoto}

@@ -364,7 +364,7 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       titulo: "EQUIPAMENTO NO CLIENTE",
       subitens: [
         { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
-        { titulo: "DGO/Roseta", id: "secao-eq-dgo-cliente" },
+        { titulo: "Roseta", id: "secao-eq-dgo-cliente" },
         { titulo: "Equipamento", id: "secao-eq-equipamentos-cliente" },
         { titulo: "Identificação SGP no Cliente", id: "secao-eqClienteSgp" },
         { titulo: "Configuração equipamento no cliente", id: "secao-eq-config-cliente" },
@@ -432,7 +432,7 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
   equipamento: [
     { titulo: "EQUIPAMENTO NO CLIENTE", id: "secao-eq-cliente" },
     { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
-    { titulo: "DGO/Roseta", id: "secao-eq-dgo-cliente" },
+    { titulo: "Roseta", id: "secao-eq-dgo-cliente" },
     { titulo: "Equipamento", id: "secao-eq-equipamentos-cliente" },
     { titulo: "Identificação SGP no Cliente", id: "secao-eqClienteSgp" },
     { titulo: "Configuração equipamento no cliente", id: "secao-eq-config-cliente" },
@@ -466,10 +466,11 @@ export function navegarParaSecaoFormulario(targetId: string) {
   const el = document.getElementById(targetId);
   if (!el) return false;
   abrirDetailsAncestrais(el);
+  // Aguarda o layout do <details> abrir antes do scroll (subseções em accordion fechado).
   window.setTimeout(() => {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     highlightSecaoTemporaria(el);
-  }, 50);
+  }, 120);
   return true;
 }
 
@@ -518,6 +519,10 @@ function RelatorioIndiceLateral({
                   <li key={`${item.id}-${item.titulo}`}>
                     <button
                       type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        onNavigate(item.id);
+                      }}
                       onClick={() => onNavigate(item.id)}
                       className="w-full rounded-md py-1.5 pl-3 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     >
@@ -626,9 +631,13 @@ export function RelatorioAbasCampo({
   }, []);
 
   const handleSelectSearchResult = (targetId: string) => {
-    navegarParaSecaoFormulario(targetId);
+    const ok = navegarParaSecaoFormulario(targetId);
     setSearchTerm("");
     setIsDropdownOpen(false);
+    if (!ok) {
+      // Retry curto: DOM pode ainda não ter montado após troca de aba.
+      window.setTimeout(() => navegarParaSecaoFormulario(targetId), 160);
+    }
   };
 
   const handleIndiceNavigate = (targetId: string) => {
@@ -837,6 +846,11 @@ export function RelatorioAbasCampo({
                   <li key={`${item.id}-${item.titulo}`}>
                     <button
                       type="button"
+                      onMouseDown={(e) => {
+                        // Evita que o blur/mousedown do document feche o dropdown antes do click.
+                        e.preventDefault();
+                        handleSelectSearchResult(item.id);
+                      }}
                       onClick={() => handleSelectSearchResult(item.id)}
                       className="w-full cursor-pointer border-b border-border px-3 py-3 text-left text-sm last:border-b-0 hover:bg-gray-100"
                     >
@@ -1728,7 +1742,7 @@ export function RelatorioRedeAcesso({
                         )}
                       </div>
                     </div>
-                    <div className="mt-auto w-full">
+                    <div className="mt-auto w-full min-w-0">
                       <label className="mb-1.5 block text-sm font-semibold">OBS</label>
                       <textarea
                         value={cabo.obs}
@@ -2062,7 +2076,7 @@ export function RelatorioOutrasFotos({
                   />
                 )}
               </div>
-              <div className="mt-auto w-full">
+              <div className="mt-auto w-full min-w-0">
                 <label className="mb-1.5 block text-sm font-semibold">OBS</label>
                 <textarea
                   value={item.obs}

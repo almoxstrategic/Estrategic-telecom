@@ -5,6 +5,7 @@ import {
   RelatorioFotoComControles,
 } from "@/components/RelatorioFotoComControles";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { Button } from "@/components/ui/button";
 import { inputClass, textareaObsClass } from "@/components/RelatorioRedeAcesso";
 import { SeletorPadraoCoresFibra } from "@/components/SeletorPadraoCoresFibra";
 import { corFibraPorNumero, type PadraoCoresFibra } from "@/lib/fiber-colors";
@@ -433,6 +434,7 @@ export function RelatorioTesteOptico({
   readOnly,
   padraoCoresFibra = "br",
   onPadraoCoresFibraChange,
+  layoutMode = "tecnico",
 }: {
   value: TesteOpticoPayload;
   onChange: (next: TesteOpticoPayload, opts?: ChangeOpts) => void;
@@ -440,9 +442,12 @@ export function RelatorioTesteOptico({
   readOnly: boolean;
   padraoCoresFibra?: PadraoCoresFibra;
   onPadraoCoresFibraChange?: (next: PadraoCoresFibra) => void;
+  /** Gestor: botão Adicionar no cabeçalho da seção. */
+  layoutMode?: "tecnico" | "gestor";
 }) {
   const [mostrarEstacao, setMostrarEstacao] = useState(() => testeOpticoEstacaoAtivo(value.estacao));
   const padrao = padraoCoresFibra === "eua" ? "eua" : "br";
+  const isGestor = layoutMode === "gestor";
 
   useEffect(() => {
     if (testeOpticoEstacaoAtivo(value.estacao)) setMostrarEstacao(true);
@@ -491,7 +496,21 @@ export function RelatorioTesteOptico({
             onRemover={readOnly ? undefined : removerEstacao}
           />
         </div>
-      ) : readOnly ? null : (
+      ) : readOnly ? null : isGestor ? (
+        <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
+          <h3 className="text-lg font-bold text-gray-900">Teste Óptico (Na Estação)</h3>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setMostrarEstacao(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar Teste Óptico (Na Estação)
+          </Button>
+        </div>
+      ) : (
         <BotaoAdicionar
           label="Adicionar Teste Óptico (Na Estação)"
           onClick={() => setMostrarEstacao(true)}
@@ -509,6 +528,7 @@ export function RelatorioTestePotencia({
   onChangeImplantacao,
   onUploadPhoto,
   readOnly,
+  layoutMode = "tecnico",
 }: {
   tipoExecucao: TipoExecucao;
   valueEmpresarial: TestePotenciaPayload;
@@ -517,10 +537,16 @@ export function RelatorioTestePotencia({
   onChangeImplantacao: (next: TestePotenciaPayload, opts?: ChangeOpts) => void;
   onUploadPhoto?: (file: EvidencePhotoRef) => Promise<StoredPhoto>;
   readOnly: boolean;
+  /** Gestor: botão Adicionar no cabeçalho da seção. */
+  layoutMode?: "tecnico" | "gestor";
 }) {
   const isImplantacao = tipoExecucao === "implantacao";
   const value = isImplantacao ? valueImplantacao : valueEmpresarial;
   const onChange = isImplantacao ? onChangeImplantacao : onChangeEmpresarial;
+  const isGestor = layoutMode === "gestor";
+
+  const adicionarTeste = () =>
+    onChange({ ...value, otdr: [...value.otdr, emptyTesteOtdrItem()] }, { immediate: true });
 
   const patchItem = (id: string, patch: Partial<TesteOtdrItemPayload>, opts?: ChangeOpts) => {
     onChange(
@@ -541,7 +567,25 @@ export function RelatorioTestePotencia({
 
   return (
     <div className="space-y-4 break-inside-avoid rounded-2xl border border-border bg-card p-5 shadow-sm print:break-before-avoid print:break-inside-avoid print:space-y-1 print:border-0 print:p-2 print:shadow-none">
-      <h2 className="text-base font-bold print:mb-1 print:text-sm">Teste OTDR</h2>
+      {isGestor ? (
+        <div className="mb-4 flex items-center justify-between gap-3 print:mb-1">
+          <h3 className="text-lg font-bold text-gray-900 print:text-sm">Teste OTDR</h3>
+          {readOnly ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 print:hidden"
+              onClick={adicionarTeste}
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar mais teste
+            </Button>
+          )}
+        </div>
+      ) : (
+        <h2 className="text-base font-bold print:mb-1 print:text-sm">Teste OTDR</h2>
+      )}
       <div className="print:mb-1">
         <CampoMedicaoDecimal
           id="comprimento-trecho-otdr"
@@ -601,13 +645,8 @@ export function RelatorioTestePotencia({
           </div>
         ))}
       </div>
-      {readOnly ? null : (
-        <BotaoAdicionar
-          label="Adicionar mais teste"
-          onClick={() =>
-            onChange({ ...value, otdr: [...value.otdr, emptyTesteOtdrItem()] }, { immediate: true })
-          }
-        />
+      {isGestor || readOnly ? null : (
+        <BotaoAdicionar label="Adicionar mais teste" onClick={adicionarTeste} />
       )}
     </div>
   );

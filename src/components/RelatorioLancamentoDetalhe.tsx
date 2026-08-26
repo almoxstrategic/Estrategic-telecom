@@ -370,7 +370,7 @@ function ObsEditavel({
   );
 
   return (
-    <div className="w-full space-y-1.5">
+    <div className="w-full min-w-0 space-y-1.5">
       <label className="block text-sm font-semibold">OBS</label>
       <textarea
         value={local}
@@ -380,7 +380,7 @@ function ObsEditavel({
         }}
         rows={2}
         disabled={!onChange}
-        className="box-border w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+        className="box-border w-full min-h-[64px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
       />
     </div>
   );
@@ -648,15 +648,28 @@ function PostePerguntaQuadrante({
   return <PendenciaItemFrame def={pendencia}>{inner}</PendenciaItemFrame>;
 }
 
-function BotaoAdicionar({ label, onClick }: { label: string; onClick: () => void }) {
+/** Cabeçalho de seção dinâmica: título à esquerda, botão Adicionar à direita (visão Gestor). */
+function SecaoDinamicaHeader({
+  titulo,
+  addLabel,
+  onAdd,
+  canAdd = true,
+}: {
+  titulo: string;
+  addLabel: string;
+  onAdd: () => void;
+  canAdd?: boolean;
+}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 px-3 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5"
-    >
-      <Plus className="h-4 w-4" /> {label}
-    </button>
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h3 className="text-lg font-bold text-gray-900">{titulo}</h3>
+      {canAdd ? (
+        <Button type="button" variant="outline" size="sm" onClick={onAdd} className="shrink-0">
+          <Plus className="h-4 w-4" />
+          {addLabel}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -694,6 +707,7 @@ function AdminListaEquipamentos({
   titulo,
   addLabel,
   showIdentificacao,
+  tipoEquipamentoFixo,
   itemLabel,
   itens,
   canEdit,
@@ -704,6 +718,8 @@ function AdminListaEquipamentos({
   titulo: string;
   addLabel: string;
   showIdentificacao: boolean;
+  /** Trava o tipo (ex.: bloco Roseta → Roseta). */
+  tipoEquipamentoFixo?: string;
   itemLabel?: string;
   itens: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[];
   canEdit: boolean;
@@ -713,7 +729,21 @@ function AdminListaEquipamentos({
 }) {
   const [fallback] = useState(() => emptyItem());
   const list = itens.length ? itens : [fallback];
-  const label = itemLabel ?? (showIdentificacao ? "Equipamento" : "DGO/Roseta");
+  const label = itemLabel ?? (showIdentificacao ? "Equipamento" : "Roseta");
+
+  useEffect(() => {
+    if (!tipoEquipamentoFixo || !canEdit) return;
+    const needsFix = list.some((row) => row.tipoEquipamento?.trim() !== tipoEquipamentoFixo);
+    if (!needsFix) return;
+    onPatchList(
+      list.map((row) =>
+        row.tipoEquipamento?.trim() === tipoEquipamentoFixo
+          ? row
+          : { ...row, tipoEquipamento: tipoEquipamentoFixo },
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- normaliza tipo fixo do bloco Roseta
+  }, [tipoEquipamentoFixo, canEdit, list.map((r) => r.id).join("|")]);
 
   const patchItem = (
     id: string,
@@ -739,7 +769,12 @@ function AdminListaEquipamentos({
 
   return (
     <div className="space-y-3">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">{titulo}</h4>
+      <SecaoDinamicaHeader
+        titulo={titulo}
+        addLabel={addLabel}
+        canAdd={canEdit}
+        onAdd={() => onPatchList([...list, emptyItem()])}
+      />
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3 lg:grid-cols-3">
         {list.map((item, index) => (
           <div
@@ -767,13 +802,21 @@ function AdminListaEquipamentos({
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-gray-500">Tipo equipamento</p>
-                <TipoEquipamentoCombobox
-                  value={item.tipoEquipamento}
-                  onChange={(tipoEquipamento) => patchItem(item.id, { tipoEquipamento })}
-                  disabled={!canEdit}
-                />
+              <div className="min-w-0">
+                <p className="mb-1 text-xs text-gray-500">Tipo equipamento</p>
+                {tipoEquipamentoFixo ? (
+                  <TipoEquipamentoCombobox
+                    value={item.tipoEquipamento?.trim() || tipoEquipamentoFixo}
+                    onChange={() => {}}
+                    disabled
+                  />
+                ) : (
+                  <TipoEquipamentoCombobox
+                    value={item.tipoEquipamento}
+                    onChange={(tipoEquipamento) => patchItem(item.id, { tipoEquipamento })}
+                    disabled={!canEdit}
+                  />
+                )}
               </div>
               {(
                 [
@@ -784,9 +827,9 @@ function AdminListaEquipamentos({
                     ? ([["Identificação", "identificacao"]] as const)
                     : []),
                 ] as const
-              ).map(([label, key]) => (
-                <div key={key}>
-                  <p className="text-xs text-gray-500">{label}</p>
+              ).map(([fieldLabel, key]) => (
+                <div key={key} className="min-w-0">
+                  <p className="mb-1 text-xs text-gray-500">{fieldLabel}</p>
                   <input
                     type="text"
                     value={
@@ -810,15 +853,15 @@ function AdminListaEquipamentos({
                   ["Foto do equipamento", "foto"],
                   ["Etiqueta de Identificação", "etiqueta"],
                 ] as const
-              ).map(([label, campo]) => {
+              ).map(([fotoLabel, campo]) => {
                 const foto = item[campo];
                 return (
                   <div key={campo}>
-                    <FotoLabel>{label}</FotoLabel>
+                    <FotoLabel>{fotoLabel}</FotoLabel>
                     {foto ? (
                       <RelatorioFotoComControles
                         src={foto.url}
-                        alt={label}
+                        alt={fotoLabel}
                         canEdit={canEdit}
                         onDelete={canEdit ? () => void setFoto(item.id, campo, null) : undefined}
                         onReplace={
@@ -827,7 +870,8 @@ function AdminListaEquipamentos({
                       />
                     ) : canEdit ? (
                       <PhotoUpload
-                        label={label}
+                        label={fotoLabel}
+                        hideLabel
                         value={null}
                         onChange={(file) => void setFoto(item.id, campo, file)}
                       />
@@ -839,8 +883,8 @@ function AdminListaEquipamentos({
               })}
             </div>
 
-            <div>
-              <p className="text-xs text-gray-500">OBS</p>
+            <div className="w-full min-w-0">
+              <p className="mb-1 text-xs text-gray-500">OBS</p>
               <textarea
                 value={item.obs}
                 disabled={!canEdit}
@@ -852,15 +896,6 @@ function AdminListaEquipamentos({
           </div>
         ))}
       </div>
-      {canEdit ? (
-        <button
-          type="button"
-          onClick={() => onPatchList([...list, emptyItem()])}
-          className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5"
-        >
-          <Plus className="h-4 w-4" /> {addLabel}
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -1669,7 +1704,12 @@ export function RelatorioDetalhe({
       : items.filter((item) => item.foto || item.ref || item.obs || item.obsAdmin);
     return (
       <section className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">{heading}</h3>
+        <SecaoDinamicaHeader
+          titulo={heading}
+          addLabel="Adicionar mais fotos"
+          canAdd={canEditPhotos}
+          onAdd={() => adicionarOutra(categoria)}
+        />
         {visiveis.length ? (
           <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
             {visiveis.map((item) => renderOutra(item, categoria))}
@@ -1677,9 +1717,6 @@ export function RelatorioDetalhe({
         ) : (
           <p className="text-sm text-muted-foreground">Nenhum bloco adicional.</p>
         )}
-        {canEditPhotos ? (
-          <BotaoAdicionar label="Adicionar mais fotos" onClick={() => adicionarOutra(categoria)} />
-        ) : null}
       </section>
     );
   };
@@ -1783,7 +1820,17 @@ export function RelatorioDetalhe({
             </div>
             {lancamentoCabosRe[abaLancamentoRe].isSim === true ? (
               <div className="space-y-4 border-b border-gray-100 pb-6">
-                <h2 className="font-semibold text-gray-800">Metragem de cabo</h2>
+                <SecaoDinamicaHeader
+                  titulo="Metragem de cabo"
+                  addLabel="Adicionar mais cabo"
+                  canAdd={canEditPhotos}
+                  onAdd={() => {
+                    patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
+                      ...lado,
+                      metragens: [...lado.metragens, emptyCaboMetragem()],
+                    }));
+                  }}
+                />
                 <div className="flex flex-col gap-4">
                   {lancamentoCabosRe[abaLancamentoRe].metragens.map((cabo, index) =>
                     renderCabo(
@@ -1794,17 +1841,6 @@ export function RelatorioDetalhe({
                       `Cabo ${index + 1}`,
                     ),
                   )}
-                  {canEditPhotos ? (
-                    <BotaoAdicionar
-                      label="Adicionar mais cabo"
-                      onClick={() => {
-                        patchLancamentoCabos("lancamentoCabosRe", abaLancamentoRe, (lado) => ({
-                          ...lado,
-                          metragens: [...lado.metragens, emptyCaboMetragem()],
-                        }));
-                      }}
-                    />
-                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -2071,7 +2107,17 @@ export function RelatorioDetalhe({
             </div>
             {lancamentoCabosRc[abaLancamentoRc].isSim === true ? (
               <div className="space-y-4 border-b border-gray-100 pb-6">
-                <h2 className="font-semibold text-gray-800">Metragem de cabo</h2>
+                <SecaoDinamicaHeader
+                  titulo="Metragem de cabo"
+                  addLabel="Adicionar mais cabo"
+                  canAdd={canEditPhotos}
+                  onAdd={() => {
+                    patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
+                      ...lado,
+                      metragens: [...lado.metragens, emptyCaboMetragem()],
+                    }));
+                  }}
+                />
                 <div className="flex flex-col gap-4">
                   {lancamentoCabosRc[abaLancamentoRc].metragens.map((cabo, index) =>
                     renderCabo(
@@ -2082,17 +2128,6 @@ export function RelatorioDetalhe({
                       `Cabo ${index + 1}`,
                     ),
                   )}
-                  {canEditPhotos ? (
-                    <BotaoAdicionar
-                      label="Adicionar mais cabo"
-                      onClick={() => {
-                        patchLancamentoCabos("lancamentoCabosRc", abaLancamentoRc, (lado) => ({
-                          ...lado,
-                          metragens: [...lado.metragens, emptyCaboMetragem()],
-                        }));
-                      }}
-                    />
-                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -2307,10 +2342,11 @@ export function RelatorioDetalhe({
             </div>
 
             <AdminListaEquipamentos
-              titulo="DGO/Roseta"
-              addLabel="Adicionar mais DGO/Roseta/Patch Panel"
+              titulo="Roseta"
+              addLabel="Adicionar mais Roseta"
               showIdentificacao={false}
-              itemLabel="DGO/Roseta"
+              tipoEquipamentoFixo="Roseta"
+              itemLabel="Roseta"
               itens={payload?.eqClienteDgo ?? []}
               canEdit={canEditPhotos}
               onUploadPhoto={onUploadPhoto}
@@ -2461,6 +2497,7 @@ export function RelatorioDetalhe({
           <div className="print:hidden">
             {abaAtiva === "teste-optico" ? (
               <RelatorioTesteOptico
+                layoutMode="gestor"
                 readOnly={!canEditPhotos}
                 value={payload?.testeOptico ?? emptyTesteOptico()}
                 padraoCoresFibra={
@@ -2480,6 +2517,7 @@ export function RelatorioDetalhe({
             ) : null}
             {abaAtiva === "teste-otdr" ? (
               <RelatorioTestePotencia
+                layoutMode="gestor"
                 tipoExecucao={isImplantacao ? "implantacao" : "empresarial"}
                 readOnly={!canEditPhotos}
                 valueEmpresarial={payload?.testePotenciaEmpresarial ?? emptyTestePotencia()}

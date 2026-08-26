@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ChoiceButton, inputClass } from "@/components/RelatorioRedeAcesso";
 import {
   emptyMedicaoTomada,
@@ -271,6 +272,25 @@ export function AbaInfraestrutura({
       )}
 
       <div className="space-y-4 pt-1">
+        {isGestor ? (
+          <div className="mb-0 flex items-center justify-between gap-3">
+            <h3 className="text-lg font-bold text-gray-900">Tomadas</h3>
+            {readOnly || !onChange ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() =>
+                  onChange({ ...value, tomadas: [...tomadas, emptyMedicaoTomada()] })
+                }
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar mais tomada
+              </Button>
+            )}
+          </div>
+        ) : null}
         {tomadas.map((tomada, index) => (
           <TomadaCard
             key={tomada.id}
@@ -296,7 +316,7 @@ export function AbaInfraestrutura({
             }
           />
         ))}
-        {readOnly || !onChange ? null : (
+        {isGestor || readOnly || !onChange ? null : (
           <button
             type="button"
             onClick={() =>

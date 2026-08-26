@@ -3,10 +3,8 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { toast } from "sonner";
 import { useEvidencePhotoPasteSlot } from "@/components/EvidencePhotoPasteContext";
 import { ExpandableImage } from "@/components/ExpandableImage";
-import { useApp } from "@/lib/app-store";
 import { waitForImageMemoryRelease } from "@/lib/compress-image";
 import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
-import { hasPainelFullAccess } from "@/lib/roles";
 import type { EvidencePhotoRef } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -56,14 +54,12 @@ export function PhotoUpload({
   hideHelperText?: boolean;
   fillWidth?: boolean;
 }) {
-  const { user } = useApp();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [busyMode, setBusyMode] = useState<BusyMode>("idle");
   const [dragOver, setDragOver] = useState(false);
   const busy = busyMode !== "idle";
-  const showHelperText =
-    !compact && !hideHelperText && hasPainelFullAccess(user?.role);
+  const showHelperText = false;
 
   useEffect(() => {
     return () => {

@@ -290,7 +290,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
       {(payload?.eqClienteDgo ?? []).map((item, index) => (
         <Secao
           key={item.id}
-          titulo={`DGO/Roseta ${index + 1}${item.tipoEquipamento ? ` — ${item.tipoEquipamento}` : ""}`}
+          titulo={`Roseta ${index + 1}${item.tipoEquipamento ? ` — ${item.tipoEquipamento}` : ""}`}
           obs={[
             item.modelo && `Modelo: ${item.modelo}`,
             item.fabricante && `Fabricante: ${item.fabricante}`,

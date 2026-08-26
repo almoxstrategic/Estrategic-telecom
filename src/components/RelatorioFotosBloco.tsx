@@ -217,7 +217,7 @@ export function RelatorioFotosBloco({
       </div>
 
       <div className="mt-4 w-full min-w-0 space-y-3">
-        <div className="w-full">
+        <div className="w-full min-w-0">
           <label className="mb-1.5 block text-sm font-semibold">OBS</label>
           <textarea
             value={obs}

@@ -478,29 +478,32 @@ function AdminLancamentoDetalhePage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando relatório...</p>
           ) : row ? (
-            <EvidencePhotoPasteProvider>
-              <RelatorioDetalhe
-                row={row}
-                canEditPhotos={canAudit}
-                canEditCadastro={canAudit}
-                onCadastroSaved={setRow}
-                onAddPhoto={(categoria, file, ambiente) =>
-                  void onAdminAddPhoto(categoria, file, ambiente)
-                }
-                onAddPhotos={(categoria, files, ambiente) =>
-                  void onAdminAddPhotos(categoria, files, ambiente)
-                }
-                onReplacePhoto={(categoria, file, meta) =>
-                  void onAdminReplacePhoto(categoria, file, meta)
-                }
-                uploadingCategoria={uploadingCategoria}
-                onUpdatePayload={onUpdatePayload}
-                onUploadPhoto={async (file) => {
-                  if (!user?.id) throw new Error("Sessão inválida.");
-                  return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
-                }}
-              />
-            </EvidencePhotoPasteProvider>
+            /* Escala 75% exclusiva da visão do Gestor — técnico permanece em 100%. */
+            <div className="origin-top-left [zoom:0.75]">
+              <EvidencePhotoPasteProvider>
+                <RelatorioDetalhe
+                  row={row}
+                  canEditPhotos={canAudit}
+                  canEditCadastro={canAudit}
+                  onCadastroSaved={setRow}
+                  onAddPhoto={(categoria, file, ambiente) =>
+                    void onAdminAddPhoto(categoria, file, ambiente)
+                  }
+                  onAddPhotos={(categoria, files, ambiente) =>
+                    void onAdminAddPhotos(categoria, files, ambiente)
+                  }
+                  onReplacePhoto={(categoria, file, meta) =>
+                    void onAdminReplacePhoto(categoria, file, meta)
+                  }
+                  uploadingCategoria={uploadingCategoria}
+                  onUpdatePayload={onUpdatePayload}
+                  onUploadPhoto={async (file) => {
+                    if (!user?.id) throw new Error("Sessão inválida.");
+                    return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
+                  }}
+                />
+              </EvidencePhotoPasteProvider>
+            </div>
           ) : (
             <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-muted-foreground">
               Relatório não encontrado.

@@ -246,7 +246,7 @@ function collectEquipamentoItensLista(
     const children: PdfAtomicBlock[] = [
       {
         kind: "subheader",
-        text: `${opts.comIdentificacao ? "Equipamento" : "DGO/Roseta"} ${index + 1}`,
+        text: `${opts.comIdentificacao ? "Equipamento" : "Roseta"} ${index + 1}`,
       },
     ];
     pushPara(children, item.tipoEquipamento, "Tipo equipamento");

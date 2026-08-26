@@ -163,19 +163,37 @@ function linha(
   };
 }
 
-/** Conta itens por tipo (equipamentos + DGO/Roseta do cliente). */
+/**
+ * TOTAL DE POSTES: desconta 1 poste de conexão compartilhado entre RE e RC.
+ * TOTAL = max(0, (RE + RC) - 1) quando a soma > 0; caso contrário 0.
+ */
+export function totalPostesDeduplicado(re: number, rc: number): number {
+  const soma = numOrZero(re) + numOrZero(rc);
+  if (soma <= 0) return 0;
+  return Math.max(0, soma - 1);
+}
+
+/** Conta itens por tipo (equipamentos + Roseta do cliente). */
 function contagemPorTipoEquipamento(
-  ...listas: ({ tipoEquipamento?: string | null }[] | null | undefined)[]
+  equipamentos: { tipoEquipamento?: string | null }[] | null | undefined,
+  rosetas: { tipoEquipamento?: string | null }[] | null | undefined,
 ): Map<string, number> {
   const map = new Map<string, number>();
-  for (const itens of listas) {
-    for (const item of itens ?? []) {
-      const tipo = String(item.tipoEquipamento ?? "").trim();
-      if (!tipo) continue;
-      map.set(tipo, (map.get(tipo) ?? 0) + 1);
-    }
+  for (const item of equipamentos ?? []) {
+    const tipo = String(item.tipoEquipamento ?? "").trim();
+    if (!tipo) continue;
+    map.set(tipo, (map.get(tipo) ?? 0) + 1);
+  }
+  // Bloco Roseta: conta sempre como Roseta (legado pode ainda ter DGO/PDO).
+  for (const _item of rosetas ?? []) {
+    map.set("Roseta", (map.get("Roseta") ?? 0) + 1);
   }
   return map;
+}
+
+function labelTipoEquipamentoMedicao(tipo: string): string {
+  if (tipo === "Roseta") return "Roseta instalada";
+  return `Equipamento ${tipo}`;
 }
 
 /**
@@ -208,7 +226,7 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
   const linhasTipoEq = [...porTipo.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
     .map(([tipo, qtd]) =>
-      linha(`eq-tipo-${tipo}`, "acessos", `Equipamento ${tipo}`, "Unid.", 0, qtd),
+      linha(`eq-tipo-${tipo}`, "acessos", labelTipoEquipamentoMedicao(tipo), "Unid.", 0, qtd),
     );
   const totalEquipamentos = [...porTipo.values()].reduce((acc, n) => acc + n, 0);
 
@@ -223,7 +241,9 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       rc.redeLancadaAereo,
     ),
     ...linhasFoAereo,
-    linha("postes-total", "aereo", "TOTAL DE POSTES", "Unid.", re.totalPostes, rc.totalPostes),
+    linha("postes-total", "aereo", "TOTAL DE POSTES", "Unid.", re.totalPostes, rc.totalPostes, undefined, {
+      total: totalPostesDeduplicado(re.totalPostes, rc.totalPostes),
+    }),
     linha(
       "postes-nova",
       "aereo",

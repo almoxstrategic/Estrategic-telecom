@@ -72,12 +72,14 @@ export function pendenciaFotoGrupo(opts: {
     opts.section === "cabos" || opts.section === "poste" || opts.section === "caixa"
       ? `${secaoBase} (${opts.aba})`
       : secaoBase;
-  return buildPendenciaItem({
+  const itemId = `${opts.aba}.foto.${opts.grupoKey}`;
+  return {
+    itemId,
+    label: `${secao} - ${opts.title}`,
     aba: opts.aba,
-    secao,
-    subbloco: opts.title,
-    key: `foto.${opts.grupoKey}`,
-  });
+    /** Mesmo id das âncoras de busca/índice (`secao-${grupoKey}`). */
+    anchorId: `secao-${opts.grupoKey}`,
+  };
 }
 
 export function pendenciaMetragemCabo(opts: {
