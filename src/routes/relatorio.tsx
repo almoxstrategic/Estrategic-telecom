@@ -1683,7 +1683,7 @@ function RelatorioPage() {
                     {
                       grupoKey: "dutoSubterraneo",
                       section: "cabos",
-                      title: "Const. de duto subterrâneo (MD ou MND)",
+                      title: "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
                       slots: duto,
                       onChange: setDuto,
                       obs: dutoObs,
@@ -1691,7 +1691,6 @@ function RelatorioPage() {
                       obsAdmin: obsAdminGrupos.dutoSubterraneo ?? "",
                       onObsAdminChange: patchObsAdminGrupo("dutoSubterraneo"),
                       quantidade: redeAcesso.metrosDutoSubterraneo,
-                      quantidadeLabel: "Const. de DUTO SUBTERÂNEO (MD ou MND) — metros (MT)",
                       quantidadePlaceholder: "Ex: 120",
                       onQuantidadeChange: (metrosDutoSubterraneo: number | null) => {
                         setRedeAcesso((prev) => ({ ...prev, metrosDutoSubterraneo }));
@@ -1949,7 +1948,7 @@ function RelatorioPage() {
                     {
                       grupoKey: "rcDutoSubterraneo",
                       section: "cabos",
-                      title: "Const. de duto subterrâneo (MD ou MND)",
+                      title: "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
                       slots: rcDuto,
                       onChange: setRcDuto,
                       obs: rcDutoObs,
@@ -1957,7 +1956,6 @@ function RelatorioPage() {
                       obsAdmin: obsAdminGrupos.rcDutoSubterraneo ?? "",
                       onObsAdminChange: patchObsAdminGrupo("rcDutoSubterraneo"),
                       quantidade: redeCliente.metrosDutoSubterraneo,
-                      quantidadeLabel: "Const. de DUTO SUBTERÂNEO (MD ou MND) — metros (MT)",
                       quantidadePlaceholder: "Ex: 120",
                       onQuantidadeChange: (metrosDutoSubterraneo: number | null) => {
                         setRedeCliente((prev) => ({ ...prev, metrosDutoSubterraneo }));

@@ -296,7 +296,7 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       subitens: [
         { titulo: "Lançamento de cabos", id: "secao-cabos" },
         { titulo: "Sobra técnica", id: "secao-sobraTecnica" },
-        { titulo: "Const. de duto subterrâneo", id: "secao-dutoSubterraneo" },
+        { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-dutoSubterraneo" },
       ],
     },
     {
@@ -337,7 +337,7 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
         { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
         { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
         { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
-        { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
+        { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-rcDutoSubterraneo" },
       ],
     },
     {
@@ -401,7 +401,7 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
     { titulo: "CAIXA DE EMENDA (RE)", id: "secao-caixa-emenda" },
     { titulo: "Caixa de emenda (fotos)", id: "secao-caixaEmenda" },
-    { titulo: "Const. de duto subterrâneo", id: "secao-dutoSubterraneo" },
+    { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-dutoSubterraneo" },
     { titulo: "Plaqueta de Identificação", id: "secao-plaquetaIdentificacao" },
     { titulo: "OUTRAS FOTOS (RE)", id: "secao-outras-fotos" },
   ],
@@ -420,7 +420,7 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
     { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
     { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
-    { titulo: "Const. de duto subterrâneo", id: "secao-rcDutoSubterraneo" },
+    { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-rcDutoSubterraneo" },
     { titulo: "POSTE (RC)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
     { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
@@ -1149,7 +1149,10 @@ function renderGrupoFotoCard(
         section: grupo.section,
       })}
       headerExtra={
-        grupo.showAmbienteToggle || grupo.quantidadeLabel || grupo.coordenadas ? (
+        grupo.showAmbienteToggle ||
+        grupo.onQuantidadeChange ||
+        grupo.quantidadeLabel ||
+        grupo.coordenadas ? (
           <div className="space-y-3">
             {grupo.showAmbienteToggle ? (
               <AmbienteToggle
@@ -1158,7 +1161,7 @@ function renderGrupoFotoCard(
                 disabled={readOnly}
               />
             ) : null}
-            {grupo.quantidadeLabel ? (
+            {grupo.onQuantidadeChange || grupo.quantidadeLabel ? (
               <CampoQuantidade
                 label={grupo.quantidadeLabel}
                 placeholder={grupo.quantidadePlaceholder ?? "Ex: 0"}
@@ -1197,7 +1200,7 @@ export function CampoQuantidade({
   onChange,
   disabled = false,
 }: {
-  label: string;
+  label?: string;
   placeholder: string;
   value: number | null;
   onChange?: (value: number | null) => void;
@@ -1206,9 +1209,11 @@ export function CampoQuantidade({
   const id = useId();
   return (
     <div className="mb-4">
-      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold">
-        {label}
-      </label>
+      {label ? (
+        <label htmlFor={id} className="mb-1.5 block text-sm font-semibold">
+          {label}
+        </label>
+      ) : null}
       <input
         id={id}
         type="text"

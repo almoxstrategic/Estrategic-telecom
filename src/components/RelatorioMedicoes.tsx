@@ -13,7 +13,7 @@ const BLOCO_TITULO: Record<ResumoCadernoLinha["bloco"], string> = {
   aereo: "Infraestrutura Aérea",
   aterramento: "Aterramento",
   subterraneo: "Infraestrutura Subterrânea",
-  acessos: "Acessos, Caixas e Equipamentos",
+  acessos: "Acessos e Equipamentos",
 };
 
 const BLOCOS: ResumoCadernoLinha["bloco"][] = [

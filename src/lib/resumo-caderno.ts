@@ -1,7 +1,6 @@
 import {
   calcularMetragemCaboTotal,
   parseMarcacaoNumero,
-  qtdCaixasTotal,
   type CaboMetragemPayload,
   type CordoalhaBlocoPayload,
   type LancamentoPorAmbientePayload,
@@ -23,11 +22,8 @@ export type ResumoCadernoLado = {
   redeLancadaSubterraneo: number;
   dutoSubterraneo: number;
   caixaSubterranea: number;
-  /** RE: metragem FO | RC: equipamentos instalados */
-  fibrasOuEquipamentos: number;
-  /** Capacidade FO dominante (tipo de cabo), para o rótulo RE. */
-  capacidadeFo: number | null;
-  caixasEmendaInstalada: number;
+  caixasEmendaAereo: number;
+  caixasEmendaSubterraneo: number;
   /** Código SIM/NÃO. */
   caixasEmendaExistenteRota: number;
   fiberloopInstalados: number;
@@ -41,7 +37,7 @@ export type ResumoCadernoLinha = {
   /** Rótulo específico RC quando diferente do RE (bloco 4). */
   labelRc?: string;
   unidade: ResumoCadernoUnidade;
-  /** Unidade na coluna RC quando diferente da RE (ex.: fibras × equipamentos). */
+  /** Unidade na coluna RC quando diferente da RE. */
   unidadeRc?: ResumoCadernoUnidade;
   re: number;
   rc: number;
@@ -88,41 +84,45 @@ function tipoCaboNumero(cabo: CaboMetragemPayload): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Maior tipo de cabo (FO) entre todos os cabos — tipicamente 12, 24, etc. */
-function capacidadeFoDominante(
+/**
+ * Agrupa metragem por capacidade FO em um ambiente.
+ * Chave `0` = cabos sem tipo informado.
+ */
+function metragensPorCapacidadeFo(
   lancamento: LancamentoPorAmbientePayload | null | undefined,
-): number | null {
-  if (!lancamento) return null;
-  let max: number | null = null;
-  for (const amb of ["aereo", "subterraneo"] as const) {
-    for (const cabo of lancamento[amb]?.metragens ?? []) {
-      const n = tipoCaboNumero(cabo);
-      if (n != null && (max == null || n > max)) max = n;
-    }
+  ambiente: "aereo" | "subterraneo",
+): Map<number, number> {
+  const map = new Map<number, number>();
+  if (!lancamento) return map;
+  for (const cabo of lancamento[ambiente]?.metragens ?? []) {
+    const tipo = tipoCaboNumero(cabo) ?? 0;
+    map.set(tipo, (map.get(tipo) ?? 0) + metragemCabo(cabo));
   }
-  return max;
+  return map;
 }
 
-/** Soma metragem dos cabos cuja capacidade FO coincide com `capacidade`. */
-function somaMetragemPorCapacidadeFo(
-  lancamento: LancamentoPorAmbientePayload | null | undefined,
-  capacidade: number | null,
-): number {
-  if (!lancamento || capacidade == null) return 0;
-  let soma = 0;
-  for (const amb of ["aereo", "subterraneo"] as const) {
-    for (const cabo of lancamento[amb]?.metragens ?? []) {
-      if (tipoCaboNumero(cabo) === capacidade) soma += metragemCabo(cabo);
+/** União ordenada das capacidades FO (exclui 0=sem tipo no meio; 0 fica por último se houver). */
+function capacidadesOrdenadas(...maps: Map<number, number>[]): number[] {
+  const set = new Set<number>();
+  for (const m of maps) {
+    for (const k of m.keys()) {
+      if ((m.get(k) ?? 0) > 0) set.add(k);
     }
   }
-  return soma;
+  const list = [...set].filter((k) => k > 0).sort((a, b) => a - b);
+  if (set.has(0)) list.push(0);
+  return list;
+}
+
+function labelFibraFo(capacidade: number): string {
+  return capacidade > 0
+    ? `Quant. de fibra ${capacidade} FO lançada`
+    : "Quant. de fibra FO lançada";
 }
 
 function buildLado(
   rede: QuantidadesRedePayload | null | undefined,
   lancamento: LancamentoPorAmbientePayload | null | undefined,
-  fibrasOuEquipamentos: number,
-  capacidadeFo: number | null,
 ): ResumoCadernoLado {
   const postesNova = qtdSeSim(rede?.postesNovaCordoalha);
   return {
@@ -136,9 +136,8 @@ function buildLado(
     redeLancadaSubterraneo: somaMetragemAmbiente(lancamento, "subterraneo"),
     dutoSubterraneo: numOrZero(rede?.metrosDutoSubterraneo),
     caixaSubterranea: qtdSeSim(rede?.construcaoCaixaSubterranea),
-    fibrasOuEquipamentos,
-    capacidadeFo,
-    caixasEmendaInstalada: qtdCaixasTotal(rede),
+    caixasEmendaAereo: numOrZero(rede?.qtdCaixasEmendaPorAmbiente?.aereo),
+    caixasEmendaSubterraneo: numOrZero(rede?.qtdCaixasEmendaPorAmbiente?.subterraneo),
     caixasEmendaExistenteRota: simNaoToCode(rede?.caixaEmendaExistente?.isSim),
     fiberloopInstalados: qtdSeSim(rede?.fiberloopInstalado),
   };
@@ -168,6 +167,18 @@ function linha(
   };
 }
 
+function contagemPorTipoEquipamento(
+  itens: { tipoEquipamento?: string | null }[] | null | undefined,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const item of itens ?? []) {
+    const tipo = String(item.tipoEquipamento ?? "").trim();
+    if (!tipo) continue;
+    map.set(tipo, (map.get(tipo) ?? 0) + 1);
+  }
+  return map;
+}
+
 /**
  * Consolida métricas do caderno a partir do payload (somente leitura / derivado).
  */
@@ -177,20 +188,63 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
   linhas: ResumoCadernoLinha[];
 } {
   const p = payload;
+  const re = buildLado(p?.redeAcesso, p?.lancamentoCabosRe);
+  const rc = buildLado(p?.redeCliente, p?.lancamentoCabosRc);
+
+  const foAereoRe = metragensPorCapacidadeFo(p?.lancamentoCabosRe, "aereo");
+  const foAereoRc = metragensPorCapacidadeFo(p?.lancamentoCabosRc, "aereo");
+  const foSubRe = metragensPorCapacidadeFo(p?.lancamentoCabosRe, "subterraneo");
+  const foSubRc = metragensPorCapacidadeFo(p?.lancamentoCabosRc, "subterraneo");
+
+  const linhasFoAereo = capacidadesOrdenadas(foAereoRe, foAereoRc).map((cap) =>
+    linha(
+      `fibra-aereo-${cap || "sem-tipo"}`,
+      "aereo",
+      labelFibraFo(cap),
+      "Metros",
+      foAereoRe.get(cap) ?? 0,
+      foAereoRc.get(cap) ?? 0,
+    ),
+  );
+
+  const linhasFoSub = capacidadesOrdenadas(foSubRe, foSubRc).map((cap) =>
+    linha(
+      `fibra-sub-${cap || "sem-tipo"}`,
+      "subterraneo",
+      labelFibraFo(cap),
+      "Metros",
+      foSubRe.get(cap) ?? 0,
+      foSubRc.get(cap) ?? 0,
+    ),
+  );
+
   const eqCount = p?.eqClienteEquipamentos?.length ?? 0;
-  const capFoRe = capacidadeFoDominante(p?.lancamentoCabosRe);
-  const metragemFoRe = somaMetragemPorCapacidadeFo(p?.lancamentoCabosRe, capFoRe);
-
-  const re = buildLado(p?.redeAcesso, p?.lancamentoCabosRe, metragemFoRe, capFoRe);
-  const rc = buildLado(p?.redeCliente, p?.lancamentoCabosRc, eqCount, null);
-
-  const labelFibraRe =
-    capFoRe != null
-      ? `Quant. de fibra ${capFoRe} FO lançada`
-      : "Quant. de fibra FO lançada";
+  const dgoCount = p?.eqClienteDgo?.length ?? 0;
+  const porTipo = contagemPorTipoEquipamento(p?.eqClienteEquipamentos);
+  const linhasTipoEq = [...porTipo.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
+    .map(([tipo, qtd]) =>
+      linha(
+        `eq-tipo-${tipo}`,
+        "acessos",
+        `Equipamento ${tipo}`,
+        "Unid.",
+        0,
+        qtd,
+      ),
+    );
 
   const linhas: ResumoCadernoLinha[] = [
-    linha("rede-aereo", "aereo", "TOTAL REDE LANÇADA (AÉREO)", "Metros", re.redeLancadaAereo, rc.redeLancadaAereo),
+    // —— Infraestrutura Aérea ——
+    ...linhasFoAereo,
+    linha(
+      "rede-aereo",
+      "aereo",
+      "TOTAL REDE LANÇADA (AÉREO)",
+      "Metros",
+      re.redeLancadaAereo,
+      rc.redeLancadaAereo,
+    ),
     linha("cordoalha", "aereo", "TOTAL CORDOALHA (lançada)", "Metros", re.cordoalhaLancada, rc.cordoalhaLancada),
     linha(
       "postes-nova",
@@ -212,6 +266,34 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
     ),
     linha("postes-total", "aereo", "TOTAL DE POSTES", "Unid.", re.totalPostes, rc.totalPostes),
     linha(
+      "caixas-inst-aereo",
+      "aereo",
+      "Quant. de CAIXAS DE EMENDA instalada",
+      "Unid.",
+      re.caixasEmendaAereo,
+      rc.caixasEmendaAereo,
+    ),
+    linha(
+      "caixas-exist",
+      "aereo",
+      "CAIXAS DE EMENDA existente na rota?",
+      "SIM/NÃO",
+      re.caixasEmendaExistenteRota,
+      rc.caixasEmendaExistenteRota,
+      undefined,
+      { omitTotal: true, total: Number.NaN },
+    ),
+    linha(
+      "fiberloop",
+      "aereo",
+      "Quant. de FIBERLOOP instalados?",
+      "Unid.",
+      re.fiberloopInstalados,
+      rc.fiberloopInstalados,
+    ),
+
+    // —— Aterramento ——
+    linha(
       "aterramento-pontos",
       "aterramento",
       "Quant de pontos de Aterramento",
@@ -227,6 +309,9 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       re.hastesAterramento,
       rc.hastesAterramento,
     ),
+
+    // —— Infraestrutura Subterrânea ——
+    ...linhasFoSub,
     linha(
       "rede-sub",
       "subterraneo",
@@ -252,41 +337,32 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       rc.caixaSubterranea,
     ),
     linha(
-      "fibras-eq",
-      "acessos",
-      labelFibraRe,
-      "Metros",
-      re.fibrasOuEquipamentos,
-      rc.fibrasOuEquipamentos,
-      "Quant. de EQUIPAMENTOS instalados",
-      { unidadeRc: "Unid." },
-    ),
-    linha(
-      "caixas-inst",
-      "acessos",
+      "caixas-inst-sub",
+      "subterraneo",
       "Quant. de CAIXAS DE EMENDA instalada",
       "Unid.",
-      re.caixasEmendaInstalada,
-      rc.caixasEmendaInstalada,
+      re.caixasEmendaSubterraneo,
+      rc.caixasEmendaSubterraneo,
     ),
+
+    // —— Acessos e Equipamentos (somente ativos/passivos) ——
     linha(
-      "caixas-exist",
+      "eq-instalados",
       "acessos",
-      "CAIXAS DE EMENDA existente na rota?",
-      "SIM/NÃO",
-      re.caixasEmendaExistenteRota,
-      rc.caixasEmendaExistenteRota,
-      undefined,
-      { omitTotal: true, total: Number.NaN },
-    ),
-    linha(
-      "fiberloop",
-      "acessos",
-      "Quant. de FIBERLOOP instalados?",
+      "Quantidade de EQUIPAMENTOS instalados",
       "Unid.",
-      re.fiberloopInstalados,
-      rc.fiberloopInstalados,
+      0,
+      eqCount,
     ),
+    linha(
+      "eq-dgo",
+      "acessos",
+      "DGO / ROSETA instalado",
+      "Unid.",
+      0,
+      dgoCount,
+    ),
+    ...linhasTipoEq,
   ];
 
   return { re, rc, linhas };

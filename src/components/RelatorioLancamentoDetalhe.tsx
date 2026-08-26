@@ -505,6 +505,7 @@ function EvidenciaBloco({
     !onObsChange &&
     !onTitleChange &&
     quantidadeLabel == null &&
+    !onQuantidadeChange &&
     !coordenadas &&
     !headerExtra
   ) {
@@ -530,7 +531,7 @@ function EvidenciaBloco({
         ) : null}
       </div>
       {headerExtra ? <div className="mt-3">{headerExtra}</div> : null}
-      {quantidadeLabel ? (
+      {onQuantidadeChange || quantidadeLabel ? (
         <CampoQuantidade
           label={quantidadeLabel}
           placeholder={quantidadePlaceholder ?? "Ex: 0"}
@@ -1249,7 +1250,6 @@ export function RelatorioDetalhe({
                 quantidade:
                   (key === "dutoSubterraneo" ? redeAcesso : redeCliente).metrosDutoSubterraneo ??
                   null,
-                quantidadeLabel: "Const. de DUTO SUBTERÂNEO (MD ou MND) — metros (MT)",
                 quantidadePlaceholder: "Ex: 120",
                 onQuantidadeChange: canEditPhotos
                   ? (metrosDutoSubterraneo: number | null) =>
@@ -1830,7 +1830,10 @@ export function RelatorioDetalhe({
                 disabled={!canEditPhotos}
               />
             ) : null}
-            {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
+            {renderGrupo(
+              "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
+              "dutoSubterraneo",
+            )}
             {renderConstrucaoCaixaSubterranea("redeAcesso")}
           </AccordionBloco>
 
@@ -2122,7 +2125,10 @@ export function RelatorioDetalhe({
                 disabled={!canEditPhotos}
               />
             ) : null}
-            {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo")}
+            {renderGrupo(
+              "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
+              "rcDutoSubterraneo",
+            )}
             {renderConstrucaoCaixaSubterranea("redeCliente")}
           </AccordionBloco>
 
