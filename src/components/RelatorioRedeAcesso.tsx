@@ -63,9 +63,9 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "contatos", label: "Contatos" },
 ];
 
-/** App de campo (técnico): sem Contatos nem Infraestrutura (abas só no painel do gestor). Medições = resumo somente leitura. */
+/** App de campo (técnico): sem Contatos, Infraestrutura nem Medições (abas só no painel do gestor). */
 export const ABAS_CAMPO_TECNICO: { id: AbaCampo; label: string }[] = ABAS_CAMPO.filter(
-  (aba) => aba.id !== "contatos" && aba.id !== "infraestrutura",
+  (aba) => aba.id !== "contatos" && aba.id !== "infraestrutura" && aba.id !== "medicoes",
 );
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [
@@ -1569,6 +1569,13 @@ export function RelatorioRedeAcesso({
           <div className={flatSectionClass}>
             <h2 className="mb-3 font-semibold text-gray-800">{lancamentoTitle}</h2>
             <div className="flex w-full flex-col gap-3">
+              {onLancamentoAmbienteChange ? (
+                <AmbienteToggle
+                  value={lancamentoAmbiente}
+                  onChange={onLancamentoAmbienteChange}
+                  disabled={readOnly}
+                />
+              ) : null}
               <div className="grid grid-cols-2 gap-2">
                 <ChoiceButton
                   active={lancamentoRe === "sim"}
@@ -1585,13 +1592,6 @@ export function RelatorioRedeAcesso({
                   NÃO
                 </ChoiceButton>
               </div>
-              {onLancamentoAmbienteChange ? (
-                <AmbienteToggle
-                  value={lancamentoAmbiente}
-                  onChange={onLancamentoAmbienteChange}
-                  disabled={readOnly}
-                />
-              ) : null}
             </div>
           </div>
 

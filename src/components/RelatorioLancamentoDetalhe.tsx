@@ -1803,6 +1803,15 @@ export function RelatorioDetalhe({
           >
             <div className="border-b border-gray-300 pb-6">
               <div className="flex w-full flex-col gap-3">
+                <AmbienteToggle
+                  value={abaLancamentoRe}
+                  onChange={(ambiente) => {
+                    setAbaLancamentoRe(ambiente);
+                    if (!payload) return;
+                    patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
+                  }}
+                  disabled={false}
+                />
                 <LancamentoCabosControle
                   label="Lançamento cabos (RE)?"
                   value={lancamentoCabosRe[abaLancamentoRe].isSim}
@@ -1815,15 +1824,6 @@ export function RelatorioDetalhe({
                         next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
                     }));
                   }}
-                />
-                <AmbienteToggle
-                  value={abaLancamentoRe}
-                  onChange={(ambiente) => {
-                    setAbaLancamentoRe(ambiente);
-                    if (!payload) return;
-                    patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
-                  }}
-                  disabled={false}
                 />
               </div>
             </div>
@@ -2090,6 +2090,15 @@ export function RelatorioDetalhe({
           >
             <div className="border-b border-gray-300 pb-6">
               <div className="flex w-full flex-col gap-3">
+                <AmbienteToggle
+                  value={abaLancamentoRc}
+                  onChange={(ambiente) => {
+                    setAbaLancamentoRc(ambiente);
+                    if (!payload) return;
+                    patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
+                  }}
+                  disabled={false}
+                />
                 <LancamentoCabosControle
                   label="Lançamento cabos (RC)?"
                   value={lancamentoCabosRc[abaLancamentoRc].isSim}
@@ -2102,15 +2111,6 @@ export function RelatorioDetalhe({
                         next && lado.metragens.length === 0 ? [emptyCaboMetragem()] : lado.metragens,
                     }));
                   }}
-                />
-                <AmbienteToggle
-                  value={abaLancamentoRc}
-                  onChange={(ambiente) => {
-                    setAbaLancamentoRc(ambiente);
-                    if (!payload) return;
-                    patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
-                  }}
-                  disabled={false}
                 />
               </div>
             </div>

@@ -913,7 +913,7 @@ function RelatorioPage() {
   }, [tipo]);
 
   useEffect(() => {
-    if (abaCampo === "contatos" || abaCampo === "infraestrutura") {
+    if (abaCampo === "contatos" || abaCampo === "infraestrutura" || abaCampo === "medicoes") {
       setAbaCampo("RE");
     }
   }, [abaCampo]);
