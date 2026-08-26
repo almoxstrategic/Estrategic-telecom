@@ -524,24 +524,28 @@ function EvidenciaBloco({
   }
   const body = (
     <div className="relative z-0 flex h-full flex-col rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        {onTitleChange ? (
-          <RefTituloEditavel value={title} onChange={onTitleChange} />
-        ) : (
-          <h4 className="text-sm font-semibold text-gray-900">{title || "Outra foto"}</h4>
-        )}
-        {onRemove ? (
-          <button
-            type="button"
-            onClick={onRemove}
-            className={`${onTitleChange ? "mt-6" : ""} shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10`}
-            aria-label={`Excluir ${title}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
-      {headerExtra ? <div className="mt-3">{headerExtra}</div> : null}
+      {onTitleChange || onRemove || title.trim() ? (
+        <div className="flex items-start justify-between gap-2">
+          {onTitleChange ? (
+            <RefTituloEditavel value={title} onChange={onTitleChange} />
+          ) : title.trim() ? (
+            <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+          ) : (
+            <span />
+          )}
+          {onRemove ? (
+            <button
+              type="button"
+              onClick={onRemove}
+              className={`${onTitleChange ? "mt-6" : ""} shrink-0 rounded-lg p-1.5 text-destructive hover:bg-destructive/10`}
+              aria-label={`Excluir ${title}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {headerExtra ? <div className={title.trim() || onTitleChange || onRemove ? "mt-3" : undefined}>{headerExtra}</div> : null}
       {onQuantidadeChange || quantidadeLabel ? (
         <CampoQuantidade
           label={quantidadeLabel}
@@ -1338,6 +1342,7 @@ export function RelatorioDetalhe({
     key: RelatorioFotoGrupoKey,
     comAmbiente = false,
     herdarAmbienteDe?: RelatorioFotoGrupoKey,
+    opts?: { hideTitle?: boolean },
   ) => {
     const dualKey =
       (comAmbiente || !!herdarAmbienteDe) && isFotoGrupoPorAmbienteKey(key);
@@ -1421,7 +1426,7 @@ export function RelatorioDetalhe({
     const bloco = (
       <EvidenciaBloco
         key={`${key}-${aba}`}
-        title={title}
+        title={opts?.hideTitle ? "" : title}
         obs={grupo?.obs}
         fotos={grupo?.fotos ?? []}
         {...qtd}
@@ -2151,7 +2156,9 @@ export function RelatorioDetalhe({
             ) : null}
             {renderGateSobraTecnica("redeAcesso")}
             {mostrarSobraTecnica("redeAcesso")
-              ? renderGrupo("Sobra técnica", "sobraTecnica", true)
+              ? renderGrupo("Sobra técnica", "sobraTecnica", true, undefined, {
+                  hideTitle: true,
+                })
               : null}
             {abaLancamentoRe !== "subterraneo" ? (
               <CordoalhaSimNaoCard
@@ -2187,6 +2194,9 @@ export function RelatorioDetalhe({
               ? renderGrupo(
                   "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
                   "dutoSubterraneo",
+                  false,
+                  undefined,
+                  { hideTitle: true },
                 )
               : null}
             {renderConstrucaoCaixaSubterranea("redeAcesso")}
@@ -2448,7 +2458,9 @@ export function RelatorioDetalhe({
             )}
             {renderGateSobraTecnica("redeCliente")}
             {mostrarSobraTecnica("redeCliente")
-              ? renderGrupo("Sobra técnica", "rcSobraTecnica", true)
+              ? renderGrupo("Sobra técnica", "rcSobraTecnica", true, undefined, {
+                  hideTitle: true,
+                })
               : null}
             {abaLancamentoRc !== "subterraneo" ? (
               <CordoalhaSimNaoCard
@@ -2485,6 +2497,9 @@ export function RelatorioDetalhe({
               ? renderGrupo(
                   "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
                   "rcDutoSubterraneo",
+                  false,
+                  undefined,
+                  { hideTitle: true },
                 )
               : null}
             {renderConstrucaoCaixaSubterranea("redeCliente")}

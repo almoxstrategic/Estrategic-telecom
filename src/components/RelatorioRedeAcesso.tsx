@@ -1204,13 +1204,13 @@ function renderGrupoFotoCard(
       ambiente?: AmbienteRede | null,
     ) => void;
   },
-  opts?: { omitSectionId?: boolean },
+  opts?: { omitSectionId?: boolean; hideTitle?: boolean },
 ) {
   return (
     <RelatorioFotosBloco
       key={`${grupo.grupoKey}-${grupo.ambiente ?? "na"}`}
       id={opts?.omitSectionId ? undefined : `secao-${grupo.grupoKey}`}
-      title={grupo.title}
+      title={opts?.hideTitle ? "" : grupo.title}
       hint={grupo.hint}
       variant="flat"
       pendencia={pendenciaFotoGrupo({
@@ -2062,7 +2062,10 @@ export function RelatorioRedeAcesso({
               />
               {mostrarSobra
                 ? gruposSobra.map((grupo) =>
-                    renderGrupoFotoCard(grupo, fotoCtx, { omitSectionId: true }),
+                    renderGrupoFotoCard(grupo, fotoCtx, {
+                      omitSectionId: true,
+                      hideTitle: true,
+                    }),
                   )
                 : null}
             </div>
@@ -2114,7 +2117,10 @@ export function RelatorioRedeAcesso({
               />
               {mostrarDuto
                 ? gruposDuto.map((grupo) =>
-                    renderGrupoFotoCard(grupo, fotoCtx, { omitSectionId: true }),
+                    renderGrupoFotoCard(grupo, fotoCtx, {
+                      omitSectionId: true,
+                      hideTitle: true,
+                    }),
                   )
                 : null}
             </div>

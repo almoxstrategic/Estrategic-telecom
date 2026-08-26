@@ -146,12 +146,16 @@ export function RelatorioFotosBloco({
           : "flex h-full scroll-mt-36 flex-col space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
       }
     >
-      <div>
-        <h2 className={isFlat ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"}>
-          {title}
-        </h2>
-        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-      </div>
+      {title.trim() || hint ? (
+        <div>
+          {title.trim() ? (
+            <h2 className={isFlat ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"}>
+              {title}
+            </h2>
+          ) : null}
+          {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+        </div>
+      ) : null}
       {headerExtra}
 
       <div className={FOTO_SLOTS_ROW_CLASS}>
