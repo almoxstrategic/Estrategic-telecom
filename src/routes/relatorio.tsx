@@ -91,6 +91,9 @@ import {
   type TipoExecucao,
   emptyLancamentoPorAmbiente,
   isFotoGrupoPorAmbienteKey,
+  gateSimComLegado,
+  fotoGrupoPorAmbienteTemFotos,
+  fotoGrupoTemFotos,
   type AmbienteRede,
   type LancamentoPorAmbientePayload,
 } from "@/lib/relatorios-transmissao";
@@ -722,6 +725,15 @@ function RelatorioPage() {
       },
       qtdTotalPostes: p.redeAcesso?.qtdTotalPostes ?? null,
       metrosDutoSubterraneo: p.redeAcesso?.metrosDutoSubterraneo ?? null,
+      sobraTecnicaExecutada: gateSimComLegado(
+        p.redeAcesso?.sobraTecnicaExecutada,
+        fotoGrupoPorAmbienteTemFotos(p.sobraTecnica),
+      ),
+      construcaoDutoSubterraneo: gateSimComLegado(
+        p.redeAcesso?.construcaoDutoSubterraneo,
+        fotoGrupoTemFotos(p.dutoSubterraneo) ||
+          (p.redeAcesso?.metrosDutoSubterraneo ?? 0) > 0,
+      ),
       construcaoCaixaSubterranea: (() => {
         const raw = p.redeAcesso?.construcaoCaixaSubterranea as unknown;
         if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -805,6 +817,15 @@ function RelatorioPage() {
       },
       qtdTotalPostes: p.redeCliente?.qtdTotalPostes ?? null,
       metrosDutoSubterraneo: p.redeCliente?.metrosDutoSubterraneo ?? null,
+      sobraTecnicaExecutada: gateSimComLegado(
+        p.redeCliente?.sobraTecnicaExecutada,
+        fotoGrupoPorAmbienteTemFotos(p.rcSobraTecnica),
+      ),
+      construcaoDutoSubterraneo: gateSimComLegado(
+        p.redeCliente?.construcaoDutoSubterraneo,
+        fotoGrupoTemFotos(p.rcDutoSubterraneo) ||
+          (p.redeCliente?.metrosDutoSubterraneo ?? 0) > 0,
+      ),
       construcaoCaixaSubterranea: (() => {
         const raw = p.redeCliente?.construcaoCaixaSubterranea as unknown;
         if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -1594,6 +1615,26 @@ function RelatorioPage() {
                   onConstrucaoCaixaSubterraneaChange={(construcaoCaixaSubterranea) =>
                     setRedeAcesso((prev) => ({ ...prev, construcaoCaixaSubterranea }))
                   }
+                  sobraTecnicaExecutada={redeAcesso.sobraTecnicaExecutada}
+                  onSobraTecnicaExecutadaChange={(sobraTecnicaExecutada) =>
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      sobraTecnicaExecutada: {
+                        isSim: sobraTecnicaExecutada.isSim,
+                        quantidade: null,
+                      },
+                    }))
+                  }
+                  construcaoDutoSubterraneo={redeAcesso.construcaoDutoSubterraneo}
+                  onConstrucaoDutoSubterraneoChange={(construcaoDutoSubterraneo) =>
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      construcaoDutoSubterraneo: {
+                        isSim: construcaoDutoSubterraneo.isSim,
+                        quantidade: null,
+                      },
+                    }))
+                  }
                   caixaEmendaExistente={redeAcesso.caixaEmendaExistente}
                   onCaixaEmendaExistenteChange={(caixaEmendaExistente) =>
                     setRedeAcesso((prev) => ({
@@ -1814,6 +1855,26 @@ function RelatorioPage() {
                   construcaoCaixaSubterranea={redeCliente.construcaoCaixaSubterranea}
                   onConstrucaoCaixaSubterraneaChange={(construcaoCaixaSubterranea) =>
                     setRedeCliente((prev) => ({ ...prev, construcaoCaixaSubterranea }))
+                  }
+                  sobraTecnicaExecutada={redeCliente.sobraTecnicaExecutada}
+                  onSobraTecnicaExecutadaChange={(sobraTecnicaExecutada) =>
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      sobraTecnicaExecutada: {
+                        isSim: sobraTecnicaExecutada.isSim,
+                        quantidade: null,
+                      },
+                    }))
+                  }
+                  construcaoDutoSubterraneo={redeCliente.construcaoDutoSubterraneo}
+                  onConstrucaoDutoSubterraneoChange={(construcaoDutoSubterraneo) =>
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      construcaoDutoSubterraneo: {
+                        isSim: construcaoDutoSubterraneo.isSim,
+                        quantidade: null,
+                      },
+                    }))
                   }
                   caixaEmendaExistente={redeCliente.caixaEmendaExistente}
                   onCaixaEmendaExistenteChange={(caixaEmendaExistente) =>

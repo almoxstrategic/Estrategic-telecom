@@ -438,6 +438,16 @@ export type QuantidadesRedePayload = {
   /** Metros de construção de duto subterrâneo (MD ou MND). */
   metrosDutoSubterraneo: number | null;
   /**
+   * Const. de duto subterrâneo? (SIM/NÃO).
+   * Quando SIM, exibe metragem (MT) + fotos do duto.
+   */
+  construcaoDutoSubterraneo: CordoalhaBlocoPayload;
+  /**
+   * Sobra técnica? (SIM/NÃO).
+   * Quando SIM, exibe Aéreo/Subterrâneo + fotos da sobra.
+   */
+  sobraTecnicaExecutada: CordoalhaBlocoPayload;
+  /**
    * Construído caixa subterrânea? (SIM/NÃO + quantidade quando SIM).
    * Relatórios legados com número puro são migrados no parse.
    */
@@ -800,6 +810,28 @@ export function emptyCordoalhaBloco(): CordoalhaBlocoPayload {
   return { isSim: null, quantidade: null };
 }
 
+/** SIM/NÃO explícito; se ainda não respondido e há conteúdo legado, trata como SIM. */
+export function gateSimComLegado(
+  gate: CordoalhaBlocoPayload | null | undefined,
+  hasContent: boolean,
+): CordoalhaBlocoPayload {
+  const g = gate ?? emptyCordoalhaBloco();
+  if (g.isSim != null) return g;
+  if (hasContent) return { isSim: true, quantidade: null };
+  return g;
+}
+
+export function fotoGrupoTemFotos(g: FotoGrupoPayload | null | undefined): boolean {
+  return (g?.fotos?.length ?? 0) > 0 || Boolean(g?.obs?.trim());
+}
+
+export function fotoGrupoPorAmbienteTemFotos(
+  g: FotoGrupoPorAmbientePayload | null | undefined,
+): boolean {
+  if (!g) return false;
+  return fotoGrupoTemFotos(g.aereo) || fotoGrupoTemFotos(g.subterraneo);
+}
+
 export function emptyQuantidadesRede(): QuantidadesRedePayload {
   return {
     qtdCaixasEmenda: null,
@@ -812,6 +844,8 @@ export function emptyQuantidadesRede(): QuantidadesRedePayload {
     postesCordoalhaExistente: emptyCordoalhaBloco(),
     qtdTotalPostes: null,
     metrosDutoSubterraneo: null,
+    construcaoDutoSubterraneo: emptyCordoalhaBloco(),
+    sobraTecnicaExecutada: emptyCordoalhaBloco(),
     construcaoCaixaSubterranea: emptyCordoalhaBloco(),
     caixaEmendaExistente: emptyCordoalhaBloco(),
     aterramento: { totalHastes: null, pontosAterramento: null },
@@ -1079,6 +1113,12 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
     },
     qtdTotalPostes: parseQtdInteiro(src.qtdTotalPostes),
     metrosDutoSubterraneo: parseQtdInteiro(src.metrosDutoSubterraneo),
+    construcaoDutoSubterraneo: parseCordoalhaBloco(
+      (src as { construcaoDutoSubterraneo?: unknown }).construcaoDutoSubterraneo,
+    ),
+    sobraTecnicaExecutada: parseCordoalhaBloco(
+      (src as { sobraTecnicaExecutada?: unknown }).sobraTecnicaExecutada,
+    ),
     construcaoCaixaSubterranea: (() => {
       const raw = (src as { construcaoCaixaSubterranea?: unknown }).construcaoCaixaSubterranea;
       if (typeof raw === "number" || typeof raw === "string") {
@@ -2028,6 +2068,14 @@ function mergeQuantidadesRede(
       fromLocal.metrosDutoSubterraneo === undefined
         ? fromServer.metrosDutoSubterraneo ?? null
         : fromLocal.metrosDutoSubterraneo,
+    construcaoDutoSubterraneo: mergeCordoalhaBloco(
+      fromServer.construcaoDutoSubterraneo,
+      fromLocal.construcaoDutoSubterraneo,
+    ),
+    sobraTecnicaExecutada: mergeCordoalhaBloco(
+      fromServer.sobraTecnicaExecutada,
+      fromLocal.sobraTecnicaExecutada,
+    ),
     construcaoCaixaSubterranea: mergeCordoalhaBloco(
       fromServer.construcaoCaixaSubterranea,
       fromLocal.construcaoCaixaSubterranea,

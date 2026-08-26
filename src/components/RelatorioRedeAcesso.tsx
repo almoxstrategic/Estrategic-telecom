@@ -33,6 +33,7 @@ import {
   calcularMetragemCaboTotal,
   deleteRelatorioPhoto,
   finalizeMedicaoInput,
+  gateSimComLegado,
   type AmbienteRede,
   type CaboMetragemPayload,
   type RelatorioFotoGrupoKey,
@@ -308,7 +309,7 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       subitens: [
         { titulo: "Lançamento de cabos", id: "secao-cabos" },
         { titulo: "Sobra técnica", id: "secao-sobraTecnica" },
-        { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-dutoSubterraneo" },
+        { titulo: "Const. de duto subterrâneo (MD ou MND)", id: "secao-dutoSubterraneo" },
       ],
     },
     {
@@ -322,7 +323,6 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       titulo: "CAIXA DE EMENDA (RE)",
       subitens: [
         { titulo: "Caixa de emenda", id: "secao-caixaEmenda" },
-        { titulo: "Plaqueta de Identificação", id: "secao-plaquetaIdentificacao" },
       ],
     },
     {
@@ -349,7 +349,7 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
         { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
         { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
         { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
-        { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-rcDutoSubterraneo" },
+        { titulo: "Const. de duto subterrâneo (MD ou MND)", id: "secao-rcDutoSubterraneo" },
       ],
     },
     {
@@ -363,7 +363,6 @@ export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> =
       titulo: "CAIXA DE EMENDA (RC)",
       subitens: [
         { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
-        { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
       ],
     },
     {
@@ -413,8 +412,7 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
     { titulo: "CAIXA DE EMENDA (RE)", id: "secao-caixa-emenda" },
     { titulo: "Caixa de emenda (fotos)", id: "secao-caixaEmenda" },
-    { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-dutoSubterraneo" },
-    { titulo: "Plaqueta de Identificação", id: "secao-plaquetaIdentificacao" },
+    { titulo: "Const. de duto subterrâneo (MD ou MND)", id: "secao-dutoSubterraneo" },
     { titulo: "OUTRAS FOTOS (RE)", id: "secao-outras-fotos" },
   ],
   RC: [
@@ -432,13 +430,12 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
     { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
     { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
     { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
-    { titulo: "Const. de duto subterrâneo (MD ou MND) — metros (MT)", id: "secao-rcDutoSubterraneo" },
+    { titulo: "Const. de duto subterrâneo (MD ou MND)", id: "secao-rcDutoSubterraneo" },
     { titulo: "POSTE (RC)", id: "secao-poste" },
     { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
     { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
     { titulo: "CAIXA DE EMENDA (RC)", id: "secao-caixa-emenda" },
     { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
-    { titulo: "Plaqueta de Identificação", id: "secao-rcPlaquetaIdentificacao" },
     { titulo: "OUTRAS FOTOS (RC)", id: "secao-outras-fotos" },
   ],
   equipamento: [
@@ -1207,11 +1204,12 @@ function renderGrupoFotoCard(
       ambiente?: AmbienteRede | null,
     ) => void;
   },
+  opts?: { omitSectionId?: boolean },
 ) {
   return (
     <RelatorioFotosBloco
       key={`${grupo.grupoKey}-${grupo.ambiente ?? "na"}`}
-      id={`secao-${grupo.grupoKey}`}
+      id={opts?.omitSectionId ? undefined : `secao-${grupo.grupoKey}`}
       title={grupo.title}
       hint={grupo.hint}
       variant="flat"
@@ -1267,6 +1265,172 @@ function renderGrupoFotoCard(
       readOnly={readOnly}
       onPickPhoto={(id, file) => onGrupoPhoto(grupo.grupoKey, id, file, grupo.ambiente)}
     />
+  );
+}
+
+function FotoSlotUnico({
+  label,
+  slot,
+  readOnly,
+  onPick,
+}: {
+  label: string;
+  slot: FotoSlot;
+  readOnly: boolean;
+  onPick: (file: EvidencePhotoRef | null) => void;
+}) {
+  const src = slot.file?.previewUrl ?? slot.stored?.url ?? null;
+  if (src) {
+    return (
+      <div className="min-w-0">
+        <div className="mb-1">
+          <FotoLabel>{label}</FotoLabel>
+        </div>
+        <RelatorioFotoComControles
+          src={src}
+          alt={label}
+          canEdit={!readOnly}
+          onDelete={
+            !readOnly
+              ? () => {
+                  void deleteRelatorioPhoto(slot.stored?.path);
+                  onPick(null);
+                }
+              : undefined
+          }
+          onReplace={
+            !readOnly
+              ? (file) => {
+                  void deleteRelatorioPhoto(slot.stored?.path);
+                  onPick(file);
+                }
+              : undefined
+          }
+        />
+      </div>
+    );
+  }
+  if (readOnly) {
+    return (
+      <div className="min-w-0">
+        <FotoLabel>{label}</FotoLabel>
+        <p className="text-sm text-muted-foreground">Sem foto</p>
+      </div>
+    );
+  }
+  return <PhotoUpload label={label} value={null} onChange={onPick} />;
+}
+
+function renderCaixaEmendaUnificadaCard(
+  caixa: GrupoFotoCampo,
+  plaqueta: GrupoFotoCampo,
+  {
+    readOnly,
+    onGrupoPhoto,
+  }: {
+    readOnly: boolean;
+    onGrupoPhoto: (
+      grupoKey: RelatorioFotoGrupoKey,
+      slotId: string,
+      file: EvidencePhotoRef | null,
+      ambiente?: AmbienteRede | null,
+    ) => void;
+  },
+) {
+  const slotCaixa = caixa.slots[0] ?? { id: crypto.randomUUID(), file: null, stored: null };
+  const slotPlaqueta = plaqueta.slots[0] ?? {
+    id: crypto.randomUUID(),
+    file: null,
+    stored: null,
+  };
+
+  const pickFoto = (
+    grupo: GrupoFotoCampo,
+    slot: FotoSlot,
+    file: EvidencePhotoRef | null,
+  ) => {
+    if (!grupo.slots[0]) {
+      grupo.onChange([{ ...slot, file: null, stored: null }]);
+    }
+    onGrupoPhoto(grupo.grupoKey, slot.id, file, grupo.ambiente);
+  };
+
+  const body = (
+    <div
+      id={`secao-${caixa.grupoKey}`}
+      className="relative flex h-full flex-col space-y-4 border-b border-gray-100 pb-6 last:border-b-0 last:pb-0"
+    >
+      <h2 className="font-semibold text-gray-800">{caixa.title}</h2>
+      <div className="space-y-3">
+        {caixa.showAmbienteToggle ? (
+          <AmbienteToggle
+            value={caixa.ambiente}
+            onChange={(ambiente) => {
+              caixa.onAmbienteChange?.(ambiente);
+              plaqueta.onAmbienteChange?.(ambiente);
+            }}
+            disabled={readOnly}
+          />
+        ) : null}
+        {caixa.onQuantidadeChange || caixa.quantidadeLabel ? (
+          <CampoQuantidade
+            label={caixa.quantidadeLabel}
+            placeholder={caixa.quantidadePlaceholder ?? "Ex: 0"}
+            value={caixa.quantidade ?? null}
+            onChange={caixa.onQuantidadeChange}
+            disabled={readOnly}
+          />
+        ) : null}
+        {caixa.coordenadas ? (
+          <CampoCoordenadas
+            title={caixa.coordenadasTitle ?? "Coordenadas"}
+            value={caixa.coordenadas}
+            onChange={caixa.onCoordenadasChange}
+            disabled={readOnly}
+            embedded
+          />
+        ) : null}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <FotoSlotUnico
+          label="Foto da caixa"
+          slot={slotCaixa}
+          readOnly={readOnly}
+          onPick={(file) => pickFoto(caixa, slotCaixa, file)}
+        />
+        <FotoSlotUnico
+          label="Etiqueta / Plaqueta de Identificação"
+          slot={slotPlaqueta}
+          readOnly={readOnly}
+          onPick={(file) => pickFoto(plaqueta, slotPlaqueta, file)}
+        />
+      </div>
+      <div className="w-full min-w-0">
+        <label className="mb-1.5 block text-sm font-semibold">OBS</label>
+        <textarea
+          value={caixa.obs}
+          onChange={(e) => caixa.onObsChange(e.target.value)}
+          rows={2}
+          disabled={readOnly}
+          className={textareaObsClass()}
+          placeholder="Observações"
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <PendenciaItemFrame
+      key={`${caixa.grupoKey}-${caixa.ambiente ?? "na"}`}
+      def={pendenciaFotoGrupo({
+        aba: caixa.grupoKey.startsWith("rc") ? "RC" : "RE",
+        grupoKey: caixa.grupoKey,
+        title: caixa.title,
+        section: caixa.section,
+      })}
+    >
+      {body}
+    </PendenciaItemFrame>
   );
 }
 
@@ -1424,6 +1588,10 @@ export function RelatorioRedeAcesso({
   onAterramentoHastesChange,
   construcaoCaixaSubterranea,
   onConstrucaoCaixaSubterraneaChange,
+  sobraTecnicaExecutada,
+  onSobraTecnicaExecutadaChange,
+  construcaoDutoSubterraneo,
+  onConstrucaoDutoSubterraneoChange,
   caixaEmendaExistente,
   onCaixaEmendaExistenteChange,
   cabos,
@@ -1489,6 +1657,18 @@ export function RelatorioRedeAcesso({
     isSim: boolean | null;
     quantidade: number | null;
   }) => void;
+  /** Sobra técnica? (SIM/NÃO) — controla exibição do bloco de fotos. */
+  sobraTecnicaExecutada?: { isSim: boolean | null; quantidade: number | null };
+  onSobraTecnicaExecutadaChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
+  /** Const. de duto subterrâneo? (SIM/NÃO) — controla metragem + fotos. */
+  construcaoDutoSubterraneo?: { isSim: boolean | null; quantidade: number | null };
+  onConstrucaoDutoSubterraneoChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
   /** Caixa de emenda existente na rota? */
   caixaEmendaExistente?: { isSim: boolean | null; quantidade: number | null };
   onCaixaEmendaExistenteChange?: (next: {
@@ -1532,16 +1712,43 @@ export function RelatorioRedeAcesso({
   const mostrarPostes = Boolean(postesNovaCordoalha && postesCordoalhaExistente);
   const gruposLocal = grupos.filter((g) => g.section === "local");
   const gruposCabos = grupos.filter((g) => g.section === "cabos");
+  const isSobraKey = (k: RelatorioFotoGrupoKey) =>
+    k === "sobraTecnica" || k === "rcSobraTecnica";
+  const isDutoKey = (k: RelatorioFotoGrupoKey) =>
+    k === "dutoSubterraneo" || k === "rcDutoSubterraneo";
+  const isCaixaKey = (k: RelatorioFotoGrupoKey) =>
+    k === "caixaEmenda" || k === "rcCaixaEmenda";
+  const isPlaquetaKey = (k: RelatorioFotoGrupoKey) =>
+    k === "plaquetaIdentificacao" || k === "rcPlaquetaIdentificacao";
+  const gruposSobra = gruposCabos.filter((g) => isSobraKey(g.grupoKey));
+  const gruposDuto = gruposCabos.filter((g) => isDutoKey(g.grupoKey));
   const gruposCabosPrincipais = gruposCabos.filter(
-    (g) => g.grupoKey !== "dutoSubterraneo" && g.grupoKey !== "rcDutoSubterraneo",
-  );
-  const gruposDuto = gruposCabos.filter(
-    (g) => g.grupoKey === "dutoSubterraneo" || g.grupoKey === "rcDutoSubterraneo",
+    (g) => !isSobraKey(g.grupoKey) && !isDutoKey(g.grupoKey),
   );
   const gruposPoste = grupos.filter((g) => g.section === "poste");
-  const gruposCaixa = grupos.filter((g) => g.section === "caixa");
+  const gruposCaixaAll = grupos.filter((g) => g.section === "caixa");
+  const grupoCaixa = gruposCaixaAll.find((g) => isCaixaKey(g.grupoKey));
+  const grupoPlaqueta = gruposCaixaAll.find((g) => isPlaquetaKey(g.grupoKey));
+  const gruposCaixaOutros = gruposCaixaAll.filter(
+    (g) => !isCaixaKey(g.grupoKey) && !isPlaquetaKey(g.grupoKey),
+  );
   const fotoCtx = { readOnly, onGrupoPhoto };
   const mostrarLocal = redeVariant === "RC";
+
+  const sobraTemConteudo = gruposSobra.some(
+    (g) =>
+      g.slots.some((s) => Boolean(s.file || s.stored)) || Boolean(g.obs?.trim()),
+  );
+  const dutoTemConteudo = gruposDuto.some(
+    (g) =>
+      g.slots.some((s) => Boolean(s.file || s.stored)) ||
+      Boolean(g.obs?.trim()) ||
+      (g.quantidade ?? 0) > 0,
+  );
+  const gateSobra = gateSimComLegado(sobraTecnicaExecutada, sobraTemConteudo);
+  const gateDuto = gateSimComLegado(construcaoDutoSubterraneo, dutoTemConteudo);
+  const mostrarSobra = gateSobra.isSim === true;
+  const mostrarDuto = gateDuto.isSim === true;
 
   return (
     <EvidencePhotoPasteProvider>
@@ -1834,6 +2041,35 @@ export function RelatorioRedeAcesso({
 
           {gruposCabosPrincipais.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
 
+          {onSobraTecnicaExecutadaChange ? (
+            <div
+              id={redeVariant === "RC" ? "secao-rcSobraTecnica" : "secao-sobraTecnica"}
+              className="scroll-mt-36 space-y-4"
+            >
+              <CordoalhaSimNaoCard
+                title="Sobra técnica?"
+                hideQuantidade
+                value={gateSobra}
+                onChange={onSobraTecnicaExecutadaChange}
+                disabled={readOnly}
+                variant="flat"
+                pendencia={pendenciaPergunta({
+                  aba: redeVariant,
+                  secao: `Lançamento (${redeVariant})`,
+                  subbloco: "Sobra técnica?",
+                  key: "lancamento.sobraTecnica",
+                })}
+              />
+              {mostrarSobra
+                ? gruposSobra.map((grupo) =>
+                    renderGrupoFotoCard(grupo, fotoCtx, { omitSectionId: true }),
+                  )
+                : null}
+            </div>
+          ) : mostrarSobra ? (
+            gruposSobra.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))
+          ) : null}
+
           {fiberloopInstalado &&
           onFiberloopInstaladoChange &&
           lancamentoAmbiente !== "subterraneo" ? (
@@ -1855,7 +2091,36 @@ export function RelatorioRedeAcesso({
             />
           ) : null}
 
-          {gruposDuto.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          {onConstrucaoDutoSubterraneoChange ? (
+            <div
+              id={
+                redeVariant === "RC" ? "secao-rcDutoSubterraneo" : "secao-dutoSubterraneo"
+              }
+              className="scroll-mt-36 space-y-4"
+            >
+              <CordoalhaSimNaoCard
+                title="Const. de duto subterrâneo (MD ou MND)?"
+                hideQuantidade
+                value={gateDuto}
+                onChange={onConstrucaoDutoSubterraneoChange}
+                disabled={readOnly}
+                variant="flat"
+                pendencia={pendenciaPergunta({
+                  aba: redeVariant,
+                  secao: `Lançamento (${redeVariant})`,
+                  subbloco: "Const. de duto subterrâneo?",
+                  key: "lancamento.construcaoDuto",
+                })}
+              />
+              {mostrarDuto
+                ? gruposDuto.map((grupo) =>
+                    renderGrupoFotoCard(grupo, fotoCtx, { omitSectionId: true }),
+                  )
+                : null}
+            </div>
+          ) : mostrarDuto ? (
+            gruposDuto.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))
+          ) : null}
           {onConstrucaoCaixaSubterraneaChange ? (
             <CordoalhaSimNaoCard
               title="Construído caixa subterrânea?"
@@ -2012,7 +2277,16 @@ export function RelatorioRedeAcesso({
               })}
             />
           ) : null}
-          {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          {grupoCaixa && grupoPlaqueta
+            ? renderCaixaEmendaUnificadaCard(grupoCaixa, grupoPlaqueta, fotoCtx)
+            : null}
+          {gruposCaixaOutros.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          {!grupoPlaqueta && grupoCaixa
+            ? renderGrupoFotoCard(grupoCaixa, fotoCtx)
+            : null}
+          {grupoPlaqueta && !grupoCaixa
+            ? renderGrupoFotoCard(grupoPlaqueta, fotoCtx)
+            : null}
         </AccordionBloco>
 
         <AccordionBloco

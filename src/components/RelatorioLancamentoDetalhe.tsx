@@ -57,6 +57,9 @@ import {
   emptyTesteOptico,
   emptyTestePotencia,
   emptyLancamentoPorAmbiente,
+  gateSimComLegado,
+  fotoGrupoPorAmbienteTemFotos,
+  fotoGrupoTemFotos,
   isFotoGrupoPorAmbienteKey,
   looksLikeFotoGrupoPorAmbiente,
   simDerivadoLancamento,
@@ -1201,6 +1204,100 @@ export function RelatorioDetalhe({
     );
   };
 
+  const renderGateSobraTecnica = (lado: "redeAcesso" | "redeCliente") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    const grupoKey = lado === "redeAcesso" ? "sobraTecnica" : "rcSobraTecnica";
+    const value = gateSimComLegado(
+      rede.sobraTecnicaExecutada,
+      fotoGrupoPorAmbienteTemFotos(payload?.[grupoKey]),
+    );
+    return (
+      <CordoalhaSimNaoCard
+        id={`secao-${grupoKey}-gate`}
+        title="Sobra técnica?"
+        hideQuantidade
+        variant="flat"
+        value={value}
+        onChange={
+          canEditPhotos
+            ? (sobraTecnicaExecutada) =>
+                patchRedeCampo(lado, {
+                  sobraTecnicaExecutada: {
+                    isSim: sobraTecnicaExecutada.isSim,
+                    quantidade: null,
+                  },
+                })
+            : undefined
+        }
+        disabled={!canEditPhotos}
+        pendencia={pendenciaPergunta({
+          aba: lado === "redeAcesso" ? "RE" : "RC",
+          secao: `Lançamento (${lado === "redeAcesso" ? "RE" : "RC"})`,
+          subbloco: "Sobra técnica?",
+          key: "lancamento.sobraTecnica",
+        })}
+      />
+    );
+  };
+
+  const renderGateConstrucaoDuto = (lado: "redeAcesso" | "redeCliente") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    const grupoKey = lado === "redeAcesso" ? "dutoSubterraneo" : "rcDutoSubterraneo";
+    const value = gateSimComLegado(
+      rede.construcaoDutoSubterraneo,
+      fotoGrupoTemFotos(payload?.[grupoKey]) || (rede.metrosDutoSubterraneo ?? 0) > 0,
+    );
+    return (
+      <CordoalhaSimNaoCard
+        id={`secao-${grupoKey}-gate`}
+        title="Const. de duto subterrâneo (MD ou MND)?"
+        hideQuantidade
+        variant="flat"
+        value={value}
+        onChange={
+          canEditPhotos
+            ? (construcaoDutoSubterraneo) =>
+                patchRedeCampo(lado, {
+                  construcaoDutoSubterraneo: {
+                    isSim: construcaoDutoSubterraneo.isSim,
+                    quantidade: null,
+                  },
+                })
+            : undefined
+        }
+        disabled={!canEditPhotos}
+        pendencia={pendenciaPergunta({
+          aba: lado === "redeAcesso" ? "RE" : "RC",
+          secao: `Lançamento (${lado === "redeAcesso" ? "RE" : "RC"})`,
+          subbloco: "Const. de duto subterrâneo?",
+          key: "lancamento.construcaoDuto",
+        })}
+      />
+    );
+  };
+
+  const mostrarSobraTecnica = (lado: "redeAcesso" | "redeCliente") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    const grupoKey = lado === "redeAcesso" ? "sobraTecnica" : "rcSobraTecnica";
+    return (
+      gateSimComLegado(
+        rede.sobraTecnicaExecutada,
+        fotoGrupoPorAmbienteTemFotos(payload?.[grupoKey]),
+      ).isSim === true
+    );
+  };
+
+  const mostrarConstrucaoDuto = (lado: "redeAcesso" | "redeCliente") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    const grupoKey = lado === "redeAcesso" ? "dutoSubterraneo" : "rcDutoSubterraneo";
+    return (
+      gateSimComLegado(
+        rede.construcaoDutoSubterraneo,
+        fotoGrupoTemFotos(payload?.[grupoKey]) || (rede.metrosDutoSubterraneo ?? 0) > 0,
+      ).isSim === true
+    );
+  };
+
   const patchQtdFiberloop = (
     lado: "redeAcesso" | "redeCliente",
     qtdFiberloopInstalado: number | null,
@@ -1374,6 +1471,205 @@ export function RelatorioDetalhe({
       />
     );
     return bloco;
+  };
+
+  const renderCaixaEmendaUnificada = (
+    title: string,
+    caixaKey: "caixaEmenda" | "rcCaixaEmenda",
+    plaquetaKey: "plaquetaIdentificacao" | "rcPlaquetaIdentificacao",
+  ) => {
+    const aba = abaGrupoDe(caixaKey);
+    const rawCaixa = payload?.[caixaKey];
+    const rawPlaqueta = payload?.[plaquetaKey];
+    const caixaGrupo: FotoGrupoPayload | undefined = looksLikeFotoGrupoPorAmbiente(rawCaixa)
+      ? rawCaixa[aba]
+      : undefined;
+    const plaquetaGrupo: FotoGrupoPayload | undefined = looksLikeFotoGrupoPorAmbiente(rawPlaqueta)
+      ? rawPlaqueta[aba]
+      : undefined;
+    const redeCliente = payload?.redeCliente ?? emptyQuantidadesRede();
+    const redeAcesso = payload?.redeAcesso ?? emptyQuantidadesRede();
+    const variante = caixaKey === "caixaEmenda" ? "RE" : "RC";
+
+    const patchCaixaSlice = (nextSlice: FotoGrupoPayload) => {
+      if (!payload || !looksLikeFotoGrupoPorAmbiente(rawCaixa)) return;
+      patchPayload({
+        ...payload,
+        [caixaKey]: { ...rawCaixa, [aba]: nextSlice },
+      });
+    };
+    const patchPlaquetaSlice = (nextSlice: FotoGrupoPayload) => {
+      if (!payload || !looksLikeFotoGrupoPorAmbiente(rawPlaqueta)) return;
+      patchPayload({
+        ...payload,
+        [plaquetaKey]: { ...rawPlaqueta, [aba]: nextSlice },
+      });
+    };
+
+    const setFotoCampo = (
+      which: "caixa" | "plaqueta",
+      file: EvidencePhotoRef | null,
+    ) => {
+      if (!canEditPhotos) return;
+      const grupo = which === "caixa" ? caixaGrupo : plaquetaGrupo;
+      const key = which === "caixa" ? caixaKey : plaquetaKey;
+      const patchSlice = which === "caixa" ? patchCaixaSlice : patchPlaquetaSlice;
+      const base = grupo ?? { fotos: [], obs: "", obsAdmin: "" };
+      if (!file) {
+        const old = base.fotos[0];
+        if (!old) return;
+        patchSlice(removeFotoGrupoAt(base, 0));
+        void deleteRelatorioPhoto(old.path);
+        return;
+      }
+      if (base.fotos[0] && onReplacePhoto) {
+        onReplacePhoto(key, file, { index: 0, ambiente: aba });
+        return;
+      }
+      onAddPhoto(key, file, aba);
+    };
+
+    const fotoCaixa = caixaGrupo?.fotos?.[0] ?? null;
+    const fotoPlaqueta = plaquetaGrupo?.fotos?.[0] ?? null;
+
+    const qtdHeader =
+      (isEmpresarial || isImplantacao) && caixaKey === "caixaEmenda" ? (
+        <CampoQuantidade
+          label="Quantidade de Caixas de Emenda"
+          placeholder="Ex: 4"
+          value={redeAcesso.qtdCaixasEmendaPorAmbiente[aba] ?? null}
+          onChange={
+            canEditPhotos
+              ? (qtdCaixasEmenda: number | null) =>
+                  patchQtdCaixas("redeAcesso", aba, qtdCaixasEmenda)
+              : undefined
+          }
+          disabled={!canEditPhotos}
+        />
+      ) : isEmpresarial && caixaKey === "rcCaixaEmenda" ? (
+        <>
+          <CampoQuantidade
+            label="Quantidade de Caixas de Emenda"
+            placeholder="Ex: 1"
+            value={redeCliente.qtdCaixasEmendaPorAmbiente[aba] ?? null}
+            onChange={
+              canEditPhotos
+                ? (qtdCaixasEmenda: number | null) =>
+                    patchQtdCaixas("redeCliente", aba, qtdCaixasEmenda)
+                : undefined
+            }
+            disabled={!canEditPhotos}
+          />
+          <CampoCoordenadas
+            title="Coordenadas da Caixa de Emenda"
+            value={
+              redeCliente.caixaEmendaAcomodacaoPorAmbiente[aba]?.coordenadas ?? emptyCoordenadas()
+            }
+            onChange={
+              canEditPhotos
+                ? (coordenadas: { latitude: string; longitude: string }) => {
+                    if (!payload) return;
+                    patchPayload({
+                      ...payload,
+                      redeCliente: {
+                        ...redeCliente,
+                        caixaEmendaAcomodacaoPorAmbiente: {
+                          ...redeCliente.caixaEmendaAcomodacaoPorAmbiente,
+                          [aba]: { coordenadas },
+                        },
+                        caixaEmendaAcomodacao:
+                          aba === "aereo" ? { coordenadas } : redeCliente.caixaEmendaAcomodacao,
+                      },
+                    });
+                  }
+                : undefined
+            }
+            disabled={!canEditPhotos}
+            embedded
+          />
+        </>
+      ) : null;
+
+    const renderFotoColuna = (
+      label: string,
+      foto: StoredPhoto | null,
+      which: "caixa" | "plaqueta",
+    ) => (
+      <div className="min-w-0">
+        <FotoLabel>{label}</FotoLabel>
+        {foto ? (
+          <RelatorioFotoComControles
+            src={foto.url}
+            alt={label}
+            canEdit={canEditPhotos}
+            onDelete={canEditPhotos ? () => setFotoCampo(which, null) : undefined}
+            onReplace={canEditPhotos ? (file) => setFotoCampo(which, file) : undefined}
+          />
+        ) : canEditPhotos ? (
+          <PhotoUpload
+            label={label}
+            hideLabel
+            value={null}
+            onChange={(file) => setFotoCampo(which, file)}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Sem foto</p>
+        )}
+      </div>
+    );
+
+    const body = (
+      <div
+        id={`secao-${caixaKey}`}
+        className="relative z-0 flex h-full flex-col rounded-xl border border-gray-300 bg-white p-4 shadow-sm"
+      >
+        <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+        <div className="mt-3 space-y-3">
+          <AmbienteToggle
+            value={aba}
+            onChange={(ambiente) =>
+              setAbasGrupos((prev) => ({
+                ...prev,
+                [caixaKey]: ambiente,
+                [plaquetaKey]: ambiente,
+              }))
+            }
+            disabled={false}
+          />
+          {qtdHeader}
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {renderFotoColuna("Foto da caixa", fotoCaixa, "caixa")}
+          {renderFotoColuna("Etiqueta / Plaqueta de Identificação", fotoPlaqueta, "plaqueta")}
+        </div>
+        {canEditPhotos ? (
+          <div className="mt-4 w-full min-w-0">
+            <ObsEditavel
+              value={caixaGrupo?.obs ?? ""}
+              onChange={(obs) => {
+                const base = caixaGrupo ?? { fotos: [], obs: "", obsAdmin: "" };
+                patchCaixaSlice({ ...base, obs });
+              }}
+            />
+          </div>
+        ) : caixaGrupo?.obs ? (
+          <p className="mt-4 text-sm text-gray-700">{caixaGrupo.obs}</p>
+        ) : null}
+      </div>
+    );
+
+    return (
+      <PendenciaItemFrame
+        key={`${caixaKey}-${aba}`}
+        def={pendenciaFotoGrupo({
+          aba: variante,
+          grupoKey: caixaKey,
+          title,
+        })}
+      >
+        {body}
+      </PendenciaItemFrame>
+    );
   };
 
   const renderCabo = (
@@ -1853,7 +2149,10 @@ export function RelatorioDetalhe({
                 </div>
               </div>
             ) : null}
-            {renderGrupo("Sobra técnica", "sobraTecnica", true)}
+            {renderGateSobraTecnica("redeAcesso")}
+            {mostrarSobraTecnica("redeAcesso")
+              ? renderGrupo("Sobra técnica", "sobraTecnica", true)
+              : null}
             {abaLancamentoRe !== "subterraneo" ? (
               <CordoalhaSimNaoCard
                 title="Fiberloop instalado?"
@@ -1883,10 +2182,13 @@ export function RelatorioDetalhe({
                 disabled={!canEditPhotos}
               />
             ) : null}
-            {renderGrupo(
-              "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
-              "dutoSubterraneo",
-            )}
+            {renderGateConstrucaoDuto("redeAcesso")}
+            {mostrarConstrucaoDuto("redeAcesso")
+              ? renderGrupo(
+                  "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
+                  "dutoSubterraneo",
+                )
+              : null}
             {renderConstrucaoCaixaSubterranea("redeAcesso")}
           </AccordionBloco>
 
@@ -2023,12 +2325,10 @@ export function RelatorioDetalhe({
             pendenciaBloco="RE.caixa"
           >
             {renderCaixaEmendaExistente("redeAcesso", "RE")}
-            {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
-            {renderGrupo(
-              "Plaqueta de Identificação - Caixa de emenda",
-              "plaquetaIdentificacao",
-              false,
+            {renderCaixaEmendaUnificada(
+              "Caixa de emenda",
               "caixaEmenda",
+              "plaquetaIdentificacao",
             )}
           </AccordionBloco>
 
@@ -2146,7 +2446,10 @@ export function RelatorioDetalhe({
               "Terminação do cabo no cliente (PTO/Roseta - área interna)",
               "rcTerminacaoCabo",
             )}
-            {renderGrupo("Sobra técnica", "rcSobraTecnica", true)}
+            {renderGateSobraTecnica("redeCliente")}
+            {mostrarSobraTecnica("redeCliente")
+              ? renderGrupo("Sobra técnica", "rcSobraTecnica", true)
+              : null}
             {abaLancamentoRc !== "subterraneo" ? (
               <CordoalhaSimNaoCard
                 id="secao-fiberloopInstalado"
@@ -2177,10 +2480,13 @@ export function RelatorioDetalhe({
                 disabled={!canEditPhotos}
               />
             ) : null}
-            {renderGrupo(
-              "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
-              "rcDutoSubterraneo",
-            )}
+            {renderGateConstrucaoDuto("redeCliente")}
+            {mostrarConstrucaoDuto("redeCliente")
+              ? renderGrupo(
+                  "Const. de duto subterrâneo (MD ou MND) — metros (MT)",
+                  "rcDutoSubterraneo",
+                )
+              : null}
             {renderConstrucaoCaixaSubterranea("redeCliente")}
           </AccordionBloco>
 
@@ -2295,16 +2601,10 @@ export function RelatorioDetalhe({
             pendenciaBloco="RC.caixa"
           >
             {renderCaixaEmendaExistente("redeCliente", "RC")}
-            {renderGrupo(
+            {renderCaixaEmendaUnificada(
               "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
               "rcCaixaEmenda",
-              true,
-            )}
-            {renderGrupo(
-              "Plaqueta de Identificação - Caixa de emenda",
               "rcPlaquetaIdentificacao",
-              false,
-              "rcCaixaEmenda",
             )}
           </AccordionBloco>
 
