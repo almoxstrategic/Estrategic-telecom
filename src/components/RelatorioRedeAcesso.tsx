@@ -63,9 +63,9 @@ export const ABAS_CAMPO: { id: AbaCampo; label: string }[] = [
   { id: "contatos", label: "Contatos" },
 ];
 
-/** App de campo (técnico): sem Contatos, Medições nem Infraestrutura (abas só no painel do gestor). */
+/** App de campo (técnico): sem Contatos nem Infraestrutura (abas só no painel do gestor). Medições = resumo somente leitura. */
 export const ABAS_CAMPO_TECNICO: { id: AbaCampo; label: string }[] = ABAS_CAMPO.filter(
-  (aba) => aba.id !== "contatos" && aba.id !== "medicoes" && aba.id !== "infraestrutura",
+  (aba) => aba.id !== "contatos" && aba.id !== "infraestrutura",
 );
 
 export const ABAS_CAMPO_IMPLANTACAO: { id: AbaCampo; label: string }[] = [

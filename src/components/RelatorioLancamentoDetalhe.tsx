@@ -2383,7 +2383,9 @@ export function RelatorioDetalhe({
           readOnly={!canEditPhotos}
         />
       ) : null}
-      {abaAtiva === "medicoes" ? <AbaMedicoes /> : null}
+      {abaAtiva === "medicoes" ? (
+        <AbaMedicoes payload={payload} clienteNome={row.cliente} />
+      ) : null}
       {abaAtiva === "contatos" ? (
         <AbaContatos
           value={payload?.contatos ?? emptyContatos()}

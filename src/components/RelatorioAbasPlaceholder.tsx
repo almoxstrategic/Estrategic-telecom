@@ -312,13 +312,7 @@ export function AbaInfraestrutura({
   );
 }
 
-export function AbaMedicoes() {
-  return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
-      <p className="text-sm text-muted-foreground">Sem formulários ativos</p>
-    </div>
-  );
-}
+export { AbaMedicoes } from "@/components/RelatorioMedicoes";
 
 function ContatoSubsecao({
   title,

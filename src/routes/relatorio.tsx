@@ -867,7 +867,7 @@ function RelatorioPage() {
   }, [tipo]);
 
   useEffect(() => {
-    if (abaCampo === "contatos" || abaCampo === "medicoes" || abaCampo === "infraestrutura") {
+    if (abaCampo === "contatos" || abaCampo === "infraestrutura") {
       setAbaCampo("RE");
     }
   }, [abaCampo]);
@@ -2110,7 +2110,7 @@ function RelatorioPage() {
                   readOnly={readOnly}
                 />
               ) : mostrarMedicoes ? (
-                <AbaMedicoes />
+                <AbaMedicoes payload={buildPayload()} clienteNome={cliente} />
               ) : null}
             </>
           ) : null}
