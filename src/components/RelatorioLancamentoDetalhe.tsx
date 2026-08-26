@@ -37,6 +37,7 @@ import {
   inputClass,
   type AbaCampo,
 } from "@/components/RelatorioRedeAcesso";
+import { TipoEquipamentoCombobox } from "@/components/TipoEquipamentoCombobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
@@ -766,9 +767,16 @@ function AdminListaEquipamentos({
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-gray-500">Tipo equipamento</p>
+                <TipoEquipamentoCombobox
+                  value={item.tipoEquipamento}
+                  onChange={(tipoEquipamento) => patchItem(item.id, { tipoEquipamento })}
+                  disabled={!canEdit}
+                />
+              </div>
               {(
                 [
-                  ["Tipo equipamento", "tipoEquipamento"],
                   ["Modelo", "modelo"],
                   ["Fabricante", "fabricante"],
                   ["SGP", "sgp"],

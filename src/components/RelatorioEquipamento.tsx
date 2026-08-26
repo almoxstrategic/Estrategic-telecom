@@ -13,6 +13,7 @@ import {
   type OutraFotoState,
 } from "@/components/RelatorioRedeAcesso";
 import { EquipamentosIpsCard } from "@/components/RelatorioAbasPlaceholder";
+import { TipoEquipamentoCombobox } from "@/components/TipoEquipamentoCombobox";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
   deleteRelatorioPhoto,
@@ -152,13 +153,14 @@ function EquipamentoItemCard({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <CampoTexto
-          label="Tipo equipamento"
-          value={item.tipoEquipamento}
-          onChange={(tipoEquipamento) => onPatch({ tipoEquipamento })}
-          disabled={readOnly}
-          placeholder="Ex: ONT, Switch"
-        />
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold">Tipo equipamento</label>
+          <TipoEquipamentoCombobox
+            value={item.tipoEquipamento}
+            onChange={(tipoEquipamento) => onPatch({ tipoEquipamento })}
+            disabled={readOnly}
+          />
+        </div>
         <CampoTexto
           label="Modelo"
           value={item.modelo}

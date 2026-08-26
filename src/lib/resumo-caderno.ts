@@ -19,11 +19,9 @@ export type ResumoCadernoLado = {
   totalPostes: number;
   pontosAterramento: number;
   hastesAterramento: number;
-  redeLancadaSubterraneo: number;
   dutoSubterraneo: number;
   caixaSubterranea: number;
   caixasEmendaAereo: number;
-  caixasEmendaSubterraneo: number;
   /** Código SIM/NÃO. */
   caixasEmendaExistenteRota: number;
   fiberloopInstalados: number;
@@ -101,7 +99,7 @@ function metragensPorCapacidadeFo(
   return map;
 }
 
-/** União ordenada das capacidades FO (exclui 0=sem tipo no meio; 0 fica por último se houver). */
+/** União ordenada das capacidades FO (0=sem tipo por último). */
 function capacidadesOrdenadas(...maps: Map<number, number>[]): number[] {
   const set = new Set<number>();
   for (const m of maps) {
@@ -133,11 +131,9 @@ function buildLado(
     totalPostes: numOrZero(rede?.qtdTotalPostes),
     pontosAterramento: numOrZero(rede?.aterramento?.pontosAterramento),
     hastesAterramento: numOrZero(rede?.aterramento?.totalHastes),
-    redeLancadaSubterraneo: somaMetragemAmbiente(lancamento, "subterraneo"),
     dutoSubterraneo: numOrZero(rede?.metrosDutoSubterraneo),
     caixaSubterranea: qtdSeSim(rede?.construcaoCaixaSubterranea),
     caixasEmendaAereo: numOrZero(rede?.qtdCaixasEmendaPorAmbiente?.aereo),
-    caixasEmendaSubterraneo: numOrZero(rede?.qtdCaixasEmendaPorAmbiente?.subterraneo),
     caixasEmendaExistenteRota: simNaoToCode(rede?.caixaEmendaExistente?.isSim),
     fiberloopInstalados: qtdSeSim(rede?.fiberloopInstalado),
   };
@@ -167,14 +163,17 @@ function linha(
   };
 }
 
+/** Conta itens por tipo (equipamentos + DGO/Roseta do cliente). */
 function contagemPorTipoEquipamento(
-  itens: { tipoEquipamento?: string | null }[] | null | undefined,
+  ...listas: ({ tipoEquipamento?: string | null }[] | null | undefined)[]
 ): Map<string, number> {
   const map = new Map<string, number>();
-  for (const item of itens ?? []) {
-    const tipo = String(item.tipoEquipamento ?? "").trim();
-    if (!tipo) continue;
-    map.set(tipo, (map.get(tipo) ?? 0) + 1);
+  for (const itens of listas) {
+    for (const item of itens ?? []) {
+      const tipo = String(item.tipoEquipamento ?? "").trim();
+      if (!tipo) continue;
+      map.set(tipo, (map.get(tipo) ?? 0) + 1);
+    }
   }
   return map;
 }
@@ -193,8 +192,6 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
 
   const foAereoRe = metragensPorCapacidadeFo(p?.lancamentoCabosRe, "aereo");
   const foAereoRc = metragensPorCapacidadeFo(p?.lancamentoCabosRc, "aereo");
-  const foSubRe = metragensPorCapacidadeFo(p?.lancamentoCabosRe, "subterraneo");
-  const foSubRc = metragensPorCapacidadeFo(p?.lancamentoCabosRc, "subterraneo");
 
   const linhasFoAereo = capacidadesOrdenadas(foAereoRe, foAereoRc).map((cap) =>
     linha(
@@ -207,36 +204,16 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
     ),
   );
 
-  const linhasFoSub = capacidadesOrdenadas(foSubRe, foSubRc).map((cap) =>
-    linha(
-      `fibra-sub-${cap || "sem-tipo"}`,
-      "subterraneo",
-      labelFibraFo(cap),
-      "Metros",
-      foSubRe.get(cap) ?? 0,
-      foSubRc.get(cap) ?? 0,
-    ),
-  );
-
-  const eqCount = p?.eqClienteEquipamentos?.length ?? 0;
-  const dgoCount = p?.eqClienteDgo?.length ?? 0;
-  const porTipo = contagemPorTipoEquipamento(p?.eqClienteEquipamentos);
+  const porTipo = contagemPorTipoEquipamento(p?.eqClienteEquipamentos, p?.eqClienteDgo);
   const linhasTipoEq = [...porTipo.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
     .map(([tipo, qtd]) =>
-      linha(
-        `eq-tipo-${tipo}`,
-        "acessos",
-        `Equipamento ${tipo}`,
-        "Unid.",
-        0,
-        qtd,
-      ),
+      linha(`eq-tipo-${tipo}`, "acessos", `Equipamento ${tipo}`, "Unid.", 0, qtd),
     );
+  const totalEquipamentos = [...porTipo.values()].reduce((acc, n) => acc + n, 0);
 
   const linhas: ResumoCadernoLinha[] = [
-    // —— Infraestrutura Aérea ——
-    ...linhasFoAereo,
+    // —— A. Infraestrutura Aérea (ordem fixa) ——
     linha(
       "rede-aereo",
       "aereo",
@@ -245,15 +222,17 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       re.redeLancadaAereo,
       rc.redeLancadaAereo,
     ),
-    linha("cordoalha", "aereo", "TOTAL CORDOALHA (lançada)", "Metros", re.cordoalhaLancada, rc.cordoalhaLancada),
+    ...linhasFoAereo,
+    linha("postes-total", "aereo", "TOTAL DE POSTES", "Unid.", re.totalPostes, rc.totalPostes),
     linha(
       "postes-nova",
       "aereo",
-      "TOTAL de POSTES COM NOVA CORDOALHA",
+      "POSTE COM NOVA CORDOALHA",
       "Unid.",
       re.postesNovaCordoalha,
       rc.postesNovaCordoalha,
     ),
+    linha("cordoalha", "aereo", "CORDOALHA (lançada)", "Metros", re.cordoalhaLancada, rc.cordoalhaLancada),
     linha(
       "postes-exist",
       "aereo",
@@ -264,7 +243,6 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       undefined,
       { omitTotal: true, total: Number.NaN },
     ),
-    linha("postes-total", "aereo", "TOTAL DE POSTES", "Unid.", re.totalPostes, rc.totalPostes),
     linha(
       "caixas-inst-aereo",
       "aereo",
@@ -292,7 +270,7 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       rc.fiberloopInstalados,
     ),
 
-    // —— Aterramento ——
+    // —— B. Aterramento ——
     linha(
       "aterramento-pontos",
       "aterramento",
@@ -310,16 +288,7 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       rc.hastesAterramento,
     ),
 
-    // —— Infraestrutura Subterrânea ——
-    ...linhasFoSub,
-    linha(
-      "rede-sub",
-      "subterraneo",
-      "TOTAL REDE LANÇADA (SUBTERRÂNEO)",
-      "Metros",
-      re.redeLancadaSubterraneo,
-      rc.redeLancadaSubterraneo,
-    ),
+    // —— C. Infraestrutura Subterrânea (somente duto + caixa) ——
     linha(
       "duto-sub",
       "subterraneo",
@@ -336,31 +305,15 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       re.caixaSubterranea,
       rc.caixaSubterranea,
     ),
-    linha(
-      "caixas-inst-sub",
-      "subterraneo",
-      "Quant. de CAIXAS DE EMENDA instalada",
-      "Unid.",
-      re.caixasEmendaSubterraneo,
-      rc.caixasEmendaSubterraneo,
-    ),
 
-    // —— Acessos e Equipamentos (somente ativos/passivos) ——
+    // —— Acessos e Equipamentos ——
     linha(
       "eq-instalados",
       "acessos",
       "Quantidade de EQUIPAMENTOS instalados",
       "Unid.",
       0,
-      eqCount,
-    ),
-    linha(
-      "eq-dgo",
-      "acessos",
-      "DGO / ROSETA instalado",
-      "Unid.",
-      0,
-      dgoCount,
+      totalEquipamentos,
     ),
     ...linhasTipoEq,
   ];
