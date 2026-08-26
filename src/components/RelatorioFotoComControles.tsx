@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, Pencil, Trash2, Upload } from "lucide-react";
 import { ExpandableImage } from "@/components/ExpandableImage";
+import { useEvidencePhotoPasteSlot } from "@/components/EvidencePhotoPasteContext";
 import { FOTO_PREVIEW_FRAME_CLASS } from "@/components/PhotoUpload";
 import { toast } from "sonner";
 import { prepareEvidencePhotoFile } from "@/lib/evidence-photo-file";
@@ -35,9 +36,11 @@ export function RelatorioFotoComControles({
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const pickReplace = async (file: File | undefined, source: "camera" | "gallery") => {
     if (!file || !onReplace) return;
+    setBusy(true);
     try {
       const prepared = await prepareEvidencePhotoFile(file, undefined, {
         withTimestamp: source === "camera",
@@ -46,6 +49,7 @@ export function RelatorioFotoComControles({
     } catch (err) {
       toast.error((err as Error).message || "Não foi possível processar a foto.");
     } finally {
+      setBusy(false);
       if (cameraRef.current) cameraRef.current.value = "";
       if (galleryRef.current) galleryRef.current.value = "";
       setChooserOpen(false);
@@ -63,6 +67,7 @@ export function RelatorioFotoComControles({
       return;
     }
 
+    setBusy(true);
     try {
       const prepared: EvidencePhotoRef[] = [];
       for (const file of files) {
@@ -72,13 +77,21 @@ export function RelatorioFotoComControles({
     } catch (err) {
       toast.error((err as Error).message || "Não foi possível processar as fotos.");
     } finally {
+      setBusy(false);
       if (galleryRef.current) galleryRef.current.value = "";
       setChooserOpen(false);
     }
   };
 
+  const { pasteTargetProps } = useEvidencePhotoPasteSlot({
+    canAccept: Boolean(canEdit && onReplace),
+    isBusy: busy,
+    acceptFile: (file) => void pickReplace(file, "gallery"),
+  });
+
   return (
     <div
+      {...pasteTargetProps}
       className={cn(
         FOTO_PREVIEW_FRAME_CLASS,
         fillWidth && "max-w-full sm:max-w-none",

@@ -118,9 +118,8 @@ export function PhotoUpload({
     [handleFile, onGalleryFiles],
   );
 
-  useEvidencePhotoPasteSlot({
-    priority: suffix === "inicio" ? 0 : 1,
-    isEmpty: value === null,
+  const { pasteTargetProps } = useEvidencePhotoPasteSlot({
+    canAccept: true,
     isBusy: busy,
     acceptFile: (file) => void handleFile(file, "gallery"),
   });
@@ -160,7 +159,10 @@ export function PhotoUpload({
       : "Otimizando imagem...";
 
   return (
-    <div className={fillWidth ? "w-full min-w-0 max-w-full" : "w-full min-w-0 max-w-full sm:max-w-[360px]"}>
+    <div
+      className={fillWidth ? "w-full min-w-0 max-w-full" : "w-full min-w-0 max-w-full sm:max-w-[360px]"}
+      {...pasteTargetProps}
+    >
       {hideLabel ? null : (
         <div className="mb-1 h-5 text-sm font-bold text-foreground">{label}</div>
       )}
@@ -237,11 +239,11 @@ export function PhotoUpload({
             "cursor-pointer border-2 border-dashed bg-muted/40 px-3 text-center transition hover:border-primary/50 hover:bg-muted/60",
             dragOver ? "border-primary bg-primary/5" : "border-border",
           )}
-          aria-label={`${label}: clique ou arraste para enviar`}
+          aria-label={`${label}: clique, arraste ou Ctrl+V para enviar`}
         >
           <ImageIcon className="mb-1 h-6 w-6 shrink-0 text-muted-foreground" />
           <p className="px-1 text-[11px] font-medium leading-snug text-muted-foreground">
-            Sem foto • Clique ou arraste para enviar
+            Sem foto • Clique, arraste ou Ctrl+V
           </p>
           <div className="mt-2 flex items-center justify-center gap-1.5">
             <button
@@ -289,7 +291,7 @@ export function PhotoUpload({
       />
       {showHelperText ? (
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Arraste, clique ou pressione Ctrl+V para colar uma imagem.{" "}
+          Arraste, clique ou pressione Ctrl+V com o mouse sobre este campo.{" "}
           {onGalleryFiles ? "A galeria aceita várias fotos de uma vez. " : null}
           {suffix === "inicio" ? "Início" : "Fim"}: comprimida (~320KB) no envio. Fotos da câmera
           recebem data, hora e geolocalização.
