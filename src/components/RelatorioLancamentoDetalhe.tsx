@@ -34,7 +34,7 @@ import {
   AmbienteToggle,
   RefTituloInput,
   RelatorioAbasCampo,
-  inputClass,
+  inputClassGestor,
   type AbaCampo,
 } from "@/components/RelatorioRedeAcesso";
 import { TipoEquipamentoCombobox } from "@/components/TipoEquipamentoCombobox";
@@ -424,7 +424,7 @@ function MetaField({ label, value }: { label: string; value: string }) {
   const empty = value === "Não informado";
   return (
     <div className="min-w-0">
-      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-gray-700">{label}</p>
       <p className={empty ? "mt-0.5 text-sm font-normal text-gray-400" : "mt-0.5 text-sm font-medium text-gray-900"}>
         {value}
       </p>
@@ -513,7 +513,7 @@ function EvidenciaBloco({
     return null;
   }
   const body = (
-    <div className="flex h-full flex-col rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <div className="relative z-0 flex h-full flex-col rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         {onTitleChange ? (
           <RefTituloEditavel value={title} onChange={onTitleChange} />
@@ -609,8 +609,8 @@ function PostePerguntaQuadrante({
 }) {
   const sim = value.isSim === true;
   const inner = (
-    <div className="flex flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-      <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+    <div className="flex flex-col gap-2 rounded-xl border border-gray-300 bg-gray-50 p-4">
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
         <ChoiceButton
           active={value.isSim === true}
@@ -661,7 +661,7 @@ function SecaoDinamicaHeader({
   canAdd?: boolean;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="mb-5 flex items-center justify-between gap-3">
       <h3 className="text-lg font-bold text-gray-900">{titulo}</h3>
       {canAdd ? (
         <Button type="button" variant="outline" size="sm" onClick={onAdd} className="shrink-0">
@@ -768,7 +768,7 @@ function AdminListaEquipamentos({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5 pt-1">
       <SecaoDinamicaHeader
         titulo={titulo}
         addLabel={addLabel}
@@ -779,7 +779,7 @@ function AdminListaEquipamentos({
         {list.map((item, index) => (
           <div
             key={item.id}
-            className="flex h-full flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+            className="relative z-0 flex h-full flex-col gap-3 rounded-xl border border-gray-300 bg-white p-4 shadow-sm"
           >
             <div className="flex items-start justify-between gap-2">
               <h5 className="text-sm font-semibold text-gray-900">
@@ -803,7 +803,7 @@ function AdminListaEquipamentos({
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="min-w-0">
-                <p className="mb-1 text-xs text-gray-500">Tipo equipamento</p>
+                <p className="mb-1 text-xs font-medium text-gray-700">Tipo equipamento</p>
                 {tipoEquipamentoFixo ? (
                   <TipoEquipamentoCombobox
                     value={item.tipoEquipamento?.trim() || tipoEquipamentoFixo}
@@ -829,7 +829,7 @@ function AdminListaEquipamentos({
                 ] as const
               ).map(([fieldLabel, key]) => (
                 <div key={key} className="min-w-0">
-                  <p className="mb-1 text-xs text-gray-500">{fieldLabel}</p>
+                  <p className="mb-1 text-xs font-medium text-gray-700">{fieldLabel}</p>
                   <input
                     type="text"
                     value={
@@ -841,7 +841,7 @@ function AdminListaEquipamentos({
                     }
                     disabled={!canEdit}
                     onChange={(e) => patchItem(item.id, { [key]: e.target.value })}
-                    className={inputClass()}
+                    className={inputClassGestor()}
                   />
                 </div>
               ))}
@@ -884,13 +884,13 @@ function AdminListaEquipamentos({
             </div>
 
             <div className="w-full min-w-0">
-              <p className="mb-1 text-xs text-gray-500">OBS</p>
+              <p className="mb-1 text-xs font-medium text-gray-700">OBS</p>
               <textarea
                 value={item.obs}
                 disabled={!canEdit}
                 rows={2}
                 onChange={(e) => patchItem(item.id, { obs: e.target.value })}
-                className={inputClass()}
+                className={inputClassGestor()}
               />
             </div>
           </div>
@@ -1086,7 +1086,7 @@ export function RelatorioDetalhe({
   const renderAterramentoQtds = (lado: "redeAcesso" | "redeCliente") => {
     const rede = payload?.[lado] ?? emptyQuantidadesRede();
     return (
-      <div className="space-y-1 border-b border-gray-100 pb-4">
+      <div className="space-y-1 border-b border-gray-300 pb-4">
         <CampoQuantidade
           label="Quant. de pontos de Aterramento"
           placeholder="Ex: 2"
@@ -1128,7 +1128,7 @@ export function RelatorioDetalhe({
   const renderTotalPostes = (lado: "redeAcesso" | "redeCliente", variante: "RE" | "RC") => {
     const rede = payload?.[lado] ?? emptyQuantidadesRede();
     return (
-      <div className="border-b border-gray-100 pb-4">
+      <div className="border-b border-gray-300 pb-4">
         <CampoQuantidade
           label={`Total de poste (${variante})`}
           placeholder="Ex: 12"
@@ -1405,7 +1405,7 @@ export function RelatorioDetalhe({
         })}
       >
       <div
-        className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+        className="relative z-0 rounded-xl border border-gray-300 bg-white p-4 shadow-sm"
       >
         <div className="mb-4 flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-gray-900">{titulo}</p>
@@ -1429,7 +1429,7 @@ export function RelatorioDetalhe({
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <div className="space-y-3">
             <div>
-              <p className="text-xs text-gray-500">Tipo do cabo</p>
+              <p className="text-xs text-gray-700">Tipo do cabo</p>
               <input
                 type="text"
                 inputMode="numeric"
@@ -1441,12 +1441,12 @@ export function RelatorioDetalhe({
                   patchCaboCampos({ tipoCabo: apenasDigitos(e.target.value) })
                 }
                 placeholder="Ex: 12"
-                className={inputClass()}
+                className={inputClassGestor()}
               />
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-gray-500">Marcação Inicial (m)</p>
+                <p className="text-xs text-gray-700">Marcação Inicial (m)</p>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -1459,11 +1459,11 @@ export function RelatorioDetalhe({
                       marcacaoInicial: finalizeMedicaoInput(e.target.value),
                     })
                   }
-                  className={inputClass()}
+                  className={inputClassGestor()}
                 />
               </div>
               <div>
-                <p className="text-xs text-gray-500">Marcação Final (m)</p>
+                <p className="text-xs text-gray-700">Marcação Final (m)</p>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -1476,12 +1476,12 @@ export function RelatorioDetalhe({
                       marcacaoFinal: finalizeMedicaoInput(e.target.value),
                     })
                   }
-                  className={inputClass()}
+                  className={inputClassGestor()}
                 />
               </div>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Metragem Total (m)</p>
+              <p className="text-xs text-gray-700">Metragem Total (m)</p>
               <input
                 type="text"
                 readOnly
@@ -1489,7 +1489,7 @@ export function RelatorioDetalhe({
                   cabo.metragem ||
                   calcularMetragemCaboTotal(cabo.marcacaoInicial, cabo.marcacaoFinal)
                 }
-                className={`${inputClass()} cursor-default bg-gray-100`}
+                className={`${inputClassGestor()} cursor-default bg-gray-100`}
                 tabIndex={-1}
               />
             </div>
@@ -1723,7 +1723,7 @@ export function RelatorioDetalhe({
 
   return (
     <div className="space-y-5">
-      <div className="relative rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="relative rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
         {canEditCadastro ? (
           <Button
             type="button"
@@ -1736,7 +1736,7 @@ export function RelatorioDetalhe({
             Editar Dados
           </Button>
         ) : null}
-        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Endereço</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-700">Endereço</p>
         <p className="mt-1 pr-28 text-base font-medium">
           <span className={row.endereco?.trim() ? "text-gray-900" : "font-normal text-gray-400"}>
             {displayCadastral(row.endereco)}
@@ -1783,16 +1783,19 @@ export function RelatorioDetalhe({
         layoutMode="gestor"
       />
 
+      {/* Escala 75% só no conteúdo das abas — abas sticky ficam fora do zoom. */}
+      <div className="origin-top-left space-y-5 [zoom:0.75]">
       {abaAtiva === "RE" ? (
         <div className="space-y-4">
           <AccordionBloco
             title="LANÇAMENTO (RE)"
             id="secao-cabos"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.lancamento"
           >
-            <div className="border-b border-gray-100 pb-6">
+            <div className="border-b border-gray-300 pb-6">
               <div className="flex w-full flex-col gap-3">
                 <LancamentoCabosControle
                   label="Lançamento cabos (RE)?"
@@ -1819,7 +1822,7 @@ export function RelatorioDetalhe({
               </div>
             </div>
             {lancamentoCabosRe[abaLancamentoRe].isSim === true ? (
-              <div className="space-y-4 border-b border-gray-100 pb-6">
+              <div className="space-y-4 border-b border-gray-300 pb-6">
                 <SecaoDinamicaHeader
                   titulo="Metragem de cabo"
                   addLabel="Adicionar mais cabo"
@@ -1885,6 +1888,7 @@ export function RelatorioDetalhe({
             title="POSTE (RE)"
             id="secao-poste"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.poste"
           >
@@ -2010,6 +2014,7 @@ export function RelatorioDetalhe({
             title="CAIXA DE EMENDA (RE)"
             id="secao-caixa-emenda"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.caixa"
           >
@@ -2027,6 +2032,7 @@ export function RelatorioDetalhe({
             title="OUTRAS FOTOS (RE)"
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.outras"
           >
@@ -2041,6 +2047,7 @@ export function RelatorioDetalhe({
             title="LOCAL (RC)"
             id="secao-local"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.local"
           >
@@ -2076,10 +2083,11 @@ export function RelatorioDetalhe({
             title="LANÇAMENTO (RC)"
             id="secao-cabos"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.lancamento"
           >
-            <div className="border-b border-gray-100 pb-6">
+            <div className="border-b border-gray-300 pb-6">
               <div className="flex w-full flex-col gap-3">
                 <LancamentoCabosControle
                   label="Lançamento cabos (RC)?"
@@ -2106,7 +2114,7 @@ export function RelatorioDetalhe({
               </div>
             </div>
             {lancamentoCabosRc[abaLancamentoRc].isSim === true ? (
-              <div className="space-y-4 border-b border-gray-100 pb-6">
+              <div className="space-y-4 border-b border-gray-300 pb-6">
                 <SecaoDinamicaHeader
                   titulo="Metragem de cabo"
                   addLabel="Adicionar mais cabo"
@@ -2179,6 +2187,7 @@ export function RelatorioDetalhe({
             title="POSTE (RC)"
             id="secao-poste"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.poste"
           >
@@ -2282,6 +2291,7 @@ export function RelatorioDetalhe({
             title="CAIXA DE EMENDA (RC)"
             id="secao-caixa-emenda"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.caixa"
           >
@@ -2303,6 +2313,7 @@ export function RelatorioDetalhe({
             title="OUTRAS FOTOS (RC)"
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.outras"
           >
@@ -2317,12 +2328,13 @@ export function RelatorioDetalhe({
             title="EQUIPAMENTO NO CLIENTE"
             id="secao-eq-cliente"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="EQ.cliente"
           >
             <div
               id="secao-tecnologia-acesso"
-              className="scroll-mt-36 space-y-1.5 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+              className="scroll-mt-36 space-y-1.5 rounded-xl border border-gray-300 bg-white p-4 shadow-sm"
             >
               <label htmlFor="admin-tecnologia-acesso" className="block text-sm font-semibold">
                 Tecnologia de Acesso
@@ -2337,7 +2349,7 @@ export function RelatorioDetalhe({
                   if (!payload || !canEditPhotos) return;
                   patchPayload({ ...payload, tecnologiaAcesso: e.target.value });
                 }}
-                className={inputClass()}
+                className={inputClassGestor()}
               />
             </div>
 
@@ -2357,28 +2369,31 @@ export function RelatorioDetalhe({
               emptyItem={emptyDgoClienteItem}
             />
 
-            <AdminListaEquipamentos
-              titulo="Equipamento"
-              addLabel="Adicionar mais Equipamento"
-              showIdentificacao
-              itemLabel="Equipamento"
-              itens={payload?.eqClienteEquipamentos ?? []}
-              canEdit={canEditPhotos}
-              onUploadPhoto={onUploadPhoto}
-              onPatchList={(next) => {
-                if (!payload) return;
-                patchPayload({
-                  ...payload,
-                  eqClienteEquipamentos: next as EquipamentoClienteItemPayload[],
-                });
-              }}
-              emptyItem={emptyEquipamentoClienteItem}
-            />
-
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {renderGrupo("Identificação SGP no Cliente", "eqClienteSgp")}
+            <div className="mt-2 space-y-1 border-t border-gray-300 pt-6">
+              <AdminListaEquipamentos
+                titulo="Equipamento"
+                addLabel="Adicionar mais Equipamento"
+                showIdentificacao
+                itemLabel="Equipamento"
+                itens={payload?.eqClienteEquipamentos ?? []}
+                canEdit={canEditPhotos}
+                onUploadPhoto={onUploadPhoto}
+                onPatchList={(next) => {
+                  if (!payload) return;
+                  patchPayload({
+                    ...payload,
+                    eqClienteEquipamentos: next as EquipamentoClienteItemPayload[],
+                  });
+                }}
+                emptyItem={emptyEquipamentoClienteItem}
+              />
             </div>
 
+            <div className="relative z-0 mt-6 space-y-3 border-t border-gray-300 pt-6">
+              <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {renderGrupo("Identificação SGP no Cliente", "eqClienteSgp")}
+              </div>
+            </div>
             <EquipamentosIpsCard
               title="Configuração equipamento no cliente"
               value={
@@ -2405,16 +2420,33 @@ export function RelatorioDetalhe({
             title="EQUIPAMENTO NA ESTAÇÃO"
             id="secao-eq-estacao"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="EQ.estacao"
           >
-            <p
+            <div
               id="secao-estacao-entrega-acesso"
-              className="scroll-mt-36 text-sm text-muted-foreground"
+              className="scroll-mt-36 space-y-3 border-b border-gray-300 pb-6"
             >
-              Estação Entrega de Acesso
-              {payload?.estacaoEntregaAcesso ? `: ${payload.estacaoEntregaAcesso}` : ""}
-            </p>
+              <label
+                htmlFor="estacao-entrega-acesso-gestor"
+                className="mb-1.5 block text-sm font-semibold text-gray-900"
+              >
+                Estação Entrega de Acesso
+              </label>
+              <input
+                id="estacao-entrega-acesso-gestor"
+                type="text"
+                value={payload?.estacaoEntregaAcesso ?? ""}
+                onChange={(e) => {
+                  if (!payload || !canEditPhotos) return;
+                  patchPayload({ ...payload, estacaoEntregaAcesso: e.target.value });
+                }}
+                placeholder="Nome / identificação da estação"
+                disabled={!canEditPhotos}
+                className={inputClassGestor()}
+              />
+            </div>
 
             <AdminListaEquipamentos
               titulo="DGO / DID / ROUTER"
@@ -2440,24 +2472,25 @@ export function RelatorioDetalhe({
               ).map(([title, key]) => renderGrupo(title, key))}
             </div>
 
-            <AdminListaEquipamentos
-              titulo="Equipamento"
-              addLabel="Adicionar mais Equipamento"
-              showIdentificacao
-              itemLabel="Equipamento"
-              itens={payload?.eqEstacaoEquipamento ?? []}
-              canEdit={canEditPhotos}
-              onUploadPhoto={onUploadPhoto}
-              onPatchList={(next) => {
-                if (!payload) return;
-                patchPayload({
-                  ...payload,
-                  eqEstacaoEquipamento: next as EquipamentoClienteItemPayload[],
-                });
-              }}
-              emptyItem={emptyEquipamentoClienteItem}
-            />
-
+            <div className="mt-2 space-y-1 border-t border-gray-300 pt-6">
+              <AdminListaEquipamentos
+                titulo="Equipamento"
+                addLabel="Adicionar mais Equipamento"
+                showIdentificacao
+                itemLabel="Equipamento"
+                itens={payload?.eqEstacaoEquipamento ?? []}
+                canEdit={canEditPhotos}
+                onUploadPhoto={onUploadPhoto}
+                onPatchList={(next) => {
+                  if (!payload) return;
+                  patchPayload({
+                    ...payload,
+                    eqEstacaoEquipamento: next as EquipamentoClienteItemPayload[],
+                  });
+                }}
+                emptyItem={emptyEquipamentoClienteItem}
+              />
+            </div>
             <EquipamentosIpsCard
               title="Configuração equipamento na estação"
               value={
@@ -2484,6 +2517,7 @@ export function RelatorioDetalhe({
             title="OUTRAS FOTOS"
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
+            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="EQ.outras"
           >
@@ -2596,6 +2630,7 @@ export function RelatorioDetalhe({
           readOnly={!canEditPhotos}
         />
       ) : null}
+      </div>
     </div>
   );
 }

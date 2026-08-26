@@ -403,7 +403,7 @@ export function RelatorioEquipamento({
           </div>
 
           <div className={flatSectionClass}>
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Roseta
             </h4>
             <ListaItensEquipamento
@@ -421,6 +421,9 @@ export function RelatorioEquipamento({
           </div>
 
           <div className={flatSectionClass}>
+            <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Equipamento
+            </h4>
             <ListaItensEquipamento
               id="secao-eq-equipamentos-cliente"
               itemLabel="Equipamento"
@@ -521,7 +524,10 @@ export function RelatorioEquipamento({
             </div>
           ))}
 
-          <div className={flatSectionClass}>
+          <div className={`${flatSectionClass} pt-1`}>
+            <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Equipamento
+            </h4>
             <ListaItensEquipamento
               id="secao-eq-equipamentos-estacao"
               itemLabel="Equipamento"

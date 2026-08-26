@@ -31,11 +31,12 @@ export function PendenciasFooterActions({
 
   return (
     <>
-      <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
+      <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
         {draftCount > 0 ? (
           <Button
             type="button"
-            className="rounded-lg border border-amber-300 bg-amber-50 px-5 py-2 text-sm font-semibold text-amber-900 shadow-none hover:bg-amber-100"
+            size="sm"
+            className="h-8 rounded-md border border-amber-300 bg-amber-50 px-3 text-xs font-semibold text-amber-900 shadow-none hover:bg-amber-100"
             onClick={() => setModalOpen(true)}
             disabled={saving}
           >
@@ -44,11 +45,12 @@ export function PendenciasFooterActions({
         ) : null}
         <Button
           type="button"
-          className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+          size="sm"
+          className="h-8 rounded-md bg-green-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-green-700"
           onClick={onAprovar}
           disabled={saving}
         >
-          <CheckCircle2 className="h-4 w-4" />
+          <CheckCircle2 className="h-3.5 w-3.5" />
           Aprovar e Fechar
         </Button>
       </div>

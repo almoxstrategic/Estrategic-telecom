@@ -33,7 +33,7 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-semibold">{label}</label>
+      <label className="mb-1.5 block text-sm font-semibold text-gray-800">{label}</label>
       <input
         type={type}
         inputMode={inputMode}
@@ -69,10 +69,10 @@ export function EquipamentosIpsCard({
       className={
         embedded
           ? "space-y-3"
-          : "space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          : "space-y-3 rounded-2xl border border-gray-300 bg-card p-5 shadow-sm"
       }
     >
-      <h2 className={embedded ? "mb-3 font-semibold text-gray-800" : "text-base font-bold"}>
+      <h2 className={embedded ? "mb-3 font-semibold text-gray-900" : "text-base font-bold text-gray-900"}>
         {title}
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -194,7 +194,7 @@ function InfraPerguntaSimNao({
     <div
       className={
         compact
-          ? `flex flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4 ${className ?? ""}`
+          ? `flex flex-col gap-2 rounded-xl border border-gray-300 bg-gray-50 p-4 ${className ?? ""}`
           : `space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm ${className ?? ""}`
       }
     >

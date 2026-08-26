@@ -90,6 +90,11 @@ export function inputClass() {
   return "w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted";
 }
 
+/** Inputs da visão Gestor — borda e texto com contraste reforçado. */
+export function inputClassGestor() {
+  return "w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-base text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted";
+}
+
 /** Textarea de OBS compacta (2 linhas) com resize vertical manual. */
 export function textareaObsClass() {
   return `${inputClass()} min-h-[64px] resize-y`;
@@ -210,7 +215,7 @@ export function TipoExecucaoPicker({
 export const RELATORIO_ABAS_STICKY_ID = "relatorio-abas-sticky";
 
 /** Header sticky (~64px) — usado só como fallback de offset dos accordions. */
-const APP_HEADER_STICKY_PX = 64;
+const APP_HEADER_STICKY_PX = 56;
 /** Fallback se a barra ainda não estiver no DOM. */
 const ABAS_BAR_FALLBACK_PX = 104;
 
@@ -662,7 +667,9 @@ export function RelatorioAbasCampo({
                 tabsFullBleed ? "px-0" : "px-5",
               )
             : cn(
-                "sticky top-16 z-40 w-full bg-white py-2",
+                isGestor
+                  ? "sticky top-14 z-40 w-full border-b border-gray-200 bg-white py-1"
+                  : "sticky top-16 z-40 w-full bg-white py-2",
                 tabsFullBleed ? "-mx-5 w-[calc(100%+2.5rem)] max-w-none px-0" : "",
               )
         }
@@ -699,12 +706,16 @@ export function RelatorioAbasCampo({
                   key={aba.id}
                   type="button"
                   onClick={() => onChange(aba.id)}
-                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-center text-xs font-semibold transition ${
-                    isGestor ? "md:px-4 md:text-sm" : ""
+                  className={`shrink-0 whitespace-nowrap rounded-full border text-center font-semibold transition ${
+                    isGestor
+                      ? "border-gray-200 px-2.5 py-0.5 text-[11px] md:px-3 md:text-xs"
+                      : "border-border px-3 py-1.5 text-xs"
                   } ${
                     ativa
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-white text-muted-foreground hover:bg-muted"
+                      : isGestor
+                        ? "bg-white text-gray-700 hover:bg-gray-50"
+                        : "bg-white text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   {aba.label}
@@ -726,24 +737,38 @@ export function RelatorioAbasCampo({
 
         <div
           ref={buscaWrapRef}
-          className={cn("relative mt-2 w-full", tabsFullBleed && "px-5")}
+          className={cn(
+            "relative w-full",
+            isGestor ? "mt-1" : "mt-2",
+            tabsFullBleed && "px-5",
+          )}
         >
           <div className="flex items-center gap-2">
             {indiceMenu.length > 0 ? (
               <button
                 type="button"
                 onClick={() => setIsSideMenuOpen(true)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-white text-foreground transition hover:bg-muted"
+                className={cn(
+                  "flex shrink-0 items-center justify-center rounded-lg border bg-white text-foreground transition hover:bg-muted",
+                  isGestor
+                    ? "h-8 w-8 border-gray-200"
+                    : "h-10 w-10 border-input",
+                )}
                 aria-label="Abrir índice de seções"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className={isGestor ? "h-4 w-4" : "h-5 w-5"} />
               </button>
             ) : null}
 
             <div className="relative min-w-0 flex-1">
               {secoes.length > 0 ? (
                 <>
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Search
+                    className={cn(
+                      "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground",
+                      isGestor ? "h-3.5 w-3.5" : "h-4 w-4",
+                    )}
+                  />
                   <input
                     type="search"
                     value={searchTerm}
@@ -753,7 +778,12 @@ export function RelatorioAbasCampo({
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
                     placeholder="Buscar seção (ex: Caixa de Emenda)"
-                    className="box-border w-full rounded-lg border border-input bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className={cn(
+                      "box-border w-full rounded-lg bg-white pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20",
+                      isGestor
+                        ? "border border-gray-200 py-1.5"
+                        : "border border-input py-2",
+                    )}
                     aria-label="Busca rápida de seções do formulário"
                     autoComplete="off"
                   />
@@ -765,14 +795,16 @@ export function RelatorioAbasCampo({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-white transition hover:bg-muted ${
-                    temPendencia ? "text-destructive" : "text-muted-foreground"
-                  }`}
+                  className={cn(
+                    "relative flex shrink-0 items-center justify-center rounded-lg border bg-white transition hover:bg-muted",
+                    isGestor ? "h-8 w-8 border-gray-200" : "h-10 w-10 border-input",
+                    temPendencia ? "text-destructive" : isGestor ? "text-gray-700" : "text-muted-foreground",
+                  )}
                   aria-label={
                     temPendencia ? "Ver pendência do relatório" : "Notificações do relatório"
                   }
                 >
-                  <Bell className="h-5 w-5" />
+                  <Bell className={isGestor ? "h-4 w-4" : "h-5 w-5"} />
                   {temPendencia ? (
                     <span
                       className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background"
@@ -1035,6 +1067,8 @@ export function AccordionBloco({
   defaultOpen = false,
   variant = "default",
   pendenciaBloco,
+  /** Compensa `zoom` no ancestral (ex.: 0.75 na visão Gestor) para o sticky alinhar ao chrome real. */
+  stickyZoomCompensation = 1,
 }: {
   title: string;
   children: ReactNode;
@@ -1048,11 +1082,16 @@ export function AccordionBloco({
   variant?: "default" | "audit";
   /** Agrega contagem de pendências filhas no cabeçalho. */
   pendenciaBloco?: PendenciaBlocoId;
+  stickyZoomCompensation?: number;
 }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const stickyOffsetPx = useAbasStickyOffsetPx(stickTabsAtViewportTop);
+  const measuredOffsetPx = useAbasStickyOffsetPx(stickTabsAtViewportTop);
+  const zoomSafe = stickyZoomCompensation > 0 ? stickyZoomCompensation : 1;
+  const stickyOffsetPx = Math.round(measuredOffsetPx / zoomSafe);
   const isStuck = useAccordionStuck(sentinelRef, stickyOffsetPx);
   const isAudit = variant === "audit";
+  /** Chrome reforçado na visão Gestor (zoom 0.75). */
+  const strongChrome = zoomSafe < 1;
   const pendenciasCtx = usePendencias();
   const pendenciaCount = pendenciaBloco
     ? (pendenciasCtx?.countInBloco(pendenciaBloco) ?? 0)
@@ -1061,20 +1100,22 @@ export function AccordionBloco({
 
   const summaryClass = cn(
     "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden",
+    /* Fundo sempre opaco para o conteúdo não transparecer ao rolar. */
+    "bg-white",
     isAudit
       ? "border-b px-4 text-sm font-bold uppercase tracking-wider"
       : "border-b px-5 font-bold",
-    isAudit ? (isStuck ? "-mx-4 py-2.5 shadow-sm" : "py-3") : isStuck ? "-mx-5 py-2 shadow-sm" : "py-4",
+    isAudit ? (isStuck ? "-mx-4 py-2.5 shadow-md" : "py-3") : isStuck ? "-mx-5 py-2 shadow-md" : "py-4",
     !isAudit && (isStuck ? "text-sm" : "text-base"),
     hasPendencias
-      ? "border-amber-200/60 border-l-2 border-l-amber-400 bg-amber-50/50 text-gray-900"
-      : isAudit
-        ? isStuck
-          ? "border-gray-200 bg-gray-50 text-gray-800"
-          : "border-gray-200 bg-white text-gray-800"
-        : isStuck
-          ? "border-gray-200 bg-gray-50"
-          : "border-gray-100 bg-white",
+      ? "border-amber-200 border-l-2 border-l-amber-400 bg-amber-50 text-gray-900"
+      : strongChrome
+        ? "border-gray-200 text-gray-900"
+        : isAudit
+          ? "border-gray-200 text-gray-800"
+          : isStuck
+            ? "border-gray-200"
+            : "border-gray-100",
   );
 
   return (
@@ -1085,12 +1126,16 @@ export function AccordionBloco({
       className={
         isAudit
           ? cn(
-              "group relative overflow-visible rounded-xl border bg-white shadow-sm open:shadow-md",
-              hasPendencias ? "border-amber-200/60" : "border-gray-100",
+              "group relative z-0 overflow-visible rounded-xl border bg-white shadow-sm open:shadow-md",
+              hasPendencias ? "border-amber-200" : strongChrome ? "border-gray-200" : "border-gray-100",
             )
           : cn(
-              "group relative overflow-visible rounded-2xl border bg-card shadow-sm open:shadow-md",
-              hasPendencias ? "border-amber-200/60" : "border-border",
+              "group relative z-0 overflow-visible rounded-2xl border bg-card shadow-sm open:shadow-md",
+              hasPendencias
+                ? "border-amber-200"
+                : strongChrome
+                  ? "border-gray-200"
+                  : "border-border",
             )
       }
       style={{ scrollMarginTop: stickyOffsetPx }}
@@ -1120,8 +1165,8 @@ export function AccordionBloco({
       <div
         className={
           isAudit
-            ? "flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-5"
-            : "flex flex-col gap-6 px-4 pb-5 pt-4 sm:px-5"
+            ? "relative z-0 flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-5"
+            : "relative z-0 flex flex-col gap-6 px-4 pb-5 pt-4 sm:px-5"
         }
       >
         {children}
@@ -1224,7 +1269,7 @@ export function CampoQuantidade({
   return (
     <div className="mb-4">
       {label ? (
-        <label htmlFor={id} className="mb-1.5 block text-sm font-semibold">
+        <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-gray-800">
           {label}
         </label>
       ) : null}

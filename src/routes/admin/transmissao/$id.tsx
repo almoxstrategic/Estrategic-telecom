@@ -411,25 +411,25 @@ function AdminLancamentoDetalhePage() {
   return (
     <PendenciasProvider mode="gestor" confirmed={row?.payload.pendenciasItens ?? []}>
       <div className="min-h-screen bg-white">
-        <AppHeader />
-        <header className="border-b border-gray-200 bg-white">
-          <div className="flex w-full flex-wrap items-center justify-between gap-3 px-6 py-4 lg:px-10">
-            <div className="min-w-0 space-y-1.5">
+        <AppHeader compact />
+        <header className="border-b border-gray-300 bg-white">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2 px-6 py-2.5 lg:px-10">
+            <div className="min-w-0 space-y-0.5">
               <Link
                 to="/admin/transmissao"
-                className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-foreground"
               >
-                <ArrowLeft className="h-4 w-4" /> Voltar para a lista
+                <ArrowLeft className="h-3.5 w-3.5" /> Voltar para a lista
               </Link>
               {row ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-bold tracking-tight text-gray-900">OS/WF {row.os_wf}</h1>
+                  <h1 className="text-lg font-bold tracking-tight text-gray-900">OS/WF {row.os_wf}</h1>
                   <StatusBadge status={row.status} />
                 </div>
               ) : (
-                <h1 className="text-xl font-bold tracking-tight text-gray-900">Detalhes do relatório</h1>
+                <h1 className="text-lg font-bold tracking-tight text-gray-900">Detalhes do relatório</h1>
               )}
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-gray-600">
                 {refreshing ? "Atualizando dados..." : "Dashboard de auditoria"}
               </p>
             </div>
@@ -474,36 +474,33 @@ function AdminLancamentoDetalhePage() {
           </div>
         </header>
 
-        <main className={cn("w-full px-6 py-4 lg:px-10", mostrarFooter ? "pb-36" : "pb-10")}>
+        <main className={cn("w-full px-6 py-4 lg:px-10", mostrarFooter ? "pb-20" : "pb-10")}>
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando relatório...</p>
           ) : row ? (
-            /* Escala 75% exclusiva da visão do Gestor — técnico permanece em 100%. */
-            <div className="origin-top-left [zoom:0.75]">
-              <EvidencePhotoPasteProvider>
-                <RelatorioDetalhe
-                  row={row}
-                  canEditPhotos={canAudit}
-                  canEditCadastro={canAudit}
-                  onCadastroSaved={setRow}
-                  onAddPhoto={(categoria, file, ambiente) =>
-                    void onAdminAddPhoto(categoria, file, ambiente)
-                  }
-                  onAddPhotos={(categoria, files, ambiente) =>
-                    void onAdminAddPhotos(categoria, files, ambiente)
-                  }
-                  onReplacePhoto={(categoria, file, meta) =>
-                    void onAdminReplacePhoto(categoria, file, meta)
-                  }
-                  uploadingCategoria={uploadingCategoria}
-                  onUpdatePayload={onUpdatePayload}
-                  onUploadPhoto={async (file) => {
-                    if (!user?.id) throw new Error("Sessão inválida.");
-                    return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
-                  }}
-                />
-              </EvidencePhotoPasteProvider>
-            </div>
+            <EvidencePhotoPasteProvider>
+              <RelatorioDetalhe
+                row={row}
+                canEditPhotos={canAudit}
+                canEditCadastro={canAudit}
+                onCadastroSaved={setRow}
+                onAddPhoto={(categoria, file, ambiente) =>
+                  void onAdminAddPhoto(categoria, file, ambiente)
+                }
+                onAddPhotos={(categoria, files, ambiente) =>
+                  void onAdminAddPhotos(categoria, files, ambiente)
+                }
+                onReplacePhoto={(categoria, file, meta) =>
+                  void onAdminReplacePhoto(categoria, file, meta)
+                }
+                uploadingCategoria={uploadingCategoria}
+                onUpdatePayload={onUpdatePayload}
+                onUploadPhoto={async (file) => {
+                  if (!user?.id) throw new Error("Sessão inválida.");
+                  return uploadRelatorioPhoto(user.id, file.file, "admin-teste");
+                }}
+              />
+            </EvidencePhotoPasteProvider>
           ) : (
             <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-muted-foreground">
               Relatório não encontrado.
@@ -512,17 +509,18 @@ function AdminLancamentoDetalhePage() {
         </main>
 
         {mostrarFooter && row ? (
-          <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/90 p-4 backdrop-blur-md">
-            <div className="mx-auto flex w-full flex-col gap-3 px-6 lg:px-10">
+          <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white px-4 py-2">
+            <div className="mx-auto flex w-full flex-col gap-2 px-2 lg:px-6">
               {row.status === "fechado" ? (
                 <div className="flex justify-end">
                   <Button
                     type="button"
-                    className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+                    size="sm"
+                    className="h-8 rounded-md bg-green-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-green-700"
                     onClick={() => void onGerarPdf()}
                     disabled={gerandoPdf}
                   >
-                    <FileDown className="h-4 w-4" />
+                    <FileDown className="h-3.5 w-3.5" />
                     {gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
                   </Button>
                 </div>

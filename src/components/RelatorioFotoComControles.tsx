@@ -175,7 +175,7 @@ export function RelatorioFotoComControles({
 }
 
 export function FotoLabel({ children }: { children?: string }) {
-  return <p className="h-5 text-sm font-bold">{children || "\u00A0"}</p>;
+  return <p className="h-5 text-sm font-bold text-gray-800">{children || "\u00A0"}</p>;
 }
 
 /** Slot vazio estático (somente leitura). Preferir PhotoUpload quando editável. */

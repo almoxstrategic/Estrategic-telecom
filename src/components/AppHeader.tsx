@@ -10,23 +10,30 @@ import { cn } from "@/lib/utils";
 export function AppHeader({
   /** Quando false, o header rola com a página (ex.: técnico no formulário de relatório). */
   sticky = true,
+  /** Visão auditoria: altura reduzida para liberar área útil. */
+  compact = false,
 }: {
   sticky?: boolean;
+  compact?: boolean;
 } = {}) {
   const [open, setOpen] = useState(false);
   return (
     <header
       className={cn(
-        "z-30 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur",
+        "z-30 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-gray-300 bg-white px-4 backdrop-blur",
+        compact ? "py-1.5" : "py-3",
         sticky ? "sticky top-0" : "relative",
       )}
     >
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           aria-label="Abrir menu"
-          className="grid h-10 w-10 place-items-center rounded-lg text-foreground hover:bg-muted active:scale-95 transition"
+          className={cn(
+            "grid place-items-center rounded-lg text-foreground hover:bg-muted active:scale-95 transition",
+            compact ? "h-8 w-8" : "h-10 w-10",
+          )}
         >
-          <Menu className="h-6 w-6" />
+          <Menu className={compact ? "h-5 w-5" : "h-6 w-6"} />
         </SheetTrigger>
         <SheetContent side="left" className="w-[82%] max-w-xs p-0">
           <AppSidebar onNavigate={() => setOpen(false)} />
@@ -43,7 +50,7 @@ export function AppHeader({
           <Logo />
         </Link>
       </div>
-      <div className="w-10" />
+      <div className={cn(compact ? "w-8" : "w-10")} />
     </header>
   );
 }
