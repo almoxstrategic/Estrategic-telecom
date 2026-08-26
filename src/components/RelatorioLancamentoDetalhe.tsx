@@ -79,6 +79,7 @@ import {
   type AmbienteRede,
   type FotoGrupoPayload,
   type LancamentoPorAmbientePayload,
+  type QuantidadesRedePayload,
 } from "@/lib/relatorios-transmissao";
 
 export function formatDate(value: string | null | undefined) {
@@ -1026,6 +1027,129 @@ export function RelatorioDetalhe({
     patchPayload({ ...next, testePotencia1550: janela, testePotencia1330: janela });
   };
 
+  const patchRedeCampo = (
+    lado: "redeAcesso" | "redeCliente",
+    patch: Partial<QuantidadesRedePayload>,
+  ) => {
+    if (!payload) return;
+    const current = payload[lado] ?? emptyQuantidadesRede();
+    patchPayload({
+      ...payload,
+      [lado]: { ...current, ...patch },
+    });
+  };
+
+  const renderAterramentoQtds = (lado: "redeAcesso" | "redeCliente") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    return (
+      <div className="space-y-1 border-b border-gray-100 pb-4">
+        <CampoQuantidade
+          label="Quant. de pontos de Aterramento"
+          placeholder="Ex: 2"
+          value={rede.aterramento?.pontosAterramento ?? null}
+          onChange={
+            canEditPhotos
+              ? (pontosAterramento) =>
+                  patchRedeCampo(lado, {
+                    aterramento: {
+                      totalHastes: rede.aterramento?.totalHastes ?? null,
+                      pontosAterramento,
+                    },
+                  })
+              : undefined
+          }
+          disabled={!canEditPhotos}
+        />
+        <CampoQuantidade
+          label="ATERRAMENTO -> TOTAL DE HASTES (5/8)"
+          placeholder="Ex: 4"
+          value={rede.aterramento?.totalHastes ?? null}
+          onChange={
+            canEditPhotos
+              ? (totalHastes) =>
+                  patchRedeCampo(lado, {
+                    aterramento: {
+                      pontosAterramento: rede.aterramento?.pontosAterramento ?? null,
+                      totalHastes,
+                    },
+                  })
+              : undefined
+          }
+          disabled={!canEditPhotos}
+        />
+      </div>
+    );
+  };
+
+  const renderTotalPostes = (lado: "redeAcesso" | "redeCliente", variante: "RE" | "RC") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    return (
+      <div className="border-b border-gray-100 pb-4">
+        <CampoQuantidade
+          label={`Total de poste (${variante})`}
+          placeholder="Ex: 12"
+          value={rede.qtdTotalPostes ?? null}
+          onChange={
+            canEditPhotos
+              ? (qtdTotalPostes) => patchRedeCampo(lado, { qtdTotalPostes })
+              : undefined
+          }
+          disabled={!canEditPhotos}
+        />
+      </div>
+    );
+  };
+
+  const renderConstrucaoCaixaSubterranea = (lado: "redeAcesso" | "redeCliente") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    return (
+      <CordoalhaSimNaoCard
+        title="Construído caixa subterrânea?"
+        quantidadeLabel="Quantidade de Caixas Subterrâneas"
+        quantidadePlaceholder="Ex: 1"
+        value={rede.construcaoCaixaSubterranea ?? emptyCordoalhaBloco()}
+        onChange={
+          canEditPhotos
+            ? (construcaoCaixaSubterranea) =>
+                patchRedeCampo(lado, { construcaoCaixaSubterranea })
+            : undefined
+        }
+        disabled={!canEditPhotos}
+        variant="flat"
+      />
+    );
+  };
+
+  const renderCaixaEmendaExistente = (lado: "redeAcesso" | "redeCliente", variante: "RE" | "RC") => {
+    const rede = payload?.[lado] ?? emptyQuantidadesRede();
+    return (
+      <CordoalhaSimNaoCard
+        title="Caixa de emenda existente?"
+        hideQuantidade
+        value={rede.caixaEmendaExistente ?? emptyCordoalhaBloco()}
+        onChange={
+          canEditPhotos
+            ? (caixaEmendaExistente) =>
+                patchRedeCampo(lado, {
+                  caixaEmendaExistente: {
+                    isSim: caixaEmendaExistente.isSim,
+                    quantidade: null,
+                  },
+                })
+            : undefined
+        }
+        disabled={!canEditPhotos}
+        variant="flat"
+        pendencia={pendenciaPergunta({
+          aba: variante,
+          secao: `Caixa de emenda (${variante})`,
+          subbloco: "Caixa de emenda existente?",
+          key: "caixa.caixaEmendaExistente",
+        })}
+      />
+    );
+  };
+
   const patchQtdFiberloop = (
     lado: "redeAcesso" | "redeCliente",
     qtdFiberloopInstalado: number | null,
@@ -1120,7 +1244,22 @@ export function RelatorioDetalhe({
                   }
                 : undefined,
             }
-          : {};
+          : payload && (key === "dutoSubterraneo" || key === "rcDutoSubterraneo")
+            ? {
+                quantidade:
+                  (key === "dutoSubterraneo" ? redeAcesso : redeCliente).metrosDutoSubterraneo ??
+                  null,
+                quantidadeLabel: "Const. de DUTO SUBTERÂNEO (MD ou MND) — metros (MT)",
+                quantidadePlaceholder: "Ex: 120",
+                onQuantidadeChange: canEditPhotos
+                  ? (metrosDutoSubterraneo: number | null) =>
+                      patchRedeCampo(
+                        key === "dutoSubterraneo" ? "redeAcesso" : "redeCliente",
+                        { metrosDutoSubterraneo },
+                      )
+                  : undefined,
+              }
+            : {};
     const patchSlice = (nextSlice: FotoGrupoPayload) => {
       if (!payload) return;
       if (dualKey && looksLikeFotoGrupoPorAmbiente(raw)) {
@@ -1692,6 +1831,7 @@ export function RelatorioDetalhe({
               />
             ) : null}
             {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "dutoSubterraneo")}
+            {renderConstrucaoCaixaSubterranea("redeAcesso")}
           </AccordionBloco>
 
           <AccordionBloco
@@ -1702,6 +1842,7 @@ export function RelatorioDetalhe({
             pendenciaBloco="RE.poste"
           >
             {renderGrupo("Poste de conexão", "posteConexao")}
+            {renderTotalPostes("redeAcesso", "RE")}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <PostePerguntaQuadrante
                 title="Cordoalha existente?"
@@ -1815,6 +1956,7 @@ export function RelatorioDetalhe({
               />
             </div>
             {renderGrupo("Novo aterramento do poste", "novoAterramentoPoste")}
+            {renderAterramentoQtds("redeAcesso")}
           </AccordionBloco>
 
           <AccordionBloco
@@ -1824,6 +1966,7 @@ export function RelatorioDetalhe({
             defaultOpen
             pendenciaBloco="RE.caixa"
           >
+            {renderCaixaEmendaExistente("redeAcesso", "RE")}
             {renderGrupo("Caixa de emenda", "caixaEmenda", true)}
             {renderGrupo(
               "Plaqueta de Identificação - Caixa de emenda",
@@ -1980,6 +2123,7 @@ export function RelatorioDetalhe({
               />
             ) : null}
             {renderGrupo("Const. de duto subterrâneo (MD ou MND)", "rcDutoSubterraneo")}
+            {renderConstrucaoCaixaSubterranea("redeCliente")}
           </AccordionBloco>
 
           <AccordionBloco
@@ -1990,6 +2134,7 @@ export function RelatorioDetalhe({
             pendenciaBloco="RC.poste"
           >
             {renderGrupo("Poste de conexão (Rede cliente com Rede Externa)", "rcPosteConexao")}
+            {renderTotalPostes("redeCliente", "RC")}
             <CordoalhaSimNaoCard
               title="Lançado cordoalha?"
               quantidadeLabel="Quantidade de cordoalha lançada:"
@@ -2081,6 +2226,7 @@ export function RelatorioDetalhe({
               disabled={!canEditPhotos}
             />
             {renderGrupo("Novo aterramento do poste", "rcNovoAterramentoPoste")}
+            {renderAterramentoQtds("redeCliente")}
           </AccordionBloco>
 
           <AccordionBloco
@@ -2090,6 +2236,7 @@ export function RelatorioDetalhe({
             defaultOpen
             pendenciaBloco="RC.caixa"
           >
+            {renderCaixaEmendaExistente("redeCliente", "RC")}
             {renderGrupo(
               "Caixa de emenda na acomodação (Rede cliente com Rede Externa)",
               "rcCaixaEmenda",

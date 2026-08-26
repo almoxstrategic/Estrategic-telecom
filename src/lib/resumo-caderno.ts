@@ -4,18 +4,18 @@ import {
   qtdCaixasTotal,
   type CaboMetragemPayload,
   type CordoalhaBlocoPayload,
-  type FotoGrupoPayload,
   type LancamentoPorAmbientePayload,
   type QuantidadesRedePayload,
   type RelatorioPayload,
 } from "@/lib/relatorios-transmissao";
 
-export type ResumoCadernoUnidade = "Metros" | "Unid." | "Hastes" | "MT";
+export type ResumoCadernoUnidade = "Metros" | "Unid." | "Hastes" | "MT" | "SIM/NÃO";
 
 export type ResumoCadernoLado = {
   redeLancadaAereo: number;
   cordoalhaLancada: number;
   postesNovaCordoalha: number;
+  /** Código: 1 = SIM, 0 = NÃO, NaN = sem resposta. */
   postesCordoalhaExistente: number;
   totalPostes: number;
   pontosAterramento: number;
@@ -23,9 +23,12 @@ export type ResumoCadernoLado = {
   redeLancadaSubterraneo: number;
   dutoSubterraneo: number;
   caixaSubterranea: number;
-  /** RE: fibras FO | RC: equipamentos instalados */
+  /** RE: metragem FO | RC: equipamentos instalados */
   fibrasOuEquipamentos: number;
+  /** Capacidade FO dominante (tipo de cabo), para o rótulo RE. */
+  capacidadeFo: number | null;
   caixasEmendaInstalada: number;
+  /** Código SIM/NÃO. */
   caixasEmendaExistenteRota: number;
   fiberloopInstalados: number;
 };
@@ -38,9 +41,13 @@ export type ResumoCadernoLinha = {
   /** Rótulo específico RC quando diferente do RE (bloco 4). */
   labelRc?: string;
   unidade: ResumoCadernoUnidade;
+  /** Unidade na coluna RC quando diferente da RE (ex.: fibras × equipamentos). */
+  unidadeRc?: ResumoCadernoUnidade;
   re: number;
   rc: number;
   total: number;
+  /** Quando true, a coluna TOTAL fica vazia (ex.: SIM/NÃO só por lado). */
+  omitTotal?: boolean;
 };
 
 function numOrZero(n: number | null | undefined): number {
@@ -50,6 +57,13 @@ function numOrZero(n: number | null | undefined): number {
 function qtdSeSim(bloco: CordoalhaBlocoPayload | null | undefined): number {
   if (!bloco || bloco.isSim !== true) return 0;
   return numOrZero(bloco.quantidade);
+}
+
+/** Codifica boolean de posteadagem para exibição SIM/NÃO na aba Medições. */
+export function simNaoToCode(isSim: boolean | null | undefined): number {
+  if (isSim === true) return 1;
+  if (isSim === false) return 0;
+  return Number.NaN;
 }
 
 function metragemCabo(cabo: CaboMetragemPayload): number {
@@ -69,47 +83,63 @@ function somaMetragemAmbiente(
   return (lancamento[ambiente]?.metragens ?? []).reduce((acc, cabo) => acc + metragemCabo(cabo), 0);
 }
 
-/** Maior tipo de cabo (FO) entre todos os cabos RE/RC — tipicamente 12, 24, etc. */
-function maxFibrasFo(lancamento: LancamentoPorAmbientePayload | null | undefined): number {
-  if (!lancamento) return 0;
-  let max = 0;
+function tipoCaboNumero(cabo: CaboMetragemPayload): number | null {
+  const n = Number.parseInt(String(cabo.tipoCabo ?? "").replace(/\D/g, ""), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Maior tipo de cabo (FO) entre todos os cabos — tipicamente 12, 24, etc. */
+function capacidadeFoDominante(
+  lancamento: LancamentoPorAmbientePayload | null | undefined,
+): number | null {
+  if (!lancamento) return null;
+  let max: number | null = null;
   for (const amb of ["aereo", "subterraneo"] as const) {
     for (const cabo of lancamento[amb]?.metragens ?? []) {
-      const n = Number.parseInt(String(cabo.tipoCabo ?? "").replace(/\D/g, ""), 10);
-      if (Number.isFinite(n) && n > max) max = n;
+      const n = tipoCaboNumero(cabo);
+      if (n != null && (max == null || n > max)) max = n;
     }
   }
   return max;
 }
 
-function countFotos(grupo: FotoGrupoPayload | null | undefined): number {
-  return grupo?.fotos?.length ?? 0;
+/** Soma metragem dos cabos cuja capacidade FO coincide com `capacidade`. */
+function somaMetragemPorCapacidadeFo(
+  lancamento: LancamentoPorAmbientePayload | null | undefined,
+  capacidade: number | null,
+): number {
+  if (!lancamento || capacidade == null) return 0;
+  let soma = 0;
+  for (const amb of ["aereo", "subterraneo"] as const) {
+    for (const cabo of lancamento[amb]?.metragens ?? []) {
+      if (tipoCaboNumero(cabo) === capacidade) soma += metragemCabo(cabo);
+    }
+  }
+  return soma;
 }
 
 function buildLado(
   rede: QuantidadesRedePayload | null | undefined,
   lancamento: LancamentoPorAmbientePayload | null | undefined,
-  aterramentoFotos: FotoGrupoPayload | null | undefined,
   fibrasOuEquipamentos: number,
+  capacidadeFo: number | null,
 ): ResumoCadernoLado {
   const postesNova = qtdSeSim(rede?.postesNovaCordoalha);
-  const postesExist = qtdSeSim(rede?.postesCordoalhaExistente);
   return {
     redeLancadaAereo: somaMetragemAmbiente(lancamento, "aereo"),
     cordoalhaLancada: qtdSeSim(rede?.cordoalhaLancada),
     postesNovaCordoalha: postesNova,
-    postesCordoalhaExistente: postesExist,
-    totalPostes: postesNova + postesExist,
-    pontosAterramento: countFotos(aterramentoFotos),
+    postesCordoalhaExistente: simNaoToCode(rede?.postesCordoalhaExistente?.isSim),
+    totalPostes: numOrZero(rede?.qtdTotalPostes),
+    pontosAterramento: numOrZero(rede?.aterramento?.pontosAterramento),
     hastesAterramento: numOrZero(rede?.aterramento?.totalHastes),
     redeLancadaSubterraneo: somaMetragemAmbiente(lancamento, "subterraneo"),
-    /** Sem metragem de duto na UI — permanece 0 até haver campo de quantidade. */
-    dutoSubterraneo: 0,
-    caixaSubterranea: numOrZero(rede?.qtdCaixasEmendaPorAmbiente?.subterraneo),
+    dutoSubterraneo: numOrZero(rede?.metrosDutoSubterraneo),
+    caixaSubterranea: qtdSeSim(rede?.construcaoCaixaSubterranea),
     fibrasOuEquipamentos,
+    capacidadeFo,
     caixasEmendaInstalada: qtdCaixasTotal(rede),
-    /** Sem campo dedicado na UI atual — permanece 0 até haver fonte. */
-    caixasEmendaExistenteRota: 0,
+    caixasEmendaExistenteRota: simNaoToCode(rede?.caixaEmendaExistente?.isSim),
     fiberloopInstalados: qtdSeSim(rede?.fiberloopInstalado),
   };
 }
@@ -122,6 +152,7 @@ function linha(
   re: number,
   rc: number,
   labelRc?: string,
+  extras?: Partial<Pick<ResumoCadernoLinha, "unidadeRc" | "omitTotal" | "total">>,
 ): ResumoCadernoLinha {
   return {
     id,
@@ -129,9 +160,11 @@ function linha(
     label,
     labelRc,
     unidade,
+    unidadeRc: extras?.unidadeRc,
     re,
     rc,
-    total: re + rc,
+    total: extras?.total ?? re + rc,
+    omitTotal: extras?.omitTotal,
   };
 }
 
@@ -145,19 +178,16 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
 } {
   const p = payload;
   const eqCount = p?.eqClienteEquipamentos?.length ?? 0;
+  const capFoRe = capacidadeFoDominante(p?.lancamentoCabosRe);
+  const metragemFoRe = somaMetragemPorCapacidadeFo(p?.lancamentoCabosRe, capFoRe);
 
-  const re = buildLado(
-    p?.redeAcesso,
-    p?.lancamentoCabosRe,
-    p?.novoAterramentoPoste,
-    maxFibrasFo(p?.lancamentoCabosRe),
-  );
-  const rc = buildLado(
-    p?.redeCliente,
-    p?.lancamentoCabosRc,
-    p?.rcNovoAterramentoPoste,
-    eqCount,
-  );
+  const re = buildLado(p?.redeAcesso, p?.lancamentoCabosRe, metragemFoRe, capFoRe);
+  const rc = buildLado(p?.redeCliente, p?.lancamentoCabosRc, eqCount, null);
+
+  const labelFibraRe =
+    capFoRe != null
+      ? `Quant. de fibra ${capFoRe} FO lançada`
+      : "Quant. de fibra FO lançada";
 
   const linhas: ResumoCadernoLinha[] = [
     linha("rede-aereo", "aereo", "TOTAL REDE LANÇADA (AÉREO)", "Metros", re.redeLancadaAereo, rc.redeLancadaAereo),
@@ -173,10 +203,12 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
     linha(
       "postes-exist",
       "aereo",
-      "TOTAL de POSTES COM CORDOALHA EXISTENTE",
-      "Unid.",
+      "POSTES COM CORDOALHA EXISTENTE?",
+      "SIM/NÃO",
       re.postesCordoalhaExistente,
       rc.postesCordoalhaExistente,
+      undefined,
+      { omitTotal: true, total: Number.NaN },
     ),
     linha("postes-total", "aereo", "TOTAL DE POSTES", "Unid.", re.totalPostes, rc.totalPostes),
     linha(
@@ -204,7 +236,7 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       rc.redeLancadaSubterraneo,
     ),
     linha(
-      "duto",
+      "duto-sub",
       "subterraneo",
       "Const. de DUTO SUBTERÂNEO (MD ou MND)",
       "MT",
@@ -222,16 +254,17 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
     linha(
       "fibras-eq",
       "acessos",
-      "Quant. de FIBRAS (FO) para esse acesso",
-      "Unid.",
+      labelFibraRe,
+      "Metros",
       re.fibrasOuEquipamentos,
       rc.fibrasOuEquipamentos,
-      "Quantidade de equipamentos instalados",
+      "Quant. de EQUIPAMENTOS instalados",
+      { unidadeRc: "Unid." },
     ),
     linha(
       "caixas-inst",
       "acessos",
-      "Quant. caixas de emendas INSTALADA",
+      "Quant. de CAIXAS DE EMENDA instalada",
       "Unid.",
       re.caixasEmendaInstalada,
       rc.caixasEmendaInstalada,
@@ -239,10 +272,12 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
     linha(
       "caixas-exist",
       "acessos",
-      "Quantas caixas EMENDA existente na rota",
-      "Unid.",
+      "CAIXAS DE EMENDA existente na rota?",
+      "SIM/NÃO",
       re.caixasEmendaExistenteRota,
       rc.caixasEmendaExistenteRota,
+      undefined,
+      { omitTotal: true, total: Number.NaN },
     ),
     linha(
       "fiberloop",
@@ -258,6 +293,11 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
 }
 
 export function formatResumoNumero(value: number, unidade: ResumoCadernoUnidade): string {
+  if (unidade === "SIM/NÃO") {
+    if (value === 1) return "SIM";
+    if (value === 0) return "NÃO";
+    return "—";
+  }
   if (!Number.isFinite(value)) return "0";
   if (unidade === "Metros" || unidade === "MT") {
     return Number.isInteger(value)

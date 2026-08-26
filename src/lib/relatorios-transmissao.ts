@@ -433,9 +433,21 @@ export type QuantidadesRedePayload = {
   postesNovaCordoalha: CordoalhaBlocoPayload;
   /** Postes com cordoalha existente (após Poste de conexão). */
   postesCordoalhaExistente: CordoalhaBlocoPayload;
-  /** @deprecated Removido da UI (Aterramento - TERROMETRO). Mantido para parse legado. */
+  /** Total de postes — input explícito (RE/RC). */
+  qtdTotalPostes: number | null;
+  /** Metros de construção de duto subterrâneo (MD ou MND). */
+  metrosDutoSubterraneo: number | null;
+  /**
+   * Construído caixa subterrânea? (SIM/NÃO + quantidade quando SIM).
+   * Relatórios legados com número puro são migrados no parse.
+   */
+  construcaoCaixaSubterranea: CordoalhaBlocoPayload;
+  /** Caixa de emenda existente na rota? (SIM/NÃO). */
+  caixaEmendaExistente: CordoalhaBlocoPayload;
+  /** Quantidades de aterramento (input explícito nas abas RE/RC). */
   aterramento: {
     totalHastes: number | null;
+    pontosAterramento: number | null;
   };
   /** Coordenadas do Cliente (aba RC). */
   coordenadas: CoordenadasPayload;
@@ -798,7 +810,11 @@ export function emptyQuantidadesRede(): QuantidadesRedePayload {
     cordoalhaExistente: emptyCordoalhaBloco(),
     postesNovaCordoalha: emptyCordoalhaBloco(),
     postesCordoalhaExistente: emptyCordoalhaBloco(),
-    aterramento: { totalHastes: null },
+    qtdTotalPostes: null,
+    metrosDutoSubterraneo: null,
+    construcaoCaixaSubterranea: emptyCordoalhaBloco(),
+    caixaEmendaExistente: emptyCordoalhaBloco(),
+    aterramento: { totalHastes: null, pontosAterramento: null },
     coordenadas: emptyCoordenadas(),
     caixaEmendaAcomodacao: { coordenadas: emptyCoordenadas() },
     caixaEmendaAcomodacaoPorAmbiente: {
@@ -1021,7 +1037,7 @@ function parseCordoalhaBloco(raw: unknown): CordoalhaBlocoPayload {
 function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
   const src = (raw && typeof raw === "object" ? raw : {}) as Partial<QuantidadesRedePayload> & {
     caixaEmendaAcomodacao?: { coordenadas?: unknown };
-    aterramento?: { totalHastes?: unknown };
+    aterramento?: { totalHastes?: unknown; pontosAterramento?: unknown };
     fiberloopInstalado?: unknown;
   };
   const fiberloopParsed = parseCordoalhaBloco(src.fiberloopInstalado);
@@ -1061,8 +1077,23 @@ function parseQuantidadesRede(raw: unknown): QuantidadesRedePayload {
       isSim: parseCordoalhaBloco(src.postesCordoalhaExistente).isSim,
       quantidade: null,
     },
+    qtdTotalPostes: parseQtdInteiro(src.qtdTotalPostes),
+    metrosDutoSubterraneo: parseQtdInteiro(src.metrosDutoSubterraneo),
+    construcaoCaixaSubterranea: (() => {
+      const raw = (src as { construcaoCaixaSubterranea?: unknown }).construcaoCaixaSubterranea;
+      if (typeof raw === "number" || typeof raw === "string") {
+        const qtd = parseQtdInteiro(raw);
+        return qtd != null ? { isSim: true as const, quantidade: qtd } : emptyCordoalhaBloco();
+      }
+      return parseCordoalhaBloco(raw);
+    })(),
+    caixaEmendaExistente: {
+      isSim: parseCordoalhaBloco(src.caixaEmendaExistente).isSim,
+      quantidade: null,
+    },
     aterramento: {
       totalHastes: parseQtdInteiro(src.aterramento?.totalHastes),
+      pontosAterramento: parseQtdInteiro(src.aterramento?.pontosAterramento),
     },
     coordenadas: parseCoordenadas(src.coordenadas),
     caixaEmendaAcomodacao: { coordenadas: coordsAcomodacao },
@@ -1989,11 +2020,34 @@ function mergeQuantidadesRede(
       ).isSim,
       quantidade: null,
     },
+    qtdTotalPostes:
+      fromLocal.qtdTotalPostes === undefined
+        ? fromServer.qtdTotalPostes ?? null
+        : fromLocal.qtdTotalPostes,
+    metrosDutoSubterraneo:
+      fromLocal.metrosDutoSubterraneo === undefined
+        ? fromServer.metrosDutoSubterraneo ?? null
+        : fromLocal.metrosDutoSubterraneo,
+    construcaoCaixaSubterranea: mergeCordoalhaBloco(
+      fromServer.construcaoCaixaSubterranea,
+      fromLocal.construcaoCaixaSubterranea,
+    ),
+    caixaEmendaExistente: {
+      isSim: mergeCordoalhaBloco(
+        fromServer.caixaEmendaExistente,
+        fromLocal.caixaEmendaExistente,
+      ).isSim,
+      quantidade: null,
+    },
     aterramento: {
       totalHastes:
         fromLocal.aterramento?.totalHastes === undefined
           ? fromServer.aterramento?.totalHastes ?? null
           : fromLocal.aterramento.totalHastes,
+      pontosAterramento:
+        fromLocal.aterramento?.pontosAterramento === undefined
+          ? fromServer.aterramento?.pontosAterramento ?? null
+          : fromLocal.aterramento.pontosAterramento,
     },
     coordenadas: mergeCoordenadas(fromServer.coordenadas, fromLocal.coordenadas),
     caixaEmendaAcomodacao: {

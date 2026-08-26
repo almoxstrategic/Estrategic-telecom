@@ -720,7 +720,30 @@ function RelatorioPage() {
         isSim: (p.redeAcesso?.postesCordoalhaExistente ?? emptyCordoalhaBloco()).isSim,
         quantidade: null,
       },
-      aterramento: { totalHastes: null },
+      qtdTotalPostes: p.redeAcesso?.qtdTotalPostes ?? null,
+      metrosDutoSubterraneo: p.redeAcesso?.metrosDutoSubterraneo ?? null,
+      construcaoCaixaSubterranea: (() => {
+        const raw = p.redeAcesso?.construcaoCaixaSubterranea as unknown;
+        if (typeof raw === "number" && Number.isFinite(raw)) {
+          return { isSim: true as const, quantidade: Math.trunc(raw) };
+        }
+        if (raw && typeof raw === "object") {
+          const b = raw as { isSim?: boolean | null; quantidade?: number | null };
+          return {
+            isSim: b.isSim === true ? true : b.isSim === false ? false : null,
+            quantidade: typeof b.quantidade === "number" ? b.quantidade : null,
+          };
+        }
+        return emptyCordoalhaBloco();
+      })(),
+      caixaEmendaExistente: {
+        isSim: (p.redeAcesso?.caixaEmendaExistente ?? emptyCordoalhaBloco()).isSim,
+        quantidade: null,
+      },
+      aterramento: {
+        totalHastes: p.redeAcesso?.aterramento?.totalHastes ?? null,
+        pontosAterramento: p.redeAcesso?.aterramento?.pontosAterramento ?? null,
+      },
     });
     setObsAdminGrupos({
       posteConexao: readObsAdmin(p.posteConexao),
@@ -780,7 +803,30 @@ function RelatorioPage() {
         isSim: (p.redeCliente?.postesCordoalhaExistente ?? emptyCordoalhaBloco()).isSim,
         quantidade: null,
       },
-      aterramento: { totalHastes: null },
+      qtdTotalPostes: p.redeCliente?.qtdTotalPostes ?? null,
+      metrosDutoSubterraneo: p.redeCliente?.metrosDutoSubterraneo ?? null,
+      construcaoCaixaSubterranea: (() => {
+        const raw = p.redeCliente?.construcaoCaixaSubterranea as unknown;
+        if (typeof raw === "number" && Number.isFinite(raw)) {
+          return { isSim: true as const, quantidade: Math.trunc(raw) };
+        }
+        if (raw && typeof raw === "object") {
+          const b = raw as { isSim?: boolean | null; quantidade?: number | null };
+          return {
+            isSim: b.isSim === true ? true : b.isSim === false ? false : null,
+            quantidade: typeof b.quantidade === "number" ? b.quantidade : null,
+          };
+        }
+        return emptyCordoalhaBloco();
+      })(),
+      caixaEmendaExistente: {
+        isSim: (p.redeCliente?.caixaEmendaExistente ?? emptyCordoalhaBloco()).isSim,
+        quantidade: null,
+      },
+      aterramento: {
+        totalHastes: p.redeCliente?.aterramento?.totalHastes ?? null,
+        pontosAterramento: p.redeCliente?.aterramento?.pontosAterramento ?? null,
+      },
       coordenadas: p.redeCliente?.coordenadas ?? emptyCoordenadas(),
       caixaEmendaAcomodacao: {
         coordenadas: p.redeCliente?.caixaEmendaAcomodacao?.coordenadas ?? emptyCoordenadas(),
@@ -1526,6 +1572,38 @@ function RelatorioPage() {
                       },
                     }))
                   }
+                  qtdTotalPostes={redeAcesso.qtdTotalPostes}
+                  onQtdTotalPostesChange={(qtdTotalPostes) =>
+                    setRedeAcesso((prev) => ({ ...prev, qtdTotalPostes }))
+                  }
+                  aterramentoPontos={redeAcesso.aterramento.pontosAterramento}
+                  onAterramentoPontosChange={(pontosAterramento) =>
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      aterramento: { ...prev.aterramento, pontosAterramento },
+                    }))
+                  }
+                  aterramentoHastes={redeAcesso.aterramento.totalHastes}
+                  onAterramentoHastesChange={(totalHastes) =>
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      aterramento: { ...prev.aterramento, totalHastes },
+                    }))
+                  }
+                  construcaoCaixaSubterranea={redeAcesso.construcaoCaixaSubterranea}
+                  onConstrucaoCaixaSubterraneaChange={(construcaoCaixaSubterranea) =>
+                    setRedeAcesso((prev) => ({ ...prev, construcaoCaixaSubterranea }))
+                  }
+                  caixaEmendaExistente={redeAcesso.caixaEmendaExistente}
+                  onCaixaEmendaExistenteChange={(caixaEmendaExistente) =>
+                    setRedeAcesso((prev) => ({
+                      ...prev,
+                      caixaEmendaExistente: {
+                        isSim: caixaEmendaExistente.isSim,
+                        quantidade: null,
+                      },
+                    }))
+                  }
                   cabos={lancamentoCabosRe[lancamentoReAmbiente].metragens}
                   onPatchCabo={(id, patch) =>
                     patchCaboAmbiente(setLancamentoCabosRe, lancamentoReAmbiente, id, patch)
@@ -1612,6 +1690,12 @@ function RelatorioPage() {
                       onObsChange: setDutoObs,
                       obsAdmin: obsAdminGrupos.dutoSubterraneo ?? "",
                       onObsAdminChange: patchObsAdminGrupo("dutoSubterraneo"),
+                      quantidade: redeAcesso.metrosDutoSubterraneo,
+                      quantidadeLabel: "Const. de DUTO SUBTERÂNEO (MD ou MND) — metros (MT)",
+                      quantidadePlaceholder: "Ex: 120",
+                      onQuantidadeChange: (metrosDutoSubterraneo: number | null) => {
+                        setRedeAcesso((prev) => ({ ...prev, metrosDutoSubterraneo }));
+                      },
                     },
                     {
                       grupoKey: "caixaEmenda",
@@ -1706,6 +1790,38 @@ function RelatorioPage() {
                       ...prev,
                       postesCordoalhaExistente: {
                         isSim: postesCordoalhaExistente.isSim,
+                        quantidade: null,
+                      },
+                    }))
+                  }
+                  qtdTotalPostes={redeCliente.qtdTotalPostes}
+                  onQtdTotalPostesChange={(qtdTotalPostes) =>
+                    setRedeCliente((prev) => ({ ...prev, qtdTotalPostes }))
+                  }
+                  aterramentoPontos={redeCliente.aterramento.pontosAterramento}
+                  onAterramentoPontosChange={(pontosAterramento) =>
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      aterramento: { ...prev.aterramento, pontosAterramento },
+                    }))
+                  }
+                  aterramentoHastes={redeCliente.aterramento.totalHastes}
+                  onAterramentoHastesChange={(totalHastes) =>
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      aterramento: { ...prev.aterramento, totalHastes },
+                    }))
+                  }
+                  construcaoCaixaSubterranea={redeCliente.construcaoCaixaSubterranea}
+                  onConstrucaoCaixaSubterraneaChange={(construcaoCaixaSubterranea) =>
+                    setRedeCliente((prev) => ({ ...prev, construcaoCaixaSubterranea }))
+                  }
+                  caixaEmendaExistente={redeCliente.caixaEmendaExistente}
+                  onCaixaEmendaExistenteChange={(caixaEmendaExistente) =>
+                    setRedeCliente((prev) => ({
+                      ...prev,
+                      caixaEmendaExistente: {
+                        isSim: caixaEmendaExistente.isSim,
                         quantidade: null,
                       },
                     }))
@@ -1840,6 +1956,12 @@ function RelatorioPage() {
                       onObsChange: setRcDutoObs,
                       obsAdmin: obsAdminGrupos.rcDutoSubterraneo ?? "",
                       onObsAdminChange: patchObsAdminGrupo("rcDutoSubterraneo"),
+                      quantidade: redeCliente.metrosDutoSubterraneo,
+                      quantidadeLabel: "Const. de DUTO SUBTERÂNEO (MD ou MND) — metros (MT)",
+                      quantidadePlaceholder: "Ex: 120",
+                      onQuantidadeChange: (metrosDutoSubterraneo: number | null) => {
+                        setRedeCliente((prev) => ({ ...prev, metrosDutoSubterraneo }));
+                      },
                     },
                     {
                       grupoKey: "rcPosteConexao",

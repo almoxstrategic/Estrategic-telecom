@@ -27,24 +27,34 @@ function ValorComUnidade({
   value,
   unidade,
   destaque = false,
+  empty = false,
 }: {
   value: number;
   unidade: ResumoCadernoLinha["unidade"];
   destaque?: boolean;
+  empty?: boolean;
 }) {
+  const isSimNao = unidade === "SIM/NÃO";
   return (
     <div
       className={cn(
         "flex h-full min-h-[2.75rem] items-stretch",
         destaque ? "bg-gray-100" : "",
+        empty ? "bg-gray-50 text-gray-400" : "",
       )}
     >
-      <div className="flex flex-1 items-center justify-center px-2 text-sm font-bold tabular-nums text-gray-900">
-        {formatResumoNumero(value, unidade)}
-      </div>
-      <div className="flex w-[4.25rem] shrink-0 items-center justify-center border-l border-gray-300 px-1 text-center text-[11px] text-gray-600">
-        {unidade}
-      </div>
+      {empty ? (
+        <div className="flex flex-1 items-center justify-center px-2 text-sm text-gray-400">—</div>
+      ) : (
+        <>
+          <div className="flex flex-1 items-center justify-center px-2 text-sm font-bold tabular-nums text-gray-900">
+            {formatResumoNumero(value, unidade)}
+          </div>
+          <div className="flex w-[4.25rem] shrink-0 items-center justify-center border-l border-gray-300 px-1 text-center text-[11px] text-gray-600">
+            {isSimNao ? "" : unidade}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -83,6 +93,7 @@ function TabelaBlocoDesktop({
             {rows.map((row, idx) => {
               const labelRc = row.labelRc ?? row.label;
               const zebra = idx % 2 === 1 ? "bg-gray-50" : "bg-white";
+              const unidadeRc = row.unidadeRc ?? row.unidade;
               return (
                 <tr key={row.id} className={zebra}>
                   <td className="border border-gray-300 px-3 py-2 text-left text-xs font-medium text-gray-800 sm:text-sm">
@@ -92,10 +103,15 @@ function TabelaBlocoDesktop({
                     <ValorComUnidade value={row.re} unidade={row.unidade} />
                   </td>
                   <td className="border border-gray-300 p-0 align-middle">
-                    <ValorComUnidade value={row.total} unidade={row.unidade} destaque />
+                    <ValorComUnidade
+                      value={row.total}
+                      unidade={row.unidade}
+                      destaque
+                      empty={row.omitTotal === true}
+                    />
                   </td>
                   <td className="border border-gray-300 p-0 align-middle">
-                    <ValorComUnidade value={row.rc} unidade={row.unidade} />
+                    <ValorComUnidade value={row.rc} unidade={unidadeRc} />
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left text-xs font-medium text-gray-800 sm:text-sm">
                     {labelRc}
@@ -149,6 +165,9 @@ function CardLadoMobile({
               <ul className="space-y-2">
                 {rows.map((row) => {
                   const label = lado === "rc" && row.labelRc ? row.labelRc : row.label;
+                  const unidade =
+                    lado === "rc" && row.unidadeRc ? row.unidadeRc : row.unidade;
+                  const hideValor = lado === "total" && row.omitTotal;
                   return (
                     <li
                       key={row.id}
@@ -158,10 +177,21 @@ function CardLadoMobile({
                         {label}
                       </span>
                       <span className="shrink-0 text-sm font-bold tabular-nums text-gray-900">
-                        {formatResumoNumero(getValue(row), row.unidade)}{" "}
-                        <span className="text-[11px] font-normal text-gray-500">
-                          {row.unidade}
-                        </span>
+                        {hideValor ? (
+                          <span className="font-normal text-gray-400">—</span>
+                        ) : (
+                          <>
+                            {formatResumoNumero(getValue(row), unidade)}
+                            {unidade !== "SIM/NÃO" ? (
+                              <>
+                                {" "}
+                                <span className="text-[11px] font-normal text-gray-500">
+                                  {unidade}
+                                </span>
+                              </>
+                            ) : null}
+                          </>
+                        )}
                       </span>
                     </li>
                   );

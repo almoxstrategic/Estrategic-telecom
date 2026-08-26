@@ -1334,6 +1334,16 @@ export function RelatorioRedeAcesso({
   onPostesNovaCordoalhaChange,
   postesCordoalhaExistente,
   onPostesCordoalhaExistenteChange,
+  qtdTotalPostes,
+  onQtdTotalPostesChange,
+  aterramentoPontos,
+  onAterramentoPontosChange,
+  aterramentoHastes,
+  onAterramentoHastesChange,
+  construcaoCaixaSubterranea,
+  onConstrucaoCaixaSubterraneaChange,
+  caixaEmendaExistente,
+  onCaixaEmendaExistenteChange,
   cabos,
   onPatchCabo,
   onAddCabo,
@@ -1379,6 +1389,27 @@ export function RelatorioRedeAcesso({
   }) => void;
   postesCordoalhaExistente?: { isSim: boolean | null; quantidade: number | null };
   onPostesCordoalhaExistenteChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
+  /** Total de poste (RE/RC) — input explícito abaixo do Poste de conexão. */
+  qtdTotalPostes?: number | null;
+  onQtdTotalPostesChange?: (value: number | null) => void;
+  /** Quant. de pontos de Aterramento (input explícito). */
+  aterramentoPontos?: number | null;
+  onAterramentoPontosChange?: (value: number | null) => void;
+  /** ATERRAMENTO -> TOTAL DE HASTES (5/8). */
+  aterramentoHastes?: number | null;
+  onAterramentoHastesChange?: (value: number | null) => void;
+  /** Construído caixa subterrânea? (SIM/NÃO + quantidade). */
+  construcaoCaixaSubterranea?: { isSim: boolean | null; quantidade: number | null };
+  onConstrucaoCaixaSubterraneaChange?: (next: {
+    isSim: boolean | null;
+    quantidade: number | null;
+  }) => void;
+  /** Caixa de emenda existente na rota? */
+  caixaEmendaExistente?: { isSim: boolean | null; quantidade: number | null };
+  onCaixaEmendaExistenteChange?: (next: {
     isSim: boolean | null;
     quantidade: number | null;
   }) => void;
@@ -1743,6 +1774,23 @@ export function RelatorioRedeAcesso({
           ) : null}
 
           {gruposDuto.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
+          {onConstrucaoCaixaSubterraneaChange ? (
+            <CordoalhaSimNaoCard
+              title="Construído caixa subterrânea?"
+              quantidadeLabel="Quantidade de Caixas Subterrâneas"
+              quantidadePlaceholder="Ex: 1"
+              value={construcaoCaixaSubterranea ?? { isSim: null, quantidade: null }}
+              onChange={onConstrucaoCaixaSubterraneaChange}
+              disabled={readOnly}
+              variant="flat"
+              pendencia={pendenciaPergunta({
+                aba: redeVariant,
+                secao: `Lançamento (${redeVariant})`,
+                subbloco: "Construído caixa subterrânea?",
+                key: "lancamento.construcaoCaixaSubterranea",
+              })}
+            />
+          ) : null}
         </AccordionBloco>
 
         <AccordionBloco
@@ -1754,9 +1802,23 @@ export function RelatorioRedeAcesso({
           {gruposPoste.map((grupo) => {
             const isPoste =
               grupo.grupoKey === "posteConexao" || grupo.grupoKey === "rcPosteConexao";
+            const isAterramento =
+              grupo.grupoKey === "novoAterramentoPoste" ||
+              grupo.grupoKey === "rcNovoAterramentoPoste";
             return (
               <div key={grupo.grupoKey} className="contents">
                 {renderGrupoFotoCard(grupo, fotoCtx)}
+                {isPoste ? (
+                  <div className="border-b border-gray-100 pb-4">
+                    <CampoQuantidade
+                      label={`Total de poste (${redeVariant})`}
+                      placeholder="Ex: 12"
+                      value={qtdTotalPostes ?? null}
+                      onChange={onQtdTotalPostesChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                ) : null}
                 {isPoste && mostrarCordoalha ? (
                   <>
                     <CordoalhaSimNaoCard
@@ -1823,6 +1885,24 @@ export function RelatorioRedeAcesso({
                     />
                   </>
                 ) : null}
+                {isAterramento ? (
+                  <div className="space-y-1 border-b border-gray-100 pb-4">
+                    <CampoQuantidade
+                      label="Quant. de pontos de Aterramento"
+                      placeholder="Ex: 2"
+                      value={aterramentoPontos ?? null}
+                      onChange={onAterramentoPontosChange}
+                      disabled={readOnly}
+                    />
+                    <CampoQuantidade
+                      label="ATERRAMENTO -> TOTAL DE HASTES (5/8)"
+                      placeholder="Ex: 4"
+                      value={aterramentoHastes ?? null}
+                      onChange={onAterramentoHastesChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -1834,6 +1914,22 @@ export function RelatorioRedeAcesso({
           stickTabsAtViewportTop={stickTabsAtViewportTop}
           pendenciaBloco={redeVariant === "RC" ? "RC.caixa" : "RE.caixa"}
         >
+          {caixaEmendaExistente != null && onCaixaEmendaExistenteChange ? (
+            <CordoalhaSimNaoCard
+              title="Caixa de emenda existente?"
+              hideQuantidade
+              value={caixaEmendaExistente}
+              onChange={onCaixaEmendaExistenteChange}
+              disabled={readOnly}
+              variant="flat"
+              pendencia={pendenciaPergunta({
+                aba: redeVariant,
+                secao: `Caixa de emenda (${redeVariant})`,
+                subbloco: "Caixa de emenda existente?",
+                key: "caixa.caixaEmendaExistente",
+              })}
+            />
+          ) : null}
           {gruposCaixa.map((grupo) => renderGrupoFotoCard(grupo, fotoCtx))}
         </AccordionBloco>
 
