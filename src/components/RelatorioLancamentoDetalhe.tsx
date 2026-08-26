@@ -114,23 +114,30 @@ function tipoLabel(tipo: RelatorioTransmissao["tipo_execucao"]) {
 export function StatusBadge({ status }: { status: RelatorioStatus }) {
   if (status === "avisado") {
     return (
-      <Badge className="border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600">
+      <Badge className="h-5 border-emerald-600 bg-emerald-600 px-1.5 text-[10px] text-white hover:bg-emerald-600">
         Avisado
       </Badge>
     );
   }
   if (status === "pendente") {
     return (
-      <Badge className="border-orange-600 bg-orange-500 text-white hover:bg-orange-500">
+      <Badge className="h-5 border-orange-600 bg-orange-500 px-1.5 text-[10px] text-white hover:bg-orange-500">
         Pendenciado
       </Badge>
     );
   }
   if (status === "fechado") {
-    return <Badge variant="secondary">Fechado</Badge>;
+    return (
+      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+        Fechado
+      </Badge>
+    );
   }
   return (
-    <Badge variant="secondary" className="bg-gray-200 text-gray-700 hover:bg-gray-200">
+    <Badge
+      variant="secondary"
+      className="h-5 bg-gray-200 px-1.5 text-[10px] text-gray-700 hover:bg-gray-200"
+    >
       Em andamento
     </Badge>
   );
@@ -1405,7 +1412,7 @@ export function RelatorioDetalhe({
         })}
       >
       <div
-        className="relative z-0 rounded-xl border border-gray-300 bg-white p-4 shadow-sm"
+        className="relative z-0 rounded-xl border border-gray-300 bg-white p-4 shadow-sm min-w-0 max-w-full"
       >
         <div className="mb-4 flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-gray-900">{titulo}</p>
@@ -1426,8 +1433,8 @@ export function RelatorioDetalhe({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 items-start gap-4 min-w-0 lg:grid-cols-2 lg:gap-6">
+          <div className="min-w-0 space-y-3">
             <div>
               <p className="text-xs text-gray-700">Tipo do cabo</p>
               <input
@@ -1495,7 +1502,7 @@ export function RelatorioDetalhe({
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 w-full max-w-full">
             <CaboFotos
               inicio={cabo.fotoInicio}
               fim={cabo.fotoFim}
@@ -1722,22 +1729,22 @@ export function RelatorioDetalhe({
   };
 
   return (
-    <div className="space-y-5">
-      <div className="relative rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
+    <div className="w-full max-w-full min-w-0 space-y-3">
+      <div className="relative rounded-xl border border-gray-300 bg-white p-3 shadow-sm">
         {canEditCadastro ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="absolute right-4 top-4 text-muted-foreground"
+            className="absolute right-3 top-3 h-7 px-2 text-[11px] text-muted-foreground"
             onClick={() => setModalEdicaoAberto(true)}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-3 w-3" />
             Editar Dados
           </Button>
         ) : null}
-        <p className="text-xs font-bold uppercase tracking-wider text-gray-700">Endereço</p>
-        <p className="mt-1 pr-28 text-base font-medium">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-700">Endereço</p>
+        <p className="mt-0.5 pr-24 text-sm font-medium">
           <span className={row.endereco?.trim() ? "text-gray-900" : "font-normal text-gray-400"}>
             {displayCadastral(row.endereco)}
           </span>
@@ -1746,7 +1753,7 @@ export function RelatorioDetalhe({
             {displayCadastral(row.cidade)}
           </span>
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7">
           <MetaField label="Operadora" value={row.cliente_operadora || "Claro"} />
           <MetaField label="Cliente" value={displayCadastral(row.cliente)} />
           <MetaField label="Responsável" value={displayCadastral(row.responsavel)} />
@@ -1783,15 +1790,14 @@ export function RelatorioDetalhe({
         layoutMode="gestor"
       />
 
-      {/* Escala 75% só no conteúdo das abas — abas sticky ficam fora do zoom. */}
-      <div className="origin-top-left space-y-5 [zoom:0.75]">
+      {/* Conteúdo em 100% da largura — sem zoom (zoom quebrava sticky e gerava scroll lateral). */}
+      <div className="w-full max-w-full min-w-0 space-y-4">
       {abaAtiva === "RE" ? (
         <div className="space-y-4">
           <AccordionBloco
             title="LANÇAMENTO (RE)"
             id="secao-cabos"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.lancamento"
           >
@@ -1888,7 +1894,6 @@ export function RelatorioDetalhe({
             title="POSTE (RE)"
             id="secao-poste"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.poste"
           >
@@ -2014,7 +2019,6 @@ export function RelatorioDetalhe({
             title="CAIXA DE EMENDA (RE)"
             id="secao-caixa-emenda"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.caixa"
           >
@@ -2032,7 +2036,6 @@ export function RelatorioDetalhe({
             title="OUTRAS FOTOS (RE)"
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RE.outras"
           >
@@ -2047,7 +2050,6 @@ export function RelatorioDetalhe({
             title="LOCAL (RC)"
             id="secao-local"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.local"
           >
@@ -2083,7 +2085,6 @@ export function RelatorioDetalhe({
             title="LANÇAMENTO (RC)"
             id="secao-cabos"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.lancamento"
           >
@@ -2187,7 +2188,6 @@ export function RelatorioDetalhe({
             title="POSTE (RC)"
             id="secao-poste"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.poste"
           >
@@ -2291,7 +2291,6 @@ export function RelatorioDetalhe({
             title="CAIXA DE EMENDA (RC)"
             id="secao-caixa-emenda"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.caixa"
           >
@@ -2313,7 +2312,6 @@ export function RelatorioDetalhe({
             title="OUTRAS FOTOS (RC)"
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="RC.outras"
           >
@@ -2328,7 +2326,6 @@ export function RelatorioDetalhe({
             title="EQUIPAMENTO NO CLIENTE"
             id="secao-eq-cliente"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="EQ.cliente"
           >
@@ -2420,7 +2417,6 @@ export function RelatorioDetalhe({
             title="EQUIPAMENTO NA ESTAÇÃO"
             id="secao-eq-estacao"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="EQ.estacao"
           >
@@ -2517,7 +2513,6 @@ export function RelatorioDetalhe({
             title="OUTRAS FOTOS"
             id="secao-outras-fotos"
             stickTabsAtViewportTop={false}
-            stickyZoomCompensation={0.75}
             defaultOpen
             pendenciaBloco="EQ.outras"
           >

@@ -11,19 +11,20 @@ import { cn } from "@/lib/utils";
 type BusyMode = "idle" | "camera" | "gallery";
 
 export const FOTO_PREVIEW_FRAME_CLASS =
-  "relative flex h-48 max-h-48 w-full max-w-[360px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-lg border border-border bg-muted";
+  "relative flex h-48 max-h-48 w-full max-w-full flex-col items-center justify-center overflow-hidden rounded-lg border border-border bg-muted sm:max-w-[360px]";
 
 /** Wrapper do rótulo + preview — altura de label alinhada entre slots. */
 export const FOTO_SLOT_WRAP_CLASS =
-  "flex w-full max-w-[360px] shrink-0 flex-col gap-1";
+  "flex w-full min-w-0 max-w-full flex-col gap-1 sm:max-w-[360px]";
 
 /** Agrupa fotos com alinhamento vertical uniforme (mesma altura entre anexada e dropzone). */
 export const FOTO_SLOTS_ROW_CLASS =
   "flex flex-col flex-wrap items-stretch justify-start gap-4 sm:flex-row";
 
-/** Par Inicial/Final dentro do card de metragem (2 colunas iguais). */
-export const FOTO_CABO_PAIR_CLASS = "grid w-full grid-cols-2 items-stretch gap-3";
-export const FOTO_CABO_SLOT_WRAP_CLASS = "flex min-w-0 w-full flex-col gap-1";
+/** Par Inicial/Final dentro do card de metragem (2 colunas iguais, responsivo). */
+export const FOTO_CABO_PAIR_CLASS =
+  "grid w-full min-w-0 grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
+export const FOTO_CABO_SLOT_WRAP_CLASS = "flex min-w-0 w-full max-w-full flex-col gap-1";
 
 export function PhotoUpload({
   label,
@@ -159,7 +160,7 @@ export function PhotoUpload({
       : "Otimizando imagem...";
 
   return (
-    <div className={fillWidth ? "w-full min-w-0 shrink" : "w-full max-w-[360px] shrink-0"}>
+    <div className={fillWidth ? "w-full min-w-0 max-w-full" : "w-full min-w-0 max-w-full sm:max-w-[360px]"}>
       {hideLabel ? null : (
         <div className="mb-1 h-5 text-sm font-bold text-foreground">{label}</div>
       )}
@@ -167,7 +168,7 @@ export function PhotoUpload({
         <div
           className={cn(
             FOTO_PREVIEW_FRAME_CLASS,
-            fillWidth && "max-w-none",
+            fillWidth && "max-w-full sm:max-w-none",
             "gap-1.5 px-3 text-center text-xs text-muted-foreground",
           )}
         >
@@ -175,11 +176,11 @@ export function PhotoUpload({
           {busyLabel}
         </div>
       ) : value ? (
-        <div className={cn(FOTO_PREVIEW_FRAME_CLASS, fillWidth && "max-w-none", "bg-muted p-0")}>
+        <div className={cn(FOTO_PREVIEW_FRAME_CLASS, fillWidth && "max-w-full sm:max-w-none", "bg-muted p-0")}>
           <ExpandableImage
             src={value.previewUrl}
             alt={label}
-            className="h-full w-full rounded-lg object-cover"
+            className="h-full w-full max-w-full rounded-lg object-cover"
           />
           <button
             type="button"
@@ -232,7 +233,7 @@ export function PhotoUpload({
           onDrop={onDrop}
           className={cn(
             FOTO_PREVIEW_FRAME_CLASS,
-            fillWidth && "max-w-none",
+            fillWidth && "max-w-full sm:max-w-none",
             "cursor-pointer border-2 border-dashed bg-muted/40 px-3 text-center transition hover:border-primary/50 hover:bg-muted/60",
             dragOver ? "border-primary bg-primary/5" : "border-border",
           )}

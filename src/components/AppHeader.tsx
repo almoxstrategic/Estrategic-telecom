@@ -12,16 +12,20 @@ export function AppHeader({
   sticky = true,
   /** Visão auditoria: altura reduzida para liberar área útil. */
   compact = false,
+  /** Remove a borda inferior (ex.: chrome unificado com abas). */
+  flushBottom = false,
 }: {
   sticky?: boolean;
   compact?: boolean;
+  flushBottom?: boolean;
 } = {}) {
   const [open, setOpen] = useState(false);
   return (
     <header
       className={cn(
-        "z-30 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-gray-300 bg-white px-4 backdrop-blur",
-        compact ? "py-1.5" : "py-3",
+        "z-50 grid grid-cols-[auto_1fr_auto] items-center gap-2 bg-white px-3 lg:px-4",
+        flushBottom ? "border-b-0" : "border-b border-gray-200",
+        compact ? "py-1" : "py-3",
         sticky ? "sticky top-0" : "relative",
       )}
     >

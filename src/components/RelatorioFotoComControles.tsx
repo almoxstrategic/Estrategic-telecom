@@ -81,14 +81,14 @@ export function RelatorioFotoComControles({
     <div
       className={cn(
         FOTO_PREVIEW_FRAME_CLASS,
-        fillWidth && "max-w-none",
+        fillWidth && "max-w-full sm:max-w-none",
         "group break-inside-avoid p-0 print:break-inside-avoid",
       )}
     >
       <ExpandableImage
         src={src}
         alt={alt}
-        className={compact ? IMAGE_CLASS_COMPACT : IMAGE_CLASS}
+        className={cn(compact ? IMAGE_CLASS_COMPACT : IMAGE_CLASS, "max-h-full max-w-full")}
       />
       {canEdit && (onDelete || onReplace) ? (
         <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 pb-2 pt-8 print:hidden">
@@ -180,4 +180,4 @@ export function FotoLabel({ children }: { children?: string }) {
 
 /** Slot vazio estático (somente leitura). Preferir PhotoUpload quando editável. */
 export const FOTO_SLOT_CLASS =
-  "flex h-48 max-h-48 w-full max-w-[360px] shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-xs text-muted-foreground";
+  "flex h-48 max-h-48 w-full max-w-full min-w-0 shrink items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-xs text-muted-foreground sm:max-w-[360px]";

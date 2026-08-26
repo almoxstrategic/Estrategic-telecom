@@ -25,7 +25,7 @@ export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
           decoding="async"
           loading="lazy"
           className={cn(
-            "h-full w-full cursor-zoom-in rounded-lg object-cover transition hover:opacity-95",
+            "h-full w-full max-w-full cursor-zoom-in rounded-lg object-cover transition hover:opacity-95",
             className,
           )}
         />

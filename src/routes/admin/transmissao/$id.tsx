@@ -410,71 +410,87 @@ function AdminLancamentoDetalhePage() {
 
   return (
     <PendenciasProvider mode="gestor" confirmed={row?.payload.pendenciasItens ?? []}>
-      <div className="min-h-screen bg-white">
-        <AppHeader compact />
-        <header className="border-b border-gray-300 bg-white">
-          <div className="flex w-full flex-wrap items-center justify-between gap-2 px-6 py-2.5 lg:px-10">
-            <div className="min-w-0 space-y-0.5">
+      <div className="min-h-screen w-full max-w-full min-w-0 bg-white">
+        <div
+          id="gestor-top-chrome"
+          className="sticky top-0 z-50 isolate bg-white"
+        >
+          <AppHeader compact sticky={false} flushBottom />
+          <header className="bg-white">
+            <div className="flex w-full items-center gap-2 px-3 py-1 lg:px-4">
               <Link
                 to="/admin/transmissao"
-                className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-foreground"
+                className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-gray-600 hover:text-foreground"
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Voltar para a lista
+                <ArrowLeft className="h-3 w-3" />
+                <span className="hidden sm:inline">Voltar</span>
               </Link>
-              {row ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-lg font-bold tracking-tight text-gray-900">OS/WF {row.os_wf}</h1>
-                  <StatusBadge status={row.status} />
-                </div>
-              ) : (
-                <h1 className="text-lg font-bold tracking-tight text-gray-900">Detalhes do relatório</h1>
-              )}
-              <p className="text-[11px] text-gray-600">
-                {refreshing ? "Atualizando dados..." : "Dashboard de auditoria"}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {canAudit && row && row.status !== "fechado" ? (
-                <RelatorioSyncStatus
-                  status={
-                    saveHint === "saving"
-                      ? "saving"
-                      : saveHint === "error"
-                        ? "error"
-                        : saveHint === "saved"
-                          ? "saved"
-                          : "idle"
-                  }
-                />
-              ) : null}
-              {canAudit && row ? (
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                {row ? (
+                  <>
+                    <h1 className="truncate text-sm font-bold tracking-tight text-gray-900">
+                      OS/WF {row.os_wf}
+                    </h1>
+                    <StatusBadge status={row.status} />
+                  </>
+                ) : (
+                  <h1 className="truncate text-sm font-bold tracking-tight text-gray-900">
+                    Detalhes do relatório
+                  </h1>
+                )}
+                <span className="hidden truncate text-[10px] text-gray-500 md:inline">
+                  {refreshing ? "Atualizando..." : "Auditoria"}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {canAudit && row && row.status !== "fechado" ? (
+                  <RelatorioSyncStatus
+                    status={
+                      saveHint === "saving"
+                        ? "saving"
+                        : saveHint === "error"
+                          ? "error"
+                          : saveHint === "saved"
+                            ? "saved"
+                            : "idle"
+                    }
+                  />
+                ) : null}
+                {canAudit && row ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => void onExcluir()}
+                    disabled={saving}
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" />
+                    Excluir
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                  onClick={() => void onExcluir()}
-                  disabled={saving}
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => void carregar(true)}
+                  disabled={loading || refreshing}
                 >
-                  <Trash2 className="mr-1 h-3.5 w-3.5" />
-                  Excluir
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  Atualizar
                 </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void carregar(true)}
-                disabled={loading || refreshing}
-              >
-                <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                Atualizar
-              </Button>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        </div>
 
-        <main className={cn("w-full px-6 py-4 lg:px-10", mostrarFooter ? "pb-20" : "pb-10")}>
+        <main
+          className={cn(
+            "w-full max-w-full min-w-0 px-3 py-2 lg:px-4",
+            mostrarFooter ? "pb-20" : "pb-8",
+          )}
+        >
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando relatório...</p>
           ) : row ? (

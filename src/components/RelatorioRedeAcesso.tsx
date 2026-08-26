@@ -214,10 +214,36 @@ export function TipoExecucaoPicker({
 /** Âncora DOM da barra sticky (abas + busca) — usada para medir o offset do accordion. */
 export const RELATORIO_ABAS_STICKY_ID = "relatorio-abas-sticky";
 
-/** Header sticky (~64px) — usado só como fallback de offset dos accordions. */
-const APP_HEADER_STICKY_PX = 56;
+/** Chrome superior unificado do Gestor (logo + OS) — offset das abas sticky. */
+export const GESTOR_TOP_CHROME_ID = "gestor-top-chrome";
+
+/** Header sticky compacto (~48px) — fallback se o chrome ainda não estiver no DOM. */
+const APP_HEADER_STICKY_PX = 48;
 /** Fallback se a barra ainda não estiver no DOM. */
 const ABAS_BAR_FALLBACK_PX = 104;
+
+function useGestorChromeHeightPx(enabled: boolean): number {
+  const [heightPx, setHeightPx] = useState(APP_HEADER_STICKY_PX);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const measure = () => {
+      const chrome = document.getElementById(GESTOR_TOP_CHROME_ID);
+      setHeightPx(Math.round(chrome?.getBoundingClientRect().height ?? APP_HEADER_STICKY_PX));
+    };
+    measure();
+    const chrome = document.getElementById(GESTOR_TOP_CHROME_ID);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (chrome && ro) ro.observe(chrome);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [enabled]);
+
+  return heightPx;
+}
 
 function useAbasStickyOffsetPx(stickTabsAtViewportTop: boolean): number {
   const [offsetPx, setOffsetPx] = useState(
@@ -228,16 +254,20 @@ function useAbasStickyOffsetPx(stickTabsAtViewportTop: boolean): number {
     const measure = () => {
       const bar = document.getElementById(RELATORIO_ABAS_STICKY_ID);
       const barH = bar?.getBoundingClientRect().height ?? ABAS_BAR_FALLBACK_PX;
-      const headerH = stickTabsAtViewportTop ? 0 : APP_HEADER_STICKY_PX;
+      const chrome = document.getElementById(GESTOR_TOP_CHROME_ID);
+      const headerH = stickTabsAtViewportTop
+        ? 0
+        : Math.round(chrome?.getBoundingClientRect().height ?? APP_HEADER_STICKY_PX);
       setOffsetPx(Math.round(headerH + barH));
     };
 
     measure();
     const bar = document.getElementById(RELATORIO_ABAS_STICKY_ID);
+    const chrome = document.getElementById(GESTOR_TOP_CHROME_ID);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     if (bar && ro) ro.observe(bar);
+    if (chrome && ro) ro.observe(chrome);
     window.addEventListener("resize", measure);
-    // Altura da barra muda com conteúdo (ex.: busca); observa o subtree.
     const mo =
       typeof MutationObserver !== "undefined" && bar
         ? new MutationObserver(measure)
@@ -577,6 +607,7 @@ export function RelatorioAbasCampo({
   const isGestor = layoutMode === "gestor";
   /** Técnico mobile: setas nas bordas e abas com largura máxima entre elas. */
   const tabsFullBleed = !isGestor;
+  const gestorChromeTopPx = useGestorChromeHeightPx(isGestor && !stickToViewportTop);
   const pendenciasCtx = usePendencias();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -660,6 +691,9 @@ export function RelatorioAbasCampo({
     <>
       <div
         id={RELATORIO_ABAS_STICKY_ID}
+        style={
+          isGestor && !stickToViewportTop ? { top: gestorChromeTopPx } : undefined
+        }
         className={
           stickToViewportTop
             ? cn(
@@ -668,7 +702,7 @@ export function RelatorioAbasCampo({
               )
             : cn(
                 isGestor
-                  ? "sticky top-14 z-40 w-full border-b border-gray-200 bg-white py-1"
+                  ? "sticky z-50 w-full max-w-full isolate border-b border-gray-200 bg-white pt-1 pb-1.5"
                   : "sticky top-16 z-40 w-full bg-white py-2",
                 tabsFullBleed ? "-mx-5 w-[calc(100%+2.5rem)] max-w-none px-0" : "",
               )
@@ -677,7 +711,7 @@ export function RelatorioAbasCampo({
         <div
           className={cn(
             "flex w-full items-center",
-            tabsFullBleed ? "gap-0" : "gap-1",
+            isGestor ? "mb-1.5 gap-1" : tabsFullBleed ? "gap-0" : "gap-1",
           )}
         >
           {!isGestor ? (
@@ -694,7 +728,7 @@ export function RelatorioAbasCampo({
             ref={abasScrollRef}
             className={
               isGestor
-                ? "flex w-full min-w-0 flex-1 flex-wrap items-center justify-between gap-2"
+                ? "flex w-full min-w-0 flex-1 flex-wrap items-center gap-1"
                 : "mx-0 flex w-full min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto whitespace-nowrap px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             }
             aria-label="Seções do relatório"
@@ -708,7 +742,7 @@ export function RelatorioAbasCampo({
                   onClick={() => onChange(aba.id)}
                   className={`shrink-0 whitespace-nowrap rounded-full border text-center font-semibold transition ${
                     isGestor
-                      ? "border-gray-200 px-2.5 py-0.5 text-[11px] md:px-3 md:text-xs"
+                      ? "border-gray-200 px-2 py-0.5 text-[10px] md:text-[11px]"
                       : "border-border px-3 py-1.5 text-xs"
                   } ${
                     ativa
@@ -739,7 +773,7 @@ export function RelatorioAbasCampo({
           ref={buscaWrapRef}
           className={cn(
             "relative w-full",
-            isGestor ? "mt-1" : "mt-2",
+            isGestor ? "mt-0" : "mt-2",
             tabsFullBleed && "px-5",
           )}
         >
@@ -751,12 +785,12 @@ export function RelatorioAbasCampo({
                 className={cn(
                   "flex shrink-0 items-center justify-center rounded-lg border bg-white text-foreground transition hover:bg-muted",
                   isGestor
-                    ? "h-8 w-8 border-gray-200"
+                    ? "h-7 w-7 border-gray-200"
                     : "h-10 w-10 border-input",
                 )}
                 aria-label="Abrir índice de seções"
               >
-                <Menu className={isGestor ? "h-4 w-4" : "h-5 w-5"} />
+                <Menu className={isGestor ? "h-3.5 w-3.5" : "h-5 w-5"} />
               </button>
             ) : null}
 
@@ -765,7 +799,7 @@ export function RelatorioAbasCampo({
                 <>
                   <Search
                     className={cn(
-                      "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground",
+                      "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground",
                       isGestor ? "h-3.5 w-3.5" : "h-4 w-4",
                     )}
                   />
@@ -779,10 +813,10 @@ export function RelatorioAbasCampo({
                     onFocus={() => setIsDropdownOpen(true)}
                     placeholder="Buscar seção (ex: Caixa de Emenda)"
                     className={cn(
-                      "box-border w-full rounded-lg bg-white pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20",
+                      "box-border w-full rounded-lg bg-white pr-3 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20",
                       isGestor
-                        ? "border border-gray-200 py-1.5"
-                        : "border border-input py-2",
+                        ? "border border-gray-200 py-1 pl-8 text-xs"
+                        : "border border-input py-2 pl-9",
                     )}
                     aria-label="Busca rápida de seções do formulário"
                     autoComplete="off"
@@ -797,14 +831,14 @@ export function RelatorioAbasCampo({
                   type="button"
                   className={cn(
                     "relative flex shrink-0 items-center justify-center rounded-lg border bg-white transition hover:bg-muted",
-                    isGestor ? "h-8 w-8 border-gray-200" : "h-10 w-10 border-input",
+                    isGestor ? "h-7 w-7 border-gray-200" : "h-10 w-10 border-input",
                     temPendencia ? "text-destructive" : isGestor ? "text-gray-700" : "text-muted-foreground",
                   )}
                   aria-label={
                     temPendencia ? "Ver pendência do relatório" : "Notificações do relatório"
                   }
                 >
-                  <Bell className={isGestor ? "h-4 w-4" : "h-5 w-5"} />
+                  <Bell className={isGestor ? "h-3.5 w-3.5" : "h-5 w-5"} />
                   {temPendencia ? (
                     <span
                       className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background"
@@ -1099,14 +1133,25 @@ export function AccordionBloco({
   const hasPendencias = pendenciaCount > 0;
 
   const summaryClass = cn(
-    "sticky z-30 flex cursor-pointer list-none items-center justify-between gap-3 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden",
+    "sticky z-30 flex w-full max-w-full min-w-0 cursor-pointer list-none items-center justify-between gap-3 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden",
     /* Fundo sempre opaco para o conteúdo não transparecer ao rolar. */
     "bg-white",
+    /* Sem -mx-* no sticky: margem negativa estoura a viewport e gera scroll lateral. */
     isAudit
-      ? "border-b px-4 text-sm font-bold uppercase tracking-wider"
-      : "border-b px-5 font-bold",
-    isAudit ? (isStuck ? "-mx-4 py-2.5 shadow-md" : "py-3") : isStuck ? "-mx-5 py-2 shadow-md" : "py-4",
-    !isAudit && (isStuck ? "text-sm" : "text-base"),
+      ? "border-b px-3 text-sm font-bold uppercase tracking-wider"
+      : "border-b px-4 font-bold sm:px-5",
+    isAudit
+      ? isStuck
+        ? "py-2 shadow-md"
+        : "py-2.5"
+      : isStuck
+        ? strongChrome
+          ? "py-1.5 shadow-md"
+          : "py-2 shadow-md"
+        : strongChrome
+          ? "py-2.5"
+          : "py-4",
+    !isAudit && (isStuck ? "text-sm" : strongChrome ? "text-sm" : "text-base"),
     hasPendencias
       ? "border-amber-200 border-l-2 border-l-amber-400 bg-amber-50 text-gray-900"
       : strongChrome
@@ -1126,11 +1171,11 @@ export function AccordionBloco({
       className={
         isAudit
           ? cn(
-              "group relative z-0 overflow-visible rounded-xl border bg-white shadow-sm open:shadow-md",
+              "group relative z-0 w-full max-w-full min-w-0 overflow-visible rounded-xl border bg-white shadow-sm open:shadow-md",
               hasPendencias ? "border-amber-200" : strongChrome ? "border-gray-200" : "border-gray-100",
             )
           : cn(
-              "group relative z-0 overflow-visible rounded-2xl border bg-card shadow-sm open:shadow-md",
+              "group relative z-0 w-full max-w-full min-w-0 overflow-visible rounded-2xl border bg-card shadow-sm open:shadow-md",
               hasPendencias
                 ? "border-amber-200"
                 : strongChrome
@@ -1165,8 +1210,10 @@ export function AccordionBloco({
       <div
         className={
           isAudit
-            ? "relative z-0 flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-5"
-            : "relative z-0 flex flex-col gap-6 px-4 pb-5 pt-4 sm:px-5"
+            ? "relative z-0 flex w-full max-w-full min-w-0 flex-col gap-4 px-3 pb-4 pt-3 sm:px-4"
+            : strongChrome
+              ? "relative z-0 flex w-full max-w-full min-w-0 flex-col gap-4 px-3 pb-4 pt-3 sm:px-4"
+              : "relative z-0 flex w-full max-w-full min-w-0 flex-col gap-6 px-4 pb-5 pt-4 sm:px-5"
         }
       >
         {children}
