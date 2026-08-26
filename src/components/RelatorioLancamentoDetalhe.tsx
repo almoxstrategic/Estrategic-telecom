@@ -1797,7 +1797,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="LANÇAMENTO (RE)"
             id="secao-cabos"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RE.lancamento"
           >
@@ -1893,7 +1893,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="POSTE (RE)"
             id="secao-poste"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RE.poste"
           >
@@ -2018,7 +2018,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="CAIXA DE EMENDA (RE)"
             id="secao-caixa-emenda"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RE.caixa"
           >
@@ -2035,7 +2035,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="OUTRAS FOTOS (RE)"
             id="secao-outras-fotos"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RE.outras"
           >
@@ -2049,7 +2049,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="LOCAL (RC)"
             id="secao-local"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RC.local"
           >
@@ -2084,7 +2084,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="LANÇAMENTO (RC)"
             id="secao-cabos"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RC.lancamento"
           >
@@ -2187,7 +2187,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="POSTE (RC)"
             id="secao-poste"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RC.poste"
           >
@@ -2290,7 +2290,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="CAIXA DE EMENDA (RC)"
             id="secao-caixa-emenda"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RC.caixa"
           >
@@ -2311,7 +2311,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="OUTRAS FOTOS (RC)"
             id="secao-outras-fotos"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="RC.outras"
           >
@@ -2325,7 +2325,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="EQUIPAMENTO NO CLIENTE"
             id="secao-eq-cliente"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="EQ.cliente"
           >
@@ -2416,7 +2416,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="EQUIPAMENTO NA ESTAÇÃO"
             id="secao-eq-estacao"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="EQ.estacao"
           >
@@ -2512,7 +2512,7 @@ export function RelatorioDetalhe({
           <AccordionBloco
             title="OUTRAS FOTOS"
             id="secao-outras-fotos"
-            stickTabsAtViewportTop={false}
+            stickTabsAtViewportTop
             defaultOpen
             pendenciaBloco="EQ.outras"
           >

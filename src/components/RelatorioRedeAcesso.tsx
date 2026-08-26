@@ -214,36 +214,13 @@ export function TipoExecucaoPicker({
 /** Âncora DOM da barra sticky (abas + busca) — usada para medir o offset do accordion. */
 export const RELATORIO_ABAS_STICKY_ID = "relatorio-abas-sticky";
 
-/** Chrome superior unificado do Gestor (logo + OS) — offset das abas sticky. */
+/** Chrome opcional acima das abas (ex.: AppHeader sticky em outras telas). */
 export const GESTOR_TOP_CHROME_ID = "gestor-top-chrome";
 
-/** Header sticky compacto (~48px) — fallback se o chrome ainda não estiver no DOM. */
-const APP_HEADER_STICKY_PX = 48;
+/** Fallback de altura do header sticky — usado só se houver chrome no DOM. */
+const APP_HEADER_STICKY_PX = 44;
 /** Fallback se a barra ainda não estiver no DOM. */
 const ABAS_BAR_FALLBACK_PX = 104;
-
-function useGestorChromeHeightPx(enabled: boolean): number {
-  const [heightPx, setHeightPx] = useState(APP_HEADER_STICKY_PX);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const measure = () => {
-      const chrome = document.getElementById(GESTOR_TOP_CHROME_ID);
-      setHeightPx(Math.round(chrome?.getBoundingClientRect().height ?? APP_HEADER_STICKY_PX));
-    };
-    measure();
-    const chrome = document.getElementById(GESTOR_TOP_CHROME_ID);
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
-    if (chrome && ro) ro.observe(chrome);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [enabled]);
-
-  return heightPx;
-}
 
 function useAbasStickyOffsetPx(stickTabsAtViewportTop: boolean): number {
   const [offsetPx, setOffsetPx] = useState(
@@ -607,7 +584,6 @@ export function RelatorioAbasCampo({
   const isGestor = layoutMode === "gestor";
   /** Técnico mobile: setas nas bordas e abas com largura máxima entre elas. */
   const tabsFullBleed = !isGestor;
-  const gestorChromeTopPx = useGestorChromeHeightPx(isGestor && !stickToViewportTop);
   const pendenciasCtx = usePendencias();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -691,18 +667,16 @@ export function RelatorioAbasCampo({
     <>
       <div
         id={RELATORIO_ABAS_STICKY_ID}
-        style={
-          isGestor && !stickToViewportTop ? { top: gestorChromeTopPx } : undefined
-        }
         className={
-          stickToViewportTop
+          stickToViewportTop && !isGestor
             ? cn(
                 "sticky top-0 z-40 -mx-5 w-[calc(100%+2.5rem)] max-w-none bg-background py-2 shadow-sm",
                 tabsFullBleed ? "px-0" : "px-5",
               )
             : cn(
                 isGestor
-                  ? "sticky z-50 w-full max-w-full isolate border-b border-gray-200 bg-white pt-1 pb-1.5"
+                  ? /* Gestor Transmissão: abas no topo da viewport (logo não é sticky). */
+                    "sticky top-0 z-50 w-full max-w-full isolate border-b border-gray-200 bg-white pt-1.5 pb-2"
                   : "sticky top-16 z-40 w-full bg-white py-2",
                 tabsFullBleed ? "-mx-5 w-[calc(100%+2.5rem)] max-w-none px-0" : "",
               )
@@ -711,7 +685,7 @@ export function RelatorioAbasCampo({
         <div
           className={cn(
             "flex w-full items-center",
-            isGestor ? "mb-1.5 gap-1" : tabsFullBleed ? "gap-0" : "gap-1",
+            isGestor ? "mb-2 gap-1.5" : tabsFullBleed ? "gap-0" : "gap-1",
           )}
         >
           {!isGestor ? (
@@ -728,7 +702,7 @@ export function RelatorioAbasCampo({
             ref={abasScrollRef}
             className={
               isGestor
-                ? "flex w-full min-w-0 flex-1 flex-wrap items-center gap-1"
+                ? "flex w-full min-w-0 flex-1 flex-wrap items-center justify-center gap-1.5"
                 : "mx-0 flex w-full min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto whitespace-nowrap px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             }
             aria-label="Seções do relatório"
@@ -742,7 +716,7 @@ export function RelatorioAbasCampo({
                   onClick={() => onChange(aba.id)}
                   className={`shrink-0 whitespace-nowrap rounded-full border text-center font-semibold transition ${
                     isGestor
-                      ? "border-gray-200 px-2 py-0.5 text-[10px] md:text-[11px]"
+                      ? "border-gray-200 px-2.5 py-1 text-[11px] md:text-xs"
                       : "border-border px-3 py-1.5 text-xs"
                   } ${
                     ativa
@@ -785,12 +759,12 @@ export function RelatorioAbasCampo({
                 className={cn(
                   "flex shrink-0 items-center justify-center rounded-lg border bg-white text-foreground transition hover:bg-muted",
                   isGestor
-                    ? "h-7 w-7 border-gray-200"
+                    ? "h-8 w-8 border-gray-200"
                     : "h-10 w-10 border-input",
                 )}
                 aria-label="Abrir índice de seções"
               >
-                <Menu className={isGestor ? "h-3.5 w-3.5" : "h-5 w-5"} />
+                <Menu className={isGestor ? "h-4 w-4" : "h-5 w-5"} />
               </button>
             ) : null}
 
@@ -798,10 +772,7 @@ export function RelatorioAbasCampo({
               {secoes.length > 0 ? (
                 <>
                   <Search
-                    className={cn(
-                      "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground",
-                      isGestor ? "h-3.5 w-3.5" : "h-4 w-4",
-                    )}
+                    className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                   />
                   <input
                     type="search"
@@ -815,7 +786,7 @@ export function RelatorioAbasCampo({
                     className={cn(
                       "box-border w-full rounded-lg bg-white pr-3 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20",
                       isGestor
-                        ? "border border-gray-200 py-1 pl-8 text-xs"
+                        ? "border border-gray-200 py-1.5 pl-9 text-[13px]"
                         : "border border-input py-2 pl-9",
                     )}
                     aria-label="Busca rápida de seções do formulário"
@@ -831,14 +802,14 @@ export function RelatorioAbasCampo({
                   type="button"
                   className={cn(
                     "relative flex shrink-0 items-center justify-center rounded-lg border bg-white transition hover:bg-muted",
-                    isGestor ? "h-7 w-7 border-gray-200" : "h-10 w-10 border-input",
+                    isGestor ? "h-8 w-8 border-gray-200" : "h-10 w-10 border-input",
                     temPendencia ? "text-destructive" : isGestor ? "text-gray-700" : "text-muted-foreground",
                   )}
                   aria-label={
                     temPendencia ? "Ver pendência do relatório" : "Notificações do relatório"
                   }
                 >
-                  <Bell className={isGestor ? "h-3.5 w-3.5" : "h-5 w-5"} />
+                  <Bell className={isGestor ? "h-4 w-4" : "h-5 w-5"} />
                   {temPendencia ? (
                     <span
                       className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background"
