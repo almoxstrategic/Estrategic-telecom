@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { PhotoUpload, FOTO_SLOTS_ROW_CLASS, FOTO_SLOT_WRAP_CLASS } from "@/components/PhotoUpload";
 import { FOTO_SLOT_CLASS, FotoLabel, RelatorioFotoComControles } from "@/components/RelatorioFotoComControles";
 import { PendenciaItemFrame } from "@/components/pendencias/PendenciaItemFrame";
+import { planSmartSlotListUpload } from "@/lib/smart-multi-upload";
 import type { EvidencePhotoRef } from "@/lib/types";
 import type { PendenciaItemDef } from "@/lib/pendencias-itens";
 import { deleteRelatorioPhoto, type StoredPhoto } from "@/lib/relatorios-transmissao";
@@ -25,10 +26,6 @@ export function slotsFromStored(fotos: StoredPhoto[], minSlots: number): FotoSlo
   }));
   while (slots.length < minSlots) slots.push(newFotoSlot());
   return slots;
-}
-
-function slotIsEmpty(slot: FotoSlot): boolean {
-  return !slot.file && !slot.stored;
 }
 
 export function RelatorioFotosBloco({
@@ -73,7 +70,7 @@ export function RelatorioFotosBloco({
     updateSlot(slotId, { file, stored: file ? null : undefined });
   };
 
-  /** Distribui N fotos da galeria nos slots vazios a partir do slot clicado. */
+  /** Esteira: a partir do slot clicado, substitui/preenche em sequência e cria slots extras. */
   const distributeGalleryFiles = (fromSlotId: string, photos: EvidencePhotoRef[]) => {
     if (photos.length === 0) return;
     if (photos.length === 1) {
@@ -81,26 +78,10 @@ export function RelatorioFotosBloco({
       return;
     }
 
-    const startIdx = Math.max(
-      0,
-      slots.findIndex((slot) => slot.id === fromSlotId),
-    );
-    const working = slots.map((slot) => ({ ...slot }));
-    const assignments: { slotId: string; file: EvidencePhotoRef }[] = [];
-    let photoIdx = 0;
-
-    for (let i = startIdx; i < working.length && photoIdx < photos.length; i++) {
-      if (!slotIsEmpty(working[i])) continue;
-      assignments.push({ slotId: working[i].id, file: photos[photoIdx] });
-      photoIdx += 1;
-    }
-
-    while (photoIdx < photos.length) {
-      const slot = newFotoSlot();
-      working.push(slot);
-      assignments.push({ slotId: slot.id, file: photos[photoIdx] });
-      photoIdx += 1;
-    }
+    const { assignments, nextSlots: working } = planSmartSlotListUpload(slots, photos, {
+      startSlotId: fromSlotId,
+      createEmptySlot: newFotoSlot,
+    });
 
     if (onPickPhoto) {
       if (working.length > slots.length) {
@@ -200,6 +181,11 @@ export function RelatorioFotosBloco({
                     void deleteRelatorioPhoto(slot.stored?.path);
                     handlePick(slot.id, file);
                   }}
+                  onGalleryFiles={
+                    !readOnly
+                      ? (photos) => distributeGalleryFiles(slot.id, photos)
+                      : undefined
+                  }
                 />
               ) : readOnly ? (
                 <div className={FOTO_SLOT_CLASS}>Sem foto {index + 1}</div>

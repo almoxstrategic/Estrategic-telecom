@@ -43,6 +43,7 @@ import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import { parsePadraoCoresFibra, type PadraoCoresFibra } from "@/lib/fiber-colors";
 import { planCaboMetragemGalleryAssignments } from "@/lib/cabo-metragem-gallery";
+import { ensureItemsAppended, planSmartPairedListUpload } from "@/lib/smart-multi-upload";
 import {
   avisarConclusaoRelatorio,
   emptyCaboMetragem,
@@ -1149,12 +1150,7 @@ function RelatorioPage() {
       startCampo: fromCampo,
     });
 
-    const ensureCabos = (list: CaboMetragemPayload[]) => {
-      if (newCabos.length === 0) return list;
-      const ids = new Set(list.map((c) => c.id));
-      const extras = newCabos.filter((c) => !ids.has(c.id));
-      return extras.length ? [...list, ...extras] : list;
-    };
+    const ensureCabos = (list: CaboMetragemPayload[]) => ensureItemsAppended(list, newCabos);
 
     // Garante os novos cards no estado antes/durante os uploads.
     if (newCabos.length > 0) {
@@ -1272,6 +1268,57 @@ function RelatorioPage() {
       });
       return { ...buildPayload(), [payloadKey]: next };
     });
+  };
+
+  const handleEqItemGalleryFiles = (
+    setter: React.Dispatch<
+      React.SetStateAction<EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]>
+    >,
+    payloadKey: "eqClienteEquipamentos" | "eqClienteDgo" | "eqEstacaoEquipamento" | "eqEstacaoDgo",
+    currentList: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[],
+    emptyItem: () => EquipamentoClienteItemPayload | DgoClienteItemPayload,
+    fromItemId: string,
+    fromCampo: "foto" | "etiqueta",
+    photos: EvidencePhotoRef[],
+  ) => {
+    if (photos.length === 0) return;
+    if (photos.length === 1) {
+      handleEqItemPhoto(setter, payloadKey, fromItemId, fromCampo, photos[0]);
+      return;
+    }
+
+    const baseList = currentList.length ? currentList : [emptyItem()];
+    const { assignments, newItems } = planSmartPairedListUpload(baseList, photos, {
+      campos: ["foto", "etiqueta"] as const,
+      startItemId: fromItemId,
+      startCampo: fromCampo,
+      createEmptyItem: emptyItem,
+    });
+
+    if (newItems.length > 0) {
+      setter(
+        (prev) =>
+          ensureItemsAppended(prev.length ? prev : [emptyItem()], newItems) as typeof prev,
+      );
+    }
+
+    for (const item of assignments) {
+      void uploadFotoImediato(
+        item.file,
+        `${payloadKey}-${item.campo}-${item.itemId.slice(0, 8)}`,
+        (stored) => {
+          let next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[] = [];
+          setter((prev) => {
+            const list = ensureItemsAppended(prev.length ? prev : [emptyItem()], newItems);
+            next = list.map((row) =>
+              row.id === item.itemId ? { ...row, [item.campo]: stored } : row,
+            );
+            return next as typeof prev;
+          });
+          return { ...buildPayload(), [payloadKey]: next };
+        },
+      );
+    }
   };
 
   const setEqGrupoSlots = (
@@ -2138,6 +2185,21 @@ function RelatorioPage() {
                       file,
                     )
                   }
+                  onDgoClienteGalleryFiles={(fromItemId, fromCampo, photos) =>
+                    handleEqItemGalleryFiles(
+                      setEqClienteDgoItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqClienteDgo",
+                      eqClienteDgoItens,
+                      emptyDgoClienteItem,
+                      fromItemId,
+                      fromCampo,
+                      photos,
+                    )
+                  }
                   equipamentosCliente={eqClienteEquipamentosItens}
                   onEquipamentosClienteChange={setEqClienteEquipamentosItens}
                   onEquipamentoClientePhoto={(itemId, campo, file) =>
@@ -2151,6 +2213,21 @@ function RelatorioPage() {
                       itemId,
                       campo,
                       file,
+                    )
+                  }
+                  onEquipamentoClienteGalleryFiles={(fromItemId, fromCampo, photos) =>
+                    handleEqItemGalleryFiles(
+                      setEqClienteEquipamentosItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqClienteEquipamentos",
+                      eqClienteEquipamentosItens,
+                      emptyEquipamentoClienteItem,
+                      fromItemId,
+                      fromCampo,
+                      photos,
                     )
                   }
                   outrasCliente={outrasEqCliente}
@@ -2197,6 +2274,21 @@ function RelatorioPage() {
                       file,
                     )
                   }
+                  onEquipamentoEstacaoGalleryFiles={(fromItemId, fromCampo, photos) =>
+                    handleEqItemGalleryFiles(
+                      setEqEstacaoEquipamentoItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqEstacaoEquipamento",
+                      eqEstacaoEquipamentoItens,
+                      emptyEquipamentoClienteItem,
+                      fromItemId,
+                      fromCampo,
+                      photos,
+                    )
+                  }
                   dgosEstacao={eqEstacaoDgoItens}
                   onDgosEstacaoChange={setEqEstacaoDgoItens}
                   onDgoEstacaoPhoto={(itemId, campo, file) =>
@@ -2210,6 +2302,21 @@ function RelatorioPage() {
                       itemId,
                       campo,
                       file,
+                    )
+                  }
+                  onDgoEstacaoGalleryFiles={(fromItemId, fromCampo, photos) =>
+                    handleEqItemGalleryFiles(
+                      setEqEstacaoDgoItens as React.Dispatch<
+                        React.SetStateAction<
+                          EquipamentoClienteItemPayload[] | DgoClienteItemPayload[]
+                        >
+                      >,
+                      "eqEstacaoDgo",
+                      eqEstacaoDgoItens,
+                      emptyDgoClienteItem,
+                      fromItemId,
+                      fromCampo,
+                      photos,
                     )
                   }
                   onGrupoPhoto={(grupoKey, slotId, file) => {

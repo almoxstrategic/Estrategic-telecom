@@ -16,6 +16,10 @@ import { EquipamentosIpsCard } from "@/components/RelatorioAbasPlaceholder";
 import { TipoEquipamentoCombobox } from "@/components/TipoEquipamentoCombobox";
 import type { EvidencePhotoRef } from "@/lib/types";
 import {
+  ensureItemsAppended,
+  planSmartPairedListUpload,
+} from "@/lib/smart-multi-upload";
+import {
   deleteRelatorioPhoto,
   emptyDgoClienteItem,
   emptyEquipamentoClienteItem,
@@ -28,6 +32,70 @@ import {
 } from "@/lib/relatorios-transmissao";
 
 type CampoFotoEq = "foto" | "etiqueta";
+
+const CAMPOS_EQ = ["foto", "etiqueta"] as const satisfies readonly CampoFotoEq[];
+
+function FotoParCampo({
+  label,
+  stored,
+  readOnly,
+  onPick,
+  onGalleryFiles,
+}: {
+  label: string;
+  stored: StoredPhoto | null;
+  readOnly: boolean;
+  onPick: (file: EvidencePhotoRef | null) => void;
+  onGalleryFiles?: (photos: EvidencePhotoRef[]) => void;
+}) {
+  if (stored) {
+    return (
+      <div>
+        <div className="mb-1">
+          <FotoLabel>{label}</FotoLabel>
+        </div>
+        <RelatorioFotoComControles
+          src={stored.url}
+          alt={label}
+          canEdit={!readOnly}
+          onDelete={
+            !readOnly
+              ? () => {
+                  void deleteRelatorioPhoto(stored.path);
+                  onPick(null);
+                }
+              : undefined
+          }
+          onReplace={
+            !readOnly
+              ? (file) => {
+                  void deleteRelatorioPhoto(stored.path);
+                  onPick(file);
+                }
+              : undefined
+          }
+          onGalleryFiles={!readOnly ? onGalleryFiles : undefined}
+        />
+      </div>
+    );
+  }
+  if (readOnly) {
+    return (
+      <div>
+        <FotoLabel>{label}</FotoLabel>
+        <p className="text-sm text-muted-foreground">Sem foto</p>
+      </div>
+    );
+  }
+  return (
+    <PhotoUpload
+      label={label}
+      value={null}
+      onChange={onPick}
+      onGalleryFiles={onGalleryFiles}
+    />
+  );
+}
 
 function CampoTexto({
   label,
@@ -57,58 +125,6 @@ function CampoTexto({
   );
 }
 
-function FotoParCampo({
-  label,
-  stored,
-  readOnly,
-  onPick,
-}: {
-  label: string;
-  stored: StoredPhoto | null;
-  readOnly: boolean;
-  onPick: (file: EvidencePhotoRef | null) => void;
-}) {
-  if (stored) {
-    return (
-      <div>
-        <div className="mb-1">
-          <FotoLabel>{label}</FotoLabel>
-        </div>
-        <RelatorioFotoComControles
-          src={stored.url}
-          alt={label}
-          canEdit={!readOnly}
-          onDelete={
-            !readOnly
-              ? () => {
-                  void deleteRelatorioPhoto(stored.path);
-                  onPick(null);
-                }
-              : undefined
-          }
-          onReplace={
-            !readOnly
-              ? (file) => {
-                  void deleteRelatorioPhoto(stored.path);
-                  onPick(file);
-                }
-              : undefined
-          }
-        />
-      </div>
-    );
-  }
-  if (readOnly) {
-    return (
-      <div>
-        <FotoLabel>{label}</FotoLabel>
-        <p className="text-sm text-muted-foreground">Sem foto</p>
-      </div>
-    );
-  }
-  return <PhotoUpload label={label} value={null} onChange={onPick} />;
-}
-
 function EquipamentoItemCard({
   title,
   index,
@@ -120,6 +136,7 @@ function EquipamentoItemCard({
   onPatch,
   onRemove,
   onPhoto,
+  onGalleryFiles,
 }: {
   title: string;
   index: number;
@@ -132,6 +149,7 @@ function EquipamentoItemCard({
   onPatch: (patch: Partial<EquipamentoClienteItemPayload & DgoClienteItemPayload>) => void;
   onRemove: () => void;
   onPhoto: (campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
+  onGalleryFiles?: (campo: CampoFotoEq, photos: EvidencePhotoRef[]) => void;
 }) {
   useEffect(() => {
     if (!tipoEquipamentoFixo || readOnly) return;
@@ -214,12 +232,18 @@ function EquipamentoItemCard({
           stored={item.foto}
           readOnly={readOnly}
           onPick={(file) => onPhoto("foto", file)}
+          onGalleryFiles={
+            onGalleryFiles ? (photos) => onGalleryFiles("foto", photos) : undefined
+          }
         />
         <FotoParCampo
           label="Etiqueta de Identificação"
           stored={item.etiqueta}
           readOnly={readOnly}
           onPick={(file) => onPhoto("etiqueta", file)}
+          onGalleryFiles={
+            onGalleryFiles ? (photos) => onGalleryFiles("etiqueta", photos) : undefined
+          }
         />
       </div>
 
@@ -248,6 +272,7 @@ function ListaItensEquipamento({
   readOnly,
   onChange,
   onPhoto,
+  onGalleryFiles,
   emptyItem,
 }: {
   id?: string;
@@ -259,10 +284,52 @@ function ListaItensEquipamento({
   readOnly: boolean;
   onChange: (next: (EquipamentoClienteItemPayload | DgoClienteItemPayload)[]) => void;
   onPhoto: (itemId: string, campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
+  /**
+   * Galeria múltipla em esteira: preenche/substitui pares e cria novos itens.
+   * Se omitido, a lista aplica a esteira localmente e chama onPhoto por assignment.
+   */
+  onGalleryFiles?: (
+    fromItemId: string,
+    fromCampo: CampoFotoEq,
+    photos: EvidencePhotoRef[],
+  ) => void;
   emptyItem: () => EquipamentoClienteItemPayload | DgoClienteItemPayload;
 }) {
   const [fallback] = useState(() => emptyItem());
   const list = itens.length ? itens : [fallback];
+
+  const handleGalleryFiles = (
+    fromItemId: string,
+    fromCampo: CampoFotoEq,
+    photos: EvidencePhotoRef[],
+  ) => {
+    if (photos.length === 0) return;
+    if (onGalleryFiles) {
+      onGalleryFiles(fromItemId, fromCampo, photos);
+      return;
+    }
+    if (photos.length === 1) {
+      onPhoto(fromItemId, fromCampo, photos[0]);
+      return;
+    }
+
+    const { assignments, newItems } = planSmartPairedListUpload(list, photos, {
+      campos: CAMPOS_EQ,
+      startItemId: fromItemId,
+      startCampo: fromCampo,
+      createEmptyItem: emptyItem,
+    });
+
+    if (newItems.length > 0) {
+      onChange(ensureItemsAppended(list, newItems));
+    }
+    window.setTimeout(() => {
+      for (const item of assignments) {
+        onPhoto(item.itemId, item.campo, item.file);
+      }
+    }, 0);
+  };
+
   return (
     <div id={id} className="scroll-mt-36 space-y-4">
       <div className="flex flex-col gap-4">
@@ -281,6 +348,9 @@ function ListaItensEquipamento({
             }
             onRemove={() => onChange(removeExtraById(list, item.id))}
             onPhoto={(campo, file) => onPhoto(item.id, campo, file)}
+            onGalleryFiles={(campo, photos) =>
+              handleGalleryFiles(item.id, campo, photos)
+            }
           />
         ))}
       </div>
@@ -309,9 +379,11 @@ export function RelatorioEquipamento({
   equipamentosCliente,
   onEquipamentosClienteChange,
   onEquipamentoClientePhoto,
+  onEquipamentoClienteGalleryFiles,
   dgosCliente,
   onDgosClienteChange,
   onDgoClientePhoto,
+  onDgoClienteGalleryFiles,
   outrasCliente,
   onOutrasClienteChange,
   onOutraClientePhoto,
@@ -320,9 +392,11 @@ export function RelatorioEquipamento({
   equipamentosEstacao,
   onEquipamentosEstacaoChange,
   onEquipamentoEstacaoPhoto,
+  onEquipamentoEstacaoGalleryFiles,
   dgosEstacao,
   onDgosEstacaoChange,
   onDgoEstacaoPhoto,
+  onDgoEstacaoGalleryFiles,
   gruposConexaoEstacao = [],
   onGrupoPhoto,
   configuracaoCliente,
@@ -343,9 +417,19 @@ export function RelatorioEquipamento({
     campo: CampoFotoEq,
     file: EvidencePhotoRef | null,
   ) => void;
+  onEquipamentoClienteGalleryFiles?: (
+    fromItemId: string,
+    fromCampo: CampoFotoEq,
+    photos: EvidencePhotoRef[],
+  ) => void;
   dgosCliente: DgoClienteItemPayload[];
   onDgosClienteChange: (next: DgoClienteItemPayload[]) => void;
   onDgoClientePhoto: (itemId: string, campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
+  onDgoClienteGalleryFiles?: (
+    fromItemId: string,
+    fromCampo: CampoFotoEq,
+    photos: EvidencePhotoRef[],
+  ) => void;
   outrasCliente: OutraFotoState[];
   onOutrasClienteChange: (updater: (prev: OutraFotoState[]) => OutraFotoState[]) => void;
   onOutraClientePhoto: (itemId: string, file: EvidencePhotoRef | null) => void;
@@ -358,9 +442,19 @@ export function RelatorioEquipamento({
     campo: CampoFotoEq,
     file: EvidencePhotoRef | null,
   ) => void;
+  onEquipamentoEstacaoGalleryFiles?: (
+    fromItemId: string,
+    fromCampo: CampoFotoEq,
+    photos: EvidencePhotoRef[],
+  ) => void;
   dgosEstacao: DgoClienteItemPayload[];
   onDgosEstacaoChange: (next: DgoClienteItemPayload[]) => void;
   onDgoEstacaoPhoto: (itemId: string, campo: CampoFotoEq, file: EvidencePhotoRef | null) => void;
+  onDgoEstacaoGalleryFiles?: (
+    fromItemId: string,
+    fromCampo: CampoFotoEq,
+    photos: EvidencePhotoRef[],
+  ) => void;
   gruposConexaoEstacao?: GrupoFotoCampo[];
   onGrupoPhoto: (
     grupoKey: RelatorioFotoGrupoKey,
@@ -416,6 +510,7 @@ export function RelatorioEquipamento({
               readOnly={readOnly}
               onChange={(next) => onDgosClienteChange(next as DgoClienteItemPayload[])}
               onPhoto={onDgoClientePhoto}
+              onGalleryFiles={onDgoClienteGalleryFiles}
               emptyItem={emptyDgoClienteItem}
             />
           </div>
@@ -435,6 +530,7 @@ export function RelatorioEquipamento({
                 onEquipamentosClienteChange(next as EquipamentoClienteItemPayload[])
               }
               onPhoto={onEquipamentoClientePhoto}
+              onGalleryFiles={onEquipamentoClienteGalleryFiles}
               emptyItem={emptyEquipamentoClienteItem}
             />
           </div>
@@ -502,6 +598,7 @@ export function RelatorioEquipamento({
               readOnly={readOnly}
               onChange={(next) => onDgosEstacaoChange(next as DgoClienteItemPayload[])}
               onPhoto={onDgoEstacaoPhoto}
+              onGalleryFiles={onDgoEstacaoGalleryFiles}
               emptyItem={emptyDgoClienteItem}
             />
           </div>
@@ -539,6 +636,7 @@ export function RelatorioEquipamento({
                 onEquipamentosEstacaoChange(next as EquipamentoClienteItemPayload[])
               }
               onPhoto={onEquipamentoEstacaoPhoto}
+              onGalleryFiles={onEquipamentoEstacaoGalleryFiles}
               emptyItem={emptyEquipamentoClienteItem}
             />
           </div>

@@ -1273,11 +1273,13 @@ function FotoSlotUnico({
   slot,
   readOnly,
   onPick,
+  onGalleryFiles,
 }: {
   label: string;
   slot: FotoSlot;
   readOnly: boolean;
   onPick: (file: EvidencePhotoRef | null) => void;
+  onGalleryFiles?: (photos: EvidencePhotoRef[]) => void;
 }) {
   const src = slot.file?.previewUrl ?? slot.stored?.url ?? null;
   if (src) {
@@ -1306,6 +1308,7 @@ function FotoSlotUnico({
                 }
               : undefined
           }
+          onGalleryFiles={!readOnly ? onGalleryFiles : undefined}
         />
       </div>
     );
@@ -1318,7 +1321,14 @@ function FotoSlotUnico({
       </div>
     );
   }
-  return <PhotoUpload label={label} value={null} onChange={onPick} />;
+  return (
+    <PhotoUpload
+      label={label}
+      value={null}
+      onChange={onPick}
+      onGalleryFiles={onGalleryFiles}
+    />
+  );
 }
 
 function renderCaixaEmendaUnificadaCard(
@@ -1353,6 +1363,29 @@ function renderCaixaEmendaUnificadaCard(
       grupo.onChange([{ ...slot, file: null, stored: null }]);
     }
     onGrupoPhoto(grupo.grupoKey, slot.id, file, grupo.ambiente);
+  };
+
+  const handlePairGallery = (from: "caixa" | "plaqueta", photos: EvidencePhotoRef[]) => {
+    if (photos.length === 0) return;
+    if (photos.length === 1) {
+      if (from === "caixa") pickFoto(caixa, slotCaixa, photos[0]);
+      else pickFoto(plaqueta, slotPlaqueta, photos[0]);
+      return;
+    }
+    const order =
+      from === "caixa"
+        ? ([
+            ["caixa", slotCaixa] as const,
+            ["plaqueta", slotPlaqueta] as const,
+          ] as const)
+        : ([
+            ["plaqueta", slotPlaqueta] as const,
+            ["caixa", slotCaixa] as const,
+          ] as const);
+    for (let i = 0; i < Math.min(photos.length, order.length); i++) {
+      const [which, slot] = order[i];
+      pickFoto(which === "caixa" ? caixa : plaqueta, slot, photos[i]);
+    }
   };
 
   const body = (
@@ -1397,12 +1430,18 @@ function renderCaixaEmendaUnificadaCard(
           slot={slotCaixa}
           readOnly={readOnly}
           onPick={(file) => pickFoto(caixa, slotCaixa, file)}
+          onGalleryFiles={
+            readOnly ? undefined : (photos) => handlePairGallery("caixa", photos)
+          }
         />
         <FotoSlotUnico
           label="Etiqueta / Plaqueta de Identificação"
           slot={slotPlaqueta}
           readOnly={readOnly}
           onPick={(file) => pickFoto(plaqueta, slotPlaqueta, file)}
+          onGalleryFiles={
+            readOnly ? undefined : (photos) => handlePairGallery("plaqueta", photos)
+          }
         />
       </div>
       <div className="w-full min-w-0">
@@ -1948,6 +1987,12 @@ export function RelatorioRedeAcesso({
                               void deleteRelatorioPhoto(cabo.fotoInicio?.path);
                               onCaboPhoto(cabo.id, "fotoInicio", file);
                             }}
+                            onGalleryFiles={
+                              !readOnly && onCaboGalleryFiles
+                                ? (photos) =>
+                                    onCaboGalleryFiles(cabo.id, "fotoInicio", photos)
+                                : undefined
+                            }
                           />
                         ) : readOnly ? (
                           <p className="text-sm text-muted-foreground">Sem foto inicial.</p>
@@ -1990,6 +2035,11 @@ export function RelatorioRedeAcesso({
                               void deleteRelatorioPhoto(cabo.fotoFim?.path);
                               onCaboPhoto(cabo.id, "fotoFim", file);
                             }}
+                            onGalleryFiles={
+                              !readOnly && onCaboGalleryFiles
+                                ? (photos) => onCaboGalleryFiles(cabo.id, "fotoFim", photos)
+                                : undefined
+                            }
                           />
                         ) : readOnly ? (
                           <p className="text-sm text-muted-foreground">Sem foto final.</p>

@@ -44,6 +44,10 @@ import { useDebouncedEffect } from "@/hooks/use-debounced-effect";
 import type { EvidencePhotoRef } from "@/lib/types";
 import { planCaboMetragemGalleryAssignments } from "@/lib/cabo-metragem-gallery";
 import {
+  ensureItemsAppended,
+  planSmartPairedListUpload,
+} from "@/lib/smart-multi-upload";
+import {
   deleteRelatorioPhoto,
   emptyCaboMetragem,
   emptyCoordenadas,
@@ -781,6 +785,39 @@ function AdminListaEquipamentos({
     patchItem(id, { [campo]: stored });
   };
 
+  const handleGalleryFiles = async (
+    fromItemId: string,
+    fromCampo: "foto" | "etiqueta",
+    photos: EvidencePhotoRef[],
+  ) => {
+    if (!canEdit || photos.length === 0) return;
+    if (photos.length === 1) {
+      await setFoto(fromItemId, fromCampo, photos[0]);
+      return;
+    }
+    if (!onUploadPhoto) return;
+
+    const { assignments, newItems } = planSmartPairedListUpload(list, photos, {
+      campos: ["foto", "etiqueta"] as const,
+      startItemId: fromItemId,
+      startCampo: fromCampo,
+      createEmptyItem: emptyItem,
+    });
+
+    const storedList = await Promise.all(assignments.map((a) => onUploadPhoto(a.file)));
+    let next = ensureItemsAppended(list, newItems);
+    for (let i = 0; i < assignments.length; i++) {
+      const a = assignments[i];
+      next = next.map((row) => {
+        if (row.id !== a.itemId) return row;
+        const old = row[a.campo];
+        void deleteRelatorioPhoto(old?.path);
+        return { ...row, [a.campo]: storedList[i] };
+      });
+    }
+    onPatchList(next);
+  };
+
   return (
     <div className="space-y-5 pt-1">
       <SecaoDinamicaHeader
@@ -881,6 +918,11 @@ function AdminListaEquipamentos({
                         onReplace={
                           canEdit ? (file) => void setFoto(item.id, campo, file) : undefined
                         }
+                        onGalleryFiles={
+                          canEdit
+                            ? (photos) => void handleGalleryFiles(item.id, campo, photos)
+                            : undefined
+                        }
                       />
                     ) : canEdit ? (
                       <PhotoUpload
@@ -888,6 +930,9 @@ function AdminListaEquipamentos({
                         hideLabel
                         value={null}
                         onChange={(file) => void setFoto(item.id, campo, file)}
+                        onGalleryFiles={(photos) =>
+                          void handleGalleryFiles(item.id, campo, photos)
+                        }
                       />
                     ) : (
                       <p className="text-sm text-muted-foreground">Sem foto</p>
@@ -1599,29 +1644,48 @@ export function RelatorioDetalhe({
       label: string,
       foto: StoredPhoto | null,
       which: "caixa" | "plaqueta",
-    ) => (
-      <div className="min-w-0">
-        <FotoLabel>{label}</FotoLabel>
-        {foto ? (
-          <RelatorioFotoComControles
-            src={foto.url}
-            alt={label}
-            canEdit={canEditPhotos}
-            onDelete={canEditPhotos ? () => setFotoCampo(which, null) : undefined}
-            onReplace={canEditPhotos ? (file) => setFotoCampo(which, file) : undefined}
-          />
-        ) : canEditPhotos ? (
-          <PhotoUpload
-            label={label}
-            hideLabel
-            value={null}
-            onChange={(file) => setFotoCampo(which, file)}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">Sem foto</p>
-        )}
-      </div>
-    );
+    ) => {
+      const handleGallery = (photos: EvidencePhotoRef[]) => {
+        if (photos.length === 0) return;
+        if (photos.length === 1) {
+          setFotoCampo(which, photos[0]);
+          return;
+        }
+        const order =
+          which === "caixa"
+            ? (["caixa", "plaqueta"] as const)
+            : (["plaqueta", "caixa"] as const);
+        for (let i = 0; i < Math.min(photos.length, order.length); i++) {
+          setFotoCampo(order[i], photos[i]);
+        }
+      };
+
+      return (
+        <div className="min-w-0">
+          <FotoLabel>{label}</FotoLabel>
+          {foto ? (
+            <RelatorioFotoComControles
+              src={foto.url}
+              alt={label}
+              canEdit={canEditPhotos}
+              onDelete={canEditPhotos ? () => setFotoCampo(which, null) : undefined}
+              onReplace={canEditPhotos ? (file) => setFotoCampo(which, file) : undefined}
+              onGalleryFiles={canEditPhotos ? handleGallery : undefined}
+            />
+          ) : canEditPhotos ? (
+            <PhotoUpload
+              label={label}
+              hideLabel
+              value={null}
+              onChange={(file) => setFotoCampo(which, file)}
+              onGalleryFiles={handleGallery}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Sem foto</p>
+          )}
+        </div>
+      );
+    };
 
     const body = (
       <div
