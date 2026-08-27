@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, FileDown, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
@@ -415,75 +415,78 @@ function AdminLancamentoDetalhePage() {
     <PendenciasProvider mode="gestor" confirmed={row?.payload.pendenciasItens ?? EMPTY_PENDENCIAS}>
       <div className="min-h-screen w-full max-w-full min-w-0 bg-white">
         {/* Nesta tela o logo rola com a página — só abas/busca/blocos ficam sticky. */}
-        <AppHeader compact sticky={false} />
+        <div className="relative z-30 bg-white">
+          <AppHeader compact sticky={false} />
 
-        <header className="border-b border-gray-100 bg-white">
-          <div className="flex w-full items-center gap-2 px-3 py-1 lg:px-4">
-            <Link
-              to="/admin/transmissao"
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-gray-600 hover:text-foreground"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              <span className="hidden sm:inline">Voltar</span>
-            </Link>
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              {row ? (
-                <>
+          <header className="border-b border-gray-100 bg-white">
+            <div className="flex w-full items-center gap-2 px-3 py-1 lg:px-4">
+              <button
+                type="button"
+                onClick={voltarParaLista}
+                className="relative z-20 inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-gray-600 hover:text-foreground"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                <span className="hidden sm:inline">Voltar</span>
+              </button>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                {row ? (
+                  <>
+                    <h1 className="truncate text-sm font-bold tracking-tight text-gray-900">
+                      OS/WF {row.os_wf}
+                    </h1>
+                    <StatusBadge status={row.status} />
+                  </>
+                ) : (
                   <h1 className="truncate text-sm font-bold tracking-tight text-gray-900">
-                    OS/WF {row.os_wf}
+                    Detalhes do relatório
                   </h1>
-                  <StatusBadge status={row.status} />
-                </>
-              ) : (
-                <h1 className="truncate text-sm font-bold tracking-tight text-gray-900">
-                  Detalhes do relatório
-                </h1>
-              )}
-              <span className="hidden truncate text-[10px] text-gray-500 md:inline">
-                {refreshing ? "Atualizando..." : "Auditoria"}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {canAudit && row && row.status !== "fechado" ? (
-                <RelatorioSyncStatus
-                  status={
-                    saveHint === "saving"
-                      ? "saving"
-                      : saveHint === "error"
-                        ? "error"
-                        : saveHint === "saved"
-                          ? "saved"
-                          : "idle"
-                  }
-                />
-              ) : null}
-              {canAudit && row ? (
+                )}
+                <span className="hidden truncate text-[10px] text-gray-500 md:inline">
+                  {refreshing ? "Atualizando..." : "Auditoria"}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {canAudit && row && row.status !== "fechado" ? (
+                  <RelatorioSyncStatus
+                    status={
+                      saveHint === "saving"
+                        ? "saving"
+                        : saveHint === "error"
+                          ? "error"
+                          : saveHint === "saved"
+                            ? "saved"
+                            : "idle"
+                    }
+                  />
+                ) : null}
+                {canAudit && row ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => void onExcluir()}
+                    disabled={saving}
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" />
+                    Excluir
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 px-2 text-[11px] border-destructive/40 text-destructive hover:bg-destructive/10"
-                  onClick={() => void onExcluir()}
-                  disabled={saving}
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => void carregar(true)}
+                  disabled={loading || refreshing}
                 >
-                  <Trash2 className="mr-1 h-3 w-3" />
-                  Excluir
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  Atualizar
                 </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-[11px]"
-                onClick={() => void carregar(true)}
-                disabled={loading || refreshing}
-              >
-                <RefreshCw className="mr-1 h-3 w-3" />
-                Atualizar
-              </Button>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        </div>
 
         <main
           className={cn(

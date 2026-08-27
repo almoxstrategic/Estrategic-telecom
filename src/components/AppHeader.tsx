@@ -23,10 +23,10 @@ export function AppHeader({
   return (
     <header
       className={cn(
-        "z-50 grid grid-cols-[auto_1fr_auto] items-center gap-2 bg-white px-3 lg:px-4",
+        "relative z-30 grid grid-cols-[auto_1fr_auto] items-center gap-2 bg-white px-3 lg:px-4",
         flushBottom ? "border-b-0" : "border-b border-gray-200",
         compact ? "py-1" : "py-3",
-        sticky ? "sticky top-0" : "relative",
+        sticky ? "sticky top-0" : "",
       )}
     >
       <Sheet open={open} onOpenChange={setOpen}>
@@ -39,7 +39,7 @@ export function AppHeader({
         >
           <Menu className={compact ? "h-5 w-5" : "h-6 w-6"} />
         </SheetTrigger>
-        <SheetContent side="left" className="w-[82%] max-w-xs p-0">
+        <SheetContent side="left" className="w-[82%] max-w-xs overflow-hidden bg-white p-0">
           <AppSidebar onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>

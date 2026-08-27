@@ -145,8 +145,8 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   return (
-    <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="shrink-0 border-b border-sidebar-border p-5">
+    <nav className="relative flex h-full flex-col bg-white text-sidebar-foreground">
+      <div className="relative z-10 shrink-0 border-b border-sidebar-border bg-white py-5 pl-5 pr-12">
         <Link
           to="/admin"
           search={{ tab: "inicio" }}
@@ -160,7 +160,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Logo />
         </Link>
         {user && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-0.5">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
               {isAdmin ? roleLabel(user.role) : "Técnico"}
             </div>

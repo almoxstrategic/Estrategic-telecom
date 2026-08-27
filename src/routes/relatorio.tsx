@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bell, Info, X } from "lucide-react";
 import { toast } from "sonner";
@@ -282,6 +282,7 @@ function eqGruposFromPayload(
 
 function RelatorioPage() {
   const { user } = useApp();
+  const navigate = useNavigate();
   const { id: reportIdFromUrl } = Route.useSearch();
   const [step, setStep] = useState<1 | 2>(1);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
@@ -1492,6 +1493,13 @@ function RelatorioPage() {
     .map((nome) => nome.trim())
     .filter(Boolean);
 
+  const voltarAsOs = useCallback(() => {
+    canAutosaveRef.current = false;
+    setCurrentReportId(null);
+    setStep(1);
+    void navigate({ to: "/relatorio", search: {} });
+  }, [navigate]);
+
   if (loadingById) {
     return (
       <div className="min-h-screen bg-surface">
@@ -1533,12 +1541,13 @@ function RelatorioPage() {
     <div className="min-h-screen bg-surface">
       <AppHeader sticky={!headerRolaComPagina} />
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">
-        <Link
-          to="/relatorio"
-          className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+        <button
+          type="button"
+          onClick={voltarAsOs}
+          className="relative z-20 mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" /> Voltar às OS
-        </Link>
+        </button>
 
         <header className="mb-6">
           <div className="flex flex-row flex-wrap items-center justify-between gap-2">

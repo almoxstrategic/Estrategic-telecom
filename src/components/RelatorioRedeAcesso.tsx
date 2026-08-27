@@ -729,8 +729,9 @@ function RelatorioIndiceLateral({
         aria-label="Fechar menu de índice"
       />
       <aside
-        className="fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl animate-in slide-in-from-left duration-300"
+        className="fixed inset-y-0 left-0 z-[70] flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl animate-in slide-in-from-left duration-300"
         aria-label="Índice do formulário"
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 border-b border-border">
           <div className="flex items-center justify-between px-4 py-3">
@@ -757,7 +758,10 @@ function RelatorioIndiceLateral({
                     key={tab.id}
                     type="button"
                     title={tab.title}
-                    onClick={() => onAbaFiltroChange(tab.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAbaFiltroChange(tab.id);
+                    }}
                     className={cn(
                       "inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                       ativa
@@ -921,7 +925,8 @@ export function RelatorioAbasCampo({
     }
     setSearchTerm("");
     setIsDropdownOpen(false);
-    setIsSideMenuOpen(false);
+    // Não fecha o drawer de Índice aqui: troca de aba (RE/RC/EQUIP) no próprio
+    // Índice deve só filtrar a lista. Fechamento só via X, item ou backdrop.
     const timer = window.setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 50);
@@ -1001,7 +1006,7 @@ export function RelatorioAbasCampo({
             : cn(
                 isGestor
                   ? /* Gestor Transmissão: abas no topo da viewport (logo não é sticky). */
-                    "sticky top-0 z-50 w-full max-w-full isolate border-b border-gray-200 bg-white pt-1.5 pb-2"
+                    "sticky top-0 z-40 w-full max-w-full isolate border-b border-gray-200 bg-white pt-1.5 pb-2"
                   : "sticky top-16 z-40 w-full bg-white py-2",
                 tabsFullBleed ? "-mx-5 w-[calc(100%+2.5rem)] max-w-none px-0" : "",
               )
