@@ -1206,7 +1206,7 @@ function RelatorioPage() {
             next.metragem = calcularMetragemCaboTotal(next.marcacaoInicial, next.marcacaoFinal);
           }
           if ("tipoCabo" in patch && patch.tipoCabo != null) {
-            next.tipoCabo = apenasDigitos(patch.tipoCabo);
+            next.tipoCabo = apenasDigitos(patch.tipoCabo, 3);
           }
           return next;
         }),

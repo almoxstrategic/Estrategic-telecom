@@ -101,9 +101,10 @@ export type CaboMetragemPayload = {
   obsAdmin: string;
 };
 
-/** Remove caracteres não numéricos (Tipo do cabo). */
-export function apenasDigitos(value: string): string {
-  return value.replace(/\D/g, "");
+/** Remove caracteres não numéricos (Tipo do FO). Opcionalmente limita a quantidade de dígitos. */
+export function apenasDigitos(value: string, maxLen?: number): string {
+  const digits = value.replace(/\D/g, "");
+  return typeof maxLen === "number" && maxLen >= 0 ? digits.slice(0, maxLen) : digits;
 }
 
 /**
@@ -983,7 +984,7 @@ function parseCabosList(raw: unknown): CaboMetragemPayload[] {
     const metragemCalculada = calcularMetragemCaboTotal(marcacaoInicial, marcacaoFinal);
     return {
       id: cabo.id || crypto.randomUUID(),
-      tipoCabo: apenasDigitos(cabo.tipoCabo ?? ""),
+      tipoCabo: apenasDigitos(cabo.tipoCabo ?? "", 3),
       marcacaoInicial,
       marcacaoFinal,
       metragem: metragemCalculada || (cabo.metragem ?? ""),

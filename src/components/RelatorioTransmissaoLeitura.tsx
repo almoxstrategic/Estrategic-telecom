@@ -101,7 +101,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         (cabo, index) => (
         <Secao
           key={`re-aereo-${cabo.id}`}
-          titulo={`Cabo RE aéreo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          titulo={`Cabo RE aéreo ${index + 1} — ${cabo.tipoCabo || "n/d"} FO · ${cabo.metragem || "—"} m`}
           obs={[
             cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
             cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
@@ -115,7 +115,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
       {(payload?.lancamentoCabosRe?.subterraneo.metragens ?? []).map((cabo, index) => (
         <Secao
           key={`re-sub-${cabo.id}`}
-          titulo={`Cabo RE subterrâneo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          titulo={`Cabo RE subterrâneo ${index + 1} — ${cabo.tipoCabo || "n/d"} FO · ${cabo.metragem || "—"} m`}
           obs={[
             cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
             cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
@@ -184,7 +184,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
         (cabo, index) => (
         <Secao
           key={`rc-aereo-${cabo.id}`}
-          titulo={`Cabo RC aéreo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          titulo={`Cabo RC aéreo ${index + 1} — ${cabo.tipoCabo || "n/d"} FO · ${cabo.metragem || "—"} m`}
           obs={[
             cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
             cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,
@@ -198,7 +198,7 @@ export function RelatorioTransmissaoLeitura({ row }: { row: RelatorioTransmissao
       {(payload?.lancamentoCabosRc?.subterraneo.metragens ?? []).map((cabo, index) => (
         <Secao
           key={`rc-sub-${cabo.id}`}
-          titulo={`Cabo RC subterrâneo ${index + 1} — tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "—"} m`}
+          titulo={`Cabo RC subterrâneo ${index + 1} — ${cabo.tipoCabo || "n/d"} FO · ${cabo.metragem || "—"} m`}
           obs={[
             cabo.marcacaoInicial && `Inicial: ${cabo.marcacaoInicial} m`,
             cabo.marcacaoFinal && `Final: ${cabo.marcacaoFinal} m`,

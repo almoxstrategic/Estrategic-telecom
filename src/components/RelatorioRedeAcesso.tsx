@@ -1831,15 +1831,18 @@ export function RelatorioRedeAcesso({
                       ) : null}
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-sm font-semibold">Tipo do cabo</label>
+                      <label className="mb-1.5 block text-sm font-semibold">
+                        Tipo do FO (apenas número)
+                      </label>
                       <input
                         type="text"
                         inputMode="numeric"
+                        maxLength={3}
                         value={cabo.tipoCabo}
                         onChange={(e) =>
-                          onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value) })
+                          onPatchCabo(cabo.id, { tipoCabo: apenasDigitos(e.target.value, 3) })
                         }
-                        placeholder="Ex: 12"
+                        placeholder="Ex: 12 FO"
                         disabled={readOnly}
                         className={inputClass()}
                       />

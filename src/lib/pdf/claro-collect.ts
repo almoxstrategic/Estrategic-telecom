@@ -489,14 +489,15 @@ function collectCabos(
   if (!ativos.length) return;
   pushHeading(blocks, tituloSecao);
   for (const [index, cabo] of ativos.entries()) {
-    const label = `Cabo ${index + 1} - tipo ${cabo.tipoCabo || "n/d"} · ${cabo.metragem || "-"} m`;
+    const fo = cabo.tipoCabo.trim() || "n/d";
+    const label = `Cabo ${index + 1} - ${fo} FO · ${cabo.metragem || "-"} m`;
     const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
     const andamento = andamentoTexto(cabo.obs, cabo.obsAdmin);
     if (andamento) pushPara(children, andamento, "Andamento da Obra");
     pushKvGrid(
       children,
       [
-        { label: "Tipo do cabo", value: cabo.tipoCabo },
+        { label: "Tipo do FO", value: cabo.tipoCabo },
         { label: "Marcacao Inicial (m)", value: cabo.marcacaoInicial },
         { label: "Marcacao Final (m)", value: cabo.marcacaoFinal },
         { label: "Metragem Total (m)", value: cabo.metragem },

@@ -1696,7 +1696,7 @@ export function RelatorioDetalhe({
             next.metragem = calcularMetragemCaboTotal(next.marcacaoInicial, next.marcacaoFinal);
           }
           if ("tipoCabo" in patch && patch.tipoCabo != null) {
-            next.tipoCabo = apenasDigitos(patch.tipoCabo);
+            next.tipoCabo = apenasDigitos(patch.tipoCabo, 3);
           }
           return next;
         }),
@@ -1737,18 +1737,21 @@ export function RelatorioDetalhe({
         <div className="grid grid-cols-1 items-start gap-4 min-w-0 lg:grid-cols-2 lg:gap-6">
           <div className="min-w-0 space-y-3">
             <div>
-              <p className="text-xs text-gray-700">Tipo do cabo</p>
+              <p className="text-xs text-gray-700">Tipo do FO (apenas número)</p>
               <input
                 type="text"
                 inputMode="numeric"
+                maxLength={3}
                 autoComplete="off"
                 value={cabo.tipoCabo}
                 disabled={!canEditPhotos}
-                onChange={(e) => patchCaboCampos({ tipoCabo: e.target.value })}
-                onBlur={(e) =>
-                  patchCaboCampos({ tipoCabo: apenasDigitos(e.target.value) })
+                onChange={(e) =>
+                  patchCaboCampos({ tipoCabo: apenasDigitos(e.target.value, 3) })
                 }
-                placeholder="Ex: 12"
+                onBlur={(e) =>
+                  patchCaboCampos({ tipoCabo: apenasDigitos(e.target.value, 3) })
+                }
+                placeholder="Ex: 12 FO"
                 className={inputClassGestor()}
               />
             </div>
