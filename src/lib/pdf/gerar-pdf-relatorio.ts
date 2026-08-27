@@ -1060,8 +1060,8 @@ async function drawCaboResumoPair(
   titulo: string,
   re: PdfResumoCaboResumo,
   rc: PdfResumoCaboResumo,
+  opts?: { forceNewPage?: boolean },
 ): Promise<void> {
-  await drawResumoSectionTitle(ctx, titulo);
   const rows: [string, string, string][] = [
     ["Modelo do cabo", re.modelo, rc.modelo],
     ["Marcacao Inicial", re.marcacaoInicial, rc.marcacaoInicial],
@@ -1072,71 +1072,84 @@ async function drawCaboResumoPair(
   const labelW = CONTENT_W * 0.34;
   const valW = CONTENT_W * 0.33;
   const rowH = 14;
-  await ensureSpace(ctx, rowH + 4);
-  ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: topToPdfY(ctx.yFromTop + rowH),
-    width: CONTENT_W,
-    height: rowH,
-    color: COR_GRAY_ROW,
-  });
-  ctx.page.drawText(sanitizePdfText("Campo"), {
-    x: MARGIN_X + 3,
-    y: topToPdfY(ctx.yFromTop + 10),
-    size: 7,
-    font: ctx.fontBold,
-    color: COR_MUTED,
-  });
-  ctx.page.drawText(sanitizePdfText("RE"), {
-    x: MARGIN_X + labelW + 3,
-    y: topToPdfY(ctx.yFromTop + 10),
-    size: 7,
-    font: ctx.fontBold,
-    color: COR_MUTED,
-  });
-  ctx.page.drawText(sanitizePdfText("RC"), {
-    x: MARGIN_X + labelW + valW + 3,
-    y: topToPdfY(ctx.yFromTop + 10),
-    size: 7,
-    font: ctx.fontBold,
-    color: COR_MUTED,
-  });
-  ctx.yFromTop += rowH;
+  const titleH = 18 + 6;
+  const blockH = titleH + rowH + rows.length * rowH + 6;
 
-  for (const [lab, vRe, vRc] of rows) {
-    await ensureSpace(ctx, rowH + 2);
+  if (opts?.forceNewPage) {
+    await newPage(ctx, false);
+  } else {
+    await ensureSpace(ctx, blockH);
+  }
+
+  ctx.lockBreak = true;
+  try {
+    await drawResumoSectionTitle(ctx, titulo);
     ctx.page.drawRectangle({
       x: MARGIN_X,
       y: topToPdfY(ctx.yFromTop + rowH),
       width: CONTENT_W,
       height: rowH,
-      borderColor: COR_LINE,
-      borderWidth: 0.4,
+      color: COR_GRAY_ROW,
     });
-    ctx.page.drawText(truncate(lab, ctx.font, 7, labelW - 6), {
+    ctx.page.drawText(sanitizePdfText("Campo"), {
       x: MARGIN_X + 3,
       y: topToPdfY(ctx.yFromTop + 10),
       size: 7,
-      font: ctx.font,
-      color: COR_TEXTO,
+      font: ctx.fontBold,
+      color: COR_MUTED,
     });
-    ctx.page.drawText(truncate(vRe, ctx.font, 7, valW - 6), {
+    ctx.page.drawText(sanitizePdfText("RE"), {
       x: MARGIN_X + labelW + 3,
       y: topToPdfY(ctx.yFromTop + 10),
       size: 7,
-      font: ctx.font,
-      color: COR_TEXTO,
+      font: ctx.fontBold,
+      color: COR_MUTED,
     });
-    ctx.page.drawText(truncate(vRc, ctx.font, 7, valW - 6), {
+    ctx.page.drawText(sanitizePdfText("RC"), {
       x: MARGIN_X + labelW + valW + 3,
       y: topToPdfY(ctx.yFromTop + 10),
       size: 7,
-      font: ctx.font,
-      color: COR_TEXTO,
+      font: ctx.fontBold,
+      color: COR_MUTED,
     });
     ctx.yFromTop += rowH;
+
+    for (const [lab, vRe, vRc] of rows) {
+      ctx.page.drawRectangle({
+        x: MARGIN_X,
+        y: topToPdfY(ctx.yFromTop + rowH),
+        width: CONTENT_W,
+        height: rowH,
+        borderColor: COR_LINE,
+        borderWidth: 0.4,
+      });
+      ctx.page.drawText(truncate(lab, ctx.font, 7, labelW - 6), {
+        x: MARGIN_X + 3,
+        y: topToPdfY(ctx.yFromTop + 10),
+        size: 7,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+      ctx.page.drawText(truncate(vRe, ctx.font, 7, valW - 6), {
+        x: MARGIN_X + labelW + 3,
+        y: topToPdfY(ctx.yFromTop + 10),
+        size: 7,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+      ctx.page.drawText(truncate(vRc, ctx.font, 7, valW - 6), {
+        x: MARGIN_X + labelW + valW + 3,
+        y: topToPdfY(ctx.yFromTop + 10),
+        size: 7,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+      ctx.yFromTop += rowH;
+    }
+    ctx.yFromTop += 6;
+  } finally {
+    ctx.lockBreak = false;
   }
-  ctx.yFromTop += 6;
 }
 
 async function drawMedicoesTable(
@@ -1146,6 +1159,11 @@ async function drawMedicoesTable(
 ): Promise<void> {
   const rows = linhas.filter((l) => l.bloco === bloco);
   if (!rows.length) return;
+
+  if (bloco === "acessos") {
+    await drawMedicoesTableAcessosRc(ctx, rows);
+    return;
+  }
 
   await drawResumoSectionTitle(ctx, tituloBlocoResumo(bloco));
 
@@ -1254,6 +1272,89 @@ async function drawMedicoesTable(
   ctx.yFromTop += 8;
 }
 
+/** Acessos/equipamentos: só Rede Cliente — colunas Resumo RC + TOTAL. */
+async function drawMedicoesTableAcessosRc(
+  ctx: LayoutCtx,
+  rows: ResumoCadernoLinha[],
+): Promise<void> {
+  await drawResumoSectionTitle(ctx, tituloBlocoResumo("acessos"));
+
+  const colLabel = CONTENT_W * 0.72;
+  const colTotal = CONTENT_W * 0.28;
+  const headerH = 16;
+  const rowH = 13;
+
+  await ensureSpace(ctx, headerH + rowH + 4);
+  ctx.page.drawRectangle({
+    x: MARGIN_X,
+    y: topToPdfY(ctx.yFromTop + headerH),
+    width: CONTENT_W,
+    height: headerH,
+    color: COR_GRAY_ROW,
+  });
+  ctx.page.drawText(sanitizePdfText("Resumo RC"), {
+    x: MARGIN_X + 2,
+    y: topToPdfY(ctx.yFromTop + 11),
+    size: 6.5,
+    font: ctx.fontBold,
+    color: COR_MUTED,
+  });
+  ctx.page.drawText(sanitizePdfText("TOTAL"), {
+    x: MARGIN_X + colLabel + 2,
+    y: topToPdfY(ctx.yFromTop + 11),
+    size: 6.5,
+    font: ctx.fontBold,
+    color: COR_MUTED,
+  });
+  ctx.yFromTop += headerH;
+
+  for (let idx = 0; idx < rows.length; idx++) {
+    const row = rows[idx]!;
+    await ensureSpace(ctx, rowH + 2);
+    if (idx % 2 === 1) {
+      ctx.page.drawRectangle({
+        x: MARGIN_X,
+        y: topToPdfY(ctx.yFromTop + rowH),
+        width: CONTENT_W,
+        height: rowH,
+        color: rgb(0.98, 0.98, 0.98),
+      });
+    }
+    ctx.page.drawRectangle({
+      x: MARGIN_X,
+      y: topToPdfY(ctx.yFromTop + rowH),
+      width: CONTENT_W,
+      height: rowH,
+      borderColor: COR_LINE,
+      borderWidth: 0.35,
+    });
+
+    const label = row.labelRc ?? row.label;
+    const unidade = row.unidadeRc ?? row.unidade;
+    const valor = row.omitTotal ? row.rc : Number.isFinite(row.total) ? row.total : row.rc;
+    const valorTxt = formatResumoNumero(valor, unidade);
+    const valorComUn =
+      unidade === "SIM/NÃO" ? valorTxt : `${valorTxt} ${unidade}`.trim();
+
+    ctx.page.drawText(truncate(label, ctx.font, 6.5, colLabel - 4), {
+      x: MARGIN_X + 2,
+      y: topToPdfY(ctx.yFromTop + 9),
+      size: 6.5,
+      font: ctx.font,
+      color: COR_TEXTO,
+    });
+    ctx.page.drawText(truncate(valorComUn, ctx.fontBold, 6.5, colTotal - 4), {
+      x: MARGIN_X + colLabel + 2,
+      y: topToPdfY(ctx.yFromTop + 9),
+      size: 6.5,
+      font: ctx.fontBold,
+      color: COR_TEXTO,
+    });
+    ctx.yFromTop += rowH;
+  }
+  ctx.yFromTop += 8;
+}
+
 /**
  * Folha de rosto: Resumo Executivo consolidado (alimentado pela aba Medições + cadastro).
  * Pode ocupar 1–2 páginas; o detalhe fotográfico começa em página seguinte.
@@ -1282,6 +1383,7 @@ async function drawResumoExecutivo(ctx: LayoutCtx, data: PdfResumoExecutivo): Pr
     "Lançamento Subterrâneo — cabos (RE x RC)",
     data.caboSubRe,
     data.caboSubRc,
+    { forceNewPage: true },
   );
   await drawMedicoesTable(ctx, "subterraneo", data.linhas);
   await drawMedicoesTable(ctx, "acessos", data.linhas);
