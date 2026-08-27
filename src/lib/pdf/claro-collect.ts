@@ -60,10 +60,13 @@ export type PdfPotenciaCard = {
   padraoCoresFibra?: "br" | "eua";
 };
 
+export type PdfKvField = { label: string; value: string };
+
 export type PdfAtomicBlock =
   | { kind: "heading"; text: string }
   | { kind: "subheader"; text: string }
   | { kind: "paragraph"; text: string; label?: string }
+  | { kind: "kvGrid"; fields: PdfKvField[]; cols?: 2 | 3 | 4 }
   | { kind: "photos"; items: PdfPhotoItem[]; compact?: boolean }
   | { kind: "potenciaCard"; card: PdfPotenciaCard };
 
@@ -143,6 +146,22 @@ function pushPara(target: PdfAtomicBlock[], text: string, label?: string) {
   const t = text.trim();
   if (!t) return;
   target.push({ kind: "paragraph", text: t, label });
+}
+
+/** Grade compacta chave-valor (2–4 colunas) — evita empilhar metadados. */
+function pushKvGrid(
+  target: PdfAtomicBlock[],
+  fields: { label: string; value: string | null | undefined }[],
+  cols: 2 | 3 | 4 = 3,
+) {
+  const cleaned: PdfKvField[] = [];
+  for (const f of fields) {
+    const value = String(f.value ?? "").trim();
+    if (!value) continue;
+    cleaned.push({ label: f.label, value });
+  }
+  if (!cleaned.length) return;
+  target.push({ kind: "kvGrid", fields: cleaned, cols });
 }
 
 function pushPhotos(
@@ -249,13 +268,16 @@ function collectEquipamentoItensLista(
         text: `${opts.comIdentificacao ? "Equipamento" : "Roseta"} ${index + 1}`,
       },
     ];
-    pushPara(children, item.tipoEquipamento, "Tipo equipamento");
-    pushPara(children, item.modelo, "Modelo");
-    pushPara(children, item.fabricante, "Fabricante");
-    pushPara(children, item.sgp, "SGP");
+    const fields: { label: string; value: string }[] = [
+      { label: "Tipo", value: item.tipoEquipamento },
+      { label: "Modelo", value: item.modelo },
+      { label: "Fabricante", value: item.fabricante },
+      { label: "SGP", value: item.sgp },
+    ];
     if (opts.comIdentificacao && "identificacao" in item) {
-      pushPara(children, item.identificacao, "Identificacao");
+      fields.push({ label: "Identificacao", value: item.identificacao });
     }
+    pushKvGrid(children, fields, opts.comIdentificacao ? 3 : 4);
     const andamento = andamentoTexto(item.obs, item.obsAdmin);
     if (andamento) pushPara(children, andamento, "Andamento da Obra");
     const fotos: PdfPhotoItem[] = [];
@@ -275,7 +297,7 @@ function collectEquipamentoItensLista(
         caption: "",
       });
     }
-    if (fotos.length) children.push({ kind: "photos", items: fotos });
+    if (fotos.length) children.push({ kind: "photos", items: fotos, compact: true });
     pushGroup(blocks, children);
   }
 }
@@ -302,14 +324,22 @@ function collectCabos(
     const children: PdfAtomicBlock[] = [{ kind: "subheader", text: label }];
     const andamento = andamentoTexto(cabo.obs, cabo.obsAdmin);
     if (andamento) pushPara(children, andamento, "Andamento da Obra");
-    pushPara(children, cabo.marcacaoInicial, "Marcacao Inicial (m)");
-    pushPara(children, cabo.marcacaoFinal, "Marcacao Final (m)");
-    pushPara(children, cabo.metragem, "Metragem Total (m)");
+    pushKvGrid(
+      children,
+      [
+        { label: "Tipo do cabo", value: cabo.tipoCabo },
+        { label: "Marcacao Inicial (m)", value: cabo.marcacaoInicial },
+        { label: "Marcacao Final (m)", value: cabo.marcacaoFinal },
+        { label: "Metragem Total (m)", value: cabo.metragem },
+      ],
+      4,
+    );
     const fotos: PdfPhotoItem[] = [];
     if (hasPhoto(cabo.fotoInicio)) {
       fotos.push({
         url: resolvePhotoUrl(cabo.fotoInicio),
         path: cabo.fotoInicio?.path?.trim() || undefined,
+        title: "Foto Inicial",
         caption: label,
       });
     }
@@ -317,10 +347,11 @@ function collectCabos(
       fotos.push({
         url: resolvePhotoUrl(cabo.fotoFim),
         path: cabo.fotoFim?.path?.trim() || undefined,
+        title: "Foto Final",
         caption: label,
       });
     }
-    pushPhotos(children, fotos);
+    pushPhotos(children, fotos, { compact: true });
     pushGroup(blocks, children);
   }
 }
@@ -350,22 +381,33 @@ function collectOutras(
   pushGroup(blocks, children);
 }
 
-/** Emparelha 1550nm e 1330nm na mesma linha (grid 2 colunas). */
+/** Emparelha 1550nm e 1330nm: painel KV horizontal + prints em 2 colunas. */
 function appendParJanelasOpticas(
   target: PdfAtomicBlock[],
   pontoLabel: string,
   faixa1550: TesteOpticoFaixaPayload | undefined,
   faixa1330: TesteOpticoFaixaPayload | undefined,
+  numeroFibra?: number | null,
 ) {
   const children: PdfAtomicBlock[] = [{ kind: "subheader", text: pontoLabel }];
   const fotos: PdfPhotoItem[] = [];
 
+  const fields: { label: string; value: string }[] = [];
+  if (numeroFibra != null && Number.isFinite(numeroFibra)) {
+    fields.push({ label: "No Fibra", value: String(Math.trunc(numeroFibra)) });
+  }
+  if (faixa1550?.dbm?.trim()) {
+    fields.push({ label: "1550 nm", value: `${faixa1550.dbm.trim()} dBm` });
+  }
+  if (faixa1330?.dbm?.trim()) {
+    fields.push({ label: "1330 nm", value: `${faixa1330.dbm.trim()} dBm` });
+  }
+  pushKvGrid(children, fields, 3);
+
   const pushFaixa = (janela: string, faixa: TesteOpticoFaixaPayload | undefined) => {
     if (!faixa) return;
     const andamento = andamentoTexto(faixa.obs, faixa.obsAdmin);
-    const label = `${janela}`;
-    if (faixa.dbm.trim()) pushPara(children, `${faixa.dbm} dBm`, `${label} - Medicao`);
-    const items = toPhotoItems(faixa.fotos ?? [], { title: label, caption: andamento });
+    const items = toPhotoItems(faixa.fotos ?? [], { title: janela, caption: andamento });
     fotos.push(...items);
   };
 
@@ -394,7 +436,7 @@ function buildTesteOtdrAtoms(
   const children: PdfAtomicBlock[] = [{ kind: "heading", text: tituloSecao }];
 
   if (kmRaw) {
-    pushPara(children, `${kmRaw} km`, "Comprimento do trecho optico testado");
+    pushKvGrid(children, [{ label: "Comprimento do trecho optico testado", value: `${kmRaw} km` }], 2);
   }
 
   const fotos: PdfPhotoItem[] = [];
@@ -641,14 +683,12 @@ export function collectPdfBlocksEscopo(
     const to = p?.testeOptico;
     if (to) {
       const optico: PdfAtomicBlock[] = [{ kind: "heading", text: sec("2.1. Teste Optico") }];
-      if (to.cliente?.numeroFibra != null) {
-        pushPara(optico, String(to.cliente.numeroFibra), "No Fibra (Cliente)");
-      }
       appendParJanelasOpticas(
         optico,
         "No Cliente",
         to.cliente?.nm1550?.[0],
         to.cliente?.nm1330?.[0],
+        to.cliente?.numeroFibra,
       );
       if (optico.length > 1) pushGroup(blocks, optico);
     }
@@ -658,57 +698,87 @@ export function collectPdfBlocksEscopo(
   pushHeading(blocks, sec("3. Rede Externa (RE)"));
   {
     const meta: PdfAtomicBlock[] = [];
-    pushPara(meta, simNao(p?.lancamentoCabosRe?.aereo.isSim ?? p?.lancamentoRe), "Lancamento de cabos aereo (RE)");
-    pushPara(
+    pushKvGrid(
       meta,
-      simNao(p?.lancamentoCabosRe?.subterraneo.isSim),
-      "Lancamento de cabos subterraneo (RE)",
+      [
+        {
+          label: "Lancamento cabos aereo (RE)",
+          value: simNao(p?.lancamentoCabosRe?.aereo.isSim ?? p?.lancamentoRe),
+        },
+        {
+          label: "Lancamento cabos subterraneo (RE)",
+          value: simNao(p?.lancamentoCabosRe?.subterraneo.isSim),
+        },
+        {
+          label: "Fiberloop instalado (RE)",
+          value: simNao(p?.redeAcesso?.fiberloopInstalado?.isSim),
+        },
+        {
+          label: "Qtd. Fiberloop (RE)",
+          value:
+            p?.redeAcesso?.fiberloopInstalado?.isSim === true &&
+            p.redeAcesso.fiberloopInstalado.quantidade != null
+              ? String(p.redeAcesso.fiberloopInstalado.quantidade)
+              : "",
+        },
+        {
+          label: "Lancado cordoalha (RE)",
+          value: simNao(p?.redeAcesso?.cordoalhaLancada?.isSim),
+        },
+        {
+          label: "Qtd. cordoalha lancada (RE)",
+          value:
+            p?.redeAcesso?.cordoalhaLancada?.isSim === true &&
+            p.redeAcesso.cordoalhaLancada.quantidade != null
+              ? String(p.redeAcesso.cordoalhaLancada.quantidade)
+              : "",
+        },
+        {
+          label: "Cordoalha existente (RE)",
+          value: simNao(p?.redeAcesso?.cordoalhaExistente?.isSim),
+        },
+        {
+          label: "Postes nova cordoalha (RE)",
+          value: simNao(p?.redeAcesso?.postesNovaCordoalha?.isSim),
+        },
+        {
+          label: "Qtd. postes nova cordoalha (RE)",
+          value:
+            p?.redeAcesso?.postesNovaCordoalha?.isSim === true &&
+            p.redeAcesso.postesNovaCordoalha.quantidade != null
+              ? String(p.redeAcesso.postesNovaCordoalha.quantidade)
+              : "",
+        },
+        {
+          label: "Postes cordoalha existente (RE)",
+          value: simNao(p?.redeAcesso?.postesCordoalhaExistente?.isSim),
+        },
+        {
+          label: "Qtd. caixas aereo (RE)",
+          value:
+            p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.aereo != null
+              ? String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.aereo)
+              : "",
+        },
+        {
+          label: "Qtd. caixas subterraneo (RE)",
+          value:
+            p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.subterraneo != null
+              ? String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.subterraneo)
+              : "",
+        },
+        {
+          label: "Qtd. caixas de emenda (RE)",
+          value:
+            p?.redeAcesso?.qtdCaixasEmenda != null &&
+            p.redeAcesso.qtdCaixasEmendaPorAmbiente?.aereo == null &&
+            p.redeAcesso.qtdCaixasEmendaPorAmbiente?.subterraneo == null
+              ? String(p.redeAcesso.qtdCaixasEmenda)
+              : "",
+        },
+      ],
+      3,
     );
-    pushPara(meta, simNao(p?.redeAcesso?.fiberloopInstalado?.isSim), "Fiberloop instalado (RE)");
-    if (
-      p?.redeAcesso?.fiberloopInstalado?.isSim &&
-      p.redeAcesso.fiberloopInstalado.quantidade != null
-    ) {
-      pushPara(meta, String(p.redeAcesso.fiberloopInstalado.quantidade), "Qtd. Fiberloop (RE)");
-    }
-    pushPara(meta, simNao(p?.redeAcesso?.cordoalhaLancada?.isSim), "Lancado cordoalha (RE)");
-    if (p?.redeAcesso?.cordoalhaLancada?.isSim && p.redeAcesso.cordoalhaLancada.quantidade != null) {
-      pushPara(meta, String(p.redeAcesso.cordoalhaLancada.quantidade), "Qtd. cordoalha lancada (RE)");
-    }
-    pushPara(meta, simNao(p?.redeAcesso?.cordoalhaExistente?.isSim), "Cordoalha existente (RE)");
-    pushPara(meta, simNao(p?.redeAcesso?.postesNovaCordoalha?.isSim), "Postes novo com nova cordoalha (RE)");
-    if (
-      p?.redeAcesso?.postesNovaCordoalha?.isSim &&
-      p.redeAcesso.postesNovaCordoalha.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeAcesso.postesNovaCordoalha.quantidade),
-        "Qtd. postes com nova cordoalha (RE)",
-      );
-    }
-    pushPara(
-      meta,
-      simNao(p?.redeAcesso?.postesCordoalhaExistente?.isSim),
-      "Postes com cordoalha existente (RE)",
-    );
-    if (p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.aereo != null) {
-      pushPara(meta, String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.aereo), "Qtd. caixas aereo (RE)");
-    }
-    if (p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.subterraneo != null) {
-      pushPara(
-        meta,
-        String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.subterraneo),
-        "Qtd. caixas subterraneo (RE)",
-      );
-    }
-    if (
-      p?.redeAcesso?.qtdCaixasEmenda != null &&
-      p.redeAcesso.qtdCaixasEmendaPorAmbiente?.aereo == null &&
-      p.redeAcesso.qtdCaixasEmendaPorAmbiente?.subterraneo == null
-    ) {
-      pushPara(meta, String(p.redeAcesso.qtdCaixasEmenda), "Qtd. caixas de emenda");
-    }
     for (const b of meta) blocks.push(b);
   }
   if (p?.lancamentoCabosRe?.aereo.isSim === true) {
@@ -735,51 +805,72 @@ export function collectPdfBlocksEscopo(
   pushHeading(blocks, sec("4. Rede Cliente (RC)"));
   {
     const meta: PdfAtomicBlock[] = [];
-    pushPara(meta, p?.tecnologiaAcesso?.trim() || "-", "Tecnologia de Acesso");
-    pushPara(meta, simNao(p?.lancamentoCabosRc?.aereo.isSim ?? p?.lancamentoRc), "Lancamento de cabos aereo (RC)");
-    pushPara(
+    pushKvGrid(
       meta,
-      simNao(p?.lancamentoCabosRc?.subterraneo.isSim),
-      "Lancamento de cabos subterraneo (RC)",
+      [
+        { label: "Tecnologia de Acesso", value: p?.tecnologiaAcesso?.trim() || "-" },
+        {
+          label: "Lancamento cabos aereo (RC)",
+          value: simNao(p?.lancamentoCabosRc?.aereo.isSim ?? p?.lancamentoRc),
+        },
+        {
+          label: "Lancamento cabos subterraneo (RC)",
+          value: simNao(p?.lancamentoCabosRc?.subterraneo.isSim),
+        },
+        {
+          label: "Fiberloop instalado (RC)",
+          value: simNao(p?.redeCliente?.fiberloopInstalado?.isSim),
+        },
+        {
+          label: "Qtd. Fiberloop (RC)",
+          value:
+            p?.redeCliente?.fiberloopInstalado?.isSim === true &&
+            p.redeCliente.fiberloopInstalado.quantidade != null
+              ? String(p.redeCliente.fiberloopInstalado.quantidade)
+              : "",
+        },
+        {
+          label: "Lancado cordoalha (RC)",
+          value: simNao(p?.redeCliente?.cordoalhaLancada?.isSim),
+        },
+        {
+          label: "Qtd. cordoalha lancada (RC)",
+          value:
+            p?.redeCliente?.cordoalhaLancada?.isSim === true &&
+            p.redeCliente.cordoalhaLancada.quantidade != null
+              ? String(p.redeCliente.cordoalhaLancada.quantidade)
+              : "",
+        },
+        {
+          label: "Cordoalha existente (RC)",
+          value: simNao(p?.redeCliente?.cordoalhaExistente?.isSim),
+        },
+        {
+          label: "Postes nova cordoalha (RC)",
+          value: simNao(p?.redeCliente?.postesNovaCordoalha?.isSim),
+        },
+        {
+          label: "Qtd. postes nova cordoalha (RC)",
+          value:
+            p?.redeCliente?.postesNovaCordoalha?.isSim === true &&
+            p.redeCliente.postesNovaCordoalha.quantidade != null
+              ? String(p.redeCliente.postesNovaCordoalha.quantidade)
+              : "",
+        },
+        {
+          label: "Postes cordoalha existente (RC)",
+          value: simNao(p?.redeCliente?.postesCordoalhaExistente?.isSim),
+        },
+        {
+          label: "Qtd. caixas de emenda (RC)",
+          value:
+            p?.redeCliente?.qtdCaixasEmenda != null
+              ? String(p.redeCliente.qtdCaixasEmenda)
+              : "",
+        },
+      ],
+      3,
     );
-    pushPara(meta, simNao(p?.redeCliente?.fiberloopInstalado?.isSim), "Fiberloop instalado (RC)");
-    if (
-      p?.redeCliente?.fiberloopInstalado?.isSim &&
-      p.redeCliente.fiberloopInstalado.quantidade != null
-    ) {
-      pushPara(meta, String(p.redeCliente.fiberloopInstalado.quantidade), "Qtd. Fiberloop (RC)");
-    }
-    pushPara(meta, simNao(p?.redeCliente?.cordoalhaLancada?.isSim), "Lancado cordoalha (RC)");
-    if (
-      p?.redeCliente?.cordoalhaLancada?.isSim &&
-      p.redeCliente.cordoalhaLancada.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeCliente.cordoalhaLancada.quantidade),
-        "Qtd. cordoalha lancada (RC)",
-      );
-    }
-    pushPara(meta, simNao(p?.redeCliente?.cordoalhaExistente?.isSim), "Cordoalha existente (RC)");
-    pushPara(meta, simNao(p?.redeCliente?.postesNovaCordoalha?.isSim), "Postes novo com nova cordoalha (RC)");
-    if (
-      p?.redeCliente?.postesNovaCordoalha?.isSim &&
-      p.redeCliente.postesNovaCordoalha.quantidade != null
-    ) {
-      pushPara(
-        meta,
-        String(p.redeCliente.postesNovaCordoalha.quantidade),
-        "Qtd. postes com nova cordoalha (RC)",
-      );
-    }
-    pushPara(
-      meta,
-      simNao(p?.redeCliente?.postesCordoalhaExistente?.isSim),
-      "Postes com cordoalha existente (RC)",
-    );
-    if (p?.redeCliente?.qtdCaixasEmenda != null) {
-      pushPara(meta, String(p.redeCliente.qtdCaixasEmenda), "Qtd. caixas de emenda (RC)");
-    }
     for (const b of meta) blocks.push(b);
   }
   if (p?.lancamentoCabosRc?.aereo.isSim === true) {
@@ -833,10 +924,14 @@ export function collectPdfBlocksEscopo(
     pushHeading(blocks, sec("6. Equipamentos na Estacao/PPC"));
     {
       const meta: PdfAtomicBlock[] = [];
-      pushPara(meta, simNao(p.relatorioEstacao), "Relatorio fotografico da estacao");
-      if (p.estacaoEntregaAcesso?.trim()) {
-        pushPara(meta, p.estacaoEntregaAcesso, "Estacao / entrega de acesso");
-      }
+      pushKvGrid(
+        meta,
+        [
+          { label: "Relatorio fotografico da estacao", value: simNao(p.relatorioEstacao) },
+          { label: "Estacao / entrega de acesso", value: p.estacaoEntregaAcesso },
+        ],
+        2,
+      );
       for (const b of meta) blocks.push(b);
     }
     collectGruposEmGrade(blocks, [

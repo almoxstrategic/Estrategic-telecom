@@ -52,6 +52,8 @@ const COR_LINE = rgb(0.86, 0.88, 0.9);
 const COR_HEADER_BAR = rgb(0.18, 0.22, 0.25);
 const COR_YELLOW = rgb(0.996, 0.953, 0.78);
 const COR_GRAY_ROW = rgb(0.94, 0.94, 0.94);
+/** Fundo sutil do painel chave-valor compacto (#f8f9fa). */
+const COR_KV_BG = rgb(0.973, 0.976, 0.98);
 const COR_OK = rgb(0.09, 0.55, 0.27);
 const COR_NOK = rgb(0.75, 0.1, 0.1);
 
@@ -470,19 +472,75 @@ async function drawHeading(ctx: LayoutCtx, text: string): Promise<void> {
 }
 
 async function drawSubheader(ctx: LayoutCtx, text: string): Promise<void> {
-  const lines = wrapText(text, ctx.fontBold, 10, CONTENT_W);
-  await ensureSpace(ctx, lines.length * 13 + 8);
+  const lines = wrapText(text, ctx.fontBold, 9.5, CONTENT_W);
+  await ensureSpace(ctx, lines.length * 12 + 4);
   for (const line of lines) {
     ctx.page.drawText(line, {
       x: MARGIN_X,
-      y: topToPdfY(ctx.yFromTop + 11),
-      size: 10,
+      y: topToPdfY(ctx.yFromTop + 10),
+      size: 9.5,
       font: ctx.fontBold,
       color: COR_TEXTO,
     });
-    ctx.yFromTop += 13;
+    ctx.yFromTop += 12;
   }
-  ctx.yFromTop += 6;
+  ctx.yFromTop += 3;
+}
+
+function measureKvGrid(fields: { label: string; value: string }[], cols: number): number {
+  if (!fields.length) return 0;
+  const rows = Math.ceil(fields.length / cols);
+  const rowH = 28;
+  const pad = 6;
+  return pad * 2 + rows * rowH + 4;
+}
+
+async function drawKvGrid(
+  ctx: LayoutCtx,
+  fields: { label: string; value: string }[],
+  cols: 2 | 3 | 4 = 3,
+): Promise<void> {
+  if (!fields.length) return;
+  const gap = 6;
+  const pad = 6;
+  const rowH = 28;
+  const rows = Math.ceil(fields.length / cols);
+  const blockH = pad * 2 + rows * rowH;
+  await ensureSpace(ctx, blockH + 4);
+
+  ctx.page.drawRectangle({
+    x: MARGIN_X,
+    y: topToPdfY(ctx.yFromTop + blockH),
+    width: CONTENT_W,
+    height: blockH,
+    color: COR_KV_BG,
+    borderColor: COR_LINE,
+    borderWidth: 0.4,
+  });
+
+  const colW = (CONTENT_W - pad * 2 - gap * (cols - 1)) / cols;
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i]!;
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = MARGIN_X + pad + col * (colW + gap);
+    const y = ctx.yFromTop + pad + row * rowH;
+    ctx.page.drawText(truncate(field.label, ctx.fontBold, 6.5, colW - 2), {
+      x,
+      y: topToPdfY(y + 9),
+      size: 6.5,
+      font: ctx.fontBold,
+      color: COR_MUTED,
+    });
+    ctx.page.drawText(truncate(field.value, ctx.font, 9, colW - 2), {
+      x,
+      y: topToPdfY(y + 21),
+      size: 9,
+      font: ctx.font,
+      color: COR_TEXTO,
+    });
+  }
+  ctx.yFromTop += blockH + 4;
 }
 
 async function drawParagraph(ctx: LayoutCtx, text: string, label?: string): Promise<void> {
@@ -642,7 +700,7 @@ async function drawPhotos(
 }
 
 function measureSubheader(text: string, font: PDFFont): number {
-  return wrapText(text, font, 10, CONTENT_W).length * 13 + 6;
+  return wrapText(text, font, 9.5, CONTENT_W).length * 12 + 3;
 }
 
 function measureParagraph(text: string, font: PDFFont, label?: string): number {
@@ -676,6 +734,7 @@ async function measureGroupHeight(
   for (const child of children) {
     if (child.kind === "subheader") h += measureSubheader(child.text, ctx.fontBold);
     else if (child.kind === "paragraph") h += measureParagraph(child.text, ctx.font, child.label);
+    else if (child.kind === "kvGrid") h += measureKvGrid(child.fields, child.cols ?? 3);
     else if (child.kind === "photos") {
       h += measurePhotos(child.items, child.compact);
     } else if (child.kind === "potenciaCard") h += measurePotenciaCard(child.card);
@@ -906,6 +965,7 @@ async function drawAtomic(ctx: LayoutCtx, block: PdfAtomicBlock): Promise<void> 
   if (block.kind === "heading") await drawHeading(ctx, block.text);
   else if (block.kind === "subheader") await drawSubheader(ctx, block.text);
   else if (block.kind === "paragraph") await drawParagraph(ctx, block.text, block.label);
+  else if (block.kind === "kvGrid") await drawKvGrid(ctx, block.fields, block.cols ?? 3);
   else if (block.kind === "photos") await drawPhotos(ctx, block.items, block.compact);
   else if (block.kind === "potenciaCard") await drawPotenciaCard(ctx, block.card);
 }
