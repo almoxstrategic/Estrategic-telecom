@@ -14,10 +14,18 @@ import type {
   PendenciaItemDef,
   PendenciaBlocoId,
 } from "@/lib/pendencias-itens";
-import { countPendenciasNoBloco } from "@/lib/pendencias-itens";
+import {
+  countPendenciasNoBloco,
+  resolvePendenciaNavTargets,
+} from "@/lib/pendencias-itens";
 
 type AbaController = {
   setAba: (aba: PendenciaAba) => void;
+  /**
+   * Troca Áereo/Subterrâneo (e estado necessário) para o cabo ficar montado no DOM
+   * antes do scrollIntoView.
+   */
+  ensureCaboVisible?: (aba: "RE" | "RC", caboId: string) => void;
 };
 
 type PendenciasContextValue = {
@@ -100,10 +108,44 @@ export function PendenciasProvider({
   }, []);
 
   const goToItem = useCallback((item: PendenciaItem | PendenciaItemDef) => {
-    abaCtrlRef.current?.setAba(item.aba);
+    const targets = resolvePendenciaNavTargets(item);
+    const ctrl = abaCtrlRef.current;
+    ctrl?.setAba(item.aba);
+    if (targets.metragem) {
+      ctrl?.ensureCaboVisible?.(targets.metragem.aba, targets.metragem.caboId);
+    }
+
+    const primary = targets.candidates[0] ?? item.anchorId;
+    const fallbackIds = [
+      ...targets.candidates.slice(1),
+      ...targets.fallbackSectionIds,
+    ];
+
+    // Delay maior: troca de aba + ambiente (aéreo/sub) precisa remontar o card.
     window.setTimeout(() => {
-      navegarParaSecaoFormulario(item.anchorId);
-    }, 120);
+      // Abre a seção pai cedo (accordion), mesmo se o cabo ainda não montou.
+      for (const sectionId of targets.fallbackSectionIds) {
+        const section = document.getElementById(sectionId);
+        if (section instanceof HTMLDetailsElement) section.open = true;
+        else if (section) {
+          let node: HTMLElement | null = section;
+          while (node) {
+            if (node instanceof HTMLDetailsElement) {
+              node.open = true;
+              break;
+            }
+            node = node.parentElement;
+          }
+        }
+      }
+
+      navegarParaSecaoFormulario(primary, {
+        itemId: item.itemId,
+        fallbackIds,
+        retries: 8,
+        retryDelayMs: 120,
+      });
+    }, targets.metragem ? 180 : 120);
   }, []);
 
   const value = useMemo<PendenciasContextValue>(

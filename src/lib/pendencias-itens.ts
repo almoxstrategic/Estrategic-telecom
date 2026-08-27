@@ -37,6 +37,11 @@ const SECAO_POR_SECTION: Record<string, string> = {
   outras: "Outras fotos",
 };
 
+/** Sanitiza string para uso seguro como `id` no DOM. */
+export function sanitizePendenciaDomId(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
 export function buildPendenciaItem(opts: {
   aba: PendenciaAba;
   secao: string;
@@ -48,7 +53,53 @@ export function buildPendenciaItem(opts: {
     itemId,
     label: `${opts.secao} - ${opts.subbloco}`,
     aba: opts.aba,
-    anchorId: `pendencia-${itemId.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
+    anchorId: `pendencia-${sanitizePendenciaDomId(itemId)}`,
+  };
+}
+
+/** Âncora estável do card de metragem (independe do índice na lista). */
+export function anchorIdMetragemCabo(aba: "RE" | "RC", caboId: string): string {
+  return `pendencia-metragem-${aba}-${sanitizePendenciaDomId(caboId)}`;
+}
+
+export function parseMetragemCaboItemId(
+  itemId: string,
+): { aba: "RE" | "RC"; caboId: string } | null {
+  const m = itemId.match(/^(RE|RC)\.lancamento\.metragem\.(.+)$/);
+  if (!m) return null;
+  const caboId = m[2]?.trim();
+  if (!caboId) return null;
+  return { aba: m[1] as "RE" | "RC", caboId };
+}
+
+/** Candidatos de id DOM + fallback de seção para navegação do sininho. */
+export function resolvePendenciaNavTargets(item: {
+  itemId: string;
+  anchorId: string;
+}): {
+  candidates: string[];
+  fallbackSectionIds: string[];
+  metragem: { aba: "RE" | "RC"; caboId: string } | null;
+} {
+  const candidates: string[] = [];
+  const push = (id: string | null | undefined) => {
+    const v = id?.trim();
+    if (!v || candidates.includes(v)) return;
+    candidates.push(v);
+  };
+
+  const metragem = parseMetragemCaboItemId(item.itemId);
+  if (metragem) {
+    push(anchorIdMetragemCabo(metragem.aba, metragem.caboId));
+    // Formato legado gerado por buildPendenciaItem.
+    push(`pendencia-${sanitizePendenciaDomId(item.itemId)}`);
+  }
+  push(item.anchorId);
+
+  return {
+    candidates,
+    fallbackSectionIds: metragem ? ["secao-cabos"] : [],
+    metragem,
   };
 }
 
@@ -87,12 +138,13 @@ export function pendenciaMetragemCabo(opts: {
   caboId: string;
   index: number;
 }): PendenciaItemDef {
-  return buildPendenciaItem({
+  const itemId = `${opts.aba}.lancamento.metragem.${opts.caboId}`;
+  return {
+    itemId,
+    label: `Lançamento (${opts.aba}) - Metragem de cabo (Cabo ${opts.index + 1})`,
     aba: opts.aba,
-    secao: `Lançamento (${opts.aba})`,
-    subbloco: `Metragem de cabo (Cabo ${opts.index + 1})`,
-    key: `lancamento.metragem.${opts.caboId}`,
-  });
+    anchorId: anchorIdMetragemCabo(opts.aba, opts.caboId),
+  };
 }
 
 export function pendenciaPergunta(opts: {

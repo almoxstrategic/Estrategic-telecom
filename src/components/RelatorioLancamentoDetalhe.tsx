@@ -1010,12 +1010,6 @@ export function RelatorioDetalhe({
     {},
   );
   const pendenciasCtx = usePendencias();
-  useEffect(() => {
-    pendenciasCtx?.registerAbaController({
-      setAba: (aba) => setAbaAtiva(aba as AbaCampo),
-    });
-    return () => pendenciasCtx?.registerAbaController(null);
-  }, [pendenciasCtx]);
   const isEmpresarial = row.tipo_execucao === "empresarial";
   const isImplantacao = row.tipo_execucao === "implantacao";
   const abasVisiveis = isEmpresarial
@@ -1082,6 +1076,32 @@ export function RelatorioDetalhe({
   const patchPayload = (next: RelatorioPayload) => {
     onUpdatePayload?.(next);
   };
+
+  useEffect(() => {
+    pendenciasCtx?.registerAbaController({
+      setAba: (aba) => setAbaAtiva(aba as AbaCampo),
+      ensureCaboVisible: (aba, caboId) => {
+        const dual = aba === "RE" ? lancamentoCabosRe : lancamentoCabosRc;
+        const ambientes: AmbienteRede[] = ["aereo", "subterraneo"];
+        for (const ambiente of ambientes) {
+          if (!dual[ambiente].metragens.some((c) => c.id === caboId)) continue;
+          if (aba === "RE") {
+            setAbaLancamentoRe(ambiente);
+            if (payload && payload.lancamentoReAmbiente !== ambiente) {
+              patchPayload({ ...payload, lancamentoReAmbiente: ambiente });
+            }
+          } else {
+            setAbaLancamentoRc(ambiente);
+            if (payload && payload.lancamentoRcAmbiente !== ambiente) {
+              patchPayload({ ...payload, lancamentoRcAmbiente: ambiente });
+            }
+          }
+          return;
+        }
+      },
+    });
+    return () => pendenciasCtx?.registerAbaController(null);
+  }, [pendenciasCtx, lancamentoCabosRe, lancamentoCabosRc, payload, onUpdatePayload]);
 
   const patchLancamentoCabos = (
     dualKey: "lancamentoCabosRe" | "lancamentoCabosRc",

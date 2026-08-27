@@ -230,14 +230,21 @@ function DadoObraCampo({
 
 type FotoGrupoUi = { slots: FotoSlot[]; obs: string; obsAdmin: string };
 
-function PendenciasAbaBridge({ setAba }: { setAba: (aba: AbaCampo) => void }) {
+function PendenciasAbaBridge({
+  setAba,
+  ensureCaboVisible,
+}: {
+  setAba: (aba: AbaCampo) => void;
+  ensureCaboVisible?: (aba: "RE" | "RC", caboId: string) => void;
+}) {
   const ctx = usePendencias();
   useEffect(() => {
     ctx?.registerAbaController({
       setAba: (aba) => setAba(aba as AbaCampo),
+      ensureCaboVisible,
     });
     return () => ctx?.registerAbaController(null);
-  }, [ctx, setAba]);
+  }, [ctx, setAba, ensureCaboVisible]);
   return null;
 }
 
@@ -1500,6 +1507,20 @@ function RelatorioPage() {
     void navigate({ to: "/relatorio", search: {} });
   }, [navigate]);
 
+  const ensureCaboVisible = useCallback(
+    (aba: "RE" | "RC", caboId: string) => {
+      const dual = aba === "RE" ? lancamentoCabosRe : lancamentoCabosRc;
+      const ambientes: AmbienteRede[] = ["aereo", "subterraneo"];
+      for (const ambiente of ambientes) {
+        if (!dual[ambiente].metragens.some((c) => c.id === caboId)) continue;
+        if (aba === "RE") setLancamentoReAmbiente(ambiente);
+        else setLancamentoRcAmbiente(ambiente);
+        return;
+      }
+    },
+    [lancamentoCabosRe, lancamentoCabosRc],
+  );
+
   if (loadingById) {
     return (
       <div className="min-h-screen bg-surface">
@@ -1537,7 +1558,7 @@ function RelatorioPage() {
 
   return (
     <PendenciasProvider mode="tecnico" confirmed={pendenciasItens}>
-    <PendenciasAbaBridge setAba={setAbaCampo} />
+    <PendenciasAbaBridge setAba={setAbaCampo} ensureCaboVisible={ensureCaboVisible} />
     <div className="min-h-screen bg-surface">
       <AppHeader sticky={!headerRolaComPagina} />
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-4">

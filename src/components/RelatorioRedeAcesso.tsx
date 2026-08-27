@@ -27,6 +27,7 @@ import {
   countPendenciasNaAba,
   indiceBlocoTemPendencia,
   indiceSubitemTemPendencia,
+  resolvePendenciaNavTargets,
   type IndicePendenciaMatch,
   type PendenciaBlocoId,
   type PendenciaIndiceRef,
@@ -995,8 +996,21 @@ export function RelatorioAbasCampo({
         pendenciasCtx.goToItem(item);
         return;
       }
+      const targets = resolvePendenciaNavTargets(item);
       onChange(item.aba as AbaCampo);
-      window.setTimeout(() => navegarParaSecaoFormulario(item.anchorId), 120);
+      const primary = targets.candidates[0] ?? item.anchorId;
+      const fallbackIds = [
+        ...targets.candidates.slice(1),
+        ...targets.fallbackSectionIds,
+      ];
+      window.setTimeout(() => {
+        navegarParaSecaoFormulario(primary, {
+          itemId: item.itemId,
+          fallbackIds,
+          retries: 8,
+          retryDelayMs: 120,
+        });
+      }, 160);
     },
     [onChange, pendenciasCtx],
   );
