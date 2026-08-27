@@ -234,12 +234,181 @@ function collectGruposEmGrade(
   pushGroup(blocks, [{ kind: "photos", items: fotos }]);
 }
 
+function grupoTemEvidencia(grupo: FotoGrupoPayload | null | undefined): boolean {
+  if (!grupo) return false;
+  return (
+    (grupo.fotos ?? []).some((f) => hasPhoto(f)) ||
+    Boolean(andamentoTexto(grupo.obs, grupo.obsAdmin))
+  );
+}
+
+function formatCoords(coords: { latitude?: string; longitude?: string } | null | undefined): string {
+  const lat = coords?.latitude?.trim() ?? "";
+  const lng = coords?.longitude?.trim() ?? "";
+  if (!lat && !lng) return "";
+  return `${lat || "—"}, ${lng || "—"}`;
+}
+
+/**
+ * Card de evidência: subtítulo + metadados (kv) + fotos + OBS.
+ * Mantém tudo do bloco junto (page-break-inside via group).
+ */
+function collectEvidenciaCard(
+  blocks: PdfContentBlock[],
+  titulo: string,
+  opts: {
+    fields?: { label: string; value: string | null | undefined }[];
+    cols?: 2 | 3 | 4;
+    fotos?: PdfPhotoItem[];
+    obs?: string;
+    compactPhotos?: boolean;
+  },
+) {
+  const fields = (opts.fields ?? []).filter((f) => String(f.value ?? "").trim());
+  const fotos = (opts.fotos ?? []).filter((i) => i.url.trim() || i.path?.trim());
+  const obs = opts.obs?.trim() ?? "";
+  if (!fields.length && !fotos.length && !obs) return;
+
+  const children: PdfAtomicBlock[] = [{ kind: "subheader", text: titulo }];
+  if (fields.length) pushKvGrid(children, fields, opts.cols ?? 3);
+  if (obs) pushPara(children, obs, "OBS");
+  if (fotos.length) pushPhotos(children, fotos, { compact: opts.compactPhotos ?? true });
+  pushGroup(blocks, children);
+}
+
+function collectGrupoCard(
+  blocks: PdfContentBlock[],
+  titulo: string,
+  grupo: FotoGrupoPayload | null | undefined,
+  extraFields?: { label: string; value: string | null | undefined }[],
+) {
+  if (!grupoTemEvidencia(grupo) && !(extraFields ?? []).some((f) => String(f.value ?? "").trim())) {
+    return;
+  }
+  const fotos = toPhotoItems((grupo?.fotos ?? []).filter((f) => hasPhoto(f)), {
+    title: titulo,
+    caption: "",
+  });
+  collectEvidenciaCard(blocks, titulo, {
+    fields: extraFields,
+    fotos,
+    obs: andamentoTexto(grupo?.obs, grupo?.obsAdmin),
+    compactPhotos: true,
+  });
+}
+
+function collectGruposCards(
+  blocks: PdfContentBlock[],
+  itens: {
+    titulo: string;
+    grupo: FotoGrupoPayload | null | undefined;
+    fields?: { label: string; value: string | null | undefined }[];
+  }[],
+) {
+  for (const item of itens) {
+    collectGrupoCard(blocks, item.titulo, item.grupo, item.fields);
+  }
+}
+
+/**
+ * Caixa de emenda unificada: dados + Foto da caixa | Plaqueta + OBS (por ambiente).
+ */
+function collectCaixaEmendaUnificada(
+  blocks: PdfContentBlock[],
+  tituloBase: string,
+  caixa: FotoGrupoPorAmbientePayload | FotoGrupoPayload | null | undefined,
+  plaqueta: FotoGrupoPorAmbientePayload | FotoGrupoPayload | null | undefined,
+  opts?: {
+    qtdPorAmbiente?: { aereo: number | null; subterraneo: number | null };
+    coordsPorAmbiente?: {
+      aereo?: { latitude: string; longitude: string };
+      subterraneo?: { latitude: string; longitude: string };
+    };
+    caixaExistente?: boolean | null;
+  },
+) {
+  const ambientes: { key: "aereo" | "subterraneo"; label: string }[] = [
+    { key: "aereo", label: "Aereo" },
+    { key: "subterraneo", label: "Subterraneo" },
+  ];
+
+  const slice = (
+    g: FotoGrupoPorAmbientePayload | FotoGrupoPayload | null | undefined,
+    key: "aereo" | "subterraneo",
+  ): FotoGrupoPayload | null => {
+    if (!g) return null;
+    if (looksLikeFotoGrupoPorAmbiente(g)) return g[key] ?? null;
+    // Payload flat legado: trata como aéreo.
+    return key === "aereo" ? g : null;
+  };
+
+  let any = false;
+  for (const amb of ambientes) {
+    const caixaSlice = slice(caixa, amb.key);
+    const plaqSlice = slice(plaqueta, amb.key);
+    const fotoCaixa = (caixaSlice?.fotos ?? []).find((f) => hasPhoto(f)) ?? null;
+    const fotoPlaq = (plaqSlice?.fotos ?? []).find((f) => hasPhoto(f)) ?? null;
+    const obs = andamentoTexto(caixaSlice?.obs, caixaSlice?.obsAdmin);
+    const qtd = opts?.qtdPorAmbiente?.[amb.key];
+    const coords = formatCoords(opts?.coordsPorAmbiente?.[amb.key]);
+
+    if (!fotoCaixa && !fotoPlaq && !obs && qtd == null && !coords) continue;
+
+    const fields: { label: string; value: string | null | undefined }[] = [
+      { label: "Ambiente", value: amb.label },
+      {
+        label: "Caixa de emenda existente?",
+        value: opts?.caixaExistente == null ? "" : simNao(opts.caixaExistente),
+      },
+      { label: "Qtd. caixas de emenda", value: qtd != null ? String(qtd) : "" },
+      { label: "Coordenadas", value: coords },
+    ];
+
+    const fotos: PdfPhotoItem[] = [];
+    if (fotoCaixa) {
+      fotos.push({
+        url: resolvePhotoUrl(fotoCaixa),
+        path: fotoCaixa.path?.trim() || undefined,
+        title: "Foto da caixa",
+        caption: "",
+      });
+    }
+    if (fotoPlaq) {
+      fotos.push({
+        url: resolvePhotoUrl(fotoPlaq),
+        path: fotoPlaq.path?.trim() || undefined,
+        title: "Etiqueta / Plaqueta de Identificacao",
+        caption: "",
+      });
+    }
+
+    collectEvidenciaCard(blocks, `${tituloBase} (${amb.label})`, {
+      fields,
+      cols: 3,
+      fotos,
+      obs,
+      compactPhotos: true,
+    });
+    any = true;
+  }
+
+  // Se só há caixa flat sem ambiente e nada foi emitido, tenta um card único.
+  if (!any && caixa && !looksLikeFotoGrupoPorAmbiente(caixa)) {
+    collectGrupoCard(blocks, tituloBase, caixa, [
+      {
+        label: "Caixa de emenda existente?",
+        value: opts?.caixaExistente == null ? "" : simNao(opts.caixaExistente),
+      },
+    ]);
+  }
+}
+
 function collectGrupo(
   blocks: PdfContentBlock[],
   titulo: string,
   grupo: FotoGrupoPayload | null | undefined,
 ) {
-  collectGruposEmGrade(blocks, [{ titulo, grupo }]);
+  collectGrupoCard(blocks, titulo, grupo);
 }
 
 function collectEquipamentoItensLista(
@@ -588,61 +757,57 @@ function collectTestePotenciaTabelas(
 }
 
 /**
- * Une titulo de secao (+ paragrafos soltos) ao proximo grupo/bloco de corpo,
- * evitando orfaos (titulo sozinho no fim da pagina).
- * Encadeia titulos consecutivos (ex.: "1. RE" + "Metragem...") ate o 1o grupo.
+ * Une cada título de seção ao conteúdo seguinte (até o próximo título),
+ * equivalente a break-inside: avoid / break-after: avoid no título.
+ * Encadeia títulos consecutivos (ex.: "3. RE" + "Lançamento (RE)") com o 1º bloco de corpo.
  */
 export function coalesceSectionLeads(blocks: PdfContentBlock[]): PdfContentBlock[] {
   const out: PdfContentBlock[] = [];
-  let pending: PdfAtomicBlock[] = [];
   let i = 0;
 
-  const flushPendingAlone = () => {
-    if (!pending.length) return;
-    if (pending.length === 1) out.push(pending[0]);
-    else out.push({ kind: "group", children: pending });
-    pending = [];
+  const startsNewSection = (b: PdfContentBlock | undefined): boolean => {
+    if (!b) return true;
+    if (b.kind === "heading") return true;
+    if (b.kind === "group" && b.children[0]?.kind === "heading") return true;
+    return false;
+  };
+
+  const appendBlockAtoms = (target: PdfAtomicBlock[], b: PdfContentBlock) => {
+    if (b.kind === "group") {
+      target.push(...b.children);
+      return;
+    }
+    target.push(b as PdfAtomicBlock);
   };
 
   while (i < blocks.length) {
     const cur = blocks[i];
-    if (cur.kind === "heading") {
-      const lead: PdfAtomicBlock[] = [...pending, cur];
-      pending = [];
+
+    // Título solto ou grupo que já começa com título → absorve corpo até o próximo título.
+    if (cur.kind === "heading" || (cur.kind === "group" && cur.children[0]?.kind === "heading")) {
+      const children: PdfAtomicBlock[] =
+        cur.kind === "heading" ? [cur] : [...cur.children];
       i += 1;
-      while (
-        i < blocks.length &&
-        (blocks[i].kind === "paragraph" || blocks[i].kind === "subheader")
-      ) {
-        lead.push(blocks[i] as PdfAtomicBlock);
+
+      // Títulos consecutivos (pai + subseção) ficam no mesmo envelope.
+      while (i < blocks.length && blocks[i].kind === "heading") {
+        children.push(blocks[i] as Extract<PdfAtomicBlock, { kind: "heading" }>);
         i += 1;
       }
-      const next = blocks[i];
-      if (next?.kind === "group") {
-        out.push({ kind: "group", children: [...lead, ...next.children] });
+
+      while (i < blocks.length && !startsNewSection(blocks[i])) {
+        appendBlockAtoms(children, blocks[i]!);
         i += 1;
-      } else if (
-        next &&
-        (next.kind === "photos" || next.kind === "potenciaCard")
-      ) {
-        out.push({ kind: "group", children: [...lead, next] });
-        i += 1;
-      } else if (next?.kind === "heading") {
-        // Guarda para amarrar ao proximo titulo/corpo
-        pending = lead;
-      } else {
-        if (lead.length === 1) out.push(lead[0]);
-        else out.push({ kind: "group", children: lead });
       }
+
+      out.push({ kind: "group", children });
       continue;
     }
 
-    flushPendingAlone();
-    out.push(blocks[i]);
+    out.push(cur);
     i += 1;
   }
 
-  flushPendingAlone();
   return out;
 }
 
@@ -694,27 +859,34 @@ export function collectPdfBlocksEscopo(
     }
   }
 
-  // 3. Rede Externa (RE) — evidências
+  // 3. Rede Externa (RE) — evidências por subbloco do formulário
   pushHeading(blocks, sec("3. Rede Externa (RE)"));
+
+  // —— Lançamento (RE) ——
+  pushHeading(blocks, sec("Lançamento (RE)"));
   {
     const meta: PdfAtomicBlock[] = [];
     pushKvGrid(
       meta,
       [
         {
-          label: "Lancamento cabos aereo (RE)",
+          label: "Lancamento cabos aereo",
           value: simNao(p?.lancamentoCabosRe?.aereo.isSim ?? p?.lancamentoRe),
         },
         {
-          label: "Lancamento cabos subterraneo (RE)",
+          label: "Lancamento cabos subterraneo",
           value: simNao(p?.lancamentoCabosRe?.subterraneo.isSim),
         },
         {
-          label: "Fiberloop instalado (RE)",
+          label: "Sobra tecnica?",
+          value: simNao(p?.redeAcesso?.sobraTecnicaExecutada?.isSim),
+        },
+        {
+          label: "Fiberloop instalado",
           value: simNao(p?.redeAcesso?.fiberloopInstalado?.isSim),
         },
         {
-          label: "Qtd. Fiberloop (RE)",
+          label: "Qtd. Fiberloop",
           value:
             p?.redeAcesso?.fiberloopInstalado?.isSim === true &&
             p.redeAcesso.fiberloopInstalado.quantidade != null
@@ -722,58 +894,26 @@ export function collectPdfBlocksEscopo(
               : "",
         },
         {
-          label: "Lancado cordoalha (RE)",
-          value: simNao(p?.redeAcesso?.cordoalhaLancada?.isSim),
+          label: "Const. duto subterraneo?",
+          value: simNao(p?.redeAcesso?.construcaoDutoSubterraneo?.isSim),
         },
         {
-          label: "Qtd. cordoalha lancada (RE)",
+          label: "Metros duto (MT)",
           value:
-            p?.redeAcesso?.cordoalhaLancada?.isSim === true &&
-            p.redeAcesso.cordoalhaLancada.quantidade != null
-              ? String(p.redeAcesso.cordoalhaLancada.quantidade)
+            p?.redeAcesso?.metrosDutoSubterraneo != null
+              ? String(p.redeAcesso.metrosDutoSubterraneo)
               : "",
         },
         {
-          label: "Cordoalha existente (RE)",
-          value: simNao(p?.redeAcesso?.cordoalhaExistente?.isSim),
+          label: "Construido caixa subterranea?",
+          value: simNao(p?.redeAcesso?.construcaoCaixaSubterranea?.isSim),
         },
         {
-          label: "Postes nova cordoalha (RE)",
-          value: simNao(p?.redeAcesso?.postesNovaCordoalha?.isSim),
-        },
-        {
-          label: "Qtd. postes nova cordoalha (RE)",
+          label: "Qtd. caixas subterraneas",
           value:
-            p?.redeAcesso?.postesNovaCordoalha?.isSim === true &&
-            p.redeAcesso.postesNovaCordoalha.quantidade != null
-              ? String(p.redeAcesso.postesNovaCordoalha.quantidade)
-              : "",
-        },
-        {
-          label: "Postes cordoalha existente (RE)",
-          value: simNao(p?.redeAcesso?.postesCordoalhaExistente?.isSim),
-        },
-        {
-          label: "Qtd. caixas aereo (RE)",
-          value:
-            p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.aereo != null
-              ? String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.aereo)
-              : "",
-        },
-        {
-          label: "Qtd. caixas subterraneo (RE)",
-          value:
-            p?.redeAcesso?.qtdCaixasEmendaPorAmbiente?.subterraneo != null
-              ? String(p.redeAcesso.qtdCaixasEmendaPorAmbiente.subterraneo)
-              : "",
-        },
-        {
-          label: "Qtd. caixas de emenda (RE)",
-          value:
-            p?.redeAcesso?.qtdCaixasEmenda != null &&
-            p.redeAcesso.qtdCaixasEmendaPorAmbiente?.aereo == null &&
-            p.redeAcesso.qtdCaixasEmendaPorAmbiente?.subterraneo == null
-              ? String(p.redeAcesso.qtdCaixasEmenda)
+            p?.redeAcesso?.construcaoCaixaSubterranea?.isSim === true &&
+            p.redeAcesso.construcaoCaixaSubterranea.quantidade != null
+              ? String(p.redeAcesso.construcaoCaixaSubterranea.quantidade)
               : "",
         },
       ],
@@ -791,38 +931,137 @@ export function collectPdfBlocksEscopo(
       p.lancamentoCabosRe.subterraneo.metragens,
     );
   }
-  collectGruposEmGrade(blocks, [
-    { titulo: "Poste de conexao", grupo: p?.posteConexao },
-    ...gruposParaPdf("Caixa de emenda", p?.caixaEmenda),
+  collectGruposCards(blocks, [
+    ...gruposParaPdf("Sobra tecnica", p?.sobraTecnica),
     { titulo: "Const. de duto subterraneo (MD ou MND)", grupo: p?.dutoSubterraneo },
-    ...gruposParaPdf("Sobra tecnica / Fiberloop", p?.sobraTecnica),
-    ...gruposParaPdf("Plaqueta de Identificacao - Caixa de emenda", p?.plaquetaIdentificacao),
-    { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
   ]);
-  collectOutras(blocks, "Outras fotos (RE)", p?.outrasFotos ?? []);
 
-  // 4. Rede Cliente (RC)
-  pushHeading(blocks, sec("4. Rede Cliente (RC)"));
+  // —— Poste (RE) ——
+  pushHeading(blocks, sec("Poste (RE)"));
   {
     const meta: PdfAtomicBlock[] = [];
     pushKvGrid(
       meta,
       [
-        { label: "Tecnologia de Acesso", value: p?.tecnologiaAcesso?.trim() || "-" },
         {
-          label: "Lancamento cabos aereo (RC)",
+          label: "Total de postes (RE)",
+          value:
+            p?.redeAcesso?.qtdTotalPostes != null ? String(p.redeAcesso.qtdTotalPostes) : "",
+        },
+        {
+          label: "Cordoalha existente?",
+          value: simNao(p?.redeAcesso?.cordoalhaExistente?.isSim),
+        },
+        {
+          label: "Postes cordoalha existente?",
+          value: simNao(p?.redeAcesso?.postesCordoalhaExistente?.isSim),
+        },
+        {
+          label: "Lancado cordoalha?",
+          value: simNao(p?.redeAcesso?.cordoalhaLancada?.isSim),
+        },
+        {
+          label: "Qtd. cordoalha lancada",
+          value:
+            p?.redeAcesso?.cordoalhaLancada?.isSim === true &&
+            p.redeAcesso.cordoalhaLancada.quantidade != null
+              ? String(p.redeAcesso.cordoalhaLancada.quantidade)
+              : "",
+        },
+        {
+          label: "Postes nova cordoalha?",
+          value: simNao(p?.redeAcesso?.postesNovaCordoalha?.isSim),
+        },
+        {
+          label: "Qtd. postes nova cordoalha",
+          value:
+            p?.redeAcesso?.postesNovaCordoalha?.isSim === true &&
+            p.redeAcesso.postesNovaCordoalha.quantidade != null
+              ? String(p.redeAcesso.postesNovaCordoalha.quantidade)
+              : "",
+        },
+        {
+          label: "Pontos de aterramento",
+          value:
+            p?.redeAcesso?.aterramento?.pontosAterramento != null
+              ? String(p.redeAcesso.aterramento.pontosAterramento)
+              : "",
+        },
+        {
+          label: "Total de hastes (5/8)",
+          value:
+            p?.redeAcesso?.aterramento?.totalHastes != null
+              ? String(p.redeAcesso.aterramento.totalHastes)
+              : "",
+        },
+      ],
+      3,
+    );
+    for (const b of meta) blocks.push(b);
+  }
+  collectGruposCards(blocks, [
+    { titulo: "Poste de conexao", grupo: p?.posteConexao },
+    { titulo: "Novo aterramento do poste", grupo: p?.novoAterramentoPoste },
+  ]);
+
+  // —— Caixa de Emenda (RE) ——
+  pushHeading(blocks, sec("Caixa de Emenda (RE)"));
+  collectCaixaEmendaUnificada(blocks, "Caixa de emenda", p?.caixaEmenda, p?.plaquetaIdentificacao, {
+    qtdPorAmbiente: p?.redeAcesso?.qtdCaixasEmendaPorAmbiente,
+    caixaExistente: p?.redeAcesso?.caixaEmendaExistente?.isSim ?? null,
+  });
+
+  // —— Outras Fotos (RE) ——
+  collectOutras(blocks, "Outras Fotos (RE)", p?.outrasFotos ?? []);
+
+  // 4. Rede Cliente (RC)
+  pushHeading(blocks, sec("4. Rede Cliente (RC)"));
+
+  // —— Local (RC) ——
+  pushHeading(blocks, sec("Local (RC)"));
+  {
+    const meta: PdfAtomicBlock[] = [];
+    pushKvGrid(
+      meta,
+      [
+        { label: "Tecnologia de Acesso", value: p?.tecnologiaAcesso?.trim() || "" },
+        { label: "Coordenadas do Cliente", value: formatCoords(p?.redeCliente?.coordenadas) },
+      ],
+      2,
+    );
+    for (const b of meta) blocks.push(b);
+  }
+  collectGruposCards(blocks, [
+    { titulo: "Cliente - Entrada/Fachada", grupo: p?.eqClienteFachada },
+    { titulo: "Cliente - Ambiente (geral da sala)", grupo: p?.eqClienteAmbiente },
+    { titulo: "Rack ou Local", grupo: p?.eqClienteRack },
+  ]);
+
+  // —— Lançamento (RC) ——
+  pushHeading(blocks, sec("Lançamento (RC)"));
+  {
+    const meta: PdfAtomicBlock[] = [];
+    pushKvGrid(
+      meta,
+      [
+        {
+          label: "Lancamento cabos aereo",
           value: simNao(p?.lancamentoCabosRc?.aereo.isSim ?? p?.lancamentoRc),
         },
         {
-          label: "Lancamento cabos subterraneo (RC)",
+          label: "Lancamento cabos subterraneo",
           value: simNao(p?.lancamentoCabosRc?.subterraneo.isSim),
         },
         {
-          label: "Fiberloop instalado (RC)",
+          label: "Sobra tecnica?",
+          value: simNao(p?.redeCliente?.sobraTecnicaExecutada?.isSim),
+        },
+        {
+          label: "Fiberloop instalado",
           value: simNao(p?.redeCliente?.fiberloopInstalado?.isSim),
         },
         {
-          label: "Qtd. Fiberloop (RC)",
+          label: "Qtd. Fiberloop",
           value:
             p?.redeCliente?.fiberloopInstalado?.isSim === true &&
             p.redeCliente.fiberloopInstalado.quantidade != null
@@ -830,42 +1069,26 @@ export function collectPdfBlocksEscopo(
               : "",
         },
         {
-          label: "Lancado cordoalha (RC)",
-          value: simNao(p?.redeCliente?.cordoalhaLancada?.isSim),
+          label: "Const. duto subterraneo?",
+          value: simNao(p?.redeCliente?.construcaoDutoSubterraneo?.isSim),
         },
         {
-          label: "Qtd. cordoalha lancada (RC)",
+          label: "Metros duto (MT)",
           value:
-            p?.redeCliente?.cordoalhaLancada?.isSim === true &&
-            p.redeCliente.cordoalhaLancada.quantidade != null
-              ? String(p.redeCliente.cordoalhaLancada.quantidade)
+            p?.redeCliente?.metrosDutoSubterraneo != null
+              ? String(p.redeCliente.metrosDutoSubterraneo)
               : "",
         },
         {
-          label: "Cordoalha existente (RC)",
-          value: simNao(p?.redeCliente?.cordoalhaExistente?.isSim),
+          label: "Construido caixa subterranea?",
+          value: simNao(p?.redeCliente?.construcaoCaixaSubterranea?.isSim),
         },
         {
-          label: "Postes nova cordoalha (RC)",
-          value: simNao(p?.redeCliente?.postesNovaCordoalha?.isSim),
-        },
-        {
-          label: "Qtd. postes nova cordoalha (RC)",
+          label: "Qtd. caixas subterraneas",
           value:
-            p?.redeCliente?.postesNovaCordoalha?.isSim === true &&
-            p.redeCliente.postesNovaCordoalha.quantidade != null
-              ? String(p.redeCliente.postesNovaCordoalha.quantidade)
-              : "",
-        },
-        {
-          label: "Postes cordoalha existente (RC)",
-          value: simNao(p?.redeCliente?.postesCordoalhaExistente?.isSim),
-        },
-        {
-          label: "Qtd. caixas de emenda (RC)",
-          value:
-            p?.redeCliente?.qtdCaixasEmenda != null
-              ? String(p.redeCliente.qtdCaixasEmenda)
+            p?.redeCliente?.construcaoCaixaSubterranea?.isSim === true &&
+            p.redeCliente.construcaoCaixaSubterranea.quantidade != null
+              ? String(p.redeCliente.construcaoCaixaSubterranea.quantidade)
               : "",
         },
       ],
@@ -883,25 +1106,109 @@ export function collectPdfBlocksEscopo(
       p.lancamentoCabosRc.subterraneo.metragens,
     );
   }
-  collectGruposEmGrade(blocks, [
+  collectGruposCards(blocks, [
+    { titulo: "Entrada do cabo (area externa)", grupo: p?.rcEntradaExterna },
+    { titulo: "Entrada do cabo (area interna)", grupo: p?.rcEntradaInterna },
+    { titulo: "Terminacao do cabo no cliente (PTO/Roseta)", grupo: p?.rcTerminacaoCabo },
+    ...gruposParaPdf("Sobra tecnica", p?.rcSobraTecnica),
+    { titulo: "Const. de duto subterraneo (MD ou MND)", grupo: p?.rcDutoSubterraneo },
+  ]);
+
+  // —— Poste (RC) ——
+  pushHeading(blocks, sec("Poste (RC)"));
+  {
+    const meta: PdfAtomicBlock[] = [];
+    pushKvGrid(
+      meta,
+      [
+        {
+          label: "Total de postes (RC)",
+          value:
+            p?.redeCliente?.qtdTotalPostes != null ? String(p.redeCliente.qtdTotalPostes) : "",
+        },
+        {
+          label: "Cordoalha existente?",
+          value: simNao(p?.redeCliente?.cordoalhaExistente?.isSim),
+        },
+        {
+          label: "Postes cordoalha existente?",
+          value: simNao(p?.redeCliente?.postesCordoalhaExistente?.isSim),
+        },
+        {
+          label: "Lancado cordoalha?",
+          value: simNao(p?.redeCliente?.cordoalhaLancada?.isSim),
+        },
+        {
+          label: "Qtd. cordoalha lancada",
+          value:
+            p?.redeCliente?.cordoalhaLancada?.isSim === true &&
+            p.redeCliente.cordoalhaLancada.quantidade != null
+              ? String(p.redeCliente.cordoalhaLancada.quantidade)
+              : "",
+        },
+        {
+          label: "Postes nova cordoalha?",
+          value: simNao(p?.redeCliente?.postesNovaCordoalha?.isSim),
+        },
+        {
+          label: "Qtd. postes nova cordoalha",
+          value:
+            p?.redeCliente?.postesNovaCordoalha?.isSim === true &&
+            p.redeCliente.postesNovaCordoalha.quantidade != null
+              ? String(p.redeCliente.postesNovaCordoalha.quantidade)
+              : "",
+        },
+        {
+          label: "Pontos de aterramento",
+          value:
+            p?.redeCliente?.aterramento?.pontosAterramento != null
+              ? String(p.redeCliente.aterramento.pontosAterramento)
+              : "",
+        },
+        {
+          label: "Total de hastes (5/8)",
+          value:
+            p?.redeCliente?.aterramento?.totalHastes != null
+              ? String(p.redeCliente.aterramento.totalHastes)
+              : "",
+        },
+      ],
+      3,
+    );
+    for (const b of meta) blocks.push(b);
+  }
+  collectGruposCards(blocks, [
     { titulo: "Poste de conexao (RC)", grupo: p?.rcPosteConexao },
     { titulo: "Novo aterramento do poste (RC)", grupo: p?.rcNovoAterramentoPoste },
-    ...gruposParaPdf("Caixa de emenda na acomodacao (RC)", p?.rcCaixaEmenda),
-    { titulo: "Const. de duto subterraneo (RC)", grupo: p?.rcDutoSubterraneo },
-    { titulo: "Terminacao do cabo no cliente", grupo: p?.rcTerminacaoCabo },
-    ...gruposParaPdf("Plaqueta de Identificacao (RC)", p?.rcPlaquetaIdentificacao),
-    { titulo: "Entrada do cabo (area interna)", grupo: p?.rcEntradaInterna },
-    { titulo: "Entrada do cabo (area externa)", grupo: p?.rcEntradaExterna },
-    ...gruposParaPdf("Sobra tecnica / Fiberloop (RC)", p?.rcSobraTecnica),
   ]);
-  collectOutras(blocks, "Outras fotos (RC)", p?.outrasFotosRc ?? []);
 
-  // 5. Equipamentos no Cliente
-  pushHeading(blocks, sec("5. Equipamentos no Cliente"));
-  collectGruposEmGrade(blocks, [
-    { titulo: "Cliente - Entrada/Fachada", grupo: p?.eqClienteFachada },
-    { titulo: "Cliente - Ambiente", grupo: p?.eqClienteAmbiente },
-    { titulo: "Rack ou Local", grupo: p?.eqClienteRack },
+  // —— Caixa de Emenda (RC) ——
+  pushHeading(blocks, sec("Caixa de Emenda (RC)"));
+  collectCaixaEmendaUnificada(
+    blocks,
+    "Caixa de emenda na acomodacao",
+    p?.rcCaixaEmenda,
+    p?.rcPlaquetaIdentificacao,
+    {
+      qtdPorAmbiente: p?.redeCliente?.qtdCaixasEmendaPorAmbiente,
+      coordsPorAmbiente: {
+        aereo: p?.redeCliente?.caixaEmendaAcomodacaoPorAmbiente?.aereo?.coordenadas,
+        subterraneo: p?.redeCliente?.caixaEmendaAcomodacaoPorAmbiente?.subterraneo?.coordenadas,
+      },
+      caixaExistente: p?.redeCliente?.caixaEmendaExistente?.isSim ?? null,
+    },
+  );
+
+  // —— Outras Fotos (RC) ——
+  collectOutras(blocks, "Outras Fotos (RC)", p?.outrasFotosRc ?? []);
+
+  // 5. Equipamentos e Acessos
+  pushHeading(blocks, sec("5. Equipamentos e Acessos"));
+
+  // —— Equipamentos no Cliente ——
+  pushHeading(blocks, sec("Equipamentos no Cliente"));
+  collectGruposCards(blocks, [
+    { titulo: "Identificacao SGP no Cliente", grupo: p?.eqClienteSgp },
   ]);
   collectEquipamentoItensLista(blocks, "DGO / DID / Roseta", p?.eqClienteDgo ?? [], {
     comIdentificacao: false,
@@ -912,43 +1219,43 @@ export function collectPdfBlocksEscopo(
     p?.eqClienteEquipamentos ?? [],
     { comIdentificacao: true },
   );
-  collectGruposEmGrade(blocks, [
-    { titulo: "Identificacao SGP no Cliente", grupo: p?.eqClienteSgp },
+
+  // —— Equipamentos na Estação/PPC ——
+  pushHeading(blocks, sec("Equipamentos na Estacao/PPC"));
+  {
+    const meta: PdfAtomicBlock[] = [];
+    pushKvGrid(
+      meta,
+      [
+        {
+          label: "Relatorio fotografico da estacao",
+          value: p?.relatorioEstacao == null ? "" : simNao(p.relatorioEstacao),
+        },
+        { label: "Estacao / entrega de acesso", value: p?.estacaoEntregaAcesso },
+      ],
+      2,
+    );
+    for (const b of meta) blocks.push(b);
+  }
+  collectGruposCards(blocks, [
+    { titulo: "Estacao - Foto geral", grupo: p?.eqEstacaoGeral },
+    { titulo: "Rack ou Local Instalacao", grupo: p?.eqEstacaoRack },
     { titulo: "Posicao DGO/DIO", grupo: p?.posicaoConexaoEstacao },
     { titulo: "Etiqueta na estacao/PPC", grupo: p?.etiquetaIdentificacao },
   ]);
-  collectOutras(blocks, "Outras fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
+  collectEquipamentoItensLista(
+    blocks,
+    "Equipamento instalado (Na estacao/PPC)",
+    p?.eqEstacaoEquipamento ?? [],
+    { comIdentificacao: true },
+  );
+  collectEquipamentoItensLista(blocks, "DGO / DID / ROUTER", p?.eqEstacaoDgo ?? [], {
+    comIdentificacao: false,
+  });
 
-  // 6. Equipamentos na Estação/PPC
-  if (p?.relatorioEstacao) {
-    pushHeading(blocks, sec("6. Equipamentos na Estacao/PPC"));
-    {
-      const meta: PdfAtomicBlock[] = [];
-      pushKvGrid(
-        meta,
-        [
-          { label: "Relatorio fotografico da estacao", value: simNao(p.relatorioEstacao) },
-          { label: "Estacao / entrega de acesso", value: p.estacaoEntregaAcesso },
-        ],
-        2,
-      );
-      for (const b of meta) blocks.push(b);
-    }
-    collectGruposEmGrade(blocks, [
-      { titulo: "Estacao - Foto geral", grupo: p.eqEstacaoGeral },
-      { titulo: "Rack ou Local Instalacao", grupo: p.eqEstacaoRack },
-    ]);
-    collectEquipamentoItensLista(
-      blocks,
-      "Equipamento instalado (Na estacao/PPC)",
-      p.eqEstacaoEquipamento ?? [],
-      { comIdentificacao: true },
-    );
-    collectEquipamentoItensLista(blocks, "DGO / DID / ROUTER", p.eqEstacaoDgo ?? [], {
-      comIdentificacao: false,
-    });
-    collectOutras(blocks, "Outras fotos (Estacao)", p.outrasFotosEqEstacao ?? []);
-  }
+  // —— Outras Fotos (Equipamentos) ——
+  collectOutras(blocks, "Outras Fotos (Equip. Cliente)", p?.outrasFotosEqCliente ?? []);
+  collectOutras(blocks, "Outras Fotos (Estacao)", p?.outrasFotosEqEstacao ?? []);
 
   return blocks;
 }

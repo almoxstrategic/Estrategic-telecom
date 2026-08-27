@@ -57,6 +57,10 @@ const COR_KV_BG = rgb(0.973, 0.976, 0.98);
 const COR_OK = rgb(0.09, 0.55, 0.27);
 const COR_NOK = rgb(0.75, 0.1, 0.1);
 
+/** Espaço mínimo após título para o 1º bloco (break-after: avoid). */
+const HEADING_KEEP_WITH_NEXT = 72;
+const SUBHEADER_KEEP_WITH_NEXT = 48;
+
 type EmbeddedPhoto = PdfPhotoItem & { image: PDFImage };
 
 type LayoutCtx = {
@@ -446,7 +450,8 @@ async function ensureSpace(ctx: LayoutCtx, needed: number): Promise<void> {
 
 async function drawHeading(ctx: LayoutCtx, text: string): Promise<void> {
   const bandH = 24;
-  await ensureSpace(ctx, bandH + 8);
+  // break-after: avoid — título + início do conteúdo na mesma página
+  await ensureSpace(ctx, bandH + 8 + HEADING_KEEP_WITH_NEXT);
   ctx.page.drawRectangle({
     x: MARGIN_X,
     y: topToPdfY(ctx.yFromTop + bandH),
@@ -473,7 +478,8 @@ async function drawHeading(ctx: LayoutCtx, text: string): Promise<void> {
 
 async function drawSubheader(ctx: LayoutCtx, text: string): Promise<void> {
   const lines = wrapText(text, ctx.fontBold, 9.5, CONTENT_W);
-  await ensureSpace(ctx, lines.length * 12 + 4);
+  const titleH = lines.length * 12 + 3;
+  await ensureSpace(ctx, titleH + SUBHEADER_KEEP_WITH_NEXT);
   for (const line of lines) {
     ctx.page.drawText(line, {
       x: MARGIN_X,
@@ -981,6 +987,23 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     headings.some((t) => /teste\s*optico/i.test(t)) &&
     headings.some((t) => /teste\s*otdr/i.test(t));
 
+  // Título(s) no início: reserva título + 1º bloco de corpo juntos (break-inside / break-after avoid).
+  const leadEnd = (() => {
+    let idx = 0;
+    while (idx < children.length && (children[idx]?.kind === "heading" || children[idx]?.kind === "subheader")) {
+      idx += 1;
+    }
+    if (idx === 0) return 0;
+    // Inclui o primeiro átomo de conteúdo após o(s) título(s).
+    return Math.min(children.length, idx + 1);
+  })();
+  if (leadEnd > 0) {
+    const leadH = await measureGroupHeight(ctx, children.slice(0, leadEnd));
+    if (remaining(ctx) < Math.min(leadH, pageCapacity * 0.5)) {
+      await newPage(ctx, false);
+    }
+  }
+
   // Optico + OTDR: bloco unico inquebravel (nova pagina se nao couber no restante)
   if (isOpticoOtdrBundle) {
     if (remaining(ctx) < Math.min(height, pageCapacity)) await newPage(ctx, false);
@@ -1018,7 +1041,7 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     return;
   }
 
-  // Grupo grande (ex.: "Outras fotos"): titulo + 1a linha de fotos juntos
+  // Grupo grande: titulo(s) + 1a linha de fotos / 1o bloco juntos
   const photosIdx = children.findIndex((c) => c.kind === "photos");
   if (photosIdx >= 0) {
     const photosBlock = children[photosIdx] as Extract<PdfAtomicBlock, { kind: "photos" }>;
@@ -1055,8 +1078,8 @@ async function drawGroup(ctx: LayoutCtx, children: PdfAtomicBlock[]): Promise<vo
     return;
   }
 
-  // Fallback: primeiros 2 filhos juntos
-  const firstKeep = children.slice(0, Math.min(2, children.length));
+  // Fallback: títulos + primeiro conteúdo juntos; restante flui
+  const firstKeep = children.slice(0, Math.max(leadEnd, Math.min(2, children.length)));
   const keepH = await measureGroupHeight(ctx, firstKeep);
   if (remaining(ctx) < Math.min(keepH, pageCapacity * 0.45)) await newPage(ctx, false);
   ctx.lockBreak = true;
@@ -1560,8 +1583,23 @@ export async function gerarPDFRelatorio(row: RelatorioTransmissao): Promise<void
   stampTotalPages(doc, font);
 
   const pdfBytes = await doc.save();
-  const safeOs = (row.os_wf || "os").replace(/[^\w.-]+/g, "_");
-  downloadBlob(pdfBytes, `relatorio-${safeOs}.pdf`);
+  const safeCliente = sanitizePdfFilenamePart(
+    row.cliente?.trim() || row.cliente_operadora?.trim() || "cliente",
+  );
+  const safeOs = sanitizePdfFilenamePart(row.os_wf || "os");
+  downloadBlob(pdfBytes, `${safeCliente}-${safeOs}.pdf`);
+}
+
+/** Parte do nome do arquivo: remove acentos/especiais e espaços. */
+function sanitizePdfFilenamePart(value: string): string {
+  const cleaned = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_.-]+|[_.-]+$/g, "")
+    .slice(0, 80);
+  return cleaned || "arquivo";
 }
 
 /** @deprecated Use gerarPDFRelatorio — mantido para imports antigos. */
