@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ClipboardList, Eye, Play, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { RelatorioTransmissaoLeitura } from "@/components/RelatorioTransmissaoLeitura";
+import { PendenciaMotivoLista } from "@/components/pendencias/PendenciaMotivoLista";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -290,11 +291,14 @@ export function MeusRelatoriosTransmissao({ tecnicoId }: { tecnicoId: string }) 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Pendência — {pendenciaAberta?.os_wf}</DialogTitle>
-            <DialogDescription>
-              {pendenciaAberta?.motivo_pendencia?.trim() ||
-                "A supervisão sinalizou uma pendência sem detalhar o motivo."}
+            <DialogDescription className="sr-only">
+              Itens de pendência sinalizados pela supervisão para a OS {pendenciaAberta?.os_wf}.
             </DialogDescription>
           </DialogHeader>
+          <PendenciaMotivoLista
+            itens={pendenciaAberta?.payload?.pendenciasItens}
+            motivo={pendenciaAberta?.motivo_pendencia}
+          />
         </DialogContent>
       </Dialog>
 

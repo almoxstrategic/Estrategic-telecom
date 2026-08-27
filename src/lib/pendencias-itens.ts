@@ -180,6 +180,68 @@ export function motivoPendenciaFromItens(itens: PendenciaItem[]): string {
   return `Pendências (${itens.length}): ${itens.map((i) => i.label).join("; ")}`;
 }
 
+/** Labels a partir dos itens granulares do payload. */
+export function labelsFromPendenciasItens(
+  itens: PendenciaItem[] | null | undefined,
+): string[] {
+  if (!itens?.length) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of itens) {
+    const label = item.label?.trim();
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    out.push(label);
+  }
+  return out;
+}
+
+/**
+ * Quebra `motivo_pendencia` legado (texto corrido) em tópicos.
+ * Aceita: "Pendência em: A", "Pendências (N): A; B", ou "A; B".
+ */
+export function parseMotivoPendenciaLabels(
+  motivo: string | null | undefined,
+): string[] {
+  const raw = motivo?.trim();
+  if (!raw) return [];
+
+  const multi = raw.match(/^Pendências?\s*\(\d+\):\s*(.+)$/i);
+  if (multi?.[1]) {
+    return multi[1]
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  const prefix = raw.match(/^Pendência em:\s*(.+)$/i);
+  if (prefix?.[1]) {
+    return prefix[1]
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  if (raw.includes(";")) {
+    return raw
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  return [raw];
+}
+
+/** Prefere itens do payload; senão parseia o motivo textual. */
+export function pendenciaLabelsForDisplay(opts: {
+  itens?: PendenciaItem[] | null;
+  motivo?: string | null;
+}): string[] {
+  const fromItens = labelsFromPendenciasItens(opts.itens);
+  if (fromItens.length > 0) return fromItens;
+  return parseMotivoPendenciaLabels(opts.motivo);
+}
+
 /** Identificador do accordion/seção pai para agregação do contador no cabeçalho. */
 export type PendenciaBlocoId =
   | "RE.lancamento"
