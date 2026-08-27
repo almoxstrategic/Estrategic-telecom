@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import {
   Bell,
   ChevronDown,
@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   Trash2,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { EvidencePhotoPasteProvider } from "@/components/EvidencePhotoPasteContext";
@@ -23,11 +24,18 @@ import {
   pendenciaFotoGrupo,
   pendenciaMetragemCabo,
   pendenciaPergunta,
+  countPendenciasNaAba,
+  indiceBlocoTemPendencia,
+  indiceSubitemTemPendencia,
+  type IndicePendenciaMatch,
   type PendenciaBlocoId,
+  type PendenciaIndiceRef,
   type PendenciaItem,
   type PendenciaItemDef,
+  type PendenciaAba,
 } from "@/lib/pendencias-itens";
 import { cn } from "@/lib/utils";
+import { navegarParaSecaoFormulario } from "@/lib/relatorio-navegacao";
 import {
   apenasDigitos,
   calcularMetragemCaboTotal,
@@ -296,105 +304,289 @@ export type SecaoPesquisavel = {
   id: string;
 };
 
+export type IndiceMenuSubitem = SecaoPesquisavel & {
+  /** Regras extras além do match por anchorId === id. */
+  pendencia?: IndicePendenciaMatch;
+};
+
 export type IndiceMenuBloco = {
   titulo: string;
-  subitens: SecaoPesquisavel[];
+  /** Bloco accordion para agregar pendências no cabeçalho da seção. */
+  pendenciaBloco?: PendenciaBlocoId;
+  subitens: IndiceMenuSubitem[];
 };
+
+/** Abas curtas do drawer do Índice (filtro de conteúdo). */
+export type IndiceAbaFiltro = Extract<AbaCampo, "RE" | "RC" | "equipamento">;
+
+export const INDICE_ABAS_FILTRO: { id: IndiceAbaFiltro; label: string; title: string }[] = [
+  { id: "RE", label: "RE", title: "Rede Externa" },
+  { id: "RC", label: "RC", title: "Rede Cliente" },
+  { id: "equipamento", label: "EQUIP", title: "Equipamentos e Acessos" },
+];
 
 /** Árvore de navegação do menu lateral por aba. */
 export const INDICE_MENU_POR_ABA: Partial<Record<AbaCampo, IndiceMenuBloco[]>> = {
   RE: [
     {
       titulo: "LANÇAMENTO (RE)",
+      pendenciaBloco: "RE.lancamento",
       subitens: [
-        { titulo: "Lançamento de cabos", id: "secao-cabos" },
-        { titulo: "Sobra técnica", id: "secao-sobraTecnica" },
-        { titulo: "Const. de duto subterrâneo (MD ou MND)", id: "secao-dutoSubterraneo" },
+        {
+          titulo: "Lançamento de cabos",
+          id: "secao-cabos",
+          pendencia: { prefixes: ["RE.lancamento.metragem."] },
+        },
+        {
+          titulo: "Sobra técnica",
+          id: "secao-sobraTecnica",
+          pendencia: {
+            fotoKeys: ["sobraTecnica"],
+            itemIds: ["RE.lancamento.sobraTecnica"],
+          },
+        },
+        {
+          titulo: "Const. de duto subterrâneo (MD ou MND)",
+          id: "secao-dutoSubterraneo",
+          pendencia: {
+            fotoKeys: ["dutoSubterraneo"],
+            itemIds: ["RE.lancamento.construcaoDuto", "RE.lancamento.construcaoCaixaSubterranea"],
+          },
+        },
       ],
     },
     {
       titulo: "POSTE (RE)",
+      pendenciaBloco: "RE.poste",
       subitens: [
-        { titulo: "Poste de conexão", id: "secao-posteConexao" },
-        { titulo: "Novo aterramento do poste", id: "secao-novoAterramentoPoste" },
+        {
+          titulo: "Poste de conexão",
+          id: "secao-posteConexao",
+          pendencia: {
+            fotoKeys: ["posteConexao"],
+            prefixes: ["RE.poste."],
+          },
+        },
+        {
+          titulo: "Novo aterramento do poste",
+          id: "secao-novoAterramentoPoste",
+          pendencia: { fotoKeys: ["novoAterramentoPoste"] },
+        },
       ],
     },
     {
       titulo: "CAIXA DE EMENDA (RE)",
+      pendenciaBloco: "RE.caixa",
       subitens: [
-        { titulo: "Caixa de emenda", id: "secao-caixaEmenda" },
+        {
+          titulo: "Caixa de emenda",
+          id: "secao-caixaEmenda",
+          pendencia: {
+            fotoKeys: ["caixaEmenda", "plaquetaIdentificacao"],
+            itemIds: ["RE.caixa.caixaEmendaExistente"],
+          },
+        },
       ],
     },
     {
       titulo: "OUTRAS FOTOS (RE)",
-      subitens: [{ titulo: "Outras fotos", id: "secao-outras-fotos" }],
+      pendenciaBloco: "RE.outras",
+      subitens: [
+        {
+          titulo: "Outras fotos",
+          id: "secao-outras-fotos",
+          pendencia: { prefixes: ["RE.outra.", "RE.outras."] },
+        },
+      ],
     },
   ],
   RC: [
     {
       titulo: "LOCAL (RC)",
+      pendenciaBloco: "RC.local",
       subitens: [
-        { titulo: "Coordenadas do Cliente", id: "secao-coordenadas-cliente" },
-        { titulo: "Cliente - (Entrada/Fachada)", id: "secao-eqClienteFachada" },
-        { titulo: "Cliente - Ambiente (geral da sala)", id: "secao-eqClienteAmbiente" },
-        { titulo: "(Rack ou Local)", id: "secao-eqClienteRack" },
+        {
+          titulo: "Coordenadas do Cliente",
+          id: "secao-coordenadas-cliente",
+          pendencia: { prefixes: ["RC.local."] },
+        },
+        {
+          titulo: "Cliente - (Entrada/Fachada)",
+          id: "secao-eqClienteFachada",
+          pendencia: { fotoKeys: ["eqClienteFachada"] },
+        },
+        {
+          titulo: "Cliente - Ambiente (geral da sala)",
+          id: "secao-eqClienteAmbiente",
+          pendencia: { fotoKeys: ["eqClienteAmbiente"] },
+        },
+        {
+          titulo: "(Rack ou Local)",
+          id: "secao-eqClienteRack",
+          pendencia: { fotoKeys: ["eqClienteRack"] },
+        },
       ],
     },
     {
       titulo: "LANÇAMENTO (RC)",
+      pendenciaBloco: "RC.lancamento",
       subitens: [
-        { titulo: "Lançamento de cabos", id: "secao-cabos" },
-        { titulo: "Entrada do cabo (área externa)", id: "secao-rcEntradaExterna" },
-        { titulo: "Entrada do cabo (área interna)", id: "secao-rcEntradaInterna" },
-        { titulo: "Terminação do cabo no cliente", id: "secao-rcTerminacaoCabo" },
-        { titulo: "Sobra técnica", id: "secao-rcSobraTecnica" },
-        { titulo: "Fiberloop instalado?", id: "secao-fiberloopInstalado" },
-        { titulo: "Const. de duto subterrâneo (MD ou MND)", id: "secao-rcDutoSubterraneo" },
+        {
+          titulo: "Lançamento de cabos",
+          id: "secao-cabos",
+          pendencia: { prefixes: ["RC.lancamento.metragem."] },
+        },
+        {
+          titulo: "Entrada do cabo (área externa)",
+          id: "secao-rcEntradaExterna",
+          pendencia: { fotoKeys: ["rcEntradaExterna"] },
+        },
+        {
+          titulo: "Entrada do cabo (área interna)",
+          id: "secao-rcEntradaInterna",
+          pendencia: { fotoKeys: ["rcEntradaInterna"] },
+        },
+        {
+          titulo: "Terminação do cabo no cliente",
+          id: "secao-rcTerminacaoCabo",
+          pendencia: { fotoKeys: ["rcTerminacaoCabo"] },
+        },
+        {
+          titulo: "Sobra técnica",
+          id: "secao-rcSobraTecnica",
+          pendencia: {
+            fotoKeys: ["rcSobraTecnica"],
+            itemIds: ["RC.lancamento.sobraTecnica"],
+          },
+        },
+        {
+          titulo: "Fiberloop instalado?",
+          id: "secao-fiberloopInstalado",
+          pendencia: { itemIds: ["RC.lancamento.fiberloop"] },
+        },
+        {
+          titulo: "Const. de duto subterrâneo (MD ou MND)",
+          id: "secao-rcDutoSubterraneo",
+          pendencia: {
+            fotoKeys: ["rcDutoSubterraneo"],
+            itemIds: ["RC.lancamento.construcaoDuto", "RC.lancamento.construcaoCaixaSubterranea"],
+          },
+        },
       ],
     },
     {
       titulo: "POSTE (RC)",
+      pendenciaBloco: "RC.poste",
       subitens: [
-        { titulo: "Poste de conexão", id: "secao-rcPosteConexao" },
-        { titulo: "Novo aterramento do poste", id: "secao-rcNovoAterramentoPoste" },
+        {
+          titulo: "Poste de conexão",
+          id: "secao-rcPosteConexao",
+          pendencia: {
+            fotoKeys: ["rcPosteConexao"],
+            prefixes: ["RC.poste."],
+          },
+        },
+        {
+          titulo: "Novo aterramento do poste",
+          id: "secao-rcNovoAterramentoPoste",
+          pendencia: { fotoKeys: ["rcNovoAterramentoPoste"] },
+        },
       ],
     },
     {
       titulo: "CAIXA DE EMENDA (RC)",
+      pendenciaBloco: "RC.caixa",
       subitens: [
-        { titulo: "Caixa de emenda na acomodação", id: "secao-rcCaixaEmenda" },
+        {
+          titulo: "Caixa de emenda na acomodação",
+          id: "secao-rcCaixaEmenda",
+          pendencia: {
+            fotoKeys: ["rcCaixaEmenda", "rcPlaquetaIdentificacao"],
+            itemIds: ["RC.caixa.caixaEmendaExistente"],
+          },
+        },
       ],
     },
     {
       titulo: "OUTRAS FOTOS (RC)",
-      subitens: [{ titulo: "Outras fotos", id: "secao-outras-fotos" }],
+      pendenciaBloco: "RC.outras",
+      subitens: [
+        {
+          titulo: "Outras fotos",
+          id: "secao-outras-fotos",
+          pendencia: { prefixes: ["RC.outra.", "RC.outras."] },
+        },
+      ],
     },
   ],
   equipamento: [
     {
       titulo: "EQUIPAMENTO NO CLIENTE",
+      pendenciaBloco: "EQ.cliente",
       subitens: [
         { titulo: "Tecnologia de Acesso", id: "secao-tecnologia-acesso" },
-        { titulo: "Roseta", id: "secao-eq-dgo-cliente" },
-        { titulo: "Equipamento", id: "secao-eq-equipamentos-cliente" },
-        { titulo: "Identificação SGP no Cliente", id: "secao-eqClienteSgp" },
+        {
+          titulo: "Roseta",
+          id: "secao-eq-dgo-cliente",
+          pendencia: { prefixes: ["equipamento.cliente.dgo.", "EQ.cliente.dgo."] },
+        },
+        {
+          titulo: "Equipamento",
+          id: "secao-eq-equipamentos-cliente",
+          pendencia: {
+            prefixes: ["equipamento.cliente.equip.", "EQ.cliente.equip."],
+          },
+        },
+        {
+          titulo: "Identificação SGP no Cliente",
+          id: "secao-eqClienteSgp",
+          pendencia: { fotoKeys: ["eqClienteSgp"] },
+        },
         { titulo: "Configuração equipamento no cliente", id: "secao-eq-config-cliente" },
       ],
     },
     {
       titulo: "EQUIPAMENTO NA ESTAÇÃO",
+      pendenciaBloco: "EQ.estacao",
       subitens: [
         { titulo: "Estação Entrega de Acesso", id: "secao-estacao-entrega-acesso" },
-        { titulo: "DGO / DID / ROUTER", id: "secao-eq-dgo-estacao" },
-        { titulo: "Posição de conexão na Estação/PPC", id: "secao-posicaoConexaoEstacao" },
-        { titulo: "ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC", id: "secao-etiquetaIdentificacao" },
-        { titulo: "Equipamento", id: "secao-eq-equipamentos-estacao" },
+        {
+          titulo: "DGO / DID / ROUTER",
+          id: "secao-eq-dgo-estacao",
+          pendencia: { prefixes: ["equipamento.estacao.dgo.", "EQ.estacao.dgo."] },
+        },
+        {
+          titulo: "Posição de conexão na Estação/PPC",
+          id: "secao-posicaoConexaoEstacao",
+          pendencia: { fotoKeys: ["posicaoConexaoEstacao"] },
+        },
+        {
+          titulo: "ETIQUETA DE IDENTIFICAÇÃO NA ESTAÇÃO/PPC",
+          id: "secao-etiquetaIdentificacao",
+          pendencia: { fotoKeys: ["etiquetaIdentificacao"] },
+        },
+        {
+          titulo: "Equipamento",
+          id: "secao-eq-equipamentos-estacao",
+          pendencia: {
+            prefixes: ["equipamento.estacao.equip.", "EQ.estacao.equip."],
+          },
+        },
         { titulo: "Configuração equipamento na estação", id: "secao-eq-config-estacao" },
       ],
     },
     {
       titulo: "OUTRAS FOTOS",
-      subitens: [{ titulo: "Outras fotos", id: "secao-eq-outras-fotos" }],
+      pendenciaBloco: "EQ.outras",
+      subitens: [
+        {
+          titulo: "Outras fotos",
+          id: "secao-eq-outras-fotos",
+          pendencia: {
+            prefixes: ["equipamento.outra.", "EQ.outras.", "equipamento.foto.outras"],
+          },
+        },
+      ],
     },
   ],
 };
@@ -456,44 +648,76 @@ export const SECOES_PESQUISAVEIS_POR_ABA: Partial<Record<AbaCampo, SecaoPesquisa
   ],
 };
 
-function highlightSecaoTemporaria(el: HTMLElement) {
-  el.classList.add("ring-2", "ring-primary", "ring-offset-2", "transition");
-  window.setTimeout(() => {
-    el.classList.remove("ring-2", "ring-primary", "ring-offset-2", "transition");
-  }, 1800);
-}
+export { navegarParaSecaoFormulario } from "@/lib/relatorio-navegacao";
 
-function abrirDetailsAncestrais(el: HTMLElement) {
-  let node: HTMLElement | null = el;
-  while (node) {
-    if (node instanceof HTMLDetailsElement) node.open = true;
-    node = node.parentElement;
-  }
-}
-
-export function navegarParaSecaoFormulario(targetId: string) {
-  const el = document.getElementById(targetId);
-  if (!el) return false;
-  abrirDetailsAncestrais(el);
-  // Aguarda o layout do <details> abrir antes do scroll (subseções em accordion fechado).
-  window.setTimeout(() => {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    highlightSecaoTemporaria(el);
-  }, 120);
-  return true;
+function IndicePendenciaBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-300 bg-amber-100 font-semibold text-amber-900",
+        compact ? "px-1.5 py-0.5 text-[9px]" : "px-1.5 py-0.5 text-[10px]",
+      )}
+      title="Há pendência neste item"
+    >
+      <TriangleAlert className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} aria-hidden />
+      {compact ? null : <span>Pendência</span>}
+    </span>
+  );
 }
 
 function RelatorioIndiceLateral({
   open,
   onClose,
-  blocos,
+  abaFiltro,
+  onAbaFiltroChange,
+  abasDisponiveis,
   onNavigate,
 }: {
   open: boolean;
   onClose: () => void;
-  blocos: IndiceMenuBloco[];
-  onNavigate: (targetId: string) => void;
+  abaFiltro: IndiceAbaFiltro;
+  onAbaFiltroChange: (aba: IndiceAbaFiltro) => void;
+  /** Abas do formulário disponíveis (ex.: implantação só RE). */
+  abasDisponiveis: AbaCampo[];
+  onNavigate: (targetId: string, aba: IndiceAbaFiltro) => void;
 }) {
+  const pendenciasCtx = usePendencias();
+
+  const tabs = useMemo(
+    () =>
+      INDICE_ABAS_FILTRO.filter((tab) =>
+        abasDisponiveis.includes(tab.id) && Boolean(INDICE_MENU_POR_ABA[tab.id]?.length),
+      ),
+    [abasDisponiveis],
+  );
+
+  const activePendencias = useMemo<PendenciaIndiceRef[]>(() => {
+    if (!pendenciasCtx) return [];
+    const map = new Map<string, PendenciaIndiceRef>();
+    for (const item of pendenciasCtx.confirmed) {
+      map.set(item.itemId, {
+        itemId: item.itemId,
+        anchorId: item.anchorId,
+        aba: item.aba,
+      });
+    }
+    for (const item of pendenciasCtx.draft) {
+      map.set(item.itemId, {
+        itemId: item.itemId,
+        anchorId: item.anchorId,
+        aba: item.aba as PendenciaAba,
+      });
+    }
+    return [...map.values()];
+  }, [pendenciasCtx]);
+
+  const activeItemIds = pendenciasCtx?.activeItemIds ?? new Set<string>();
+
+  const abaEfetiva: IndiceAbaFiltro =
+    tabs.find((t) => t.id === abaFiltro)?.id ?? tabs[0]?.id ?? "RE";
+
+  const blocos = INDICE_MENU_POR_ABA[abaEfetiva] ?? [];
+
   if (!open) return null;
 
   return (
@@ -505,43 +729,111 @@ function RelatorioIndiceLateral({
         aria-label="Fechar menu de índice"
       />
       <aside
-        className="fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[75vw] flex-col bg-white shadow-xl animate-in slide-in-from-left duration-300"
+        className="fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl animate-in slide-in-from-left duration-300"
         aria-label="Índice do formulário"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-base font-semibold text-foreground">Índice</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label="Fechar"
-          >
-            <X className="h-5 w-5" />
-          </button>
+        <div className="shrink-0 border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3">
+            <h2 className="text-base font-semibold text-foreground">Índice</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-label="Fechar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {tabs.length > 1 ? (
+            <nav
+              className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              aria-label="Filtrar índice por aba"
+            >
+              {tabs.map((tab) => {
+                const ativa = abaEfetiva === tab.id;
+                const pendCount = countPendenciasNaAba(activePendencias, tab.id);
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    title={tab.title}
+                    onClick={() => onAbaFiltroChange(tab.id)}
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                      ativa
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {tab.label}
+                    {pendCount > 0 ? (
+                      <span
+                        className={cn(
+                          "inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                          ativa
+                            ? "bg-amber-200 text-amber-950"
+                            : "bg-amber-100 text-amber-900",
+                        )}
+                        aria-label={`${pendCount} pendência(s)`}
+                      >
+                        {pendCount}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </nav>
+          ) : null}
         </div>
         <nav className="flex-1 overflow-y-auto px-4 py-3">
-          {blocos.map((bloco) => (
-            <div key={bloco.titulo} className="mb-4 last:mb-0">
-              <p className="text-sm font-bold text-foreground">{bloco.titulo}</p>
-              <ul className="mt-1.5 space-y-0.5">
-                {bloco.subitens.map((item) => (
-                  <li key={`${item.id}-${item.titulo}`}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        onNavigate(item.id);
-                      }}
-                      onClick={() => onNavigate(item.id)}
-                      className="w-full rounded-md py-1.5 pl-3 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    >
-                      {item.titulo}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {blocos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma seção nesta aba.</p>
+          ) : (
+            blocos.map((bloco) => {
+              const subComPendencia = bloco.subitens.map((item) =>
+                indiceSubitemTemPendencia(
+                  item.id,
+                  item.pendencia,
+                  activePendencias,
+                  abaEfetiva,
+                ),
+              );
+              const blocoComPendencia = indiceBlocoTemPendencia(
+                bloco.pendenciaBloco,
+                subComPendencia.some(Boolean),
+                activeItemIds,
+              );
+              return (
+                <div key={bloco.titulo} className="mb-4 last:mb-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-foreground">{bloco.titulo}</p>
+                    {blocoComPendencia ? <IndicePendenciaBadge compact /> : null}
+                  </div>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {bloco.subitens.map((item, idx) => {
+                      const temPendencia = subComPendencia[idx];
+                      return (
+                        <li key={`${item.id}-${item.titulo}`}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              onNavigate(item.id, abaEfetiva);
+                            }}
+                            onClick={() => onNavigate(item.id, abaEfetiva)}
+                            className="flex w-full items-center gap-2 rounded-md py-1.5 pl-3 pr-1 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                          >
+                            <span className="min-w-0 flex-1">{item.titulo}</span>
+                            {temPendencia ? <IndicePendenciaBadge /> : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })
+          )}
         </nav>
       </aside>
     </>
@@ -586,12 +878,24 @@ export function RelatorioAbasCampo({
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [indiceAbaFiltro, setIndiceAbaFiltro] = useState<IndiceAbaFiltro>(() =>
+    abaAtiva === "RE" || abaAtiva === "RC" || abaAtiva === "equipamento" ? abaAtiva : "RE",
+  );
   const abaInicialRef = useRef(true);
   const buscaWrapRef = useRef<HTMLDivElement | null>(null);
-  const abasScrollRef = useRef<HTMLNavElement | null>(null);
+  const abasScrollRef = useRef<HTMLElement | null>(null);
 
   const secoes = secoesPesquisaveis ?? SECOES_PESQUISAVEIS_POR_ABA[abaAtiva] ?? [];
-  const indiceMenu = INDICE_MENU_POR_ABA[abaAtiva] ?? [];
+  const abasIndiceDisponiveis = useMemo(
+    () => abas.map((a) => a.id).filter((id): id is IndiceAbaFiltro =>
+      id === "RE" || id === "RC" || id === "equipamento",
+    ),
+    [abas],
+  );
+  const temIndiceMenu = useMemo(
+    () => abasIndiceDisponiveis.some((id) => (INDICE_MENU_POR_ABA[id]?.length ?? 0) > 0),
+    [abasIndiceDisponiveis],
+  );
   const resultados = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
     if (!termo) return [];
@@ -603,6 +907,12 @@ export function RelatorioAbasCampo({
       return true;
     });
   }, [searchTerm, secoes]);
+
+  useEffect(() => {
+    if (abaAtiva === "RE" || abaAtiva === "RC" || abaAtiva === "equipamento") {
+      setIndiceAbaFiltro(abaAtiva);
+    }
+  }, [abaAtiva]);
 
   useEffect(() => {
     if (abaInicialRef.current) {
@@ -649,10 +959,28 @@ export function RelatorioAbasCampo({
     }
   };
 
-  const handleIndiceNavigate = (targetId: string) => {
-    setIsSideMenuOpen(false);
-    navegarParaSecaoFormulario(targetId);
-  };
+  const handleIndiceNavigate = useCallback(
+    (targetId: string, abaDestino: IndiceAbaFiltro) => {
+      setIsSideMenuOpen(false);
+      if (abaAtiva !== abaDestino) {
+        onChange(abaDestino);
+        window.setTimeout(() => {
+          navegarParaSecaoFormulario(targetId);
+        }, 160);
+        return;
+      }
+      navegarParaSecaoFormulario(targetId);
+    },
+    [abaAtiva, onChange],
+  );
+
+  const handleIndiceAbaFiltroChange = useCallback(
+    (aba: IndiceAbaFiltro) => {
+      setIndiceAbaFiltro(aba);
+      if (abaAtiva !== aba) onChange(aba);
+    },
+    [abaAtiva, onChange],
+  );
 
   const scrollAbas = (direction: "left" | "right") => {
     const el = abasScrollRef.current;
@@ -749,7 +1077,7 @@ export function RelatorioAbasCampo({
           )}
         >
           <div className="flex items-center gap-2">
-            {indiceMenu.length > 0 ? (
+            {temIndiceMenu ? (
               <button
                 type="button"
                 onClick={() => setIsSideMenuOpen(true)}
@@ -898,12 +1226,16 @@ export function RelatorioAbasCampo({
         </div>
       </div>
 
-      <RelatorioIndiceLateral
-        open={isSideMenuOpen}
-        onClose={() => setIsSideMenuOpen(false)}
-        blocos={indiceMenu}
-        onNavigate={handleIndiceNavigate}
-      />
+      {isSideMenuOpen ? (
+        <RelatorioIndiceLateral
+          open
+          onClose={() => setIsSideMenuOpen(false)}
+          abaFiltro={indiceAbaFiltro}
+          onAbaFiltroChange={handleIndiceAbaFiltroChange}
+          abasDisponiveis={abasIndiceDisponiveis.length ? abasIndiceDisponiveis : ["RE"]}
+          onNavigate={handleIndiceNavigate}
+        />
+      ) : null}
 
       {showBackToTop ? (
         <button
@@ -1086,19 +1418,33 @@ export function AccordionBloco({
   pendenciaBloco?: PendenciaBlocoId;
   stickyZoomCompensation?: number;
 }) {
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const measuredOffsetPx = useAbasStickyOffsetPx(stickTabsAtViewportTop);
   const zoomSafe = stickyZoomCompensation > 0 ? stickyZoomCompensation : 1;
   const stickyOffsetPx = Math.round(measuredOffsetPx / zoomSafe);
   const isStuck = useAccordionStuck(sentinelRef, stickyOffsetPx);
-  const isAudit = variant === "audit";
-  /** Chrome reforçado na visão Gestor (zoom 0.75). */
-  const strongChrome = zoomSafe < 1;
   const pendenciasCtx = usePendencias();
   const pendenciaCount = pendenciaBloco
     ? (pendenciasCtx?.countInBloco(pendenciaBloco) ?? 0)
     : 0;
   const hasPendencias = pendenciaCount > 0;
+
+  // <details> não tem defaultOpen no React — aplica abertura inicial no DOM.
+  useEffect(() => {
+    if (!defaultOpen) return;
+    const el = detailsRef.current;
+    if (el) el.open = true;
+  }, [defaultOpen]);
+
+  const setDetailsRef = (node: HTMLDetailsElement | null) => {
+    detailsRef.current = node;
+    if (!rootRef) return;
+    (rootRef as MutableRefObject<HTMLElement | null>).current = node;
+  };
+  const isAudit = variant === "audit";
+  /** Chrome reforçado na visão Gestor (zoom 0.75). */
+  const strongChrome = zoomSafe < 1;
 
   const summaryClass = cn(
     "sticky z-30 flex w-full max-w-full min-w-0 cursor-pointer list-none items-center justify-between gap-3 transition-all duration-200 ease-in-out [&::-webkit-details-marker]:hidden",
@@ -1134,8 +1480,7 @@ export function AccordionBloco({
   return (
     <details
       id={id}
-      ref={rootRef as RefObject<HTMLDetailsElement | null> | undefined}
-      defaultOpen={defaultOpen}
+      ref={setDetailsRef}
       className={
         isAudit
           ? cn(

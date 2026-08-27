@@ -7,13 +7,17 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { navegarParaSecaoFormulario } from "@/components/RelatorioRedeAcesso";
-import type { AbaCampo } from "@/components/RelatorioRedeAcesso";
-import type { PendenciaItem, PendenciaItemDef, PendenciaBlocoId } from "@/lib/pendencias-itens";
+import { navegarParaSecaoFormulario } from "@/lib/relatorio-navegacao";
+import type {
+  PendenciaAba,
+  PendenciaItem,
+  PendenciaItemDef,
+  PendenciaBlocoId,
+} from "@/lib/pendencias-itens";
 import { countPendenciasNoBloco } from "@/lib/pendencias-itens";
 
 type AbaController = {
-  setAba: (aba: AbaCampo) => void;
+  setAba: (aba: PendenciaAba) => void;
 };
 
 type PendenciasContextValue = {
@@ -44,12 +48,13 @@ export function PendenciasProvider({
   confirmed: PendenciaItem[];
   children: ReactNode;
 }) {
+  const safeConfirmed = Array.isArray(confirmed) ? confirmed : [];
   const [draftMap, setDraftMap] = useState<Map<string, PendenciaItemDef>>(() => new Map());
   const abaCtrlRef = useRef<AbaController | null>(null);
 
   const confirmedIds = useMemo(
-    () => new Set(confirmed.map((item) => item.itemId)),
-    [confirmed],
+    () => new Set(safeConfirmed.map((item) => item.itemId).filter(Boolean)),
+    [safeConfirmed],
   );
 
   const draft = useMemo(() => [...draftMap.values()], [draftMap]);
@@ -95,7 +100,7 @@ export function PendenciasProvider({
   }, []);
 
   const goToItem = useCallback((item: PendenciaItem | PendenciaItemDef) => {
-    abaCtrlRef.current?.setAba(item.aba as AbaCampo);
+    abaCtrlRef.current?.setAba(item.aba);
     window.setTimeout(() => {
       navegarParaSecaoFormulario(item.anchorId);
     }, 120);
@@ -104,7 +109,7 @@ export function PendenciasProvider({
   const value = useMemo<PendenciasContextValue>(
     () => ({
       mode,
-      confirmed,
+      confirmed: safeConfirmed,
       draft,
       draftCount: draft.length,
       hasAnyPendencia: activeItemIds.size > 0,
@@ -119,7 +124,7 @@ export function PendenciasProvider({
     }),
     [
       mode,
-      confirmed,
+      safeConfirmed,
       draft,
       activeItemIds,
       isPending,

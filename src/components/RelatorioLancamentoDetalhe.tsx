@@ -1011,7 +1011,9 @@ export function RelatorioDetalhe({
   );
   const pendenciasCtx = usePendencias();
   useEffect(() => {
-    pendenciasCtx?.registerAbaController({ setAba: setAbaAtiva });
+    pendenciasCtx?.registerAbaController({
+      setAba: (aba) => setAbaAtiva(aba as AbaCampo),
+    });
     return () => pendenciasCtx?.registerAbaController(null);
   }, [pendenciasCtx]);
   const isEmpresarial = row.tipo_execucao === "empresarial";

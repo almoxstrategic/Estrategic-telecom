@@ -271,3 +271,58 @@ export function countPendenciasNoBloco(
   }
   return n;
 }
+
+/** Regras opcionais para vincular um link do Índice a pendências ativas. */
+export type IndicePendenciaMatch = {
+  /** Prefixo de itemId (ex.: RE.lancamento.metragem.). */
+  prefixes?: string[];
+  /** itemIds exatos. */
+  itemIds?: string[];
+  /** Chaves de foto em RE/RC/equipamento.foto.{key}. */
+  fotoKeys?: string[];
+};
+
+export type PendenciaIndiceRef = {
+  itemId: string;
+  anchorId: string;
+  aba: PendenciaAba;
+};
+
+/** True se a pendência ativa corresponde ao subitem do Índice (âncora ou regras). */
+export function indiceSubitemTemPendencia(
+  secaoDomId: string,
+  match: IndicePendenciaMatch | undefined,
+  active: PendenciaIndiceRef[],
+  abaFiltro?: PendenciaAba,
+): boolean {
+  return active.some((p) => {
+    if (abaFiltro && p.aba !== abaFiltro) return false;
+    if (p.anchorId === secaoDomId) return true;
+    if (!match) return false;
+    if (match.itemIds?.includes(p.itemId)) return true;
+    if (match.prefixes?.some((pre) => p.itemId.startsWith(pre))) return true;
+    if (match.fotoKeys?.length) {
+      const foto = fotoKeyFromItemId(p.itemId);
+      if (foto && match.fotoKeys.includes(foto)) return true;
+    }
+    return false;
+  });
+}
+
+export function indiceBlocoTemPendencia(
+  blocoId: PendenciaBlocoId | undefined,
+  subitensComPendencia: boolean,
+  activeItemIds: Iterable<string>,
+): boolean {
+  if (subitensComPendencia) return true;
+  if (!blocoId) return false;
+  return countPendenciasNoBloco(activeItemIds, blocoId) > 0;
+}
+
+/** Conta pendências ativas da aba (RE / RC / equipamento) para badge na tab do Índice. */
+export function countPendenciasNaAba(
+  active: PendenciaIndiceRef[],
+  aba: PendenciaAba,
+): number {
+  return active.reduce((n, p) => (p.aba === aba ? n + 1 : n), 0);
+}

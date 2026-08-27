@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-store";
 import { gerarPDFRelatorio } from "@/lib/pdf/gerar-pdf-relatorio";
 import { hasPainelFullAccess } from "@/lib/roles";
+import type { PendenciaItem } from "@/lib/pendencias-itens";
+
+const EMPTY_PENDENCIAS: PendenciaItem[] = [];
 import {
   appendStoredPhotoToPayload,
   confirmarPendenciasItensRelatorio,
@@ -409,7 +412,7 @@ function AdminLancamentoDetalhePage() {
   const mostrarFooter = Boolean(row && (row.status === "fechado" || podeAuditar));
 
   return (
-    <PendenciasProvider mode="gestor" confirmed={row?.payload.pendenciasItens ?? []}>
+    <PendenciasProvider mode="gestor" confirmed={row?.payload.pendenciasItens ?? EMPTY_PENDENCIAS}>
       <div className="min-h-screen w-full max-w-full min-w-0 bg-white">
         {/* Nesta tela o logo rola com a página — só abas/busca/blocos ficam sticky. */}
         <AppHeader compact sticky={false} />

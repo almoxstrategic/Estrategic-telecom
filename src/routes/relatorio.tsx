@@ -233,7 +233,9 @@ type FotoGrupoUi = { slots: FotoSlot[]; obs: string; obsAdmin: string };
 function PendenciasAbaBridge({ setAba }: { setAba: (aba: AbaCampo) => void }) {
   const ctx = usePendencias();
   useEffect(() => {
-    ctx?.registerAbaController({ setAba });
+    ctx?.registerAbaController({
+      setAba: (aba) => setAba(aba as AbaCampo),
+    });
     return () => ctx?.registerAbaController(null);
   }, [ctx, setAba]);
   return null;
