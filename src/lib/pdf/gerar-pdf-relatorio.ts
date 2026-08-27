@@ -1235,23 +1235,108 @@ async function drawCaboResumoPair(
   }
 }
 
+async function drawCaboResumoReOnly(
+  ctx: LayoutCtx,
+  titulo: string,
+  re: PdfResumoCaboResumo,
+  opts?: { forceNewPage?: boolean },
+): Promise<void> {
+  const rows: [string, string][] = [
+    ["Modelo do cabo", re.modelo],
+    ["Marcacao Inicial", re.marcacaoInicial],
+    ["Marcacao Final", re.marcacaoFinal],
+    ["Total de cabos (qtd)", re.qtdCabos],
+    ["Total metragem (m)", re.totalMetros],
+  ];
+  const labelW = CONTENT_W * 0.42;
+  const valW = CONTENT_W * 0.58;
+  const rowH = 14;
+  const titleH = 18 + 6;
+  const blockH = titleH + rowH + rows.length * rowH + 6;
+
+  if (opts?.forceNewPage) {
+    await newPage(ctx, false);
+  } else {
+    await ensureSpace(ctx, blockH);
+  }
+
+  ctx.lockBreak = true;
+  try {
+    await drawResumoSectionTitle(ctx, titulo);
+    ctx.page.drawRectangle({
+      x: MARGIN_X,
+      y: topToPdfY(ctx.yFromTop + rowH),
+      width: CONTENT_W,
+      height: rowH,
+      color: COR_GRAY_ROW,
+    });
+    ctx.page.drawText(sanitizePdfText("Campo"), {
+      x: MARGIN_X + 3,
+      y: topToPdfY(ctx.yFromTop + 10),
+      size: 7,
+      font: ctx.fontBold,
+      color: COR_MUTED,
+    });
+    ctx.page.drawText(sanitizePdfText("RE"), {
+      x: MARGIN_X + labelW + 3,
+      y: topToPdfY(ctx.yFromTop + 10),
+      size: 7,
+      font: ctx.fontBold,
+      color: COR_MUTED,
+    });
+    ctx.yFromTop += rowH;
+
+    for (const [lab, val] of rows) {
+      ctx.page.drawRectangle({
+        x: MARGIN_X,
+        y: topToPdfY(ctx.yFromTop + rowH),
+        width: CONTENT_W,
+        height: rowH,
+        borderColor: COR_LINE,
+        borderWidth: 0.4,
+      });
+      ctx.page.drawText(truncate(lab, ctx.font, 7, labelW - 6), {
+        x: MARGIN_X + 3,
+        y: topToPdfY(ctx.yFromTop + 10),
+        size: 7,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+      ctx.page.drawText(truncate(val, ctx.font, 7, valW - 6), {
+        x: MARGIN_X + labelW + 3,
+        y: topToPdfY(ctx.yFromTop + 10),
+        size: 7,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+      ctx.yFromTop += rowH;
+    }
+    ctx.yFromTop += 6;
+  } finally {
+    ctx.lockBreak = false;
+  }
+}
+
 async function drawMedicoesTable(
   ctx: LayoutCtx,
   bloco: ResumoCadernoLinha["bloco"],
   linhas: ResumoCadernoLinha[],
+  opts?: { somenteRe?: boolean },
 ): Promise<void> {
   const rows = linhas.filter((l) => l.bloco === bloco);
   if (!rows.length) return;
 
   if (bloco === "acessos") {
+    if (opts?.somenteRe) return;
     await drawMedicoesTableAcessosRc(ctx, rows);
     return;
   }
 
   await drawResumoSectionTitle(ctx, tituloBlocoResumo(bloco));
 
-  const colLabel = CONTENT_W * 0.28;
-  const colVal = CONTENT_W * 0.14;
+  const somenteRe = opts?.somenteRe === true;
+  const colLabel = somenteRe ? CONTENT_W * 0.55 : CONTENT_W * 0.28;
+  const colVal = somenteRe ? CONTENT_W * 0.45 : CONTENT_W * 0.14;
   const colTotal = CONTENT_W * 0.14;
   const headerH = 16;
   const rowH = 13;
@@ -1264,13 +1349,18 @@ async function drawMedicoesTable(
     height: headerH,
     color: COR_GRAY_ROW,
   });
-  const headers: [string, number][] = [
-    ["Resumo RE", MARGIN_X + 2],
-    ["Valor", MARGIN_X + colLabel + 2],
-    ["TOTAL", MARGIN_X + colLabel + colVal + 2],
-    ["Valor", MARGIN_X + colLabel + colVal + colTotal + 2],
-    ["Resumo RC", MARGIN_X + colLabel + colVal * 2 + colTotal + 2],
-  ];
+  const headers: [string, number][] = somenteRe
+    ? [
+        ["Resumo RE", MARGIN_X + 2],
+        ["Valor", MARGIN_X + colLabel + 2],
+      ]
+    : [
+        ["Resumo RE", MARGIN_X + 2],
+        ["Valor", MARGIN_X + colLabel + 2],
+        ["TOTAL", MARGIN_X + colLabel + colVal + 2],
+        ["Valor", MARGIN_X + colLabel + colVal + colTotal + 2],
+        ["Resumo RC", MARGIN_X + colLabel + colVal * 2 + colTotal + 2],
+      ];
   for (const [lab, x] of headers) {
     ctx.page.drawText(sanitizePdfText(lab), {
       x,
@@ -1303,13 +1393,33 @@ async function drawMedicoesTable(
       borderWidth: 0.35,
     });
 
-    const labelRc = row.labelRc ?? row.label;
-    const unidadeRc = row.unidadeRc ?? row.unidade;
     const reTxt = formatResumoNumero(row.re, row.unidade);
-    const rcTxt = formatResumoNumero(row.rc, unidadeRc);
-    const totalTxt = row.omitTotal ? "—" : formatResumoNumero(row.total, row.unidade);
     const reComUn =
       row.unidade === "SIM/NÃO" ? reTxt : `${reTxt} ${row.unidade}`.trim();
+
+    if (somenteRe) {
+      ctx.page.drawText(truncate(row.label, ctx.font, 6.5, colLabel - 4), {
+        x: MARGIN_X + 2,
+        y: topToPdfY(ctx.yFromTop + 9),
+        size: 6.5,
+        font: ctx.font,
+        color: COR_TEXTO,
+      });
+      ctx.page.drawText(truncate(reComUn, ctx.fontBold, 6.5, colVal - 4), {
+        x: MARGIN_X + colLabel + 2,
+        y: topToPdfY(ctx.yFromTop + 9),
+        size: 6.5,
+        font: ctx.fontBold,
+        color: COR_TEXTO,
+      });
+      ctx.yFromTop += rowH;
+      continue;
+    }
+
+    const labelRc = row.labelRc ?? row.label;
+    const unidadeRc = row.unidadeRc ?? row.unidade;
+    const rcTxt = formatResumoNumero(row.rc, unidadeRc);
+    const totalTxt = row.omitTotal ? "—" : formatResumoNumero(row.total, row.unidade);
     const rcComUn =
       unidadeRc === "SIM/NÃO" ? rcTxt : `${rcTxt} ${unidadeRc}`.trim();
     const totComUn =
@@ -1467,34 +1577,57 @@ async function drawMedicoesTableAcessosRc(
  * Folha de rosto: Resumo Executivo consolidado (alimentado pela aba Medições + cadastro).
  * Pode ocupar 1–2 páginas; o detalhe fotográfico começa em página seguinte.
  */
-async function drawResumoExecutivo(ctx: LayoutCtx, data: PdfResumoExecutivo): Promise<void> {
+async function drawResumoExecutivo(
+  ctx: LayoutCtx,
+  data: PdfResumoExecutivo,
+  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+): Promise<void> {
+  const isImplantacao = tipoExecucao === "implantacao";
+  const medicoesOpts = isImplantacao ? { somenteRe: true as const } : undefined;
+
   await drawHeading(ctx, "0. Resumo Executivo Consolidado");
 
   await drawResumoSectionTitle(ctx, "Dados da rede (especificos)");
-  await drawResumoKv(ctx, [
-    ["Tecnologia do Acesso", data.tecnologiaAcesso],
-  ], 2);
+  await drawResumoKv(ctx, [["Tecnologia do Acesso", data.tecnologiaAcesso]], 2);
 
-  await drawResumoSectionTitle(ctx, "Equipamentos e Fibras");
-  await drawResumoKv(ctx, [
-    ["Instalacao de equip. CLIENTE", data.instalacaoEquipCliente],
-    ["Instalacao de equip. Estacao/PPC", data.instalacaoEquipEstacao],
-    ["Quantidade de Fibras (FO)", data.quantidadeFibrasFo],
-    ["Identificacao da Estacao/PPC", data.identificacaoEstacao],
-  ], 2);
+  if (!isImplantacao) {
+    await drawResumoSectionTitle(ctx, "Equipamentos e Fibras");
+    await drawResumoKv(ctx, [
+      ["Instalacao de equip. CLIENTE", data.instalacaoEquipCliente],
+      ["Instalacao de equip. Estacao/PPC", data.instalacaoEquipEstacao],
+      ["Quantidade de Fibras (FO)", data.quantidadeFibrasFo],
+      ["Identificacao da Estacao/PPC", data.identificacaoEstacao],
+    ], 2);
+  } else if (data.quantidadeFibrasFo !== "—") {
+    await drawResumoSectionTitle(ctx, "Fibras (RE)");
+    await drawResumoKv(ctx, [["Quantidade de Fibras (FO)", data.quantidadeFibrasFo]], 2);
+  }
 
-  await drawCaboResumoPair(ctx, "Lançamento Aéreo — cabos (RE x RC)", data.caboAereoRe, data.caboAereoRc);
-  await drawMedicoesTable(ctx, "aereo", data.linhas);
-  await drawMedicoesTable(ctx, "aterramento", data.linhas);
-  await drawCaboResumoPair(
-    ctx,
-    "Lançamento Subterrâneo — cabos (RE x RC)",
-    data.caboSubRe,
-    data.caboSubRc,
-    { forceNewPage: true },
-  );
-  await drawMedicoesTable(ctx, "subterraneo", data.linhas);
-  await drawMedicoesTable(ctx, "acessos", data.linhas);
+  if (isImplantacao) {
+    await drawCaboResumoReOnly(ctx, "Lançamento Aéreo — cabos (RE)", data.caboAereoRe);
+    await drawMedicoesTable(ctx, "aereo", data.linhas, medicoesOpts);
+    await drawMedicoesTable(ctx, "aterramento", data.linhas, medicoesOpts);
+    await drawCaboResumoReOnly(
+      ctx,
+      "Lançamento Subterrâneo — cabos (RE)",
+      data.caboSubRe,
+      { forceNewPage: true },
+    );
+    await drawMedicoesTable(ctx, "subterraneo", data.linhas, medicoesOpts);
+  } else {
+    await drawCaboResumoPair(ctx, "Lançamento Aéreo — cabos (RE x RC)", data.caboAereoRe, data.caboAereoRc);
+    await drawMedicoesTable(ctx, "aereo", data.linhas, medicoesOpts);
+    await drawMedicoesTable(ctx, "aterramento", data.linhas, medicoesOpts);
+    await drawCaboResumoPair(
+      ctx,
+      "Lançamento Subterrâneo — cabos (RE x RC)",
+      data.caboSubRe,
+      data.caboSubRc,
+      { forceNewPage: true },
+    );
+    await drawMedicoesTable(ctx, "subterraneo", data.linhas, medicoesOpts);
+    await drawMedicoesTable(ctx, "acessos", data.linhas, medicoesOpts);
+  }
 
   // Detalhe técnico (Potência / OTDR) e evidências começam em página seguinte.
   await newPage(ctx, false);
@@ -1572,7 +1705,7 @@ export async function gerarPDFRelatorio(row: RelatorioTransmissao): Promise<void
   };
 
   await newPage(ctx, true);
-  await drawResumoExecutivo(ctx, resumo);
+  await drawResumoExecutivo(ctx, resumo, row.tipo_execucao);
 
   if (!blocks.length) {
     await drawParagraph(ctx, "Nenhum conteudo fotografico ou de andamento preenchido nesta OS.");

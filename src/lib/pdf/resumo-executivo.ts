@@ -5,6 +5,7 @@ import {
 } from "@/lib/resumo-caderno";
 import {
   calcularMetragemCaboTotal,
+  filtrarCabosComConteudo,
   type CaboMetragemPayload,
   type LancamentoPorAmbientePayload,
   type RelatorioPayload,
@@ -74,7 +75,8 @@ function resumoCabosAmbiente(
   lancamento: LancamentoPorAmbientePayload | null | undefined,
   ambiente: "aereo" | "subterraneo",
 ): PdfResumoCaboResumo {
-  const cabos = lancamento?.[ambiente]?.metragens ?? [];
+  const cabosBrutos = lancamento?.[ambiente]?.metragens ?? [];
+  const cabos = filtrarCabosComConteudo(cabosBrutos);
   if (!cabos.length || lancamento?.[ambiente]?.isSim !== true) {
     return {
       modelo: "—",

@@ -5,6 +5,7 @@ import {
   PERDA_CONEXAO,
   calcularAtenuacaoMaxima,
   calcularMinimoAdmissivel,
+  filtrarCabosComConteudo,
   formatarDb,
   parseNumeroCampo,
   totalConexoesCalculado,
@@ -476,16 +477,7 @@ function collectCabos(
   tituloSecao: string,
   cabos: CaboMetragemPayload[],
 ) {
-  const ativos = cabos.filter(
-    (c) =>
-      hasPhoto(c.fotoInicio) ||
-      hasPhoto(c.fotoFim) ||
-      c.tipoCabo.trim() ||
-      c.marcacaoInicial.trim() ||
-      c.marcacaoFinal.trim() ||
-      c.metragem.trim() ||
-      c.obs.trim(),
-  );
+  const ativos = filtrarCabosComConteudo(cabos);
   if (!ativos.length) return;
   pushHeading(blocks, tituloSecao);
   for (const [index, cabo] of ativos.entries()) {
@@ -832,8 +824,9 @@ export function collectPdfBlocksEscopo(
   prefix?: string,
 ): PdfContentBlock[] {
   const sec = (titulo: string) => (prefix ? `${prefix} · ${titulo}` : titulo);
+  const isImplantacao = tipoExecucao === "implantacao";
 
-  // —— Ordem: Potência → OTDR → evidências fotográficas (RE/RC/Equipamentos) ——
+  // —— Ordem: Potência → OTDR → evidências fotográficas (RE / [RC+Equip. empresarial]) ——
 
   // 1. Teste de Potência (empresarial)
   collectTestePotenciaTabelas(blocks, p, tipoExecucao);
@@ -844,8 +837,8 @@ export function collectPdfBlocksEscopo(
     if (otdrAtoms.length) pushGroup(blocks, otdrAtoms);
   }
 
-  // 2b / 7. Teste Óptico — medições técnicas (após OTDR, antes das fotos de campo)
-  {
+  // 2b. Teste Óptico (Power Meter / Caneta Laser) — somente empresarial
+  if (!isImplantacao) {
     const to = p?.testeOptico;
     if (to) {
       const optico: PdfAtomicBlock[] = [{ kind: "heading", text: sec("2.1. Teste Optico") }];
@@ -1014,6 +1007,10 @@ export function collectPdfBlocksEscopo(
 
   // —— Outras Fotos (RE) ——
   collectOutras(blocks, "Outras Fotos (RE)", p?.outrasFotos ?? []);
+
+  if (isImplantacao) {
+    return blocks;
+  }
 
   // 4. Rede Cliente (RC)
   pushHeading(blocks, sec("4. Rede Cliente (RC)"));

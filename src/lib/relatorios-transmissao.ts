@@ -667,6 +667,35 @@ export function emptyCaboMetragem(): CaboMetragemPayload {
   };
 }
 
+function storedPhotoTemConteudo(foto: StoredPhoto | null | undefined): boolean {
+  return Boolean(foto?.path?.trim() || foto?.url?.trim());
+}
+
+/** Cabo com ao menos um campo principal preenchido (ignora placeholder vazio do formulário). */
+export function caboMetragemTemConteudo(cabo: CaboMetragemPayload): boolean {
+  if (storedPhotoTemConteudo(cabo.fotoInicio) || storedPhotoTemConteudo(cabo.fotoFim)) {
+    return true;
+  }
+  if (String(cabo.tipoCabo ?? "").trim()) return true;
+  if (String(cabo.marcacaoInicial ?? "").trim()) return true;
+  if (String(cabo.marcacaoFinal ?? "").trim()) return true;
+  const metragemDireta = Number.parseFloat(String(cabo.metragem ?? "").replace(",", "."));
+  if (Number.isFinite(metragemDireta) && metragemDireta > 0) return true;
+  if (String(cabo.metragem ?? "").trim()) return true;
+  const calc = Number.parseFloat(
+    calcularMetragemCaboTotal(cabo.marcacaoInicial ?? "", cabo.marcacaoFinal ?? "").replace(
+      ",",
+      ".",
+    ),
+  );
+  if (Number.isFinite(calc) && calc > 0) return true;
+  return false;
+}
+
+export function filtrarCabosComConteudo(cabos: CaboMetragemPayload[]): CaboMetragemPayload[] {
+  return cabos.filter(caboMetragemTemConteudo);
+}
+
 export function emptyEquipamentoClienteItem(): EquipamentoClienteItemPayload {
   return {
     id: crypto.randomUUID(),

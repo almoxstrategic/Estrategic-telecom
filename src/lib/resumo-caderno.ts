@@ -1,5 +1,6 @@
 import {
   calcularMetragemCaboTotal,
+  filtrarCabosComConteudo,
   parseMarcacaoNumero,
   type CaboMetragemPayload,
   type CordoalhaBlocoPayload,
@@ -74,7 +75,10 @@ function somaMetragemAmbiente(
   ambiente: "aereo" | "subterraneo",
 ): number {
   if (!lancamento) return 0;
-  return (lancamento[ambiente]?.metragens ?? []).reduce((acc, cabo) => acc + metragemCabo(cabo), 0);
+  return filtrarCabosComConteudo(lancamento[ambiente]?.metragens ?? []).reduce(
+    (acc, cabo) => acc + metragemCabo(cabo),
+    0,
+  );
 }
 
 function tipoCaboNumero(cabo: CaboMetragemPayload): number | null {
@@ -92,7 +96,7 @@ function metragensPorCapacidadeFo(
 ): Map<number, number> {
   const map = new Map<number, number>();
   if (!lancamento) return map;
-  for (const cabo of lancamento[ambiente]?.metragens ?? []) {
+  for (const cabo of filtrarCabosComConteudo(lancamento[ambiente]?.metragens ?? [])) {
     const tipo = tipoCaboNumero(cabo) ?? 0;
     map.set(tipo, (map.get(tipo) ?? 0) + metragemCabo(cabo));
   }
