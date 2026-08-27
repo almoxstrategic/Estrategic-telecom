@@ -173,10 +173,12 @@ export function totalPostesDeduplicado(re: number, rc: number): number {
   return Math.max(0, soma - 1);
 }
 
-/** Conta itens por tipo (equipamentos + Roseta do cliente). */
+/** Conta itens por tipo (equipamentos + lista auxiliar, ex.: Roseta / DGO). */
 function contagemPorTipoEquipamento(
   equipamentos: { tipoEquipamento?: string | null }[] | null | undefined,
-  rosetas: { tipoEquipamento?: string | null }[] | null | undefined,
+  extras: { tipoEquipamento?: string | null }[] | null | undefined,
+  /** Tipo forçado para cada item da lista auxiliar (ex.: "Roseta"). */
+  extraTipoFixo?: string,
 ): Map<string, number> {
   const map = new Map<string, number>();
   for (const item of equipamentos ?? []) {
@@ -184,9 +186,10 @@ function contagemPorTipoEquipamento(
     if (!tipo) continue;
     map.set(tipo, (map.get(tipo) ?? 0) + 1);
   }
-  // Bloco Roseta: conta sempre como Roseta (legado pode ainda ter DGO/PDO).
-  for (const _item of rosetas ?? []) {
-    map.set("Roseta", (map.get("Roseta") ?? 0) + 1);
+  for (const item of extras ?? []) {
+    const tipo = extraTipoFixo ?? String(item.tipoEquipamento ?? "").trim();
+    if (!tipo) continue;
+    map.set(tipo, (map.get(tipo) ?? 0) + 1);
   }
   return map;
 }
@@ -194,6 +197,10 @@ function contagemPorTipoEquipamento(
 function labelTipoEquipamentoMedicao(tipo: string): string {
   if (tipo === "Roseta") return "Roseta instalada";
   return `Equipamento ${tipo}`;
+}
+
+function somaContagem(map: Map<string, number>): number {
+  return [...map.values()].reduce((acc, n) => acc + n, 0);
 }
 
 /**
@@ -222,13 +229,32 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
     ),
   );
 
-  const porTipo = contagemPorTipoEquipamento(p?.eqClienteEquipamentos, p?.eqClienteDgo);
-  const linhasTipoEq = [...porTipo.entries()]
-    .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
-    .map(([tipo, qtd]) =>
-      linha(`eq-tipo-${tipo}`, "acessos", labelTipoEquipamentoMedicao(tipo), "Unid.", 0, qtd),
-    );
-  const totalEquipamentos = [...porTipo.values()].reduce((acc, n) => acc + n, 0);
+  // Cliente (RC): equipamentos + Roseta. Estação/PPC: equipamentos + DGO/DID/ROUTER.
+  const porTipoCliente = contagemPorTipoEquipamento(
+    p?.eqClienteEquipamentos,
+    p?.eqClienteDgo,
+    "Roseta",
+  );
+  const porTipoEstacao = contagemPorTipoEquipamento(
+    p?.eqEstacaoEquipamento,
+    p?.eqEstacaoDgo,
+    "DGO / DID / ROUTER",
+  );
+  const tiposEq = [
+    ...new Set([...porTipoEstacao.keys(), ...porTipoCliente.keys()]),
+  ].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const linhasTipoEq = tiposEq.map((tipo) =>
+    linha(
+      `eq-tipo-${tipo}`,
+      "acessos",
+      labelTipoEquipamentoMedicao(tipo),
+      "Unid.",
+      porTipoEstacao.get(tipo) ?? 0,
+      porTipoCliente.get(tipo) ?? 0,
+    ),
+  );
+  const totalEquipamentosEstacao = somaContagem(porTipoEstacao);
+  const totalEquipamentosCliente = somaContagem(porTipoCliente);
 
   const linhas: ResumoCadernoLinha[] = [
     // —— A. Infraestrutura Aérea (ordem fixa) ——
@@ -326,14 +352,15 @@ export function buildResumoCaderno(payload: RelatorioPayload | null | undefined)
       rc.caixaSubterranea,
     ),
 
-    // —— Acessos e Equipamentos ——
+    // —— Acessos e Equipamentos (re = Estação/PPC, rc = Cliente) ——
     linha(
       "eq-instalados",
       "acessos",
-      "Quantidade de EQUIPAMENTOS instalados",
+      "Quantidade de EQUIPAMENTOS na Estação/PPC",
       "Unid.",
-      0,
-      totalEquipamentos,
+      totalEquipamentosEstacao,
+      totalEquipamentosCliente,
+      "Quantidade de EQUIPAMENTOS no Cliente (RC)",
     ),
     ...linhasTipoEq,
   ];

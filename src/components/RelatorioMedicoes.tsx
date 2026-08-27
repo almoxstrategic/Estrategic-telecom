@@ -79,13 +79,17 @@ function TabelaBlocoDesktop({
           <thead>
             <tr className="bg-gray-200 text-xs font-bold text-gray-800">
               <th className="border border-gray-300 px-2 py-2 text-left">
-                Resumo REDE DE ACESSO (RE)
+                {bloco === "acessos"
+                  ? "Equipamentos na Estação/PPC"
+                  : "Resumo REDE DE ACESSO (RE)"}
               </th>
               <th className="w-[8rem] border border-gray-300 px-1 py-2 text-center">Valor</th>
               <th className="w-[8rem] border border-gray-300 px-1 py-2 text-center">TOTAL</th>
               <th className="w-[8rem] border border-gray-300 px-1 py-2 text-center">Valor</th>
               <th className="border border-gray-300 px-2 py-2 text-left">
-                Resumo REDE CLIENTE (RC)
+                {bloco === "acessos"
+                  ? "Equipamentos no Cliente (RC)"
+                  : "Resumo REDE CLIENTE (RC)"}
               </th>
             </tr>
           </thead>

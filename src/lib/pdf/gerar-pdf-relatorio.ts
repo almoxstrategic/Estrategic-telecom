@@ -1272,15 +1272,15 @@ async function drawMedicoesTable(
   ctx.yFromTop += 8;
 }
 
-/** Acessos/equipamentos: só Rede Cliente — colunas Resumo RC + TOTAL. */
+/** Acessos/equipamentos: Cliente (RC) + Estação/PPC + TOTAL. */
 async function drawMedicoesTableAcessosRc(
   ctx: LayoutCtx,
   rows: ResumoCadernoLinha[],
 ): Promise<void> {
   await drawResumoSectionTitle(ctx, tituloBlocoResumo("acessos"));
 
-  const colLabel = CONTENT_W * 0.72;
-  const colTotal = CONTENT_W * 0.28;
+  const colLabel = CONTENT_W * 0.4;
+  const colVal = CONTENT_W * 0.2;
   const headerH = 16;
   const rowH = 13;
 
@@ -1292,20 +1292,21 @@ async function drawMedicoesTableAcessosRc(
     height: headerH,
     color: COR_GRAY_ROW,
   });
-  ctx.page.drawText(sanitizePdfText("Resumo RC"), {
-    x: MARGIN_X + 2,
-    y: topToPdfY(ctx.yFromTop + 11),
-    size: 6.5,
-    font: ctx.fontBold,
-    color: COR_MUTED,
-  });
-  ctx.page.drawText(sanitizePdfText("TOTAL"), {
-    x: MARGIN_X + colLabel + 2,
-    y: topToPdfY(ctx.yFromTop + 11),
-    size: 6.5,
-    font: ctx.fontBold,
-    color: COR_MUTED,
-  });
+  const headers: [string, number][] = [
+    ["Equipamento / item", MARGIN_X + 2],
+    ["Cliente (RC)", MARGIN_X + colLabel + 2],
+    ["Estação/PPC", MARGIN_X + colLabel + colVal + 2],
+    ["TOTAL", MARGIN_X + colLabel + colVal * 2 + 2],
+  ];
+  for (const [lab, x] of headers) {
+    ctx.page.drawText(sanitizePdfText(lab), {
+      x,
+      y: topToPdfY(ctx.yFromTop + 11),
+      size: 6.5,
+      font: ctx.fontBold,
+      color: COR_MUTED,
+    });
+  }
   ctx.yFromTop += headerH;
 
   for (let idx = 0; idx < rows.length; idx++) {
@@ -1329,12 +1330,22 @@ async function drawMedicoesTableAcessosRc(
       borderWidth: 0.35,
     });
 
-    const label = row.labelRc ?? row.label;
+    // Preferência: rótulo neutro do tipo; na linha de totais, texto curto.
+    const label =
+      row.id === "eq-instalados"
+        ? "Quantidade de EQUIPAMENTOS instalados"
+        : row.labelRc ?? row.label;
     const unidade = row.unidadeRc ?? row.unidade;
-    const valor = row.omitTotal ? row.rc : Number.isFinite(row.total) ? row.total : row.rc;
-    const valorTxt = formatResumoNumero(valor, unidade);
-    const valorComUn =
-      unidade === "SIM/NÃO" ? valorTxt : `${valorTxt} ${unidade}`.trim();
+    const clienteTxt = formatResumoNumero(row.rc, unidade);
+    const estacaoTxt = formatResumoNumero(row.re, row.unidade);
+    const totalTxt = row.omitTotal
+      ? "—"
+      : formatResumoNumero(
+          Number.isFinite(row.total) ? row.total : row.re + row.rc,
+          row.unidade,
+        );
+    const fmt = (v: string, un: string) =>
+      un === "SIM/NÃO" ? v : `${v} ${un}`.trim();
 
     ctx.page.drawText(truncate(label, ctx.font, 6.5, colLabel - 4), {
       x: MARGIN_X + 2,
@@ -1343,8 +1354,22 @@ async function drawMedicoesTableAcessosRc(
       font: ctx.font,
       color: COR_TEXTO,
     });
-    ctx.page.drawText(truncate(valorComUn, ctx.fontBold, 6.5, colTotal - 4), {
+    ctx.page.drawText(truncate(fmt(clienteTxt, unidade), ctx.fontBold, 6.5, colVal - 4), {
       x: MARGIN_X + colLabel + 2,
+      y: topToPdfY(ctx.yFromTop + 9),
+      size: 6.5,
+      font: ctx.fontBold,
+      color: COR_TEXTO,
+    });
+    ctx.page.drawText(truncate(fmt(estacaoTxt, row.unidade), ctx.fontBold, 6.5, colVal - 4), {
+      x: MARGIN_X + colLabel + colVal + 2,
+      y: topToPdfY(ctx.yFromTop + 9),
+      size: 6.5,
+      font: ctx.fontBold,
+      color: COR_TEXTO,
+    });
+    ctx.page.drawText(truncate(fmt(totalTxt, row.unidade), ctx.fontBold, 6.5, colVal - 4), {
+      x: MARGIN_X + colLabel + colVal * 2 + 2,
       y: topToPdfY(ctx.yFromTop + 9),
       size: 6.5,
       font: ctx.fontBold,
