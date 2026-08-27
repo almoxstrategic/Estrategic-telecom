@@ -583,6 +583,7 @@ function appendParJanelasOpticas(
 function buildTesteOtdrAtoms(
   p: RelatorioPayload | undefined,
   tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+  tituloSecaoOverride?: string,
 ): PdfAtomicBlock[] {
   if (!p) return [];
   const isImplantacao = tipoExecucao === "implantacao";
@@ -594,7 +595,9 @@ function buildTesteOtdrAtoms(
   const ativos = otdrItens.filter((item) => hasPhoto(item.foto) || andamentoTexto(item.obs, item.obsAdmin));
   if (!kmRaw && !ativos.length) return [];
 
-  const tituloSecao = isImplantacao ? "2. Teste OTDR (Implantacao)" : "2. Teste OTDR (Empresarial)";
+  const tituloSecao =
+    tituloSecaoOverride ??
+    (isImplantacao ? "2. Teste OTDR (Implantacao)" : "2. Teste OTDR (Empresarial)");
   const children: PdfAtomicBlock[] = [{ kind: "heading", text: tituloSecao }];
 
   if (kmRaw) {
@@ -817,44 +820,14 @@ export function buildCabecalhoDados(row: RelatorioTransmissao): PdfCabecalhoDado
   };
 }
 
-export function collectPdfBlocksEscopo(
+/** Evidências fotográficas da Rede Externa (RE). */
+function collectRedeExternaRe(
   blocks: PdfContentBlock[],
   p: RelatorioPayload | undefined,
-  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
-  prefix?: string,
-): PdfContentBlock[] {
-  const sec = (titulo: string) => (prefix ? `${prefix} · ${titulo}` : titulo);
-  const isImplantacao = tipoExecucao === "implantacao";
-
-  // —— Ordem: Potência → OTDR → evidências fotográficas (RE / [RC+Equip. empresarial]) ——
-
-  // 1. Teste de Potência (empresarial)
-  collectTestePotenciaTabelas(blocks, p, tipoExecucao);
-
-  // 2. Teste OTDR
-  {
-    const otdrAtoms = buildTesteOtdrAtoms(p, tipoExecucao);
-    if (otdrAtoms.length) pushGroup(blocks, otdrAtoms);
-  }
-
-  // 2b. Teste Óptico (Power Meter / Caneta Laser) — somente empresarial
-  if (!isImplantacao) {
-    const to = p?.testeOptico;
-    if (to) {
-      const optico: PdfAtomicBlock[] = [{ kind: "heading", text: sec("2.1. Teste Optico") }];
-      appendParJanelasOpticas(
-        optico,
-        "No Cliente",
-        to.cliente?.nm1550?.[0],
-        to.cliente?.nm1330?.[0],
-        to.cliente?.numeroFibra,
-      );
-      if (optico.length > 1) pushGroup(blocks, optico);
-    }
-  }
-
-  // 3. Rede Externa (RE) — evidências por subbloco do formulário
-  pushHeading(blocks, sec("3. Rede Externa (RE)"));
+  sec: (titulo: string) => string,
+  numeroSecao: "1" | "3",
+) {
+  pushHeading(blocks, sec(`${numeroSecao}. Rede Externa (RE)`));
 
   // —— Lançamento (RE) ——
   pushHeading(blocks, sec("Lançamento (RE)"));
@@ -1007,10 +980,54 @@ export function collectPdfBlocksEscopo(
 
   // —— Outras Fotos (RE) ——
   collectOutras(blocks, "Outras Fotos (RE)", p?.outrasFotos ?? []);
+}
 
+function pushTesteOtdrSection(
+  blocks: PdfContentBlock[],
+  p: RelatorioPayload | undefined,
+  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+  sec: (titulo: string) => string,
+  tituloSecao: string,
+) {
+  const otdrAtoms = buildTesteOtdrAtoms(p, tipoExecucao, sec(tituloSecao));
+  if (otdrAtoms.length) pushGroup(blocks, otdrAtoms);
+}
+
+export function collectPdfBlocksEscopo(
+  blocks: PdfContentBlock[],
+  p: RelatorioPayload | undefined,
+  tipoExecucao: RelatorioTransmissao["tipo_execucao"],
+  prefix?: string,
+): PdfContentBlock[] {
+  const sec = (titulo: string) => (prefix ? `${prefix} · ${titulo}` : titulo);
+  const isImplantacao = tipoExecucao === "implantacao";
+
+  // Implantação: exclusivamente RE → OTDR (sem Potência, Óptico, RC ou Equipamentos).
   if (isImplantacao) {
+    collectRedeExternaRe(blocks, p, sec, "1");
+    pushTesteOtdrSection(blocks, p, tipoExecucao, sec, "2. Teste OTDR (Implantacao)");
     return blocks;
   }
+
+  // —— Empresarial: Potência → OTDR → Óptico → RE → RC → Equipamentos ——
+
+  collectTestePotenciaTabelas(blocks, p, tipoExecucao);
+  pushTesteOtdrSection(blocks, p, tipoExecucao, sec, "2. Teste OTDR (Empresarial)");
+
+  const to = p?.testeOptico;
+  if (to) {
+    const optico: PdfAtomicBlock[] = [{ kind: "heading", text: sec("2.1. Teste Optico") }];
+    appendParJanelasOpticas(
+      optico,
+      "No Cliente",
+      to.cliente?.nm1550?.[0],
+      to.cliente?.nm1330?.[0],
+      to.cliente?.numeroFibra,
+    );
+    if (optico.length > 1) pushGroup(blocks, optico);
+  }
+
+  collectRedeExternaRe(blocks, p, sec, "3");
 
   // 4. Rede Cliente (RC)
   pushHeading(blocks, sec("4. Rede Cliente (RC)"));
