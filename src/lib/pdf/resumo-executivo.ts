@@ -13,7 +13,6 @@ import {
 
 export type PdfResumoCaboResumo = {
   modelo: string;
-  lote: string;
   marcacaoInicial: string;
   marcacaoFinal: string;
   totalMetros: string;
@@ -25,10 +24,6 @@ export type PdfResumoExecutivo = {
   endereco: string;
   cidade: string;
   tecnologiaAcesso: string;
-  osWf: string;
-  empreiteira: string;
-  /** Sigla CSL / identificação do cliente (quando disponível). */
-  siglaCsl: string;
   instalacaoEquipCliente: string;
   instalacaoEquipEstacao: string;
   quantidadeFibrasFo: string;
@@ -83,7 +78,6 @@ function resumoCabosAmbiente(
   if (!cabos.length || lancamento?.[ambiente]?.isSim !== true) {
     return {
       modelo: "—",
-      lote: "—",
       marcacaoInicial: "—",
       marcacaoFinal: "—",
       totalMetros: "—",
@@ -103,7 +97,6 @@ function resumoCabosAmbiente(
   const fim = cabos.map((c) => c.marcacaoFinal?.trim()).filter(Boolean);
   return {
     modelo: modelos.length ? modelos.join(", ") : "—",
-    lote: "—",
     marcacaoInicial: ini.length ? ini.join(" / ") : "—",
     marcacaoFinal: fim.length ? fim.join(" / ") : "—",
     totalMetros: Number.isInteger(total)
@@ -164,9 +157,6 @@ export function buildPdfResumoExecutivo(row: RelatorioTransmissao): PdfResumoExe
     endereco: dash(row.endereco),
     cidade: dash(row.cidade),
     tecnologiaAcesso: dash(p?.tecnologiaAcesso),
-    osWf: dash(row.os_wf),
-    empreiteira: dash(row.equipe_empreiteira),
-    siglaCsl: "—",
     instalacaoEquipCliente: simNaoLabel(temEquipamentoCliente(p)),
     instalacaoEquipEstacao: simNaoLabel(p?.relatorioEstacao),
     quantidadeFibrasFo: quantidadeFibrasFoLabel(linhas),

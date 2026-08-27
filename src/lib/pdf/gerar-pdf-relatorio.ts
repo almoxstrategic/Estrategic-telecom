@@ -1064,7 +1064,6 @@ async function drawCaboResumoPair(
   await drawResumoSectionTitle(ctx, titulo);
   const rows: [string, string, string][] = [
     ["Modelo do cabo", re.modelo, rc.modelo],
-    ["Lote", re.lote, rc.lote],
     ["Marcacao Inicial", re.marcacaoInicial, rc.marcacaoInicial],
     ["Marcacao Final", re.marcacaoFinal, rc.marcacaoFinal],
     ["Total de cabos (qtd)", re.qtdCabos, rc.qtdCabos],
@@ -1265,11 +1264,6 @@ async function drawResumoExecutivo(ctx: LayoutCtx, data: PdfResumoExecutivo): Pr
   await drawResumoSectionTitle(ctx, "Dados da rede (especificos)");
   await drawResumoKv(ctx, [
     ["Tecnologia do Acesso", data.tecnologiaAcesso],
-    ["Sigla CSL Cliente", data.siglaCsl],
-    ["OS/WF — Rede Acesso", data.osWf],
-    ["Empreiteira — Rede Acesso", data.empreiteira],
-    ["OS/WF — Rede Cliente", data.osWf],
-    ["Empreiteira — Rede Cliente", data.empreiteira],
   ], 2);
 
   await drawResumoSectionTitle(ctx, "Equipamentos e Fibras");
