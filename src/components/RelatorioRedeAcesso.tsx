@@ -882,6 +882,7 @@ export function RelatorioAbasCampo({
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [isPendenciasOpen, setIsPendenciasOpen] = useState(false);
   const [indiceAbaFiltro, setIndiceAbaFiltro] = useState<IndiceAbaFiltro>(() =>
     abaAtiva === "RE" || abaAtiva === "RC" || abaAtiva === "equipamento" ? abaAtiva : "RE",
   );
@@ -985,6 +986,19 @@ export function RelatorioAbasCampo({
       if (abaAtiva !== aba) onChange(aba);
     },
     [abaAtiva, onChange],
+  );
+
+  const handlePendenciaItemClick = useCallback(
+    (item: PendenciaItem) => {
+      setIsPendenciasOpen(false);
+      if (pendenciasCtx) {
+        pendenciasCtx.goToItem(item);
+        return;
+      }
+      onChange(item.aba as AbaCampo);
+      window.setTimeout(() => navegarParaSecaoFormulario(item.anchorId), 120);
+    },
+    [onChange, pendenciasCtx],
   );
 
   const scrollAbas = (direction: "left" | "right") => {
@@ -1126,7 +1140,7 @@ export function RelatorioAbasCampo({
               ) : null}
             </div>
 
-            <Popover>
+            <Popover open={isPendenciasOpen} onOpenChange={setIsPendenciasOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
@@ -1165,16 +1179,7 @@ export function RelatorioAbasCampo({
                           <button
                             type="button"
                             className="w-full px-4 py-3 text-left transition hover:bg-amber-50"
-                            onClick={() => {
-                              if (pendenciasCtx) pendenciasCtx.goToItem(item);
-                              else {
-                                onChange(item.aba as AbaCampo);
-                                window.setTimeout(
-                                  () => navegarParaSecaoFormulario(item.anchorId),
-                                  120,
-                                );
-                              }
-                            }}
+                            onClick={() => handlePendenciaItemClick(item)}
                           >
                             <p className="text-sm font-medium text-foreground">{item.label}</p>
                             <p className="mt-0.5 text-[11px] text-muted-foreground">
