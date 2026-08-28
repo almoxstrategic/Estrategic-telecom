@@ -18,6 +18,7 @@ import {
   Home,
   Map,
   MapPin,
+  Radio,
   Send,
   ShieldCheck,
   Database,
@@ -48,6 +49,8 @@ const MISCELANEAS_PATHS = [
 ] as const;
 
 const SERIALIZADOS_PATHS = ["/estoque-atlas", "/estoque-tecnico"] as const;
+
+const TRANSMISSAO_PATHS = ["/admin/transmissao"] as const;
 
 function isAdminHomePath(pathname: string): boolean {
   return pathname === "/admin" || pathname === "/admin/";
@@ -81,6 +84,10 @@ function matchesSerializadosGroup(
     return tab === "serializados";
   }
   return false;
+}
+
+function matchesTransmissaoGroup(pathname: string): boolean {
+  return TRANSMISSAO_PATHS.some((p) => pathMatches(pathname, p));
 }
 
 function matchesKpiGroup(pathname: string): boolean {
@@ -119,17 +126,22 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [isSerializadosOpen, setIsSerializadosOpen] = useState(() =>
     matchesSerializadosGroup(pathname, tab),
   );
+  const [isTransmissaoOpen, setIsTransmissaoOpen] = useState(() =>
+    matchesTransmissaoGroup(pathname),
+  );
   const [isKpiOpen, setIsKpiOpen] = useState(() => matchesKpiGroup(pathname));
 
   useEffect(() => {
     if (isAdminHomePath(pathname)) {
       setIsMiscelaneaOpen(false);
       setIsSerializadosOpen(false);
+      setIsTransmissaoOpen(false);
       setIsAdminOpen(true);
       return;
     }
     setIsMiscelaneaOpen(matchesMiscelaneasGroup(pathname, tab));
     setIsSerializadosOpen(matchesSerializadosGroup(pathname, tab));
+    setIsTransmissaoOpen(matchesTransmissaoGroup(pathname));
     if (matchesPainelAdminGroup(pathname)) {
       setIsAdminOpen(true);
     }
@@ -526,6 +538,53 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     >
                       <FileUp className="h-5 w-5 text-primary" />
                       Importação
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+            ) : null}
+
+            {showOperacional ? (
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsTransmissaoOpen((open) => !open)}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                  matchesTransmissaoGroup(pathname)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <Radio className="h-5 w-5 text-primary" />
+                  Transmissão
+                </span>
+                {isTransmissaoOpen ? (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+                )}
+              </button>
+              <div
+                className={`grid transition-all duration-200 ease-in-out ${
+                  isTransmissaoOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="space-y-1 pl-8 pt-1">
+                    <Link
+                      to="/admin/transmissao"
+                      onClick={onNavigate}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                      activeProps={{
+                        className: "bg-sidebar-accent text-sidebar-accent-foreground",
+                      }}
+                    >
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      Relatório de campo
                     </Link>
                   </div>
                 </div>
