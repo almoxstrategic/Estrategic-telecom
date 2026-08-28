@@ -1,0 +1,224 @@
+{
+  "fator": 1.0074128,
+  "percentual": 0.74128,
+  "total": 75,
+  "reajustados": 43,
+  "alteracoes": [
+    {
+      "tipo_os": "1 - ADESAO - INSTALACAO DE ASSINATURA",
+      "antes": 213.13,
+      "depois": 214.71
+    },
+    {
+      "tipo_os": "101 - ADESAO - INSTALAR PONTO PORTABILIDADE",
+      "antes": 199.33,
+      "depois": 200.81
+    },
+    {
+      "tipo_os": "102 - INSTALAR PONTO PORTABILIDADE",
+      "antes": 139.53,
+      "depois": 140.56
+    },
+    {
+      "tipo_os": "12 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA",
+      "antes": 184.16,
+      "depois": 185.53
+    },
+    {
+      "tipo_os": "148 - TROCA DECODER PARA ATUALIZACAO DIGITAL",
+      "antes": 92.8,
+      "depois": 93.49
+    },
+    {
+      "tipo_os": "149 - INSTALAR CABEAMENTO MESH",
+      "antes": 25.71,
+      "depois": 25.9
+    },
+    {
+      "tipo_os": "15 - MUDANCA DE LOCAL DE PONTO",
+      "antes": 167.07,
+      "depois": 168.31
+    },
+    {
+      "tipo_os": "156 - INSTALACAO WIFI MESH",
+      "antes": 62.76,
+      "depois": 63.23
+    },
+    {
+      "tipo_os": "172 - INST PONTO EXTENSAO REDE VIRTUA",
+      "antes": 167.93,
+      "depois": 169.17
+    },
+    {
+      "tipo_os": "175 - CONFIGURACAO STREAMING",
+      "antes": 77.11,
+      "depois": 77.68
+    },
+    {
+      "tipo_os": "176 - REFAZER MANUTENCAO PON",
+      "antes": 218.48,
+      "depois": 220.1
+    },
+    {
+      "tipo_os": "179 - MODERNIZACAO EQUIPAMENTO DIGITAL",
+      "antes": 51.4,
+      "depois": 51.78
+    },
+    {
+      "tipo_os": "188 - MANUTENCAO PREVENTIVA INDOOR I",
+      "antes": 100.97,
+      "depois": 101.72
+    },
+    {
+      "tipo_os": "190 - INSTALACAO DE CABO HFC",
+      "antes": 162.03,
+      "depois": 163.23
+    },
+    {
+      "tipo_os": "191 - INSTALACAO DE CABO GPON",
+      "antes": 194.2,
+      "depois": 195.64
+    },
+    {
+      "tipo_os": "209 - REFAZER MANUTENCAO",
+      "antes": 218.48,
+      "depois": 220.1
+    },
+    {
+      "tipo_os": "213 - TROCA DE EQUIPAMENTO HD",
+      "antes": 38.55,
+      "depois": 38.84
+    },
+    {
+      "tipo_os": "24 - MUDANCA DE PACOTE",
+      "antes": 93.64,
+      "depois": 94.33
+    },
+    {
+      "tipo_os": "240 - INSTALAR TV BASE",
+      "antes": 132.88,
+      "depois": 133.87
+    },
+    {
+      "tipo_os": "31 - REFAZER INSTALACAO",
+      "antes": 218.48,
+      "depois": 220.1
+    },
+    {
+      "tipo_os": "33 - REINSTALACAO - ASSINATURA",
+      "antes": 115.67,
+      "depois": 116.53
+    },
+    {
+      "tipo_os": "4 - RETIRAR PONTO",
+      "antes": 25.71,
+      "depois": 25.9
+    },
+    {
+      "tipo_os": "43 - ADESAO - INSTALAR PONTO VIRTUA",
+      "antes": 211.68,
+      "depois": 213.25
+    },
+    {
+      "tipo_os": "44 - INSTALAR PONTO VIRTUA",
+      "antes": 175.56,
+      "depois": 176.86
+    },
+    {
+      "tipo_os": "46 - REINSTALACAO - PONTO ADICIONAL VIRTUA",
+      "antes": 77.11,
+      "depois": 77.68
+    },
+    {
+      "tipo_os": "51 - ADESAO - INSTALACAO DE ASSINATURA DIGITAL",
+      "antes": 257.8,
+      "depois": 259.71
+    },
+    {
+      "tipo_os": "514 - MUDANCA DE ENDERECO - ENTREGA STREAMING",
+      "antes": 180.29,
+      "depois": 181.63
+    },
+    {
+      "tipo_os": "515 - MUDANCA DE ENDERECO - ENTREGA ADC STREAMING",
+      "antes": 174.78,
+      "depois": 176.08
+    },
+    {
+      "tipo_os": "516 - ADESAO ENTREGA STREAMING",
+      "antes": 38.56,
+      "depois": 38.85
+    },
+    {
+      "tipo_os": "517 - ADESAO ENTREGA ADC STREAMING",
+      "antes": 38.56,
+      "depois": 38.85
+    },
+    {
+      "tipo_os": "52 - ADESAO - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+      "antes": 66.44,
+      "depois": 66.93
+    },
+    {
+      "tipo_os": "53 - INSTALAR SERVICO CONEXAO ADICIONAL DIGITAL",
+      "antes": 146.17,
+      "depois": 147.25
+    },
+    {
+      "tipo_os": "54 - MUDANCA DE ENDERECO - INSTALAR ASSINATURA DIGITAL",
+      "antes": 205.77,
+      "depois": 207.3
+    },
+    {
+      "tipo_os": "55 - MUDANCA ENDERECO - INSTALAR SERVICO CONEXAO ADIC DIG",
+      "antes": 64.26,
+      "depois": 64.74
+    },
+    {
+      "tipo_os": "56 - MUDANCA DE LOCAL DE PONTO DIGITAL",
+      "antes": 167.07,
+      "depois": 168.31
+    },
+    {
+      "tipo_os": "57 - MUDANCA DE PACOTE DIGITAL",
+      "antes": 98.81,
+      "depois": 99.54
+    },
+    {
+      "tipo_os": "59 - REINSTALACAO - ASSINATURA DIGITAL",
+      "antes": 115.67,
+      "depois": 116.53
+    },
+    {
+      "tipo_os": "83 - INSTALAR PONTO VOIP",
+      "antes": 123.1,
+      "depois": 124.01
+    },
+    {
+      "tipo_os": "84 - MUDANCA DE ENDERECO - INSTALAR PONTO VOIP",
+      "antes": 174.78,
+      "depois": 176.08
+    },
+    {
+      "tipo_os": "94 - REINSTALACAO - ASSINATURA VOIP",
+      "antes": 102.82,
+      "depois": 103.58
+    },
+    {
+      "tipo_os": "95 - ADESAO - INSTALAR PONTO VOIP",
+      "antes": 199.33,
+      "depois": 200.81
+    },
+    {
+      "tipo_os": "MUDANCA DE PACOTE - AGREGADA",
+      "antes": 59.14,
+      "depois": 59.58
+    },
+    {
+      "tipo_os": "REINSTALACAO - PONTO ADICIONAL",
+      "antes": 77.11,
+      "depois": 77.68
+    }
+  ],
+  "geradoEm": "2026-08-28T13:34:50.651Z"
+}

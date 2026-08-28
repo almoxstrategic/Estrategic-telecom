@@ -20,7 +20,7 @@ export type PrecosOsMap = Record<string, PrecoOs>;
  * Versão do catálogo calibrado. Incrementar a cada recalibração oficial
  * para forçar upsert no Supabase e invalidar flags antigas no localStorage.
  */
-export const PRECOS_OS_CATALOGO_VERSION = 6;
+export const PRECOS_OS_CATALOGO_VERSION = 8;
 
 const CATALOGO_SEED_PREFIX = "estrategic.kpis.precos_os_catalogo_v";
 const CATALOGO_SEED_FLAG = `${CATALOGO_SEED_PREFIX}${PRECOS_OS_CATALOGO_VERSION}`;
