@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -1644,6 +1644,21 @@ export function AnaliseComportamento() {
     );
   }, [rankGeralMatrizOrdenada, buscaTecnicoRank]);
 
+  const alternarOrdemRankGeral = useCallback(
+    (coluna: OrdemRankGeralState["coluna"]) => {
+      setOrdemRankGeral((prev) => {
+        if (prev.coluna === coluna) {
+          return {
+            coluna,
+            direcao: prev.direcao === "asc" ? "desc" : "asc",
+          };
+        }
+        return { coluna, direcao: "desc" };
+      });
+    },
+    [],
+  );
+
   const filtrosLimpos = ano === null && mes === null;
   const visaoEquipe = tecnicoFiltro === TECNICO_TODOS;
 
@@ -2388,9 +2403,10 @@ export function AnaliseComportamento() {
                           </th>
                           <th
                             className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() =>
-                              alternarOrdemRankGeral("produtivasGeral")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alternarOrdemRankGeral("produtivasGeral");
+                            }}
                           >
                             Produtivas (Geral)
                             {setaOrdenacao(
@@ -2400,9 +2416,10 @@ export function AnaliseComportamento() {
                           </th>
                           <th
                             className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() =>
-                              alternarOrdemRankGeral("quebrasGeral")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alternarOrdemRankGeral("quebrasGeral");
+                            }}
                           >
                             Quebras (Geral)
                             {setaOrdenacao(
@@ -2412,9 +2429,10 @@ export function AnaliseComportamento() {
                           </th>
                           <th
                             className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() =>
-                              alternarOrdemRankGeral("aproveitamento")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alternarOrdemRankGeral("aproveitamento");
+                            }}
                           >
                             Aproveit.
                             {setaOrdenacao(
@@ -2424,9 +2442,10 @@ export function AnaliseComportamento() {
                           </th>
                           <th
                             className="sticky top-0 z-10 cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                            onClick={() =>
-                              alternarOrdemRankGeral("reprovacao")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alternarOrdemRankGeral("reprovacao");
+                            }}
                           >
                             Reprovação
                             {setaOrdenacao(
@@ -2438,7 +2457,10 @@ export function AnaliseComportamento() {
                             <th
                               key={d.dow}
                               className="sticky top-0 z-10 min-w-[110px] cursor-pointer select-none bg-white px-3 py-2 text-center font-semibold shadow-sm hover:bg-gray-100"
-                              onClick={() => alternarOrdemRankGeral(d.dow)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                alternarOrdemRankGeral(d.dow);
+                              }}
                             >
                               {d.curto}.
                               {setaOrdenacao(
