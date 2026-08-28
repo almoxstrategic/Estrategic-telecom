@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { UltimaImportacaoStamp } from "@/components/UltimaImportacaoStamp";
 import { Button } from "@/components/ui/button";
+import { requireImportacaoPainelAccess } from "@/lib/auth-guards";
 import { useApp } from "@/lib/app-store";
 import { replaceWoCabecalho, upsertDimMateriais, upsertWoConsumo } from "@/lib/logistica-service";
 import {
@@ -74,6 +75,7 @@ function normalizeImportacaoTab(value: unknown): ImportacaoTab {
 }
 
 export const Route = createFileRoute("/admin/importacao")({
+  beforeLoad: () => requireImportacaoPainelAccess(),
   validateSearch: (search: Record<string, unknown>): ImportacaoSearch => ({
     tab: normalizeImportacaoTab(search.tab),
   }),

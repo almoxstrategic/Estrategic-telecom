@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { requireKpisAccess } from "@/lib/auth-guards";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { AlertTriangle, BarChart3, Brain, CalendarRange, ChevronRight, ClipboardCheck, Copy, FilterX, LayoutDashboard, MapPin, Package, Search, Target, UserCheck, Users, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -139,7 +140,8 @@ function isKpiModulo(value: string): value is KpiModulo {
 }
 
 export const Route = createFileRoute("/admin/kpis/$modulo")({
-  beforeLoad: ({ params }) => {
+  beforeLoad: async ({ params }) => {
+    await requireKpisAccess();
     const alias = KPI_MODULO_ALIASES[params.modulo];
     if (alias) {
       throw redirect({

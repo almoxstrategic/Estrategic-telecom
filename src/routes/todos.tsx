@@ -14,7 +14,7 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { CopyRegistroButton } from "@/components/CopyRegistroButton";
 import { ExpandableImage } from "@/components/ExpandableImage";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireMiscelaneasAccess } from "@/lib/auth-guards";
 import {
   groupEvidenciasPorEnvio,
   type EvidenciaEnvioAgrupado,
@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
 export const Route = createFileRoute("/todos")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireMiscelaneasAccess(),
   validateSearch: (search: Record<string, unknown>) => ({
     login: typeof search.login === "string" ? search.login : undefined,
     wo: typeof search.wo === "string" ? search.wo : undefined,

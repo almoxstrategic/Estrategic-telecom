@@ -48,10 +48,11 @@ import { useApp } from "@/lib/app-store";
 import { requireAdmin } from "@/lib/auth-guards";
 import { formatCelularMask, isValidCelular } from "@/lib/auth-identificacao";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
-import { canManageTeam, normalizeUserRole, roleLabel } from "@/lib/roles";
+import { canManageTeam, canManageColaboradorEquipe, canAccessMiscelaneasMenus, isSupervisorTransmissaoTeamScope, normalizeUserRole, roleLabel } from "@/lib/roles";
 import {
   deleteTecnico,
   fetchColaboradoresEquipe,
+  fetchColaboradoresTransmissaoEquipe,
   updateTecnicoStatus,
   type TecnicoProfile,
   type TecnicoStatus,
@@ -92,6 +93,10 @@ function buildPerfilCopyText(tecnico: TecnicoProfile): string {
 function TecnicosPage() {
   const { getAccessToken, user } = useApp();
   const podeGerenciarEquipe = canManageTeam(user?.role);
+  const escopoTransmissao = isSupervisorTransmissaoTeamScope(user?.role);
+  const podeVerWos = canAccessMiscelaneasMenus(user?.role);
+  const podeGerenciarColaborador = (tecnico: TecnicoProfile) =>
+    canManageColaboradorEquipe(user?.role, tecnico.role);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -111,7 +116,11 @@ function TecnicosPage() {
   const loadTecnicos = async () => {
     setLoading(true);
     try {
-      setTecnicos(await fetchColaboradoresEquipe());
+      setTecnicos(
+        escopoTransmissao
+          ? await fetchColaboradoresTransmissaoEquipe()
+          : await fetchColaboradoresEquipe(),
+      );
     } catch (err) {
       toast.error((err as Error).message || "Erro ao carregar técnicos.");
     } finally {
@@ -121,7 +130,7 @@ function TecnicosPage() {
 
   useEffect(() => {
     void loadTecnicos();
-  }, []);
+  }, [escopoTransmissao]);
 
   const tecnicosFiltrados = useMemo(() => {
     const porAba = tecnicos.filter((tecnico) =>
@@ -188,6 +197,10 @@ function TecnicosPage() {
 
   const handleConfirmDelete = async () => {
     if (!confirmTarget) return;
+    if (!podeGerenciarColaborador(confirmTarget)) {
+      toast.error("Sem permissão para excluir este colaborador.");
+      return;
+    }
 
     setDeletingId(confirmTarget.id);
     try {
@@ -202,14 +215,19 @@ function TecnicosPage() {
     }
   };
 
-  const alternarStatusTecnico = async (id: string, statusAtual: TecnicoStatus) => {
+  const alternarStatusTecnico = async (tecnico: TecnicoProfile, statusAtual: TecnicoStatus) => {
+    if (!podeGerenciarColaborador(tecnico)) {
+      toast.error("Sem permissão para alterar o status deste colaborador.");
+      return;
+    }
+
     const novoStatus: TecnicoStatus = statusAtual === "ATIVO" ? "DEMITIDO" : "ATIVO";
-    setStatusUpdatingId(id);
+    setStatusUpdatingId(tecnico.id);
     try {
-      await updateTecnicoStatus(id, novoStatus);
+      await updateTecnicoStatus(tecnico.id, novoStatus);
       setTecnicos((atual) =>
-        atual.map((tecnico) =>
-          tecnico.id === id ? { ...tecnico, status: novoStatus } : tecnico,
+        atual.map((item) =>
+          item.id === tecnico.id ? { ...item, status: novoStatus } : item,
         ),
       );
       toast.success(
@@ -242,6 +260,10 @@ function TecnicosPage() {
   };
 
   const abrirEdicao = (tecnico: TecnicoProfile) => {
+    if (!podeGerenciarColaborador(tecnico)) {
+      toast.error("Sem permissão para editar este colaborador.");
+      return;
+    }
     setEditTarget(tecnico);
     setEditCelular(formatCelularMask(tecnico.celular ?? ""));
     setEditSenha("");
@@ -385,14 +407,20 @@ function TecnicosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Todos">Todos</SelectItem>
-                  <SelectItem value="Técnicos">Técnicos</SelectItem>
-                  <SelectItem value="Transmissão">Transmissão</SelectItem>
-                  <SelectItem value="Gerente">Gerente</SelectItem>
-                  <SelectItem value="COP">COP</SelectItem>
-                  <SelectItem value="Supervisor IAT">Supervisor IAT</SelectItem>
-                  <SelectItem value="Supervisor Transmissão">
-                    Supervisor Transmissão
-                  </SelectItem>
+                  {escopoTransmissao ? (
+                    <SelectItem value="Transmissão">Transmissão</SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="Técnicos">Técnicos</SelectItem>
+                      <SelectItem value="Transmissão">Transmissão</SelectItem>
+                      <SelectItem value="Gerente">Gerente</SelectItem>
+                      <SelectItem value="COP">COP</SelectItem>
+                      <SelectItem value="Supervisor IAT">Supervisor IAT</SelectItem>
+                      <SelectItem value="Supervisor Transmissão">
+                        Supervisor Transmissão
+                      </SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -482,7 +510,7 @@ function TecnicosPage() {
                           <span className="hidden text-xs font-semibold sm:inline">Perfil</span>
                         </button>
 
-                        {podeGerenciarEquipe && tecnico.login ? (
+                        {podeGerenciarEquipe && podeVerWos && tecnico.login ? (
                           <Link
                             to="/todos"
                             search={{ login: tecnico.login }}
@@ -494,7 +522,7 @@ function TecnicosPage() {
                           </Link>
                         ) : null}
 
-                        {podeGerenciarEquipe ? (
+                        {podeGerenciarEquipe && podeGerenciarColaborador(tecnico) ? (
                           <>
                         <button
                           type="button"
@@ -509,7 +537,13 @@ function TecnicosPage() {
 
                         <button
                           type="button"
-                          onClick={() => setConfirmTarget(tecnico)}
+                          onClick={() => {
+                            if (!podeGerenciarColaborador(tecnico)) {
+                              toast.error("Sem permissão para excluir este colaborador.");
+                              return;
+                            }
+                            setConfirmTarget(tecnico);
+                          }}
                           disabled={deletingId === tecnico.id || statusUpdatingId === tecnico.id}
                           aria-label={`Excluir ${tecnico.nome}`}
                           className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
@@ -519,7 +553,7 @@ function TecnicosPage() {
 
                         <button
                           type="button"
-                          onClick={() => void alternarStatusTecnico(tecnico.id, tecnico.status)}
+                          onClick={() => void alternarStatusTecnico(tecnico, tecnico.status)}
                           disabled={statusUpdatingId === tecnico.id || deletingId === tecnico.id}
                           aria-label={
                             abaAtiva === "ativos"

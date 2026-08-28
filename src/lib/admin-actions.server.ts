@@ -8,7 +8,7 @@ import {
   normalizeLogin,
   normalizeMatricula,
 } from "./auth-identificacao";
-import { hasPainelAdminAccess, normalizeUserRole } from "./roles";
+import { hasPainelAdminAccess, canManageColaboradorEquipe, normalizeUserRole } from "./roles";
 import {
   getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
@@ -40,7 +40,6 @@ async function assertAdmin(accessToken: string) {
     throw new Error("Sessão inválida. Faça login novamente como administrador.");
   }
 
-  // Sempre pelo id do usuário da sessão — seguro com N admins/gerentes.
   const { data: profile, error: profileError } = await client
     .from("profiles")
     .select("role")
@@ -51,7 +50,25 @@ async function assertAdmin(accessToken: string) {
     throw new Error("Acesso restrito a administradores e gerentes.");
   }
 
-  return user;
+  return { user, role: normalizeUserRole(profile?.role) };
+}
+
+async function assertCanManageColaborador(accessToken: string, colaboradorId: string) {
+  const { role: managerRole } = await assertAdmin(accessToken);
+  const supabase = getServiceClient();
+  const { data: target, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", colaboradorId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!target) throw new Error("Colaborador não encontrado.");
+  if (!canManageColaboradorEquipe(managerRole, target.role)) {
+    throw new Error("Sem permissão para gerenciar este colaborador.");
+  }
+
+  return { managerRole, colaboradorRole: normalizeUserRole(target.role) };
 }
 
 const withToken = z.object({
@@ -117,9 +134,12 @@ export const createUserAccount = createServerFn({ method: "POST" })
       }),
   )
   .handler(async ({ data }) => {
-    await assertAdmin(data.accessToken);
-    const supabase = getServiceClient();
+    const { role: managerRole } = await assertAdmin(data.accessToken);
     const role = normalizeUserRole(data.role);
+    if (!canManageColaboradorEquipe(managerRole, role)) {
+      throw new Error("Sem permissão para cadastrar este tipo de usuário.");
+    }
+    const supabase = getServiceClient();
     const matricula = normalizeMatricula(data.identificacao ?? "") || null;
     const login = normalizeLogin(data.login);
     const authEmail = loginToAuthEmail(login);
@@ -222,7 +242,7 @@ export const updateTecnico = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    await assertAdmin(data.accessToken);
+    await assertCanManageColaborador(data.accessToken, data.tecnicoId);
     const supabase = getServiceClient();
 
     const { error: profileError } = await supabase

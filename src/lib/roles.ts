@@ -121,12 +121,6 @@ export function canManageTeam(role: string | null | undefined): boolean {
   return hasPainelFullAccess(role);
 }
 
-export function canAccessOperacionalMenus(
-  role: string | null | undefined,
-): boolean {
-  return hasPainelFullAccess(role);
-}
-
 export function isCopRole(role: string | null | undefined): boolean {
   return normalizeUserRole(role) === "cop";
 }
@@ -138,12 +132,11 @@ export function canImportToa(role: string | null | undefined): boolean {
   );
 }
 
-/** Demais abas de Importação (Miscelâneas / Serializados / Analítico).
- * Mesmo acesso do painel: admin, gerente, supervisores e COP — sem divergência de payload/colunas. */
+/** Demais abas de Importação (Miscelâneas / Serializados / Analítico). */
 export function canAccessImportacaoAbasCompletas(
   role: string | null | undefined,
 ): boolean {
-  return canAccessAdminPanel(role);
+  return canAccessAdminPanel(role) && !isSupervisorTransmissaoRole(role);
 }
 
 /** Importação de dados do painel (TOA + Analítico): admin, gerente, supervisores e COP. */
@@ -159,6 +152,71 @@ export function isTecnicoCampoRole(role: string | null | undefined): boolean {
 
 export function isTecnicoTransmissaoRole(role: string | null | undefined): boolean {
   return normalizeUserRole(role) === "transmissao";
+}
+
+export function isSupervisorTransmissaoRole(
+  role: string | null | undefined,
+): boolean {
+  return normalizeUserRole(role) === "supervisor_transmissao";
+}
+
+/** Miscelâneas: admin, gerente e supervisor IAT — não supervisor de transmissão. */
+export function canAccessMiscelaneasMenus(
+  role: string | null | undefined,
+): boolean {
+  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+}
+
+/** Serializados: admin, gerente e supervisor IAT — não supervisor de transmissão. */
+export function canAccessSerializadosMenus(
+  role: string | null | undefined,
+): boolean {
+  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+}
+
+/** Menu Transmissão na sidebar (inclui supervisor de transmissão). */
+export function canAccessTransmissaoMenu(
+  role: string | null | undefined,
+): boolean {
+  return hasPainelFullAccess(role);
+}
+
+/** KPIs no Painel Admin / sidebar — não supervisor de transmissão. */
+export function canAccessKpisMenus(role: string | null | undefined): boolean {
+  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+}
+
+/** Importação no Painel Admin / sidebar — não supervisor de transmissão. */
+export function canAccessImportacaoPainelMenu(
+  role: string | null | undefined,
+): boolean {
+  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+}
+
+/** Gestão de equipe restrita ao setor de Transmissão. */
+export function isSupervisorTransmissaoTeamScope(
+  role: string | null | undefined,
+): boolean {
+  return isSupervisorTransmissaoRole(role);
+}
+
+/** CRUD de colaborador permitido para o gestor autenticado. */
+export function canManageColaboradorEquipe(
+  managerRole: string | null | undefined,
+  colaboradorRole: string | null | undefined,
+): boolean {
+  if (!canManageTeam(managerRole)) return false;
+  if (isSupervisorTransmissaoRole(managerRole)) {
+    return normalizeUserRole(colaboradorRole) === "transmissao";
+  }
+  return true;
+}
+
+/** @deprecated Use canAccessMiscelaneasMenus / canAccessSerializadosMenus. */
+export function canAccessOperacionalMenus(
+  role: string | null | undefined,
+): boolean {
+  return hasPainelFullAccess(role);
 }
 
 /** Conta master — não deve aparecer na Gestão de Equipe nem ser demitida. */

@@ -46,7 +46,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { requireMiscelaneasAccess } from "@/lib/auth-guards";
+
 export const Route = createFileRoute("/admin/pendencias")({
+  beforeLoad: () => requireMiscelaneasAccess(),
   head: () => ({
     meta: [
       { title: "Pendências — Estrategic Field" },

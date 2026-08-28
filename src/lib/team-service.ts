@@ -107,6 +107,29 @@ export async function fetchTecnicos(): Promise<TecnicoProfile[]> {
   return excluiMasterAdmin((fallback.data ?? []).map(mapTecnicoRow));
 }
 
+/** Gestão de Equipe — apenas Técnicos de Transmissão (ativos e demitidos). */
+export async function fetchColaboradoresTransmissaoEquipe(): Promise<TecnicoProfile[]> {
+  const supabase = getSupabaseClient();
+  const withStatus = await supabase
+    .from("profiles")
+    .select(COLABORADOR_SELECT)
+    .eq("role", "transmissao")
+    .order("nome", { ascending: true });
+
+  if (!withStatus.error) {
+    return excluiMasterAdmin((withStatus.data ?? []).map(mapTecnicoRow));
+  }
+
+  const fallback = await supabase
+    .from("profiles")
+    .select("id, nome, identificacao, login, celular, created_at, role")
+    .eq("role", "transmissao")
+    .order("nome", { ascending: true });
+
+  if (fallback.error) throw fallback.error;
+  return excluiMasterAdmin((fallback.data ?? []).map(mapTecnicoRow));
+}
+
 /** Técnicos de Transmissão (despacho de OS). */
 export async function fetchTecnicosTransmissao(): Promise<TecnicoProfile[]> {
   const supabase = getSupabaseClient();

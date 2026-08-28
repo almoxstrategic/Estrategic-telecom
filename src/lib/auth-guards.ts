@@ -8,6 +8,10 @@ import {
 } from "./auth-session";
 import {
   canAccessAdminPanel,
+  canAccessImportacaoPainelMenu,
+  canAccessKpisMenus,
+  canAccessMiscelaneasMenus,
+  canAccessSerializadosMenus,
   canManageTeam,
   isTecnicoTransmissaoRole,
   normalizeUserRole,
@@ -169,6 +173,62 @@ export async function requireTecnicoTransmissao(): Promise<AppUser> {
 
 export async function requireTecnicoOrAdmin(): Promise<AppUser> {
   return requireAuth();
+}
+
+const SUPERVISOR_TRANSMISSAO_HOME = "/admin/transmissao" as const;
+
+/** Rotas Miscelâneas — bloqueia supervisor de transmissão. */
+export async function requireMiscelaneasAccess(): Promise<AppUser> {
+  const authUser = await requireAdmin();
+  if (isSupervisorTransmissaoRestricted(authUser.role)) {
+    throw redirect({ to: SUPERVISOR_TRANSMISSAO_HOME });
+  }
+  return authUser;
+}
+
+/** Rotas Serializados — bloqueia supervisor de transmissão. */
+export async function requireSerializadosAccess(): Promise<AppUser> {
+  const authUser = await requireAdmin();
+  if (isSupervisorTransmissaoRestricted(authUser.role)) {
+    throw redirect({ to: SUPERVISOR_TRANSMISSAO_HOME });
+  }
+  return authUser;
+}
+
+function isSupervisorTransmissaoRestricted(role: AppUser["role"]): boolean {
+  return normalizeUserRole(role) === "supervisor_transmissao";
+}
+
+/** Importação: supervisor de transmissão não acessa o módulo. */
+export async function requireImportacaoPainelAccess(): Promise<AppUser> {
+  const authUser = await requireAdmin();
+  if (!canAccessImportacaoPainelMenu(authUser.role)) {
+    throw redirect({ to: SUPERVISOR_TRANSMISSAO_HOME });
+  }
+  return authUser;
+}
+
+/** KPIs: supervisor de transmissão não acessa o módulo. */
+export async function requireKpisAccess(): Promise<AppUser> {
+  const authUser = await requireAdmin();
+  if (!canAccessKpisMenus(authUser.role)) {
+    throw redirect({ to: SUPERVISOR_TRANSMISSAO_HOME });
+  }
+  return authUser;
+}
+
+/** Importação: supervisor de transmissão só na aba TOA (legado — preferir requireImportacaoPainelAccess). */
+export async function requireImportacaoTabAccess(
+  tab: "miscelaneas" | "serializados" | "toa",
+): Promise<AppUser> {
+  const authUser = await requireImportacaoPainelAccess();
+  if (tab === "miscelaneas" && !canAccessMiscelaneasMenus(authUser.role)) {
+    throw redirect({ to: SUPERVISOR_TRANSMISSAO_HOME });
+  }
+  if (tab === "serializados" && !canAccessSerializadosMenus(authUser.role)) {
+    throw redirect({ to: SUPERVISOR_TRANSMISSAO_HOME });
+  }
+  return authUser;
 }
 
 /** Rota raiz: sem sessão → login; painel (admin/gerente/cop) → /admin. */

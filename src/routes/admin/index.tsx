@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -20,7 +20,6 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import {
   ADMIN_TAB_LABELS,
-  ADMIN_TABS,
   adminTabFromSearch,
   loadPersistedAdminTab,
   persistAdminTab,
@@ -28,13 +27,31 @@ import {
   type AdminTabSearch,
 } from "@/lib/admin-tab";
 import { useApp } from "@/lib/app-store";
-import { canAccessOperacionalMenus } from "@/lib/roles";
+import {
+  canAccessImportacaoPainelMenu,
+  canAccessKpisMenus,
+  canAccessMiscelaneasMenus,
+  canAccessSerializadosMenus,
+  canAccessTransmissaoMenu,
+} from "@/lib/roles";
+import { requireAdmin } from "@/lib/auth-guards";
+import { redirect } from "@tanstack/react-router";
 
 type AdminSearch = {
   tab?: AdminTabSearch;
 };
 
 export const Route = createFileRoute("/admin/")({
+  beforeLoad: async ({ search }) => {
+    const user = await requireAdmin();
+    const tab = adminTabFromSearch(search.tab);
+    if (tab === "Miscelâneas" && !canAccessMiscelaneasMenus(user.role)) {
+      throw redirect({ to: "/admin/transmissao" });
+    }
+    if (tab === "Serializados" && !canAccessSerializadosMenus(user.role)) {
+      throw redirect({ to: "/admin/transmissao" });
+    }
+  },
   validateSearch: (search: Record<string, unknown>): AdminSearch => {
     const tab = search.tab;
     if (
@@ -62,14 +79,26 @@ const MODULE_CARD_CLASS =
 
 function AdminHome() {
   const { user } = useApp();
-  const showOperacional = canAccessOperacionalMenus(user?.role);
+  const showMiscelaneas = canAccessMiscelaneasMenus(user?.role);
+  const showSerializados = canAccessSerializadosMenus(user?.role);
+  const showTransmissaoTab = canAccessTransmissaoMenu(user?.role);
+  const showKpis = canAccessKpisMenus(user?.role);
+  const showImportacao = canAccessImportacaoPainelMenu(user?.role);
   const { tab: tabSearch } = Route.useSearch();
   const [activeTab, setActiveTab] = useState<AdminTab>("Início");
+
+  const abasVisiveis = useMemo(() => {
+    const tabs: AdminTab[] = ["Início"];
+    if (showMiscelaneas) tabs.push("Miscelâneas");
+    if (showSerializados) tabs.push("Serializados");
+    if (showTransmissaoTab) tabs.push("Lançamentos");
+    return tabs;
+  }, [showMiscelaneas, showSerializados, showTransmissaoTab]);
 
   useEffect(() => {
     const fromSearch = adminTabFromSearch(tabSearch);
     if (fromSearch) {
-      if (!showOperacional && fromSearch !== "Início") {
+      if (!abasVisiveis.includes(fromSearch)) {
         setActiveTab("Início");
         persistAdminTab("Início");
         return;
@@ -80,24 +109,20 @@ function AdminHome() {
     }
     const saved = loadPersistedAdminTab();
     if (saved) {
-      if (!showOperacional && saved !== "Início") {
+      if (!abasVisiveis.includes(saved)) {
         setActiveTab("Início");
         persistAdminTab("Início");
         return;
       }
       setActiveTab(saved);
     }
-  }, [tabSearch, showOperacional]);
+  }, [tabSearch, abasVisiveis]);
 
   const selecionarAba = (tab: AdminTab) => {
-    if (!showOperacional && tab !== "Início") return;
+    if (!abasVisiveis.includes(tab)) return;
     setActiveTab(tab);
     persistAdminTab(tab);
   };
-
-  const abasVisiveis = showOperacional
-    ? ADMIN_TABS
-    : (["Início"] as const satisfies readonly AdminTab[]);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -127,7 +152,7 @@ function AdminHome() {
           </div>
         </section>
 
-        {showOperacional && activeTab === "Miscelâneas" ? (
+        {showMiscelaneas && activeTab === "Miscelâneas" ? (
           <section className={MODULE_GRID_CLASS}>
             <Link to="/todos" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-primary/20`}>
@@ -225,39 +250,43 @@ function AdminHome() {
               </div>
             </Link>
 
-            <Link
-              to="/admin/kpis/$modulo"
-              params={{ modulo: "baixa-consumo-miscelanea" }}
-              className="block w-full"
-            >
-              <div className={`${MODULE_CARD_CLASS} border-border`}>
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <BarChart3 className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-foreground">KPI&apos;s</div>
-                  <div className="text-xs text-muted-foreground">
-                    Materiais e técnicos com maior volume de baixa
+            {showKpis ? (
+              <Link
+                to="/admin/kpis/$modulo"
+                params={{ modulo: "baixa-consumo-miscelanea" }}
+                className="block w-full"
+              >
+                <div className={`${MODULE_CARD_CLASS} border-border`}>
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <BarChart3 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground">KPI&apos;s</div>
+                    <div className="text-xs text-muted-foreground">
+                      Materiais e técnicos com maior volume de baixa
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            ) : null}
 
-            <Link to="/admin/importacao" className="block w-full">
-              <div className={`${MODULE_CARD_CLASS} border-border`}>
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <FileUp className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-foreground">Importação</div>
-                  <div className="text-xs text-muted-foreground">
-                    Cabeçalho WO e consolidado de consumo
+            {showImportacao ? (
+              <Link to="/admin/importacao" className="block w-full">
+                <div className={`${MODULE_CARD_CLASS} border-border`}>
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <FileUp className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground">Importação</div>
+                    <div className="text-xs text-muted-foreground">
+                      Cabeçalho WO e consolidado de consumo
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            ) : null}
           </section>
-        ) : showOperacional && activeTab === "Serializados" ? (
+        ) : showSerializados && activeTab === "Serializados" ? (
           <section className={MODULE_GRID_CLASS}>
             <div className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>
@@ -325,7 +354,7 @@ function AdminHome() {
               </div>
             </div>
           </section>
-        ) : showOperacional && activeTab === "Lançamentos" ? (
+        ) : showTransmissaoTab && activeTab === "Lançamentos" ? (
           <section className={MODULE_GRID_CLASS}>
             <Link to="/admin/transmissao" className="block w-full">
               <div className={`${MODULE_CARD_CLASS} border-border`}>

@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireMiscelaneasAccess } from "@/lib/auth-guards";
 import {
   loadEstoqueBtpSnapshot,
   type EstoqueBtpItem,
@@ -22,7 +22,7 @@ import {
 } from "@/lib/estoque-base-store";
 
 export const Route = createFileRoute("/estoque-base")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireMiscelaneasAccess(),
   head: () => ({
     meta: [
       { title: "Estoque Base — Estrategic Field" },

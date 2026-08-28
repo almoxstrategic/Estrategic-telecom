@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { normalizeMatricula } from "@/lib/auth-identificacao";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireSerializadosAccess } from "@/lib/auth-guards";
 import {
   aggregateEstoqueAtlasContagem,
   formatAtualizacaoAtlas,
@@ -36,7 +36,7 @@ import { fetchTecnicos, type TecnicoProfile } from "@/lib/team-service";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/estoque-atlas")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireSerializadosAccess(),
   head: () => ({
     meta: [
       { title: "Estoque Atlas — Estrategic Field" },

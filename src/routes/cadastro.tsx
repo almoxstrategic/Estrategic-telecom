@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth-identificacao";
 import {
   ROLE_SELECT_OPTIONS,
+  isSupervisorTransmissaoTeamScope,
   roleFromPoderesSelect,
 } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
@@ -31,12 +32,18 @@ export const Route = createFileRoute("/cadastro")({
 });
 
 function CadastroPage() {
-  const { getAccessToken } = useApp();
+  const { getAccessToken, user } = useApp();
   const navigate = useNavigate();
+  const escopoTransmissao = isSupervisorTransmissaoTeamScope(user?.role);
+  const opcoesPoderes = escopoTransmissao
+    ? ROLE_SELECT_OPTIONS.filter((opt) => opt.value === "TRANSMISSAO")
+    : ROLE_SELECT_OPTIONS;
   const [nome, setNome] = useState("");
   const [identificacao, setIdentificacao] = useState("");
   const [celular, setCelular] = useState("");
-  const [poderes, setPoderes] = useState<string>("TECNICO");
+  const [poderes, setPoderes] = useState<string>(
+    escopoTransmissao ? "TRANSMISSAO" : "TECNICO",
+  );
   const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
@@ -51,6 +58,10 @@ function CadastroPage() {
     }
 
     const role: UserRole = roleFromPoderesSelect(poderes);
+    if (escopoTransmissao && role !== "transmissao") {
+      toast.error("Supervisor de Transmissão só pode cadastrar Técnicos de Transmissão.");
+      return;
+    }
     const matriculaNormalizada = identificacao.trim()
       ? normalizeMatricula(identificacao)
       : "";
@@ -132,8 +143,9 @@ function CadastroPage() {
               onChange={(e) => setPoderes(e.target.value)}
               className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
+              disabled={escopoTransmissao}
             >
-              {ROLE_SELECT_OPTIONS.map((opt) => (
+              {opcoesPoderes.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

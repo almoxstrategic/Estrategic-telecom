@@ -36,7 +36,11 @@ import { useApp } from "@/lib/app-store";
 import { resetAdminTabToInicio } from "@/lib/admin-tab";
 import {
   canAccessAdminPanel,
-  canAccessOperacionalMenus,
+  canAccessImportacaoPainelMenu,
+  canAccessKpisMenus,
+  canAccessMiscelaneasMenus,
+  canAccessSerializadosMenus,
+  canAccessTransmissaoMenu,
   isTecnicoTransmissaoRole,
   roleLabel,
 } from "@/lib/roles";
@@ -110,7 +114,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
   const isAdmin = canAccessAdminPanel(user?.role);
   const isTransmissao = isTecnicoTransmissaoRole(user?.role);
-  const showOperacional = canAccessOperacionalMenus(user?.role);
+  const showMiscelaneas = canAccessMiscelaneasMenus(user?.role);
+  const showSerializados = canAccessSerializadosMenus(user?.role);
+  const showTransmissao = canAccessTransmissaoMenu(user?.role);
+  const showKpis = canAccessKpisMenus(user?.role);
+  const showImportacao = canAccessImportacaoPainelMenu(user?.role);
   const { pathname, search } = useRouterState({
     select: (s) => ({
       pathname: s.location.pathname,
@@ -243,6 +251,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <Users className="h-5 w-5 text-primary" />
                     Gestão de Equipe
                   </Link>
+                  {showKpis ? (
                   <div>
                     <button
                       type="button"
@@ -359,6 +368,8 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       </div>
                     )}
                   </div>
+                  ) : null}
+                  {showImportacao ? (
                   <Link
                     to="/admin/importacao"
                     search={{ tab: "toa" }}
@@ -372,11 +383,12 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <FileUp className="h-5 w-5 text-primary" />
                     Importação
                   </Link>
+                  ) : null}
                 </div>
               )}
             </div>
 
-            {showOperacional ? (
+            {showMiscelaneas ? (
             <div>
               <button
                 type="button"
@@ -476,7 +488,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             </div>
             ) : null}
 
-            {showOperacional ? (
+            {showSerializados ? (
             <div>
               <button
                 type="button"
@@ -561,7 +573,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             </div>
             ) : null}
 
-            {showOperacional ? (
+            {showTransmissao ? (
             <div>
               <button
                 type="button"

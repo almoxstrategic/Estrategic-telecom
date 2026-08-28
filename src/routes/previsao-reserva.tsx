@@ -14,12 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireMiscelaneasAccess } from "@/lib/auth-guards";
 import { fetchDimMateriais } from "@/lib/logistica-service";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/previsao-reserva")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireMiscelaneasAccess(),
   head: () => ({
     meta: [
       { title: "Previsão de Reserva — Estrategic Field" },

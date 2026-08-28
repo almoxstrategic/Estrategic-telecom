@@ -70,7 +70,10 @@ function sanitizeAnexoFilename(tipo: string, sufixo: "Inicio" | "Fim"): string {
   return `${base || "Material"}_${sufixo}.jpg`;
 }
 
+import { requireMiscelaneasAccess } from "@/lib/auth-guards";
+
 export const Route = createFileRoute("/admin/enviar-evidencia")({
+  beforeLoad: () => requireMiscelaneasAccess(),
   head: () => ({
     meta: [
       { title: "Enviar Evidência — Estrategic Field" },

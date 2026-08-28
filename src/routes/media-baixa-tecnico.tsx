@@ -28,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireMiscelaneasAccess } from "@/lib/auth-guards";
 import { fetchDimMateriais } from "@/lib/logistica-service";
 import type { MediaBaixaTecnicoItem } from "@/lib/logistica-types";
 import { formatQuantidade } from "@/lib/parse-locale-number";
@@ -37,7 +37,7 @@ import { formatTecnicoLabel } from "@/lib/tecnico-label";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/media-baixa-tecnico")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireMiscelaneasAccess(),
   head: () => ({
     meta: [
       { title: "Média de Baixa por Técnico — Estrategic Field" },

@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireSerializadosAccess } from "@/lib/auth-guards";
 import {
   aggregateEstoqueCampoContagem,
   formatAtualizacaoCampo,
@@ -24,7 +24,7 @@ import {
 } from "@/lib/serializados-campo-store";
 
 export const Route = createFileRoute("/estoque-tecnico")({
-  beforeLoad: () => requireAdmin(),
+  beforeLoad: () => requireSerializadosAccess(),
   head: () => ({
     meta: [
       { title: "Estoque serializado - Técnico — Estrategic Field" },
