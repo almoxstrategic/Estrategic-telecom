@@ -31,6 +31,12 @@ import {
 import { extrairTiposAtividadeUnicos } from "@/lib/filtro-tipo-atividade";
 import { formatQuantidade } from "@/lib/parse-locale-number";
 import {
+  buildDailyVolumePoints,
+  calculateMonthlyProjectionByWeekday,
+  contarDiasUteisMes,
+  contarDiasUnicosComDados,
+} from "@/lib/kpi-projecao-mensal";
+import {
   fetchPrecosOs,
   type PrecosOsMap,
 } from "@/lib/precos-os-service";
@@ -70,17 +76,7 @@ type TecnicoEstimativa = {
   diasTrabalhados: number;
 };
 
-/** Dias úteis = seg–sáb (exclui domingo). `mes` é 1–12. */
-export function contarDiasUteisMes(ano: number, mes: number): number {
-  if (!ano || mes < 1 || mes > 12) return 0;
-  const diasNoMes = new Date(ano, mes, 0).getDate();
-  let total = 0;
-  for (let dia = 1; dia <= diasNoMes; dia += 1) {
-    const dow = new Date(ano, mes - 1, dia).getDay();
-    if (dow !== 0) total += 1;
-  }
-  return total;
-}
+export { contarDiasUteisMes };
 
 function mesLabel(mes: number): string {
   return MESES.find((m) => m.value === mes)?.label ?? String(mes);
@@ -112,26 +108,40 @@ function nomeTecnicoRow(row: ToaImportacaoRow): string {
   return login || "—";
 }
 
-function datasUnicas(rows: ToaImportacaoRow[]): Set<string> {
-  const set = new Set<string>();
-  for (const row of rows) {
-    const data = String(row.data_toa ?? "").slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(data)) set.add(data);
-  }
-  return set;
-}
+function agregarVolumeDiarioToa(rows: ToaImportacaoRow[]) {
+  const byDayWo = new Map<
+    string,
+    Set<"Produtiva" | "Improdutiva">
+  >();
 
-function projetarVolume(atual: number, diasTrabalhados: number, diasUteis: number) {
-  const diasOp = Math.max(0, diasTrabalhados);
-  const uteis = Math.max(0, diasUteis);
-  const diasRestantes = Math.max(0, uteis - diasOp);
-  const mediaDiaria = diasOp > 0 ? atual / diasOp : 0;
-  const projecao = atual + mediaDiaria * diasRestantes;
-  return {
-    mediaDiaria,
-    diasRestantes,
-    projecao: Math.max(0, projecao),
-  };
+  for (const row of rows) {
+    const iso = String(row.data_toa ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
+    const day = Number(iso.slice(8, 10));
+    if (!Number.isFinite(day) || day < 1 || day > 31) continue;
+    const wo =
+      normalizeNumeroWo(row.numero_wo) ||
+      `${iso}:${normalizeToaLogin(row.login_tecnico)}:${row.id ?? ""}`;
+    const key = `${day}:${wo}`;
+    const statuses = byDayWo.get(key) ?? new Set<"Produtiva" | "Improdutiva">();
+    statuses.add(
+      String(row.status_nota ?? "").trim() === "Produtiva"
+        ? "Produtiva"
+        : "Improdutiva",
+    );
+    byDayWo.set(key, statuses);
+  }
+
+  const byDay = new Map<number, { produtivas: number; improdutivas: number }>();
+  for (const [key, statuses] of byDayWo) {
+    const day = Number(key.split(":")[0]);
+    if (!Number.isFinite(day)) continue;
+    const bucket = byDay.get(day) ?? { produtivas: 0, improdutivas: 0 };
+    if (statuses.has("Produtiva")) bucket.produtivas += 1;
+    else bucket.improdutivas += 1;
+    byDay.set(day, bucket);
+  }
+  return byDay;
 }
 
 export function EstimativaVolume() {
@@ -248,19 +258,21 @@ export function EstimativaVolume() {
 
   const estimativa = useMemo(() => {
     const kpis = agregarKpisToaFlat(rowsFiltradas);
-    const diasTrabalhados = datasUnicas(rowsFiltradas).size;
+    const diasTrabalhados = contarDiasUnicosComDados(
+      rowsFiltradas.map((row) => String(row.data_toa ?? "")),
+    );
     const diasUteis =
       ano != null && mes != null ? contarDiasUteisMes(ano, mes) : 0;
 
-    const prod = projetarVolume(
-      kpis.notasProdutivas,
-      diasTrabalhados,
-      diasUteis,
-    );
-    const improv = projetarVolume(
-      kpis.notasImprodutivas,
-      diasTrabalhados,
-      diasUteis,
+    const dailyPoints =
+      ano != null && mes != null
+        ? buildDailyVolumePoints(ano, mes, agregarVolumeDiarioToa(rowsFiltradas))
+        : [];
+
+    const prod = calculateMonthlyProjectionByWeekday(dailyPoints, "produtivas");
+    const improv = calculateMonthlyProjectionByWeekday(
+      dailyPoints,
+      "improdutivas",
     );
 
     const progressoPct =
@@ -268,7 +280,7 @@ export function EstimativaVolume() {
         ? Math.min(100, Math.round((diasTrabalhados / diasUteis) * 1000) / 10)
         : 0;
 
-    const projecaoProdutiva = Math.round(prod.projecao);
+    const projecaoProdutiva = prod.projection;
     const receitaAtual = agregarChamadosToa(
       regroupFlatRowsToChamados(rowsFiltradas),
       precosOs,
@@ -283,11 +295,11 @@ export function EstimativaVolume() {
       improdutivasAtual: kpis.notasImprodutivas,
       diasTrabalhados,
       diasUteis,
-      diasRestantes: prod.diasRestantes,
-      mediaDiariaProdutiva: prod.mediaDiaria,
-      mediaDiariaImprodutiva: improv.mediaDiaria,
+      diasRestantes: prod.daysRemaining,
+      mediaDiariaProdutiva: prod.dailyAverage,
+      mediaDiariaImprodutiva: improv.dailyAverage,
       projecaoProdutiva,
-      projecaoImprodutiva: Math.round(improv.projecao),
+      projecaoImprodutiva: improv.projection,
       progressoPct,
       receitaAtual,
       ticketMedio,
@@ -344,11 +356,23 @@ export function EstimativaVolume() {
         else improdutivasAtual += 1;
       }
       const diasTrabalhados = bucket.datas.size;
-      const prod = projetarVolume(produtivasAtual, diasTrabalhados, diasUteis);
-      const improv = projetarVolume(
-        improdutivasAtual,
-        diasTrabalhados,
-        diasUteis,
+      const dailyPoints =
+        diasUteis > 0
+          ? buildDailyVolumePoints(
+              ano ?? new Date().getFullYear(),
+              mes ?? new Date().getMonth() + 1,
+              agregarVolumeDiarioToa(
+                rowsFiltradas.filter((row) => {
+                  const rowLogin = normalizeToaLogin(row.login_tecnico);
+                  return rowLogin === login;
+                }),
+              ),
+            )
+          : [];
+      const prod = calculateMonthlyProjectionByWeekday(dailyPoints, "produtivas");
+      const improv = calculateMonthlyProjectionByWeekday(
+        dailyPoints,
+        "improdutivas",
       );
       const nome = bucket.nome || login;
       lista.push({
@@ -356,11 +380,11 @@ export function EstimativaVolume() {
         nome,
         primeiroNome: primeiroNomeDe(nome),
         produtivasAtual,
-        mediaDiariaProdutiva: prod.mediaDiaria,
-        estimativaProdutivas: Math.round(prod.projecao),
+        mediaDiariaProdutiva: prod.dailyAverage,
+        estimativaProdutivas: prod.projection,
         improdutivasAtual,
-        mediaDiariaImprodutiva: improv.mediaDiaria,
-        estimativaImprodutivas: Math.round(improv.projecao),
+        mediaDiariaImprodutiva: improv.dailyAverage,
+        estimativaImprodutivas: improv.projection,
         diasTrabalhados,
       });
     }
@@ -370,7 +394,7 @@ export function EstimativaVolume() {
         b.estimativaProdutivas - a.estimativaProdutivas ||
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
-  }, [rowsFiltradas, estimativa.diasUteis]);
+  }, [rowsFiltradas, estimativa.diasUteis, ano, mes]);
 
   const chartData = useMemo(
     () => [

@@ -53,6 +53,10 @@ import {
   type ToaImportacaoRow,
 } from "@/lib/faturamento-service";
 import { extrairTiposAtividadeUnicos } from "@/lib/filtro-tipo-atividade";
+import {
+  calculateMonthlyProjectionFromChartDays,
+  applyWeekdayProjectionToChartDays,
+} from "@/lib/kpi-projecao-mensal";
 import { normalizeNumeroWo, normalizeToaLogin } from "@/lib/toa-store";
 
 const MESES = [
@@ -254,21 +258,12 @@ function tecnicoFromToa(row: ToaImportacaoRow): string {
   return nome || "Sem técnico";
 }
 
-function mediaArredondada(valores: number[]): number {
-  if (valores.length === 0) return 0;
-  const soma = valores.reduce((acc, n) => acc + n, 0);
-  return Math.round(soma / valores.length);
-}
-
-/**
- * Headcount Seg–Sex (técnicos distintos no mês) + média de capacidade por sábado
- * + médias de nota (geral, produtiva e por técnico/diária).
- */
 function calcularResumoCapacidade(
   data: ChartPoint[],
   notas: NotaVolumeAgg[],
-  dataComProjecao?: ChartPoint[],
-  projecaoAtiva = false,
+  options?: {
+    projecaoAtiva?: boolean;
+  },
 ): ResumoCapacidade | null {
   if (data.length === 0 || data.every((d) => d.diaJs == null)) return null;
 
@@ -323,13 +318,11 @@ function calcularResumoCapacidade(
     qtdDiasProd > 0 ? Math.round(totalProdutivas / qtdDiasProd) : 0;
 
   let projecaoTotalMes: number | null = null;
-  if (projecaoAtiva && dataComProjecao) {
-    const reais = dataComProjecao.reduce((acc, d) => acc + d.produtivas, 0);
-    const fantasma = dataComProjecao.reduce(
-      (acc, d) => acc + (Number(d.produtivas_fantasma) || 0),
-      0,
-    );
-    projecaoTotalMes = reais + fantasma;
+  if (options?.projecaoAtiva && data.length > 0) {
+    projecaoTotalMes = calculateMonthlyProjectionFromChartDays(
+      data,
+      "produtivas",
+    ).projection;
   }
 
   return {
@@ -339,48 +332,6 @@ function calcularResumoCapacidade(
     mediaNotaGeral,
     projecaoTotalMes,
   };
-}
-
-/**
- * Médias históricas por dia da semana (0=Dom … 6=Sáb),
- * a partir dos dias até o cutoff (inclui zeros de fins de semana).
- * Fallback: média global do período se ainda não houver amostra daquele weekday.
- */
-function calcularMediasPorDiaSemana(
-  historicoAteCutoff: ChartPoint[],
-): Record<number, { produtivas: number; tecnicos: number }> {
-  const buckets = new Map<number, { prod: number[]; tec: number[] }>();
-  for (const d of historicoAteCutoff) {
-    if (d.diaJs == null) continue;
-    const b = buckets.get(d.diaJs) ?? { prod: [], tec: [] };
-    b.prod.push(d.produtivas);
-    b.tec.push(d.qtd_tecnicos);
-    buckets.set(d.diaJs, b);
-  }
-
-  const mediaGlobalProd = mediaArredondada(
-    historicoAteCutoff.map((d) => d.produtivas),
-  );
-  const mediaGlobalTec = mediaArredondada(
-    historicoAteCutoff.map((d) => d.qtd_tecnicos),
-  );
-
-  const medias: Record<number, { produtivas: number; tecnicos: number }> = {};
-  for (let js = 0; js <= 6; js++) {
-    const b = buckets.get(js);
-    if (b && b.prod.length > 0) {
-      medias[js] = {
-        produtivas: mediaArredondada(b.prod),
-        tecnicos: mediaArredondada(b.tec),
-      };
-    } else {
-      medias[js] = {
-        produtivas: mediaGlobalProd,
-        tecnicos: mediaGlobalTec,
-      };
-    }
-  }
-  return medias;
 }
 
 /**
@@ -400,43 +351,7 @@ function aplicarProjecaoMedia(
     }));
   }
 
-  const diasComProducao = data.filter((d) => d.produtivas > 0);
-  if (diasComProducao.length === 0) {
-    return data.map((d) => ({
-      ...d,
-      produtivas_fantasma: 0,
-      tecnicos_fantasma: null,
-    }));
-  }
-
-  /** Último dia operacional do mês (maior dia com produtivas > 0). */
-  const ultimoDiaComDados = Math.max(
-    ...diasComProducao.map((d) => Number(d.chave) || 0),
-  );
-
-  const historicoAteCutoff = data.filter(
-    (d) => (Number(d.chave) || 0) <= ultimoDiaComDados,
-  );
-  const mediasPorSemana = calcularMediasPorDiaSemana(historicoAteCutoff);
-
-  return data.map((d) => {
-    const diaNum = Number(d.chave) || 0;
-    const isFuturo = diaNum > ultimoDiaComDados;
-    const isAncora = diaNum === ultimoDiaComDados;
-    const js = d.diaJs ?? 0;
-    const mediaDia = mediasPorSemana[js] ?? { produtivas: 0, tecnicos: 0 };
-
-    return {
-      ...d,
-      produtivas_fantasma: isFuturo ? mediaDia.produtivas : 0,
-      // null no passado; âncora no último real; média do weekday no futuro.
-      tecnicos_fantasma: isFuturo
-        ? mediaDia.tecnicos
-        : isAncora
-          ? d.qtd_tecnicos
-          : null,
-    };
-  });
+  return applyWeekdayProjectionToChartDays(data);
 }
 
 /**
@@ -818,16 +733,12 @@ export function KpiVolumeNotas() {
   const resumoCapacidade = useMemo(
     () =>
       serie.modo === "dia"
-        ? calcularResumoCapacidade(
-            serieBase.data,
-            notasFiltradas,
-            serie.data,
-            mostrarProjecao && podeProjetar,
-          )
+        ? calcularResumoCapacidade(serieBase.data, notasFiltradas, {
+            projecaoAtiva: mostrarProjecao && podeProjetar,
+          })
         : null,
     [
       serie.modo,
-      serie.data,
       serieBase.data,
       notasFiltradas,
       mostrarProjecao,
