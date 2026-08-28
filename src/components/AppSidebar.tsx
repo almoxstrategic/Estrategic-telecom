@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   BarChart3,
+  Barcode,
   Brain,
   Building2,
   CalendarClock,
@@ -16,6 +17,7 @@ import {
   LayoutDashboard,
   LogOut,
   Home,
+  Layers,
   Map,
   MapPin,
   Radio,
@@ -202,7 +204,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 }`}
               >
                 <span className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
                   Painel Admin
                 </span>
                 {isAdminOpen ? (
@@ -252,7 +254,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <BarChart3 className="h-5 w-5 text-primary" />
+                        <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
                         KPI&apos;s
                       </span>
                       {isKpiOpen ? (
@@ -379,13 +381,20 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <button
                 type="button"
                 onClick={() => setIsMiscelaneaOpen((open) => !open)}
-                className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                  matchesMiscelaneasGroup(pathname, tab)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }`}
               >
-                <span>Miscelâneas</span>
+                <span className="flex items-center gap-3">
+                  <Layers className="h-5 w-5 shrink-0 text-primary" />
+                  Miscelâneas
+                </span>
                 {isMiscelaneaOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
                 )}
               </button>
               <div
@@ -472,13 +481,20 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <button
                 type="button"
                 onClick={() => setIsSerializadosOpen((open) => !open)}
-                className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent"
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-sidebar-accent ${
+                  matchesSerializadosGroup(pathname, tab)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }`}
               >
-                <span>Serializados</span>
+                <span className="flex items-center gap-3">
+                  <Barcode className="h-5 w-5 shrink-0 text-primary" />
+                  Serializados
+                </span>
                 {isSerializadosOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
                 )}
               </button>
               <div
@@ -557,7 +573,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 }`}
               >
                 <span className="flex items-center gap-3">
-                  <Radio className="h-5 w-5 text-primary" />
+                  <Radio className="h-5 w-5 shrink-0 text-primary" />
                   Transmissão
                 </span>
                 {isTransmissaoOpen ? (
