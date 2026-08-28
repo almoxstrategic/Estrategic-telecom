@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ClienteOperadoraSelect } from "@/components/ClienteOperadoraSelect";
+import { EquipeTransmissaoSelect } from "@/components/EquipeTransmissaoSelect";
 import { TecnicoTransmissaoMultiSelect } from "@/components/TecnicoTransmissaoMultiSelect";
 import { TipoExecucaoPicker } from "@/components/RelatorioRedeAcesso";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,11 @@ import {
   type RelatorioTransmissao,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
+import {
+  fetchEquipesTransmissao,
+  findEquipeByNome,
+  type EquipeTransmissao,
+} from "@/lib/equipes-transmissao-service";
 import { fetchTecnicosTransmissao, type TecnicoProfile } from "@/lib/team-service";
 
 function OptionalHint() {
@@ -80,7 +86,9 @@ export function EditarContratoOsDialog({
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
   const [cidade, setCidade] = useState("");
-  const [empreiteira, setEmpreiteira] = useState("");
+  const [equipeId, setEquipeId] = useState("");
+  const [equipeNome, setEquipeNome] = useState("");
+  const [equipes, setEquipes] = useState<EquipeTransmissao[]>([]);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [dataInicio, setDataInicio] = useState("");
   const [tipoExecucao, setTipoExecucao] = useState<TipoExecucao | "">("");
@@ -90,25 +98,33 @@ export function EditarContratoOsDialog({
 
   useEffect(() => {
     if (!open) return;
+    const seeded = equipeSeed(row);
     setClienteOperadora(parseClienteOperadora(row.cliente_operadora));
     setCliente(row.cliente ?? "");
     setEndereco(row.endereco ?? "");
     setCidade(row.cidade ?? "");
-    setEmpreiteira(row.equipe_empreiteira ?? "");
+    setEquipeNome(row.equipe_empreiteira ?? "");
     setDataInicio(dateInputValue(row.data_inicio_execucao));
     setTipoExecucao(row.tipo_execucao ?? "");
     setSaving(false);
     setEquipeError(undefined);
     setTipoError(undefined);
-
-    const seeded = equipeSeed(row);
     setTecnicos(seeded);
+    setEquipeId("");
+    setEquipes([]);
+
     void (async () => {
       try {
-        const lista = await fetchTecnicosTransmissao();
+        const [listaEquipes, listaTecnicos] = await Promise.all([
+          fetchEquipesTransmissao(),
+          fetchTecnicosTransmissao(),
+        ]);
+        setEquipes(listaEquipes);
+        const equipeMatch = findEquipeByNome(listaEquipes, row.equipe_empreiteira);
+        setEquipeId(equipeMatch?.id ?? "");
         setTecnicos(
           (row.tecnicos_atribuidos ?? []).map((id, index) => {
-            const found = lista.find((tecnico) => tecnico.id === id);
+            const found = listaTecnicos.find((tecnico) => tecnico.id === id);
             return found ?? seeded[index];
           }),
         );
@@ -135,7 +151,7 @@ export function EditarContratoOsDialog({
         clienteOperadora,
         endereco,
         cidade,
-        equipeEmpreiteira: empreiteira,
+        equipeEmpreiteira: equipeNome,
         dataInicioExecucao: dataInicio,
         tipoExecucao,
         tecnicos: tecnicos.map((t) => ({ id: t.id, nome: t.nome })),
@@ -211,23 +227,30 @@ export function EditarContratoOsDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="edit-os-empreiteira">
-              Empreiteira <OptionalHint />
+            <Label>
+              Equipe <RequiredMark />
             </Label>
-            <Input
-              id="edit-os-empreiteira"
-              value={empreiteira}
-              onChange={(e) => setEmpreiteira(e.target.value)}
-              placeholder="Empreiteira responsável"
+            <EquipeTransmissaoSelect
+              value={equipeId}
+              equipes={equipes.length > 0 ? equipes : undefined}
+              onChange={(equipe) => {
+                setEquipeId(equipe?.id ?? "");
+                setEquipeNome(equipe?.nome ?? "");
+                if (equipe) {
+                  setTecnicos(equipe.tecnicos);
+                  setEquipeError(undefined);
+                }
+              }}
             />
           </div>
           <div className="space-y-1.5">
             <Label>
-              Equipe <RequiredMark />
+              Técnicos <RequiredMark />
             </Label>
             <TecnicoTransmissaoMultiSelect
               value={tecnicos}
               invalid={Boolean(equipeError)}
+              placeholder="Selecionar técnicos…"
               onChange={(next) => {
                 setTecnicos(next);
                 if (next.length > 0) setEquipeError(undefined);

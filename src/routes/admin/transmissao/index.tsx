@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ClipboardList, Plus, Search } from "lucide-react";
+import { ArrowLeft, ClipboardList, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteOperadoraSelect } from "@/components/ClienteOperadoraSelect";
+import { EquipeTransmissaoSelect } from "@/components/EquipeTransmissaoSelect";
+import { GestaoEquipesTransmissaoDialog } from "@/components/GestaoEquipesTransmissaoDialog";
 import { TecnicoTransmissaoMultiSelect } from "@/components/TecnicoTransmissaoMultiSelect";
 import { TipoExecucaoPicker } from "@/components/RelatorioRedeAcesso";
 import {
@@ -34,6 +36,11 @@ import {
   type RelatorioTransmissao,
   type TipoExecucao,
 } from "@/lib/relatorios-transmissao";
+import {
+  fetchEquipesTransmissao,
+  findEquipeByNome,
+  type EquipeTransmissao,
+} from "@/lib/equipes-transmissao-service";
 import type { TecnicoProfile } from "@/lib/team-service";
 
 export const Route = createFileRoute("/admin/transmissao/")({
@@ -136,10 +143,12 @@ function NovaOsDialog({
   open,
   onOpenChange,
   onCreated,
+  equipesRefreshKey = 0,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (row: RelatorioTransmissao) => void;
+  equipesRefreshKey?: number;
 }) {
   const [osWf, setOsWf] = useState("");
   const [clienteOperadora, setClienteOperadora] = useState<ClienteOperadora>(
@@ -148,7 +157,9 @@ function NovaOsDialog({
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
   const [cidade, setCidade] = useState("");
-  const [empreiteira, setEmpreiteira] = useState("");
+  const [equipeId, setEquipeId] = useState("");
+  const [equipeNome, setEquipeNome] = useState("");
+  const [equipes, setEquipes] = useState<EquipeTransmissao[]>([]);
   const [tecnicos, setTecnicos] = useState<TecnicoProfile[]>([]);
   const [dataInicio, setDataInicio] = useState("");
   const [tipoExecucao, setTipoExecucao] = useState<TipoExecucao | "">("");
@@ -162,13 +173,25 @@ function NovaOsDialog({
     setCliente("");
     setEndereco("");
     setCidade("");
-    setEmpreiteira("");
+    setEquipeId("");
+    setEquipeNome("");
     setTecnicos([]);
     setDataInicio("");
     setTipoExecucao("");
     setSaving(false);
     setErrors({});
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      try {
+        setEquipes(await fetchEquipesTransmissao());
+      } catch {
+        setEquipes([]);
+      }
+    })();
+  }, [open, equipesRefreshKey]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +213,7 @@ function NovaOsDialog({
         clienteOperadora,
         endereco,
         cidade,
-        equipeEmpreiteira: empreiteira,
+        equipeEmpreiteira: equipeNome,
         dataInicioExecucao: dataInicio,
         tipoExecucao,
         tecnicos: tecnicos.map((t) => ({ id: t.id, nome: t.nome })),
@@ -275,23 +298,32 @@ function NovaOsDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="os-empreiteira">
-              Empreiteira <OptionalHint />
+            <Label>
+              Equipe <RequiredMark />
             </Label>
-            <Input
-              id="os-empreiteira"
-              value={empreiteira}
-              onChange={(e) => setEmpreiteira(e.target.value)}
-              placeholder="Empreiteira responsável"
+            <EquipeTransmissaoSelect
+              value={equipeId}
+              equipes={equipes.length > 0 ? equipes : undefined}
+              invalid={Boolean(errors.equipe) && !equipeId}
+              onEquipesLoaded={setEquipes}
+              onChange={(equipe) => {
+                setEquipeId(equipe?.id ?? "");
+                setEquipeNome(equipe?.nome ?? "");
+                if (equipe) {
+                  setTecnicos(equipe.tecnicos);
+                  if (errors.equipe) setErrors((prev) => ({ ...prev, equipe: undefined }));
+                }
+              }}
             />
           </div>
           <div className="space-y-1.5">
             <Label>
-              Equipe <RequiredMark />
+              Técnicos <RequiredMark />
             </Label>
             <TecnicoTransmissaoMultiSelect
               value={tecnicos}
               invalid={Boolean(errors.equipe)}
+              placeholder="Selecionar técnicos…"
               onChange={(next) => {
                 setTecnicos(next);
                 if (errors.equipe && next.length > 0) {
@@ -347,6 +379,8 @@ function AdminTransmissaoPage() {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatusAberto>("todos");
   const [novaOsAberta, setNovaOsAberta] = useState(false);
+  const [gestaoEquipesAberta, setGestaoEquipesAberta] = useState(false);
+  const [equipesRefreshKey, setEquipesRefreshKey] = useState(0);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -447,25 +481,36 @@ function AdminTransmissaoPage() {
                 </p>
               </div>
             </div>
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:w-auto">
-              <div className="relative w-full md:max-w-sm">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por OS, cliente ou técnico..."
-                  className="bg-gray-50 pl-9"
-                  aria-label="Buscar por OS, cliente ou técnico"
-                />
+            <div className="flex w-full flex-col gap-2 md:w-auto">
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative w-full md:max-w-sm">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Buscar por OS, cliente ou técnico..."
+                    className="bg-gray-50 pl-9"
+                    aria-label="Buscar por OS, cliente ou técnico"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  className="shrink-0 shadow-md"
+                  size="lg"
+                  onClick={() => setNovaOsAberta(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova OS / Contrato
+                </Button>
               </div>
               <Button
                 type="button"
-                className="shrink-0 shadow-md"
-                size="lg"
-                onClick={() => setNovaOsAberta(true)}
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => setGestaoEquipesAberta(true)}
               >
-                <Plus className="h-4 w-4" />
-                Nova OS / Contrato
+                <Users className="h-4 w-4" />
+                Definir equipe
               </Button>
             </div>
           </div>
@@ -541,7 +586,14 @@ function AdminTransmissaoPage() {
       <NovaOsDialog
         open={novaOsAberta}
         onOpenChange={setNovaOsAberta}
+        equipesRefreshKey={equipesRefreshKey}
         onCreated={(row) => setRows((prev) => [row, ...prev.filter((item) => item.id !== row.id)])}
+      />
+
+      <GestaoEquipesTransmissaoDialog
+        open={gestaoEquipesAberta}
+        onOpenChange={setGestaoEquipesAberta}
+        onEquipesChanged={() => setEquipesRefreshKey((prev) => prev + 1)}
       />
     </div>
   );
