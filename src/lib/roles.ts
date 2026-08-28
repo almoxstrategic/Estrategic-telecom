@@ -132,11 +132,19 @@ export function canImportToa(role: string | null | undefined): boolean {
   );
 }
 
-/** Demais abas de Importação (Miscelâneas / Serializados / Analítico). */
+/** Demais abas de Importação (Miscelâneas / Serializados / Analítico). COP só vê TOA. */
 export function canAccessImportacaoAbasCompletas(
   role: string | null | undefined,
 ): boolean {
-  return canAccessAdminPanel(role) && !isSupervisorTransmissaoRole(role);
+  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+}
+
+/** KPIs e menu Importação: full roles + COP; não supervisor de transmissão. */
+function hasPainelKpiImportMenuAccess(
+  role: string | null | undefined,
+): boolean {
+  if (isSupervisorTransmissaoRole(role)) return false;
+  return hasPainelFullAccess(role) || isCopRole(role);
 }
 
 /** Importação de dados do painel (TOA + Analítico): admin, gerente, supervisores e COP. */
@@ -181,16 +189,16 @@ export function canAccessTransmissaoMenu(
   return hasPainelFullAccess(role);
 }
 
-/** KPIs no Painel Admin / sidebar — não supervisor de transmissão. */
+/** KPIs no Painel Admin / sidebar — inclui COP; não supervisor de transmissão. */
 export function canAccessKpisMenus(role: string | null | undefined): boolean {
-  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+  return hasPainelKpiImportMenuAccess(role);
 }
 
-/** Importação no Painel Admin / sidebar — não supervisor de transmissão. */
+/** Importação no Painel Admin / sidebar — inclui COP (aba TOA); não supervisor de transmissão. */
 export function canAccessImportacaoPainelMenu(
   role: string | null | undefined,
 ): boolean {
-  return hasPainelFullAccess(role) && !isSupervisorTransmissaoRole(role);
+  return hasPainelKpiImportMenuAccess(role);
 }
 
 /** Gestão de equipe restrita ao setor de Transmissão. */
