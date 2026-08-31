@@ -224,6 +224,17 @@ async function parseCsv(file: File): Promise<RawRow[]> {
   return rowsFromMatrix(matrix);
 }
 
+async function parseSpreadsheet(file: File): Promise<RawRow[]> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    return parseXlsx(file);
+  }
+  if (name.endsWith(".csv")) {
+    return parseCsv(file);
+  }
+  throw new Error("Formato não suportado. Envie um arquivo .xlsx, .xls ou .csv.");
+}
+
 /**
  * Consolidado IAT: lê a aba "Consolidado" (ou fallback legado / 1ª aba).
  * Retorna linhas normalizadas para analitico_historico (62 campos).
