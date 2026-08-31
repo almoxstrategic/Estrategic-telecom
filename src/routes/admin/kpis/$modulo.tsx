@@ -293,7 +293,8 @@ function KpisPage() {
   );
   const [filtroReady, setFiltroReady] = useState(false);
   const filtro = useKpiFiltro();
-  const ultimaImportacaoAt = useKpiUltimaImportacao();
+  const ultimaImportacaoConsumo = useKpiUltimaImportacao("consumo");
+  const ultimaImportacaoToa = useKpiUltimaImportacao("toa");
   const [precosOs, setPrecosOs] = useState<PrecosOsMap>({});
   const [toaOsRows, setToaOsRows] = useState<ToaImportacaoRow[]>([]);
   const [analiticoRows, setAnaliticoRows] = useState<AnaliticoHistoricoRow[]>([]);
@@ -375,7 +376,7 @@ function KpisPage() {
         setPeriodosFaturamento([]);
       }
     })();
-  }, [ultimaImportacaoAt]);
+  }, [ultimaImportacaoToa]);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,7 +416,7 @@ function KpisPage() {
     return () => {
       cancelled = true;
     };
-  }, [filtro.ano, filtro.mes, filtro.dia, ultimaImportacaoAt]);
+  }, [filtro.ano, filtro.mes, filtro.dia, ultimaImportacaoToa]);
 
   const toaAgregado = useMemo(
     () =>
@@ -600,6 +601,11 @@ function KpisPage() {
     if (!filtroReady) return;
     void carregarKpis(filtro);
   }, [filtro.mes, filtro.ano, filtroReady, carregarKpis]);
+
+  useEffect(() => {
+    if (!filtroReady || !isBaixaConsumoMiscelanea) return;
+    void carregarKpis(filtro);
+  }, [ultimaImportacaoConsumo, filtroReady, isBaixaConsumoMiscelanea, filtro, carregarKpis]);
 
   useEffect(() => {
     if (itensCriticos.length === 0) {
@@ -1360,7 +1366,9 @@ function KpisPage() {
                 : "Acompanhamento do consumo de materiais e miscelâneas por técnico."}
             </p>
             <div className="mt-1.5">
-              <UltimaImportacaoStamp />
+              <UltimaImportacaoStamp
+                source={isBaixaConsumoMiscelanea ? "consumo" : "toa"}
+              />
             </div>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">

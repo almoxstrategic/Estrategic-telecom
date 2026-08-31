@@ -333,7 +333,7 @@ function ImportacaoPage() {
         return;
       }
       const result = await upsertWoConsumo(rows);
-      markKpiUltimaImportacao();
+      markKpiUltimaImportacao("consumo");
       const mergedNote =
         result.mergedDuplicates > 0
           ? ` (${result.mergedDuplicates} duplicatas na planilha foram somadas)`
@@ -420,7 +420,7 @@ function ImportacaoPage() {
 
       const persistido = await replaceToaImportacoes(chamados);
       clearToaLocalStorage();
-      markKpiUltimaImportacao();
+      markKpiUltimaImportacao("toa");
       toast.success(
         `TOA salvo (achatado): ${persistido.totalOs} O.S. / ${persistido.totalNotas} notas-WO ` +
           `(competências ${persistido.competencias.join(", ") || "—"}). ` +
@@ -449,7 +449,6 @@ function ImportacaoPage() {
         return;
       }
       const persistido = await replaceAnaliticoHistoricoLote(rows);
-      markKpiUltimaImportacao();
       const receita = rows.reduce((s, r) => s + r.valor_servico, 0);
       toast.success(
         `Analítico salvo: ${persistido.total} notas em ${persistido.meses.length} mês(es) ` +
@@ -478,7 +477,11 @@ function ImportacaoPage() {
               mapeamento de colunas e as mesmas permissões neste módulo.
             </p>
             <div className="mt-1.5">
-              <UltimaImportacaoStamp />
+              {activeTab === "toa" ? (
+                <UltimaImportacaoStamp source="toa" />
+              ) : activeTab === "miscelaneas" ? (
+                <UltimaImportacaoStamp source="consumo" />
+              ) : null}
             </div>
           </div>
           <Link to="/admin" className="text-sm font-semibold text-primary hover:underline">

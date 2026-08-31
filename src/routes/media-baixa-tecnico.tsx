@@ -708,7 +708,7 @@ function MediaBaixaTecnicoPage() {
             (Esse modulo é um protótipo)
           </p>
           <div className="mt-1.5 text-center sm:text-left">
-            <UltimaImportacaoStamp />
+            <UltimaImportacaoStamp source="consumo" />
           </div>
         </header>
 

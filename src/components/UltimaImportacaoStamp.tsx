@@ -1,14 +1,19 @@
-import { useUltimaImportacao } from "@/lib/ultima-importacao";
+import {
+  useUltimaImportacao,
+  type UltimaImportacaoSource,
+} from "@/lib/ultima-importacao";
 
 type UltimaImportacaoStampProps = {
+  source: UltimaImportacaoSource;
   className?: string;
 };
 
-/** Carimbo discreto da última importação TOA (Supabase). */
+/** Carimbo discreto da última importação (Consolidado de Consumo ou TOA). */
 export function UltimaImportacaoStamp({
+  source,
   className = "",
 }: UltimaImportacaoStampProps) {
-  const { label } = useUltimaImportacao();
+  const { label } = useUltimaImportacao(source);
   if (!label) return null;
   return (
     <span
