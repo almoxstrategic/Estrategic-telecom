@@ -220,6 +220,22 @@ export function canManageColaboradorEquipe(
   return true;
 }
 
+export type MatriculaCadastroPolicy = "required" | "optional" | "none";
+
+/** Regra de matrícula no cadastro de usuários. */
+export function matriculaCadastroPolicy(
+  role: string | null | undefined,
+): MatriculaCadastroPolicy {
+  switch (normalizeUserRole(role)) {
+    case "tecnico":
+      return "required";
+    case "transmissao":
+      return "optional";
+    default:
+      return "none";
+  }
+}
+
 /** @deprecated Use canAccessMiscelaneasMenus / canAccessSerializadosMenus. */
 export function canAccessOperacionalMenus(
   role: string | null | undefined,

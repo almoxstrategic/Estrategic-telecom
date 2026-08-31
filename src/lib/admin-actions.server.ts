@@ -8,7 +8,7 @@ import {
   normalizeLogin,
   normalizeMatricula,
 } from "./auth-identificacao";
-import { hasPainelAdminAccess, canManageColaboradorEquipe, normalizeUserRole } from "./roles";
+import { hasPainelAdminAccess, canManageColaboradorEquipe, matriculaCadastroPolicy, normalizeUserRole } from "./roles";
 import {
   getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
@@ -111,8 +111,23 @@ export const createUserAccount = createServerFn({ method: "POST" })
           .default("tecnico"),
       })
       .superRefine((data, ctx) => {
+        const role = normalizeUserRole(data.role);
+        const policy = matriculaCadastroPolicy(role);
         const matricula = normalizeMatricula(data.identificacao ?? "");
-        if (data.role === "transmissao") {
+
+        if (policy === "required") {
+          if (!matricula || !matriculaSchema.test(matricula)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["identificacao"],
+              message:
+                "Matrícula é obrigatória para Técnico (2 a 20 caracteres alfanuméricos, ex: Z628337).",
+            });
+          }
+          return;
+        }
+
+        if (policy === "optional") {
           if (matricula && !matriculaSchema.test(matricula)) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
@@ -123,12 +138,12 @@ export const createUserAccount = createServerFn({ method: "POST" })
           }
           return;
         }
-        if (!matriculaSchema.test(matricula)) {
+
+        if (matricula) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["identificacao"],
-            message:
-              "Matrícula deve ser alfanumérica (2 a 20 caracteres, ex: Z628337).",
+            message: "Este cargo não utiliza matrícula.",
           });
         }
       }),
@@ -140,7 +155,11 @@ export const createUserAccount = createServerFn({ method: "POST" })
       throw new Error("Sem permissão para cadastrar este tipo de usuário.");
     }
     const supabase = getServiceClient();
-    const matricula = normalizeMatricula(data.identificacao ?? "") || null;
+    const policy = matriculaCadastroPolicy(role);
+    const matricula =
+      policy === "none"
+        ? null
+        : normalizeMatricula(data.identificacao ?? "") || null;
     const login = normalizeLogin(data.login);
     const authEmail = loginToAuthEmail(login);
 

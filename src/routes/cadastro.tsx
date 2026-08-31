@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { requireTeamManager } from "@/lib/auth-guards";
@@ -16,6 +16,7 @@ import {
 import {
   ROLE_SELECT_OPTIONS,
   isSupervisorTransmissaoTeamScope,
+  matriculaCadastroPolicy,
   roleFromPoderesSelect,
 } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
@@ -48,7 +49,22 @@ function CadastroPage() {
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
   const [loading, setLoading] = useState(false);
-  const matriculaObrigatoria = poderes !== "TRANSMISSAO";
+
+  const roleSelecionado = useMemo(
+    (): UserRole => roleFromPoderesSelect(poderes),
+    [poderes],
+  );
+  const matriculaPolicy = matriculaCadastroPolicy(roleSelecionado);
+  const exibeMatricula = matriculaPolicy !== "none";
+  const matriculaObrigatoria = matriculaPolicy === "required";
+
+  const handlePoderesChange = (value: string) => {
+    setPoderes(value);
+    const nextRole = roleFromPoderesSelect(value);
+    if (matriculaCadastroPolicy(nextRole) === "none") {
+      setIdentificacao("");
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,23 +73,33 @@ function CadastroPage() {
       return;
     }
 
-    const role: UserRole = roleFromPoderesSelect(poderes);
+    const role = roleSelecionado;
     if (escopoTransmissao && role !== "transmissao") {
       toast.error("Supervisor de Transmissão só pode cadastrar Técnicos de Transmissão.");
       return;
     }
-    const matriculaNormalizada = identificacao.trim()
-      ? normalizeMatricula(identificacao)
-      : "";
 
-    if (role === "transmissao") {
+    const matriculaNormalizada =
+      matriculaPolicy === "none"
+        ? ""
+        : identificacao.trim()
+          ? normalizeMatricula(identificacao)
+          : "";
+
+    if (matriculaPolicy === "required") {
+      if (!matriculaNormalizada) {
+        toast.error("Matrícula é obrigatória para Técnico.");
+        return;
+      }
+      if (!isValidMatricula(matriculaNormalizada)) {
+        toast.error("Matrícula inválida. Use 2–20 caracteres alfanuméricos (ex: Z628337).");
+        return;
+      }
+    } else if (matriculaPolicy === "optional") {
       if (matriculaNormalizada && !isValidMatricula(matriculaNormalizada)) {
         toast.error("Matrícula inválida. Use 2–20 caracteres alfanuméricos (ex: Z628337).");
         return;
       }
-    } else if (!isValidMatricula(identificacao)) {
-      toast.error("Matrícula inválida. Use 2–20 caracteres alfanuméricos (ex: Z628337).");
-      return;
     }
 
     if (!isValidCelular(celular)) {
@@ -140,7 +166,7 @@ function CadastroPage() {
             <select
               id="cadastro-poderes"
               value={poderes}
-              onChange={(e) => setPoderes(e.target.value)}
+              onChange={(e) => handlePoderesChange(e.target.value)}
               className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
               disabled={escopoTransmissao}
@@ -163,28 +189,36 @@ function CadastroPage() {
               required
             />
           </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">
-              Identificação (Matrícula)
-              {!matriculaObrigatoria ? (
-                <span className="ml-1 font-normal text-muted-foreground">(opcional)</span>
-              ) : null}
-            </label>
-            <input
-              type="text"
-              autoCapitalize="characters"
-              value={identificacao}
-              onChange={(e) => setIdentificacao(normalizeMatricula(e.target.value))}
-              placeholder="Ex: Z628337"
-              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base uppercase outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              required={matriculaObrigatoria}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              {matriculaObrigatoria
-                ? "Código alfanumérico do colaborador no sistema legado."
-                : "Opcional para Técnico Transmissão. Deixe em branco se não houver matrícula TOA."}
-            </p>
-          </div>
+          {exibeMatricula ? (
+            <div>
+              <label htmlFor="cadastro-matricula" className="mb-1.5 block text-sm font-semibold">
+                Identificação (Matrícula)
+                {matriculaObrigatoria ? (
+                  <span className="ml-0.5 text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                ) : (
+                  <span className="ml-1 font-normal text-muted-foreground">(opcional)</span>
+                )}
+              </label>
+              <input
+                id="cadastro-matricula"
+                type="text"
+                autoCapitalize="characters"
+                value={identificacao}
+                onChange={(e) => setIdentificacao(normalizeMatricula(e.target.value))}
+                placeholder="Ex: Z628337"
+                className="w-full rounded-lg border border-input bg-background px-4 py-3 text-base uppercase outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                required={matriculaObrigatoria}
+                aria-required={matriculaObrigatoria}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {matriculaObrigatoria
+                  ? "Código alfanumérico do colaborador no sistema legado."
+                  : "Opcional para Técnico Transmissão. Deixe em branco se não houver matrícula TOA."}
+              </p>
+            </div>
+          ) : null}
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Celular</label>
             <input
